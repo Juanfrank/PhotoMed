@@ -80,6 +80,15 @@ object Gaze {
 
     fun matches(a: Pt, b: Pt) = abs(a.x - b.x) <= TOL_X && abs(a.y - b.y) <= TOL_Y
 
+    /** Diferencia de mirada entre dos fotos ([d] = después − antes), o null si coinciden. */
+    fun describe(d: Pt): String? {
+        val parts = buildList {
+            if (abs(d.x) > TOL_X) add(if (d.x > 0) "más a la derecha" else "más a la izquierda")
+            if (abs(d.y) > TOL_Y) add(if (d.y > 0) "más abajo" else "más arriba")
+        }
+        return if (parts.isEmpty()) null else "La mirada difiere: en “después” mira " + parts.joinToString(" y ") + " (de la imagen)"
+    }
+
     /** Indicación para el paciente (en coordenadas de la imagen guardada). [d] = actual − referencia. */
     fun hint(d: Pt): String? {
         val parts = buildList {

@@ -38,8 +38,13 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
 - Migración automática de las fotos de la versión 1 (almacenamiento privado) a la galería.
 
 ### Comparación
-- **Juxtaposition slider**, lado a lado y fundido; selección por toggle (A = antes, B = después),
-  filtro por zona y zoom sincronizado.
+- **Juxtaposition slider**, lado a lado, **cuadrícula** y fundido; selección múltiple por toggle
+  (2 a 12 fotos), filtro por zona y zoom sincronizado. Con N fotos la yuxtaposición es
+  **progresiva** (línea de tiempo 1→2→…→N) y cada foto se alinea a la primera.
+- **Alineación configurable**: puntos anatómicos, contornos y **mirada (gaze)**, activas por defecto
+  y desactivables con casillas en el menú.
+- **Selección múltiple en la galería** (mantener pulsado): comparar, compartir (con o sin datos del
+  paciente) o eliminar varias fotos.
 - **Alineación automática por zona**: hasta 140 puntos faciales o 33 corporales detectados en el
   dispositivo + coincidencia por **contornos anatómicos** (mandíbula, frente, orejas, caderas,
   falanges…) y **corrección de perspectiva vertical por proporciones de los contornos** (sin sensores);

@@ -77,6 +77,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -94,131 +95,225 @@ import com.photomed.app.ui.theme.Md3Spacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.key
+import androidx.compose.ui.unit.Dp
+import com.photomed.app.align.AlignOptions
+import com.photomed.app.align.Similarity
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
-private enum class Mode(val label: String) { SLIDER("Deslizador"), SIDE("Lado a lado"), FADE("Fundido") }
+private enum class Mode(val label: String) { SLIDER("Deslizar"), SIDE("Lado a lado"), GRID("Cuadrícula"), FADE("Fundido") }
 
+/**
+ * Comparación de 2…N fotos. Con N > 2 la yuxtaposición es progresiva: una línea de tiempo recorre
+ * las transiciones 1→2→…→N (deslizador o fundido), y "Lado a lado"/"Cuadrícula" muestran todas.
+ * Cada foto se alinea a la primera (referencia) con las condiciones activas en el menú.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
+fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initialSelection: List<String> = emptyList()) {
     val repo = LocalRepository.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val aligner = remember { Aligner(context.applicationContext) }
+    val prefs = remember { context.getSharedPreferences("photomed", android.content.Context.MODE_PRIVATE) }
     var exp by remember { mutableStateOf<Expediente?>(null) }
     var all by remember { mutableStateOf<List<Photo>?>(null) }
     var zoneFilter by remember { mutableStateOf(initialZone) }
     var selected by remember { mutableStateOf<List<String>>(emptyList()) }
-    var swapped by remember { mutableStateOf(false) }
+    var reversed by remember { mutableStateOf(false) }
     var mode by remember { mutableStateOf(Mode.SLIDER) }
-    var position by remember { mutableFloatStateOf(0.5f) }
-    var fade by remember { mutableFloatStateOf(0.5f) }
+    var timelineState by remember { mutableStateOf(Timeline.of(2, 0.5f)) }
     var zoom by remember { mutableStateOf(ZoomState()) }
-    var alignment by remember { mutableStateOf<AlignmentResult?>(null) }
+    /** Alineación de cada foto a la referencia (clave de la foto → resultado), válida para [alignedFor]. */
+    var alignments by remember { mutableStateOf<Map<String, AlignmentResult>>(emptyMap()) }
+    var alignedFor by remember { mutableStateOf<List<String>>(emptyList()) }
     var useAligned by remember { mutableStateOf(true) }
-    var aligning by remember { mutableStateOf(false) }
+    var alignJob by remember { mutableStateOf<Job?>(null) }
+    var alignProgress by remember { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf(false) }
     var settings by remember { mutableStateOf(false) }
     var keystoneAuto by remember { mutableStateOf(true) }
     var keystoneManual by remember { mutableFloatStateOf(0f) }
     var measure by remember { mutableStateOf(false) }
     var colorDialog by remember { mutableStateOf(false) }
-    var colorAdjust by remember { mutableStateOf<ColorAdjust?>(null) }
+    var colorAdjusts by remember { mutableStateOf<Map<String, ColorAdjust>>(emptyMap()) }
+    var contourOutlines by remember { mutableStateOf<Map<String, List<Pt>>>(emptyMap()) }
     var conditionsWarning by remember { mutableStateOf<String?>(null) }
+    var options by remember { mutableStateOf(AlignOptions.fromPrefs(prefs)) }
+    /** Cambia con cada reinicio de la alineación: un cálculo en curso solo se aplica si sigue vigente. */
+    var alignToken by remember { mutableStateOf(0) }
 
     LaunchedEffect(expId) {
-        withContext(Dispatchers.IO) {
-            exp = repo.getExpediente(expId)
-            all = exp?.let { repo.photos(it) }.orEmpty()
+        val (e, list) = withContext(Dispatchers.IO) {
+            val e = repo.getExpediente(expId)
+            e to e?.let { repo.photos(it) }.orEmpty()
         }
-        // Selección inicial: primera y última foto de la zona (o de la zona más reciente).
+        exp = e; all = list
         val photos = all.orEmpty()
+        // Selección inicial: la recibida (selección múltiple de la galería) o primera y última de la zona.
+        val pre = initialSelection.mapNotNull { n -> photos.firstOrNull { it.displayName == n }?.key }.take(Timeline.MAX_PHOTOS)
+        if (pre.size >= 2) { selected = pre; return@LaunchedEffect }
         val z = zoneFilter ?: photos.lastOrNull()?.zone
         val inZone = photos.filter { it.zone == z }
         if (inZone.size >= 2) selected = listOf(inZone.first().key, inZone.last().key)
     }
 
-    val photos = all.orEmpty()
-    val zonesWithPhotos = Zone.entries.filter { z -> photos.any { it.zone == z } }
-    val visible = photos.filter { zoneFilter == null || it.zone == zoneFilter }.reversed()
-    val chosen = selected.mapNotNull { k -> photos.firstOrNull { it.key == k } }.sortedBy { it.takenAt }
-    val pair = if (chosen.size == 2) (if (swapped) chosen.reversed() else chosen) else null
-    val transform = alignment?.transform?.takeIf { useAligned }
+    // Estado derivado. Se recalcula dentro de cada sección del Scaffold (que se subcompone aparte)
+    // leyendo el estado en vivo, para no usar valores capturados de una composición anterior.
+    fun derive(): CompareDerived {
+        val photos = all.orEmpty()
+        val chosen = selected.mapNotNull { k -> photos.firstOrNull { it.key == k } }.sortedBy { it.takenAt }
+        val seq: List<Photo>? = if (chosen.size >= 2) (if (reversed) chosen.reversed() else chosen) else null
+        val n = seq?.size ?: 0
+        // La línea de tiempo sigue al número de fotos (sin escribir estado durante la composición).
+        val timeline = if (timelineState.count == n || n < 2) timelineState else Timeline.of(n, if (n == 2) 0.5f else 0f)
+        val reference = seq?.firstOrNull()
+        val target = seq?.getOrNull(timeline.to)?.takeIf { it.key != reference?.key } ?: seq?.getOrNull(1)
+        val seqKeys = seq?.map { it.key }.orEmpty()
+        return CompareDerived(
+            photos = photos,
+            zonesWithPhotos = Zone.entries.filter { z -> photos.any { it.zone == z } },
+            visible = photos.filter { zoneFilter == null || it.zone == zoneFilter }.reversed(),
+            seq = seq, seqKeys = seqKeys, n = n, timeline = timeline, reference = reference, target = target,
+            validAlign = alignedFor == seqKeys,
+        )
+    }
+    fun resultOf(p: Photo): AlignmentResult? = if (useAligned && alignedFor.contains(p.key) && alignedFor == derive().seqKeys) alignments[p.key] else null
+    fun transformOf(p: Photo): Similarity? = resultOf(p)?.transform
+    val (photos, _, _, seq, seqKeys, n, timeline, reference, target, validAlign) = derive()
 
-    // Perspectiva vertical de "después": la estimada por proporciones de contornos al alinear.
-    val keystone = alignment?.keystoneDeg?.takeIf { useAligned } ?: 0f
-    val beforeModel: Any? = pair?.get(0)?.uri
-    val afterModel: Any? = pair?.let { rememberCorrected(it[1].uri, keystone, Perspective.DEFAULT_FOCAL, colorAdjust) }
-    val manualK = keystoneManual.takeIf { !keystoneAuto }
-
-    // Condiciones de captura del par (registradas en el XMP): avisar si no son comparables.
-    LaunchedEffect(pair?.getOrNull(0)?.key, pair?.getOrNull(1)?.key) {
-        val p = pair ?: run { conditionsWarning = null; return@LaunchedEffect }
-        val (ib, ia) = withContext(Dispatchers.IO) { repo.readInfo(p[0]) to repo.readInfo(p[1]) }
-        conditionsWarning = captureConditionsWarning(ib?.conditions.orEmpty(), ia?.conditions.orEmpty())
+    // Condiciones de captura (XMP): avisar si alguna foto no es comparable con la referencia.
+    LaunchedEffect(seqKeys) {
+        val s = seq ?: run { conditionsWarning = null; return@LaunchedEffect }
+        val infos = withContext(Dispatchers.IO) { s.map { repo.readInfo(it)?.conditions.orEmpty() } }
+        conditionsWarning = infos.drop(1).mapIndexedNotNull { i, c ->
+            captureConditionsWarning(infos[0], c)?.let { w -> if (s.size > 2) "Foto ${i + 2}: $w" else w }
+        }.joinToString("\n").ifEmpty { null }
     }
 
-    fun resetAlignment() { alignment = null; zoom = ZoomState() }
+    fun resetAlignment() { alignToken++; alignJob?.cancel(); alignJob = null; alignments = emptyMap(); alignedFor = emptyList(); alignProgress = null; zoom = ZoomState() }
 
-    fun toggle(p: Photo) {
-        selected = when {
-            p.key in selected -> selected - p.key
-            selected.size >= 2 -> selected.drop(1) + p.key
-            else -> selected + p.key
-        }
+    fun setOption(o: AlignOptions) {
+        options = o
+        prefs.edit().putBoolean(AlignOptions.PREF_POINTS, o.points).putBoolean(AlignOptions.PREF_CONTOURS, o.contours)
+            .putBoolean(AlignOptions.PREF_GAZE, o.gaze).apply()
         resetAlignment()
     }
 
-    fun runAlign(block: suspend (Photo, Photo) -> AlignmentResult) {
-        val (b, a) = pair ?: return
-        aligning = true
-        scope.launch {
-            val r = runCatching { block(b, a) }
-            aligning = false
-            r.onSuccess {
-                alignment = it; useAligned = true
-                val quality = if (it.score.isNaN()) "" else " · contornos ${(it.score.coerceIn(0f, 1f) * 100).roundToInt()}%"
-                snackbar.showSnackbar("Alineado: ${it.method}$quality")
-            }.onFailure { snackbar.showSnackbar("No se pudo alinear: ${it.message}") }
+    fun toggle(p: Photo) {
+        if (p.key !in selected && selected.size >= Timeline.MAX_PHOTOS)
+            scope.launch { snackbar.showSnackbar("Máximo ${Timeline.MAX_PHOTOS} fotos: se quitó la primera elegida") }
+        selected = toggleSelection(selected, p.key)
+        resetAlignment()
+    }
+
+    // Alinea cada foto a la referencia. Solo se aplica si la selección y las opciones no cambiaron
+    // mientras tanto (las alineaciones anteriores se cancelan).
+    fun runAlign() {
+        val s = derive().seq ?: return
+        val manualK = keystoneManual.takeIf { !keystoneAuto }
+        val keys = s.map { it.key }
+        val opts = options
+        val outlines = contourOutlines
+        val prev = alignJob
+        val token = ++alignToken
+        alignJob = scope.launch {
+            prev?.cancelAndJoin()
+            val out = mutableMapOf<String, AlignmentResult>()
+            var failed: Throwable? = null
+            for (i in 1 until s.size) {
+                alignProgress = if (s.size > 2) "Alineando ${i}/${s.size - 1}…" else "Alineando…"
+                val r = runCatching {
+                    aligner.auto(s[0].zone, s[0].uri, s[i].uri, manualK,
+                        opts.copy(beforeOutline = outlines[s[0].key], afterOutline = outlines[s[i].key]))
+                }
+                r.exceptionOrNull()?.let { if (it is kotlinx.coroutines.CancellationException) throw it }
+                r.onSuccess { out[s[i].key] = it }.onFailure { failed = it }
+                if (alignToken != token) return@launch
+                alignments = out.toMap(); alignedFor = keys
+            }
+            alignProgress = null
+            useAligned = true
+            val res = out.values
+            val msg = when {
+                failed != null && res.isEmpty() -> "No se pudo alinear: ${failed?.message}"
+                s.size == 2 -> res.first().let { a ->
+                    "Alineado: ${a.method}" + if (a.score.isNaN()) "" else " · contornos ${(a.score.coerceIn(0f, 1f) * 100).roundToInt()}%"
+                }
+                else -> "Alineadas ${res.size} fotos a la referencia (${formatDate(s[0].takenAt)})"
+            }
+            snackbar.showSnackbar(msg)
         }
     }
 
     Scaffold(
         topBar = {
+            val (_, _, _, seq, _, n) = derive()
             TopAppBar(
                 title = {
                     Column {
-                        Text("Comparar")
+                        Text(if (n > 2) "Comparar $n fotos" else "Comparar")
                         Text(exp?.patientName.orEmpty(), style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
                 actions = {
-                    IconButton(onClick = { swapped = !swapped; resetAlignment() }, enabled = pair != null) {
-                        Icon(Icons.Default.SwapHoriz, "Intercambiar antes y después")
+                    IconButton(onClick = { reversed = !reversed; resetAlignment() }, enabled = seq != null) {
+                        Icon(Icons.Default.SwapHoriz, "Invertir el orden")
                     }
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            Text("Alineación automática", style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Md3Spacing.s3, vertical = Md3Spacing.s1))
+                            CheckItem("Usar puntos anatómicos", options.points) { setOption(options.copy(points = it)) }
+                            CheckItem("Usar contornos", options.contours) { setOption(options.copy(contours = it)) }
+                            CheckItem("Usar mirada (gaze)", options.gaze) { setOption(options.copy(gaze = it)) }
+                            HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text(if (colorAdjust == null) "Igualar color de piel" else "Quitar igualación de color") },
+                                text = { Text(if (colorAdjusts.isEmpty()) "Igualar color de piel" else "Quitar igualación de color") },
                                 leadingIcon = { Icon(Icons.Default.Palette, null) },
-                                enabled = pair != null,
-                                onClick = { menu = false; if (colorAdjust == null) colorDialog = true else colorAdjust = null },
+                                enabled = seq != null,
+                                onClick = { menu = false; if (colorAdjusts.isEmpty()) colorDialog = true else colorAdjusts = emptyMap() },
+                            )
+                            if (n > 2 && colorAdjusts.isEmpty()) DropdownMenuItem(
+                                text = { Text("Igualar color de todas (automático)") },
+                                leadingIcon = { Icon(Icons.Default.AutoFixHigh, null) },
+                                onClick = {
+                                    menu = false
+                                    val s = seq ?: return@DropdownMenuItem
+                                    scope.launch {
+                                        val out = s.drop(1).mapNotNull { p ->
+                                            runCatching { autoColorAdjust(context, aligner, s[0], p) }
+                                                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                                                .getOrNull()?.let { p.key to it }
+                                        }.toMap()
+                                        colorAdjusts = out
+                                        snackbar.showSnackbar(if (out.isEmpty()) "No se encontró piel para igualar" else "Color igualado en ${out.size} fotos")
+                                    }
+                                },
                             )
                             DropdownMenuItem(
-                                text = { Text("Medir contornos") },
+                                text = { Text("Contornos (configuración)") },
                                 leadingIcon = { Icon(Icons.Default.Straighten, null) },
-                                enabled = pair != null,
+                                enabled = seq != null,
                                 onClick = { menu = false; measure = true },
                             )
                             DropdownMenuItem(
                                 text = { Text("Perspectiva y ajustes") },
                                 leadingIcon = { Icon(Icons.Default.Tune, null) },
-                                enabled = pair != null,
+                                enabled = seq != null,
                                 onClick = { menu = false; settings = true },
                             )
                             DropdownMenuItem(
@@ -233,6 +328,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        val (photos, zonesWithPhotos, visible, seq, seqKeys, n, timeline, reference, target, validAlign) = derive()
+        val aligning = alignJob?.isActive == true
+        // Modelos (con perspectiva y color corregidos) de cada foto de la secuencia.
+        val models: Map<String, Any> = seq?.associate { p ->
+            p.key to key(p.key) { rememberCorrected(p.uri, resultOf(p)?.keystoneDeg ?: 0f, Perspective.DEFAULT_FOCAL, colorAdjusts[p.key]) }
+        }.orEmpty()
         if (all != null && photos.size < 2) {
             EmptyState(Icons.Default.Compare, "Se necesitan dos fotografías",
                 "Tome al menos dos fotografías de una zona para compararlas.", Modifier.padding(padding))
@@ -246,7 +347,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                         selected = mode == m,
                         onClick = { mode = m },
                         shape = SegmentedButtonDefaults.itemShape(i, Mode.entries.size),
-                    ) { Text(m.label) }
+                        icon = {},
+                    ) { Text(m.label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
                 }
             }
 
@@ -255,107 +357,130 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                 Modifier.weight(1f).fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact, vertical = Md3Spacing.s2),
                 contentAlignment = Alignment.Center,
             ) {
-                if (pair == null) {
-                    Text("Seleccione dos fotografías abajo para compararlas.",
+                if (seq == null) {
+                    Text("Seleccione dos o más fotografías abajo para compararlas.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
                 } else {
-                    val (before, after) = pair
-                    val beforeLabel = "Antes · ${formatDate(before.takenAt)}"
-                    val afterLabel = "Después · ${formatDate(after.takenAt)}"
+                    fun label(i: Int): String {
+                        val d = formatDate(seq[i].takenAt)
+                        return if (n == 2) (if (i == 0) "Antes · $d" else "Después · $d") else "${i + 1} · $d"
+                    }
+                    val from = seq[timeline.from]; val to = seq[timeline.to]
                     when (mode) {
                         Mode.SLIDER -> JuxtaposeSlider(
-                            before = beforeModel!!, after = afterModel!!, afterTransform = transform,
-                            position = position, onPositionChange = { position = it },
+                            before = models.getValue(from.key), after = models.getValue(to.key),
+                            beforeTransform = transformOf(from), afterTransform = transformOf(to),
+                            position = timeline.dividerPosition, onPositionChange = { timelineState = timeline.withDivider(it) },
                             zoom = zoom, onZoomChange = { zoom = it },
-                            beforeLabel = beforeLabel, afterLabel = afterLabel,
+                            beforeLabel = label(timeline.from), afterLabel = label(timeline.to),
                             modifier = Modifier.aspectRatio(3f / 4f).clip(MaterialTheme.shapes.medium),
                         )
 
-                        Mode.SIDE -> Row(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s1)) {
-                            listOf(Triple(beforeModel, beforeLabel, null), Triple(afterModel, afterLabel, transform)).forEach { (m, label, t) ->
-                                Box(Modifier.weight(1f).aspectRatio(3f / 4f).clip(MaterialTheme.shapes.small).background(Color.Black)) {
-                                    AsyncImage(m, label, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().alignedBy(t))
-                                    Label(label, Modifier.align(Alignment.TopStart))
+                        Mode.SIDE -> BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            val gap = Md3Spacing.s1
+                            // Hasta 3 fotos caben a lo ancho; con más, desplazamiento horizontal (2,4 visibles).
+                            val cellW: Dp = if (n <= 3) minOf((maxWidth - gap * (n - 1)) / n, maxHeight * 3f / 4f)
+                            else minOf((maxWidth - gap * 2) / 2.4f, maxHeight * 3f / 4f)
+                            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                                seq.forEachIndexed { i, p -> PhotoCell(models.getValue(p.key), label(i), transformOf(p), zoom, Modifier.width(cellW)) }
+                            }
+                        }
+
+                        Mode.GRID -> BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            val gap = Md3Spacing.s1
+                            val cols = gridColumns(n, maxWidth.value, maxHeight.value)
+                            val rows = (n + cols - 1) / cols
+                            val cellW: Dp = minOf((maxWidth - gap * (cols - 1)) / cols, ((maxHeight - gap * (rows - 1)) / rows) * 3f / 4f)
+                            Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                                seq.chunked(cols).forEachIndexed { r, rowPhotos ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                                        rowPhotos.forEachIndexed { c, p ->
+                                            PhotoCell(models.getValue(p.key), label(r * cols + c), transformOf(p), zoom, Modifier.width(cellW))
+                                        }
+                                    }
                                 }
                             }
                         }
 
-                        Mode.FADE -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(
-                                Modifier.weight(1f, fill = false).aspectRatio(3f / 4f).clip(MaterialTheme.shapes.medium)
-                                    .background(Color.Black).clipToBounds()
-                            ) {
-                                AsyncImage(beforeModel, beforeLabel, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                                AsyncImage(afterModel, afterLabel, contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize().alignedBy(transform).graphicsLayer { alpha = fade })
-                                Label(if (fade < 0.5f) beforeLabel else afterLabel, Modifier.align(Alignment.TopStart))
+                        Mode.FADE -> Box(
+                            Modifier.aspectRatio(3f / 4f).clip(MaterialTheme.shapes.medium).background(Color.Black).clipToBounds()
+                        ) {
+                            val layer = Modifier.fillMaxSize().graphicsLayer {
+                                scaleX = zoom.scale; scaleY = zoom.scale; translationX = zoom.offset.x; translationY = zoom.offset.y
                             }
-                            Slider(fade, { fade = it }, Modifier.fillMaxWidth().semantics { contentDescription = "Fundido antes/después" })
+                            AsyncImage(models.getValue(from.key), label(timeline.from), contentScale = ContentScale.Crop,
+                                modifier = layer.alignedBy(transformOf(from)))
+                            AsyncImage(models.getValue(to.key), label(timeline.to), contentScale = ContentScale.Crop,
+                                modifier = layer.alignedBy(transformOf(to)).graphicsLayer { alpha = timeline.fraction })
+                            Label(if (timeline.fraction < 0.5f) label(timeline.from) else label(timeline.to), Modifier.align(Alignment.TopStart))
                         }
                     }
                 }
             }
 
-            // Alineación y datos del par
-            pair?.let { (b, a) ->
+            // Línea de tiempo (fundido, o deslizador con más de dos fotos): recorre 1→2→…→N.
+            if (seq != null && (mode == Mode.FADE || (mode == Mode.SLIDER && n > 2))) {
+                Column(Modifier.padding(horizontal = Md3Spacing.marginCompact)) {
+                    Slider(
+                        value = timeline.value, onValueChange = { timelineState = Timeline.of(n, it) },
+                        valueRange = 0f..(n - 1).toFloat(),
+                        modifier = Modifier.fillMaxWidth().semantics {
+                            contentDescription = if (n > 2) "Progresión entre $n fotos" else "Fundido antes/después"
+                        },
+                    )
+                    if (n > 2) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        seq.forEachIndexed { i, p ->
+                            Text("${i + 1}", style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (i == timeline.from || i == timeline.to) FontWeight.Bold else FontWeight.Normal,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.semantics { contentDescription = "Foto ${i + 1}, ${formatDate(p.takenAt)}" })
+                        }
+                    }
+                }
+            }
+
+            // Alineación y datos de la selección
+            seq?.let { s ->
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2),
                 ) {
-                    val res = alignment
-                    if (res == null) {
+                    val res = target?.let { alignments[it.key] }.takeIf { validAlign }
+                    if (!validAlign || alignments.isEmpty()) {
                         InputChip(
                             selected = false,
-                            onClick = { runAlign { bp, ap -> aligner.auto(bp.zone, bp.uri, ap.uri, manualK) } },
+                            onClick = { runAlign() },
                             enabled = !aligning,
-                            label = { Text("Alinear automáticamente") },
+                            label = { Text(alignProgress ?: "Alinear automáticamente") },
                             leadingIcon = { Icon(Icons.Default.AutoFixHigh, null, Modifier.size(18.dp)) },
                         )
+                        val days = TimeUnit.MILLISECONDS.toDays(kotlin.math.abs(s.last().takenAt - s.first().takenAt))
+                        Text("$days días", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         Row(
                             Modifier.weight(1f).toggleable(useAligned, role = Role.Switch) { useAligned = it },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text("Alineado", style = MaterialTheme.typography.labelLarge)
-                                Text(
-                                    "%s · %.0f%% escala · %.1f°".format(
-                                        res.landmarks.takeIf { it.isNotEmpty() }?.let { "${it.size} puntos (${res.landmarkRegions.take(4).joinToString(", ")})" }
-                                            ?: "solo contornos",
-                                        res.transform.scale * 100, res.transform.rotationDegrees,
-                                    ),
-                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                if (res.keystoneDeg != 0f) {
-                                    Text(
-                                        "Perspectiva vertical %+.1f° (%s)".format(res.keystoneDeg, res.keystoneSource),
-                                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                if (res.regionScores.isNotEmpty()) {
-                                    Text(
-                                        "Contornos: " + res.regionScores.sortedByDescending { it.second }.take(4)
-                                            .joinToString(" · ") { (n, v) -> "$n ${(v.coerceIn(0f, 1f) * 100).roundToInt()}%" },
-                                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
+                                Text(if (n > 2) "Alineadas a la foto 1 · ${alignments.size}/${n - 1}" + (alignProgress?.let { " · $it" } ?: "")
+                                    else "Alineado", style = MaterialTheme.typography.labelLarge)
+                                res?.let { AlignmentDetails(it, if (n > 2) "Foto ${s.indexOf(target) + 1}: " else "") }
                             }
                             Switch(checked = useAligned, onCheckedChange = null)
                         }
                     }
-                    if (res == null) {
-                        val days = TimeUnit.MILLISECONDS.toDays(kotlin.math.abs(a.takenAt - b.takenAt))
-                        Text("$days días", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
                 }
-                conditionsWarning?.let {
+                val gazeIssues = if (validAlign && options.gaze) s.drop(1).mapIndexedNotNull { i, p ->
+                    alignments[p.key]?.gazeHint?.let { h -> if (n > 2) "Foto ${i + 2}: $h" else h }
+                } else emptyList()
+                (listOfNotNull(conditionsWarning) + gazeIssues).forEach {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.padding(horizontal = Md3Spacing.marginCompact))
                 }
-                if (b.zone != a.zone) {
+                if (s.map { it.zone }.distinct().size > 1) {
                     Text(
-                        "Atención: zonas distintas (${b.zone.label} / ${a.zone.label})",
+                        "Atención: zonas distintas (${s.map { it.zone.label }.distinct().joinToString(" / ")})",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(horizontal = Md3Spacing.marginCompact),
                     )
@@ -375,7 +500,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                 }
             }
 
-            // Selección (toggle) de imágenes
+            // Selección múltiple (toggle) de imágenes; el número indica el orden en la comparación.
             LazyRow(
                 Modifier.fillMaxWidth().height(124.dp),
                 contentPadding = PaddingValues(horizontal = Md3Spacing.marginCompact, vertical = Md3Spacing.s2),
@@ -383,8 +508,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
             ) {
                 items(visible, key = { it.key }) { p ->
                     val isSel = p.key in selected
-                    val badge = pair?.let { (b, a) -> if (p.key == b.key) "A" else if (p.key == a.key) "B" else null }
-                        ?: if (isSel) "✓" else null
+                    val order = seqKeys.indexOf(p.key).takeIf { it >= 0 }?.let { it + 1 }
+                    val badge = order?.let { o -> if (n == 2) (if (o == 1) "A" else "B") else "$o" } ?: if (isSel) "✓" else null
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(
                             Modifier.size(66.dp, 88.dp).clip(MaterialTheme.shapes.small)
@@ -420,7 +545,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
         }
     }
 
-    if (settings && pair != null) {
+    if (settings && seq != null) {
         SafeBottomSheet(onDismiss = { settings = false }) {
             Column(Modifier.padding(horizontal = Md3Spacing.s6).padding(bottom = Md3Spacing.s8),
                 verticalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
@@ -432,19 +557,19 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                     Column(Modifier.weight(1f)) {
                         Text("Automática por proporciones de contornos", style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "Estima la inclinación entre tomas con la geometría del contorno (puntos faciales o anchos de " +
-                                "la silueta a cada altura), sin usar sensores.",
+                            "Estima la inclinación entre tomas con la geometría del contorno (puntos faciales, contornos " +
+                                "elegidos en “Contornos” o anchos de la silueta a cada altura), sin usar sensores.",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Switch(checked = keystoneAuto, onCheckedChange = null)
                 }
-                alignment?.let {
+                target?.let { alignments[it.key] }?.takeIf { validAlign }?.let {
                     Text("Última estimación: %+.1f°".format(it.keystoneDeg) +
                         (it.keystoneSource.takeIf { s -> s.isNotEmpty() }?.let { s -> " · $s" } ?: ""),
                         style = MaterialTheme.typography.labelLarge)
                 }
-                Text("Ajuste manual de “Después”: %+.1f°".format(keystoneManual), style = MaterialTheme.typography.labelLarge)
+                Text("Ajuste manual de las fotos posteriores: %+.1f°".format(keystoneManual), style = MaterialTheme.typography.labelLarge)
                 Slider(
                     value = keystoneManual, onValueChange = { keystoneManual = it; resetAlignment() },
                     valueRange = -15f..15f, enabled = !keystoneAuto,
@@ -456,26 +581,84 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
         }
     }
 
-    if (colorDialog && pair != null) {
-        ColorMatchDialog(pair[0], pair[1], onDismiss = { colorDialog = false }, onApply = {
-            colorDialog = false; colorAdjust = it
+    if (colorDialog && reference != null && target != null) {
+        ColorMatchDialog(reference, target, onDismiss = { colorDialog = false }, onApply = {
+            colorDialog = false; colorAdjusts = colorAdjusts + (target.key to it)
             scope.launch { snackbar.showSnackbar("Color igualado: ${it.describe()}") }
         })
     }
 
-    if (measure && pair != null) {
+    if (measure && reference != null && target != null) {
         ContourMeasureDialog(
-            before = pair[0], after = pair[1],
+            before = reference, after = target,
             onDismiss = { measure = false },
-            onApplyKeystone = { deg ->
-                measure = false; keystoneAuto = false; keystoneManual = deg; resetAlignment()
-                scope.launch { snackbar.showSnackbar("Perspectiva %+.1f° aplicada. Pulse “Alinear automáticamente”.".format(deg)) }
+            onContours = { b, a ->
+                val m = contourOutlines.toMutableMap()
+                if (b != null) m[reference.key] = b else m.remove(reference.key)
+                if (a != null) m[target.key] = a else m.remove(target.key)
+                if (m != contourOutlines) { contourOutlines = m; resetAlignment() }
             },
         )
     }
-
-
 }
+
+@Composable
+private fun CheckItem(text: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    DropdownMenuItem(
+        text = { Text(text) },
+        leadingIcon = { Icon(if (checked) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, null,
+            tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
+        onClick = { onChange(!checked) },
+        modifier = Modifier.semantics { stateDescription = if (checked) "Activado" else "Desactivado" },
+    )
+}
+
+@Composable
+private fun PhotoCell(model: Any, label: String, t: Similarity?, zoom: ZoomState, modifier: Modifier) {
+    Box(modifier.aspectRatio(3f / 4f).clip(MaterialTheme.shapes.small).background(Color.Black).clipToBounds()) {
+        AsyncImage(model, label, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().graphicsLayer {
+            scaleX = zoom.scale; scaleY = zoom.scale; translationX = zoom.offset.x; translationY = zoom.offset.y
+        }.alignedBy(t))
+        Label(label, Modifier.align(Alignment.TopStart))
+    }
+}
+
+@Composable
+private fun AlignmentDetails(res: AlignmentResult, prefix: String) {
+    val style = MaterialTheme.typography.bodySmall
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    Text(
+        prefix + "%s · %.0f%% escala · %.1f°".format(
+            res.landmarks.takeIf { it.isNotEmpty() }?.let { "${it.size} puntos (${res.landmarkRegions.take(4).joinToString(", ")})" }
+                ?: res.method.lowercase(),
+            res.transform.scale * 100, res.transform.rotationDegrees,
+        ), style = style, color = color,
+    )
+    if (res.keystoneDeg != 0f) Text("Perspectiva vertical %+.1f° (%s)".format(res.keystoneDeg, res.keystoneSource), style = style, color = color)
+    if (res.regionScores.isNotEmpty() && res.method.contains("ontorno")) {
+        Text("Contornos: " + res.regionScores.sortedByDescending { it.second }.take(4)
+            .joinToString(" · ") { (nm, v) -> "$nm ${(v.coerceIn(0f, 1f) * 100).roundToInt()}%" }, style = style, color = color)
+    }
+    when (res.gazeMatches) {
+        true -> Text("Mirada: misma dirección", style = style, color = color)
+        false -> Unit   // se avisa debajo
+        null -> Unit
+    }
+}
+
+/** Estado derivado de la selección (ver `derive()` en [CompareScreen]). */
+private data class CompareDerived(
+    val photos: List<Photo>,
+    val zonesWithPhotos: List<Zone>,
+    val visible: List<Photo>,
+    val seq: List<Photo>?,
+    val seqKeys: List<String>,
+    val n: Int,
+    val timeline: Timeline,
+    val reference: Photo?,
+    val target: Photo?,
+    val validAlign: Boolean,
+)
 
 /** Descripción de la estrategia de la zona (para ayudas contextuales). */
 fun alignmentHint(zone: Zone) = ZoneAlignment.of(zone).description

@@ -96,11 +96,11 @@ fun ExpedienteScreen(
     var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(reload) {
-        withContext(Dispatchers.IO) {
+        val (e, list) = withContext(Dispatchers.IO) {
             val e = repo.getExpediente(expId)
-            exp = e
-            photos = e?.let { repo.photos(it) }.orEmpty()
+            e to e?.let { repo.photos(it) }.orEmpty()
         }
+        exp = e; photos = list
     }
     val galleryDelete = rememberGalleryDelete { ok ->
         if (ok) scope.launch {

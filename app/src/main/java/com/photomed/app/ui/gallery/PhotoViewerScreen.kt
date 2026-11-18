@@ -1,7 +1,5 @@
 package com.photomed.app.ui.gallery
 
-import android.content.Context
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,10 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.FileProvider
 import com.photomed.app.data.Photo
 import com.photomed.app.data.PhotoInfo
-import com.photomed.app.data.PhotoMetadata
 import com.photomed.app.data.Zone
 import com.photomed.app.ui.LocalRepository
 import com.photomed.app.ui.components.ConfirmDialog
@@ -56,10 +52,6 @@ import com.photomed.app.ui.theme.ImmersiveTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,12 +99,12 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                             DropdownMenuItem(
                                 text = { Text("Compartir sin datos del paciente") },
                                 leadingIcon = { Icon(Icons.Outlined.PrivacyTip, null) },
-                                onClick = { shareMenu = false; scope.launch { share(context, current, anonymize = true) } },
+                                onClick = { shareMenu = false; scope.launch { if (!sharePhotos(context, listOf(current), anonymize = true)) snackbar.showSnackbar("No se pudo compartir la fotografía") } },
                             )
                             DropdownMenuItem(
                                 text = { Text("Compartir con datos del paciente") },
                                 leadingIcon = { Icon(Icons.Outlined.Badge, null) },
-                                onClick = { shareMenu = false; scope.launch { share(context, current, anonymize = false) } },
+                                onClick = { shareMenu = false; scope.launch { if (!sharePhotos(context, listOf(current), anonymize = false)) snackbar.showSnackbar("No se pudo compartir la fotografía") } },
                             )
                         }
                     }
@@ -170,25 +162,4 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
 @Composable
 private fun InfoRow(label: String, value: String) {
     ListItem(overlineContent = { Text(label) }, headlineContent = { Text(value) })
-}
-
-/** Copia la foto a caché (opcionalmente sin metadatos del paciente) y abre el selector para compartir. */
-private suspend fun share(context: Context, photo: Photo, anonymize: Boolean) {
-    val file = withContext(Dispatchers.IO) {
-        val dir = File(context.cacheDir, "share").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
-        val name = if (anonymize) {
-            "PhotoMed_${photo.zone.id}_${SimpleDateFormat("yyyyMMdd", Locale.US).format(Date(photo.takenAt))}.jpg"
-        } else photo.displayName
-        File(dir, name).also { f ->
-            context.contentResolver.openInputStream(photo.uri)!!.use { input -> f.outputStream().use { input.copyTo(it) } }
-            if (anonymize) PhotoMetadata.strip(f)
-        }
-    }
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "image/jpeg"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    context.startActivity(Intent.createChooser(intent, if (anonymize) "Compartir (anonimizada)" else "Compartir"))
 }

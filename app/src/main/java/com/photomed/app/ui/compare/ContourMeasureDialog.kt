@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,7 +67,11 @@ import com.photomed.app.data.Photo
 import com.photomed.app.ui.formatDate
 import com.photomed.app.ui.theme.ImmersiveTheme
 import com.photomed.app.ui.theme.Md3Spacing
+import com.photomed.app.align.Pt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -76,18 +79,20 @@ import kotlin.math.roundToInt
 /**
  * Medición de contornos: selección automática (óvalo facial / silueta del sujeto, como los
  * stickers) o con varita mágica (toque + tolerancia), métricas antes/después y estimación de la
- * perspectiva vertical por proporciones de anchos.
+ * perspectiva vertical por proporciones de anchos. No modifica la comparación directamente: los
+ * contornos elegidos quedan como configuración de la alineación automática (perspectiva por
+ * proporciones de estos contornos en lugar de los detectados).
  */
 @Composable
-fun ContourMeasureDialog(before: Photo, after: Photo, onDismiss: () -> Unit, onApplyKeystone: (Float) -> Unit) {
+fun ContourMeasureDialog(before: Photo, after: Photo, onDismiss: () -> Unit, onContours: (List<Pt>?, List<Pt>?) -> Unit) {
     FullScreenOverlay(onDismiss = onDismiss) {
-        ImmersiveTheme { ContourMeasureContent(before, after, onDismiss, onApplyKeystone) }
+        ImmersiveTheme { ContourMeasureContent(before, after, onDismiss, onContours) }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ContourMeasureContent(before: Photo, after: Photo, onDismiss: () -> Unit, onApplyKeystone: (Float) -> Unit) {
+private fun ContourMeasureContent(before: Photo, after: Photo, onDismiss: () -> Unit, onContours: (List<Pt>?, List<Pt>?) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val aligner = remember { Aligner(context.applicationContext) }
@@ -96,29 +101,52 @@ private fun ContourMeasureContent(before: Photo, after: Photo, onDismiss: () -> 
     var active by remember { mutableIntStateOf(0) }
     var tolerance by remember { mutableFloatStateOf(12f) }
     var busy by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
     val photos = listOf(before, after)
+    val jobs = remember { arrayOfNulls<Job>(2) }
 
-    fun auto(i: Int) = scope.launch {
-        busy = true
-        val (bmp, mask) = aligner.autoMask(photos[i].zone, photos[i].uri)
-        bitmaps[i] = bmp
-        metrics[i] = withContext(Dispatchers.Default) { mask?.let(ContourMetrics::of) }
-        busy = false
+    // Un solo cálculo por foto a la vez: el último toque gana (evita resultados obsoletos).
+    fun auto(i: Int): Job {
+        val prev = jobs[i]
+        return scope.launch {
+            prev?.cancelAndJoin()
+            busy = true
+            try {
+                val (bmp, mask) = aligner.autoMask(photos[i].zone, photos[i].uri)
+                val m = withContext(Dispatchers.Default) { mask?.let(ContourMetrics::of) }
+                ensureActive()
+                bitmaps[i] = bmp; metrics[i] = m
+                error = null
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
+            } catch (e: Exception) {
+                error = "No se pudo leer la fotografía (${e.message ?: e.javaClass.simpleName})"
+            } finally { busy = false }
+        }.also { jobs[i] = it }
     }
 
     fun wand(i: Int, x: Float, y: Float) {
         val bmp = bitmaps[i] ?: return
-        scope.launch {
+        val prev = jobs[i]
+        val tol = tolerance
+        jobs[i] = scope.launch {
+            prev?.cancelAndJoin()
             busy = true
-            metrics[i] = withContext(Dispatchers.Default) {
-                ContourMetrics.of(MagicWand.select(bmp.rgb(), bmp.width, bmp.height,
-                    (x * bmp.width).roundToInt(), (y * bmp.height).roundToInt(), tolerance))
-            }
-            busy = false
+            try {
+                val m = withContext(Dispatchers.Default) {
+                    ContourMetrics.of(MagicWand.select(bmp.rgb(), bmp.width, bmp.height,
+                        (x * bmp.width).roundToInt().coerceIn(0, bmp.width - 1), (y * bmp.height).roundToInt().coerceIn(0, bmp.height - 1), tol))
+                }
+                ensureActive()
+                metrics[i] = m
+            } finally { busy = false }
         }
     }
 
     LaunchedEffect(Unit) { auto(0).join(); auto(1) }
+    // Los contornos elegidos se guardan como configuración de la alineación.
+    LaunchedEffect(metrics[0], metrics[1]) {
+        if (metrics[0] != null || metrics[1] != null) onContours(metrics[0]?.outline, metrics[1]?.outline)
+    }
 
     val keystone = remember(metrics[0], metrics[1]) {
         val a = metrics[0]; val b = metrics[1]
@@ -139,6 +167,7 @@ private fun ContourMeasureContent(before: Photo, after: Photo, onDismiss: () -> 
             verticalArrangement = Arrangement.spacedBy(Md3Spacing.s2),
         ) {
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth()) else Box(Modifier.height(4.dp))
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 listOf("Antes · ${formatDate(before.takenAt)}", "Después · ${formatDate(after.takenAt)}").forEachIndexed { i, l ->
                     SegmentedButton(selected = active == i, onClick = { active = i },
@@ -171,8 +200,9 @@ private fun ContourMeasureContent(before: Photo, after: Photo, onDismiss: () -> 
                     style = MaterialTheme.typography.titleSmall)
                 Text("Inclinación que iguala las proporciones de anchos (superior, medio, inferior) de ambos contornos.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                FilledTonalButton(onClick = { onApplyKeystone(k) }) { Text("Aplicar a la comparación") }
             }
+            Text("Estos contornos se usarán como base al pulsar “Alinear automáticamente” (con “Usar contornos” activo).",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             Box(Modifier.height(Md3Spacing.s8))
         }
     }

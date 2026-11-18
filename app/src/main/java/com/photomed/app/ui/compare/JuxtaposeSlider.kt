@@ -44,6 +44,7 @@ fun JuxtaposeSlider(
     before: Any,
     after: Any,
     afterTransform: Similarity? = null,
+    beforeTransform: Similarity? = null,
     position: Float,
     onPositionChange: (Float) -> Unit,
     zoom: ZoomState,
@@ -93,7 +94,7 @@ fun JuxtaposeSlider(
         Box(Modifier.fillMaxSize().drawWithContent {
             clipRect(right = size.width * position) { this@drawWithContent.drawContent() }
         }) {
-            AsyncImage(before, "Antes", contentScale = ContentScale.Crop, modifier = layer)
+            AsyncImage(before, "Antes", contentScale = ContentScale.Crop, modifier = layer.alignedBy(beforeTransform))
         }
 
         // Divisor y manija

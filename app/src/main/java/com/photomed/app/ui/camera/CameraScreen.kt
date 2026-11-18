@@ -235,6 +235,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     var showSettings by remember { mutableStateOf(false) }
     var mirrorOn by remember { mutableStateOf(prefs.getBoolean("mirror_front", true)) }
     var zoomAssist by remember { mutableStateOf(prefs.getBoolean("zoom_assist", true)) }
+    var useGaze by remember { mutableStateOf(prefs.getBoolean(com.photomed.app.align.AlignOptions.PREF_GAZE, true)) }
     var zoomRatio by remember { mutableFloatStateOf(1f) }
     var refPoints by remember { mutableStateOf<Map<String, Pt>>(emptyMap()) }
     var adaptGuide by remember { mutableStateOf(true) }
@@ -249,6 +250,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     val matcher = remember(zone, engine) { LiveMatcher(zone, context.applicationContext, engine) }
     SideEffect { pipeline.swap(matcher) }
     matcher.threshold = threshold
+    matcher.useGaze = useGaze
     DisposableEffect(Unit) { onDispose { pipeline.shutdown() } }
     val lastAnalysis = remember { AtomicLong(0L) }
     // Asistencia en vivo: con referencia (foto superpuesta) iguala el encuadre; sin ella, estandariza la toma.
@@ -281,11 +283,11 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     }
 
     LaunchedEffect(reload) {
-        withContext(Dispatchers.IO) {
+        val (e, list) = withContext(Dispatchers.IO) {
             val e = repo.getExpediente(expId)
-            exp = e
-            photos = e?.let { repo.photos(it, zone) }.orEmpty()
+            e to e?.let { repo.photos(it, zone) }.orEmpty()
         }
+        exp = e; photos = list
         if (ghost == null || photos.none { it.key == ghost?.key }) ghost = photos.lastOrNull()
     }
 
@@ -655,6 +657,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             },
             onAutoCapture = { autoCapture = it; prefs.edit().putBoolean("auto_capture", it).apply() },
             onThreshold = { threshold = it; prefs.edit().putFloat("match_threshold_v2", it).apply() },
+            useGaze = useGaze,
+            onUseGaze = { useGaze = it; prefs.edit().putBoolean(com.photomed.app.align.AlignOptions.PREF_GAZE, it).apply() },
             onDismiss = { showSettings = false },
         )
     }
@@ -698,10 +702,12 @@ fun MatchSettingsSheet(
     onEngine: (com.photomed.app.align.FaceEngine) -> Unit = {},
     onAutoCapture: (Boolean) -> Unit,
     onThreshold: (Float) -> Unit,
+    useGaze: Boolean = true,
+    onUseGaze: (Boolean) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     SafeBottomSheet(onDismiss = onDismiss) {
-        MatchSettingsContent(autoCapture, threshold, onAutoCapture, onThreshold, zoomAssist, onZoomAssist, engine, onEngine)
+        MatchSettingsContent(autoCapture, threshold, onAutoCapture, onThreshold, zoomAssist, onZoomAssist, engine, onEngine, useGaze, onUseGaze)
     }
 }
 
@@ -711,6 +717,8 @@ fun MatchSettingsContent(
     zoomAssist: Boolean = true, onZoomAssist: (Boolean) -> Unit = {},
     engine: com.photomed.app.align.FaceEngine = com.photomed.app.align.FaceEngine.ML_KIT,
     onEngine: (com.photomed.app.align.FaceEngine) -> Unit = {},
+    useGaze: Boolean = true,
+    onUseGaze: (Boolean) -> Unit = {},
 ) {
     Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Coincidencia con la referencia", style = MaterialTheme.typography.titleLarge)
@@ -735,6 +743,18 @@ fun MatchSettingsContent(
                     "sin perder exactitud.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Switch(checked = zoomAssist, onCheckedChange = null)
+        }
+        Row(
+            Modifier.fillMaxWidth().toggleable(useGaze, role = Role.Switch, onValueChange = onUseGaze),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Exigir la misma mirada", style = MaterialTheme.typography.bodyLarge)
+                Text("La coincidencia también requiere que el paciente mire en la misma dirección que en la referencia " +
+                    "(posición del iris dentro del ojo).", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = useGaze, onCheckedChange = null)
         }
         Text("Motor de puntos faciales", style = MaterialTheme.typography.bodyLarge)
         com.photomed.app.align.FaceEngine.entries.forEach { e ->

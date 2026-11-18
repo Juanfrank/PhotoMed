@@ -79,7 +79,10 @@ fun AppNavigation() {
                 zone = zone,
                 onBack = { nav.popBackStack() },
                 onCamera = { nav.navigate("camera/$exp/${zone.id}") },
-                onCompare = { nav.navigate("compare/$exp?zone=${zone.id}") },
+                onCompare = { names ->
+                    val sel = if (names.isEmpty()) "" else "&sel=" + android.net.Uri.encode(names.joinToString("|"))
+                    nav.navigate("compare/$exp?zone=${zone.id}$sel")
+                },
                 onPhoto = { photo -> nav.navigate("photo/$exp/${zone.id}/${photo.displayName}") },
             )
         }
@@ -89,12 +92,16 @@ fun AppNavigation() {
             CameraScreen(expId = exp, zone = zone, onBack = { nav.popBackStack() })
         }
         composable(
-            "compare/{exp}?zone={zone}",
-            arguments = listOf(navArgument("zone") { type = NavType.StringType; nullable = true; defaultValue = null })
+            "compare/{exp}?zone={zone}&sel={sel}",
+            arguments = listOf(
+                navArgument("zone") { type = NavType.StringType; nullable = true; defaultValue = null },
+                navArgument("sel") { type = NavType.StringType; nullable = true; defaultValue = null },
+            )
         ) { entry ->
             val exp = entry.arguments?.getString("exp").orEmpty()
             val zone = Zone.fromId(entry.arguments?.getString("zone"))
-            CompareScreen(expId = exp, initialZone = zone, onBack = { nav.popBackStack() })
+            val sel = entry.arguments?.getString("sel")?.split('|')?.filter { it.isNotEmpty() }.orEmpty()
+            CompareScreen(expId = exp, initialZone = zone, onBack = { nav.popBackStack() }, initialSelection = sel)
         }
         composable("photo/{exp}/{zone}/{name}") { entry ->
             val exp = entry.arguments?.getString("exp").orEmpty()

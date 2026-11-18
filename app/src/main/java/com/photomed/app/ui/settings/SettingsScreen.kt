@@ -33,6 +33,8 @@ import com.photomed.app.align.LiveMatch
 import com.photomed.app.ui.camera.MatchSettingsContent
 import com.photomed.app.ui.components.SectionHeader
 import com.photomed.app.ui.theme.Md3Spacing
+import com.photomed.app.align.AlignOptions
+import androidx.compose.material3.Checkbox
 
 /** Ajustes globales (mismas preferencias que el panel ⚙ de la cámara). */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,6 +47,9 @@ fun SettingsScreen(onBack: () -> Unit) {
     var zoom by remember { mutableStateOf(prefs.getBoolean("zoom_assist", true)) }
     var mirror by remember { mutableStateOf(prefs.getBoolean("mirror_front", true)) }
     var engine by remember { mutableStateOf(FaceEngine.get(context)) }
+    var alignPoints by remember { mutableStateOf(prefs.getBoolean(AlignOptions.PREF_POINTS, true)) }
+    var alignContours by remember { mutableStateOf(prefs.getBoolean(AlignOptions.PREF_CONTOURS, true)) }
+    var alignGaze by remember { mutableStateOf(prefs.getBoolean(AlignOptions.PREF_GAZE, true)) }
     Scaffold(topBar = {
         TopAppBar(title = { Text("Ajustes") },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } })
@@ -56,7 +61,26 @@ fun SettingsScreen(onBack: () -> Unit) {
                 onThreshold = { threshold = it; prefs.edit().putFloat("match_threshold_v2", it).apply() },
                 zoomAssist = zoom, onZoomAssist = { zoom = it; prefs.edit().putBoolean("zoom_assist", it).apply() },
                 engine = engine, onEngine = { engine = it; FaceEngine.set(context, it) },
+                useGaze = alignGaze, onUseGaze = { alignGaze = it; prefs.edit().putBoolean(AlignOptions.PREF_GAZE, it).apply() },
             )
+            HorizontalDivider()
+            SectionHeader("Alineación automática (comparar)", Modifier.padding(horizontal = Md3Spacing.s6))
+            listOf(
+                Triple("Usar puntos anatómicos", "Ojos, cejas, nariz, boca, óvalo; articulaciones en el cuerpo.", AlignOptions.PREF_POINTS),
+                Triple("Usar contornos", "Bordes anatómicos (mandíbula, frente, orejas, silueta) y perspectiva por proporciones.", AlignOptions.PREF_CONTOURS),
+                Triple("Usar mirada (gaze)", "Comprueba que ambas fotos miren en la misma dirección.", AlignOptions.PREF_GAZE),
+            ).forEach { (title, desc, key) ->
+                val value = when (key) { AlignOptions.PREF_POINTS -> alignPoints; AlignOptions.PREF_CONTOURS -> alignContours; else -> alignGaze }
+                ListItem(
+                    headlineContent = { Text(title) },
+                    supportingContent = { Text(desc) },
+                    trailingContent = { Checkbox(checked = value, onCheckedChange = null) },
+                    modifier = Modifier.fillMaxWidth().toggleable(value, role = Role.Checkbox) {
+                        when (key) { AlignOptions.PREF_POINTS -> alignPoints = it; AlignOptions.PREF_CONTOURS -> alignContours = it; else -> alignGaze = it }
+                        prefs.edit().putBoolean(key, it).apply()
+                    },
+                )
+            }
             HorizontalDivider()
             SectionHeader("Cámara", Modifier.padding(horizontal = Md3Spacing.s6))
             ListItem(

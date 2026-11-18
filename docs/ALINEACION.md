@@ -12,6 +12,34 @@ Coordenadas normalizadas: `x ∈ [0,1]`, `y ∈ [0, 4/3]` (unidad = ancho de la 
 transformación es independiente de la resolución. En pantalla se aplica con
 `graphicsLayer(transformOrigin = 0,0; scale = s; rotationZ = θ; translation = t·ancho)`.
 
+## Condiciones de la alineación (menú ⋮ con casillas)
+
+El botón principal **“Alinear automáticamente”** usa todas las condiciones activas; cada una se
+puede desactivar en el menú ⋮ de Comparar o en Ajustes (se recuerdan):
+
+| Condición | Qué hace | Si se desactiva |
+|---|---|---|
+| **Puntos anatómicos** | semejanza por puntos (Umeyama) y perspectiva por sus proporciones | se alinea solo por contornos |
+| **Contornos** | afinado por bordes anatómicos y perspectiva por la silueta | se usa solo la transformación por puntos (los contornos solo puntúan) |
+| **Mirada (gaze)** | compara la posición del iris dentro del ojo en ambas fotos y avisa si difiere | no se evalúa |
+
+La mirada no se “corrige” con una transformación: es una condición de captura. En la cámara, con
+“Exigir la misma mirada” activo, la coincidencia pasa a “cerca” mientras la mirada difiera
+(MediaPipe: iris del modelo; ML Kit: centroide oscuro dentro del contorno del ojo, percentil 40 de
+luminancia). Tolerancia: 0,15 del semiancho del ojo en horizontal y 0,22 del semialto en vertical
+(mediana |x| en LFW frontal: 0,08).
+
+## N fotografías
+
+Con más de dos fotos (hasta 12) cada una se alinea a la **primera** (referencia) y:
+
+- **Deslizar / Fundido**: una línea de tiempo recorre las transiciones 1→2→…→N; el divisor
+  (o la opacidad) avanza dentro de la transición activa.
+- **Lado a lado**: todas en fila (desplazable con más de 3).
+- **Cuadrícula**: el número de columnas que maximiza el tamaño de celda 3:4 en la pantalla.
+
+![Progresivo](capturas/compare_progresivo.png) ![Cuadrícula](capturas/compare_cuadricula.png)
+
 ## Etapas
 
 ### 0. Perspectiva vertical por proporciones de contornos (sin sensores)
@@ -38,7 +66,9 @@ el XMP solo como dato informativo.
 
 ### Medición de contornos (varita mágica / selección automática)
 
-Menú ⋮ → “Medir contornos”:
+Menú ⋮ → “Contornos (configuración)”. Esta pantalla **no modifica la comparación**: los contornos
+elegidos (automáticos o con varita) quedan como configuración de la alineación automática, que los
+usa para estimar la perspectiva por proporciones en lugar de los detectados.
 
 - **Automática** (como al crear stickers): óvalo facial de ML Kit rasterizado, o silueta de la
   persona con ML Kit Selfie Segmentation (modelo incluido, en el dispositivo).
@@ -48,7 +78,7 @@ Menú ⋮ → “Medir contornos”:
 - **Métricas** (normalizadas por el ancho de la imagen): alto, ancho máximo, anchos al 25/50/75 % de
   la altura (frente, pómulos, mandíbula en el rostro), área, proporción ancho/alto, proporción
   superior/inferior y trazado del contorno; tabla antes/después con Δ % y perspectiva estimada por
-  proporciones, aplicable a la comparación.
+  proporciones (informativa).
 
 ![Varita mágica](referencias/varita_magica.png)
 

@@ -59,6 +59,9 @@ import com.photomed.app.data.Photo
 import com.photomed.app.ui.theme.ImmersiveTheme
 import com.photomed.app.ui.theme.Md3Spacing
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -87,32 +90,49 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
     var busy by remember { mutableStateOf(true) }
     var source by remember { mutableStateOf("") }
 
-    fun compute(auto: Boolean) = scope.launch {
+    var job by remember { mutableStateOf<Job?>(null) }
+    // El último cálculo pedido gana: se cancela el anterior para no mostrar un resultado obsoleto.
+    fun compute(auto: Boolean) { val prev = job; job = scope.launch {
+        prev?.cancelAndJoin()
         val b = bitmaps[0] ?: return@launch; val a = bitmaps[1] ?: return@launch
         busy = true
-        val masks = if (auto) listOf(aligner.skinMask(before.zone, b), aligner.skinMask(after.zone, a))
-        else listOf(points[0]?.let { ColorMatch.patch(b.width, b.height, it) }, points[1]?.let { ColorMatch.patch(a.width, a.height, it) })
-        withContext(Dispatchers.Default) {
-            val sb = masks[0]?.let { ColorMatch.stats(b.rgb(), it) }
-            val sa = masks[1]?.let { ColorMatch.stats(a.rgb(), it) }
-            if (sb != null && sa != null) {
-                val adj = ColorMatch.fit(sa, sb)
-                adjust = adj
-                val px = adj.apply(a.rgb())
-                preview = Bitmap.createBitmap(a.width, a.height, Bitmap.Config.ARGB_8888).apply { setPixels(px, 0, a.width, 0, 0, a.width, a.height) }
-                source = if (auto) "piel detectada automáticamente" else "puntos de referencia"
-            } else {
-                adjust = null; preview = null
-                source = if (auto) "no se encontró piel: toque un punto de referencia en cada foto" else "toque un punto en cada foto"
+        try {
+            val masks = if (auto) listOf(aligner.skinMask(before.zone, b), aligner.skinMask(after.zone, a))
+            else listOf(points[0]?.let { ColorMatch.patch(b.width, b.height, it) }, points[1]?.let { ColorMatch.patch(a.width, a.height, it) })
+            val res = withContext(Dispatchers.Default) {
+                val sb = masks[0]?.let { ColorMatch.stats(b.rgb(), it) }
+                val sa = masks[1]?.let { ColorMatch.stats(a.rgb(), it) }
+                if (sb == null || sa == null) null else {
+                    val adj = ColorMatch.fit(sa, sb)
+                    val px = adj.apply(a.rgb())
+                    adj to Bitmap.createBitmap(a.width, a.height, Bitmap.Config.ARGB_8888).apply { setPixels(px, 0, a.width, 0, 0, a.width, a.height) }
+                }
             }
-        }
-        busy = false
-    }
+            ensureActive()
+            adjust = res?.first; preview = res?.second
+            source = when {
+                res != null && auto -> "piel detectada automáticamente"
+                res != null -> "puntos de referencia"
+                auto -> "no se encontró piel: toque un punto de referencia en cada foto"
+                else -> "toque un punto en cada foto"
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e
+        } catch (e: Exception) {
+            adjust = null; preview = null
+            source = "No se pudo analizar la piel: toque un punto de referencia en cada foto"
+        } finally { busy = false }
+    } }
 
     LaunchedEffect(Unit) {
-        bitmaps[0] = ImageOps.load34(context, before.uri, 360)
-        bitmaps[1] = ImageOps.load34(context, after.uri, 360)
-        compute(true)
+        try {
+            bitmaps[0] = ImageOps.load34(context, before.uri, 360)
+            bitmaps[1] = ImageOps.load34(context, after.uri, 360)
+            compute(true)
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e
+        } catch (e: Exception) {
+            busy = false
+            source = "No se pudo leer la fotografía (${e.message ?: e.javaClass.simpleName})"
+        }
     }
 
     Scaffold(topBar = {
@@ -155,7 +175,7 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
             Row(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
                 AssistChip(onClick = { points[0] = null; points[1] = null; compute(true) }, label = { Text("Automático (piel)") },
                     leadingIcon = { Icon(Icons.Default.AutoFixHigh, null) })
-                AssistChip(onClick = { points[0] = null; points[1] = null; adjust = null; preview = null; source = "toque un punto en cada foto" },
+                AssistChip(onClick = { job?.cancel(); points[0] = null; points[1] = null; adjust = null; preview = null; source = "toque un punto en cada foto" },
                     label = { Text("Punto de referencia") }, leadingIcon = { Icon(Icons.Default.Colorize, null) })
             }
             Text(source, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -165,5 +185,17 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
             }
             Box(Modifier.height(Md3Spacing.s8))
         }
+    }
+}
+
+/** Igualación automática (piel detectada) de [target] respecto de [ref]; null si no se encuentra piel. */
+suspend fun autoColorAdjust(context: android.content.Context, aligner: Aligner, ref: Photo, target: Photo): ColorAdjust? {
+    val b = ImageOps.load34(context, ref.uri, 360)
+    val a = ImageOps.load34(context, target.uri, 360)
+    val mb = aligner.skinMask(ref.zone, b) ?: return null
+    val ma = aligner.skinMask(target.zone, a) ?: return null
+    return withContext(Dispatchers.Default) {
+        val sa = ColorMatch.stats(a.rgb(), ma); val sb = ColorMatch.stats(b.rgb(), mb)
+        if (sa != null && sb != null) ColorMatch.fit(sa, sb) else null
     }
 }
