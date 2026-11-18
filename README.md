@@ -28,6 +28,10 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
 - **Medición de contornos**: selección automática (óvalo facial / silueta, como los stickers) o con
   **varita mágica**; alto, anchos por nivel, área y proporciones antes/después.
 
+- **Zoom manual** con deslizador o pellizco (pausa el zoom asistido; “Auto” lo reanuda).
+- **Guía adaptada a la referencia**: sigue la inclinación de la cabeza (línea entre los ojos) y la
+  forma del cráneo, mejillas, mandíbula y mentón (óvalo facial detectado, fila a fila).
+
 ### Galería del teléfono y metadatos
 - Las fotos se guardan en la galería, en un **álbum por paciente**: `Pictures/PhotoMed/<expediente>/`.
 - Cada foto incluye los datos del paciente y del expediente como **metadatos EXIF y XMP**
@@ -43,6 +47,9 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
   **progresiva** (línea de tiempo 1→2→…→N) y cada foto se alinea a la primera.
 - **Alineación configurable**: puntos anatómicos, contornos y **mirada (gaze)**, activas por defecto
   y desactivables con casillas en el menú.
+- **Exportar imágenes ajustadas**: cada foto con perspectiva, color y alineación aplicados (y una
+  composición en cuadrícula con fechas), sin datos del paciente por defecto; se guardan en el
+  subálbum `PhotoMed/<expediente>/Exportadas` o se comparten.
 - **Selección múltiple en la galería** (mantener pulsado): comparar, compartir (con o sin datos del
   paciente) o eliminar varias fotos.
 - **Alineación automática por zona**: hasta 140 puntos faciales o 33 corporales detectados en el

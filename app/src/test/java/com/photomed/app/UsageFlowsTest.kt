@@ -270,7 +270,15 @@ class CompareExportTest {
     }
 
     @Test
-    fun exportsAdjustedPhotosAndGrid() = kotlinx.coroutines.runBlocking {
+    fun exportsAdjustedPhotosAndGrid() {
+        // Coil necesita el hilo principal: el trabajo va en otro hilo y aquí se procesa el looper.
+        val fut = java.util.concurrent.Executors.newSingleThreadExecutor().submit<Unit> { kotlinx.coroutines.runBlocking { exportBody() } }
+        val end = System.currentTimeMillis() + 60_000
+        while (!fut.isDone && System.currentTimeMillis() < end) { org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle(); Thread.sleep(10) }
+        fut.get(1, java.util.concurrent.TimeUnit.SECONDS)
+    }
+
+    private suspend fun exportBody() {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val repo = PhotoRepository(File(tmp.root, "private"), FilePhotoStore(File(tmp.root, "Pictures/PhotoMed")),
             openStream = { uri -> File(uri.path!!).inputStream() })

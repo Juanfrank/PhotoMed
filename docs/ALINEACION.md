@@ -236,3 +236,18 @@ prueba con una foto real distorsionada (más oscura, más contraste, luz cálida
 ΔE 10,8 a **ΔE 0,4**.
 
 ![Igualar color](referencias/igualar_color.png)
+
+
+## Guía adaptada a la foto de referencia
+
+1. **Inclinación**: ángulo de la línea entre los centros de los contornos de los ojos (o pupilas;
+   hombros en el cuerpo). Los puntos se enderezan antes de ajustar y la guía se dibuja girada ese
+   ángulo. La misma medida se usa en la estandarización ("Enderece la cabeza: inclinada N° hacia…"),
+   más estable que el ángulo de Euler del modo rápido de ML Kit.
+2. **Vertical**: anclas (cejas, pupilas, base nasal, boca, mentón) a su altura detectada.
+3. **Contorno de la cabeza** (`tools/guides/face_profile.py`): bordes izquierdo/derecho del cráneo,
+   sienes, mejillas, mandíbula y mentón de la ilustración, por filas. En la app cada franja de la
+   guía se escala por separado a cada lado de la línea media hasta el óvalo facial detectado a esa
+   altura (desde las cejas; el cráneo conserva la forma de la ilustración con el ancho de la frente).
+
+![Guía adaptada a rostros inclinados](../app/src/test/snapshots/images/com.photomed.app_GuideAdaptTest_adaptedGuideOnTiltedFaces.png)
