@@ -15,6 +15,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.semantics.Role
 import com.photomed.app.align.LiveMatch
+import com.photomed.app.AppScope
 import com.photomed.app.align.ZoomController
 import kotlin.coroutines.resume
 import android.graphics.Bitmap
@@ -33,6 +34,8 @@ import androidx.compose.ui.semantics.liveRegion
 import com.photomed.app.align.ImageOps
 import com.photomed.app.align.LiveFrame
 import com.photomed.app.align.LiveMatcher
+import com.photomed.app.align.AnalysisPipeline
+import androidx.compose.runtime.SideEffect
 import com.photomed.app.align.MatchStatus
 import com.photomed.app.align.Perspective
 import com.photomed.app.align.Pt
@@ -239,10 +242,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     var live by remember { mutableStateOf<LiveFrame?>(null) }
     var focalNorm by remember { mutableStateOf<Float?>(null) }
     val tilt = rememberTilt(true)
-    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+    // Hilo de análisis con motor intercambiable: el analizador usa siempre el LiveMatcher actual;
+    // al cambiar de motor el anterior se cierra en el mismo hilo (sin usar uno cerrado).
+    val pipeline = remember { AnalysisPipeline<LiveMatcher>(Executors.newSingleThreadExecutor()) }
     var engine by remember { mutableStateOf(com.photomed.app.align.FaceEngine.get(context)) }
     val matcher = remember(zone, engine) { LiveMatcher(zone, context.applicationContext, engine) }
+    SideEffect { pipeline.swap(matcher) }
     matcher.threshold = threshold
+    DisposableEffect(Unit) { onDispose { pipeline.shutdown() } }
     val lastAnalysis = remember { AtomicLong(0L) }
     // Asistencia en vivo: con referencia (foto superpuesta) iguala el encuadre; sin ella, estandariza la toma.
     val matchingEnabled = liveMatch
@@ -250,19 +257,16 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     matcher.useReference = referenceMode
     val matchingFlag = remember { AtomicBoolean(false) }
     matchingFlag.set(matchingEnabled)
-    DisposableEffect(matcher) {
-        onDispose { analysisExecutor.execute { matcher.close() } }
-    }
-    DisposableEffect(Unit) { onDispose { analysisExecutor.shutdown() } }
 
     // Referencia para la coincidencia en vivo: la foto superpuesta (encuadre 3:4), con el motor elegido.
     LaunchedEffect(ghost?.key, matcher) {
         val g = ghost ?: return@LaunchedEffect
         live = null
         val bmp = runCatching { ImageOps.load34(context, g.uri, 360) }.getOrNull() ?: return@LaunchedEffect
-        analysisExecutor.execute {
-            runCatching { matcher.setReference(bmp) }
-            refPoints = matcher.referencePoints
+        val m = matcher
+        pipeline.post {
+            runCatching { m.setReference(bmp) }
+            refPoints = m.referencePoints
         }
     }
     val status = live?.eval?.status
@@ -304,6 +308,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             .build()
     }
     LaunchedEffect(imageCapture, flashMode) { imageCapture.flashMode = flashMode }
+    val analysisRef = remember { java.util.concurrent.atomic.AtomicReference<ImageAnalysis?>() }
     val analysis = remember(lensFacing) {
         ImageAnalysis.Builder()
             .setResolutionSelector(
@@ -315,12 +320,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .build().also { a ->
-                a.setAnalyzer(analysisExecutor) { proxy ->
+                analysisRef.set(a)
+                a.setAnalyzer({ r -> pipeline.post(r::run) }) { proxy ->
                     try {
                         val now = System.currentTimeMillis()
                         if (matchingFlag.get() && now - lastAnalysis.get() >= 180) {
                             lastAnalysis.set(now)
-                            live = matcher.analyze(proxy.toUprightCrop(360))
+                            val frame = proxy.toUprightCrop(360)
+                            pipeline.withEngine { it.analyze(frame) }?.let { live = it }
                         }
                     } catch (_: Exception) {
                     } finally {
@@ -329,6 +336,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                 }
             }
     }
+    DisposableEffect(lensFacing) { onDispose { runCatching { analysisRef.get()?.clearAnalyzer() } } }
 
     LaunchedEffect(lensFacing) {
         val provider = context.cameraProvider()
@@ -354,6 +362,21 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
         }
     }
 
+    fun captureConditions(): Map<String, String> = buildMap {
+        put("Engine", engine.label)
+        put("Zoom", "%.2f".format(java.util.Locale.US, zoomRatio))
+        live?.let { f ->
+            f.eval.pointFraction?.let { put("MatchPercent", "%.0f".format(java.util.Locale.US, it * 100)) }
+            put("Assist", if (f.standard) "estandarización" else "coincidencia con referencia")
+            put("Status", f.eval.status.name)
+            f.headYaw?.let { put("HeadYaw", "%.1f".format(java.util.Locale.US, it)) }
+            f.gaze?.let { put("Gaze", "%.2f,%.2f".format(java.util.Locale.US, it.x, it.y)) }
+            CameraGuidance.faceDistanceCm(f.currentPointsAll, focalNorm, zoomRatio)?.let {
+                put("DistanceCm", "%.0f".format(java.util.Locale.US, it))
+            }
+        }
+    }
+
     fun capture() {
         val e = exp ?: return
         if (capturing) return
@@ -368,38 +391,24 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
         imageCapture.takePicture(options, ContextCompat.getMainExecutor(context),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) {
-                            runCatching {
-                                repo.savePhoto(
-                                    e, zone, temp,
-                                    cameraPitch = Perspective.cameraPitchFromDevice(
-                                        tilt.value.pitch, lensFacing == CameraSelector.LENS_FACING_FRONT),
-                                    roll = tilt.value.roll,
-                                    focalNorm = focalNorm,
-                                    conditions = buildMap {
-                                        put("Engine", engine.label)
-                                        put("Zoom", "%.2f".format(java.util.Locale.US, zoomRatio))
-                                        live?.let { f ->
-                                            f.eval.pointFraction?.let { put("MatchPercent", "%.0f".format(java.util.Locale.US, it * 100)) }
-                                            put("Assist", if (f.standard) "estandarización" else "coincidencia con referencia")
-                                            put("Status", f.eval.status.name)
-                                            f.headYaw?.let { put("HeadYaw", "%.1f".format(java.util.Locale.US, it)) }
-                                            CameraGuidance.faceDistanceCm(f.currentPointsAll, focalNorm, zoomRatio)?.let {
-                                                put("DistanceCm", "%.0f".format(java.util.Locale.US, it))
-                                            }
-                                        }
-                                    },
-                                )
-                            }.also { temp.delete() }
-                        }
-                        capturing = false
-                        result.onSuccess {
-                            lastSaved = it
-                            reload++
-                            snackbar.showSnackbar("Guardada en el álbum ${e.id}")
-                        }.onFailure {
-                            snackbar.showSnackbar("No se pudo guardar: ${it.message}")
+                    val conditions = captureConditions()
+                    val pitch = Perspective.cameraPitchFromDevice(tilt.value.pitch, lensFacing == CameraSelector.LENS_FACING_FRONT)
+                    val roll = tilt.value.roll
+                    val focal = focalNorm
+                    // Se guarda en el ámbito de la app: termina aunque se cierre la cámara.
+                    AppScope.launch {
+                        val result = runCatching {
+                            repo.savePhoto(e, zone, temp, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conditions)
+                        }.also { temp.delete() }
+                        scope.launch {
+                            capturing = false
+                            result.onSuccess {
+                                lastSaved = it
+                                reload++
+                                snackbar.showSnackbar("Guardada en el álbum ${e.id}")
+                            }.onFailure {
+                                snackbar.showSnackbar("No se pudo guardar: ${it.message}")
+                            }
                         }
                     }
                 }
@@ -759,7 +768,10 @@ private fun ImageProxy.toUprightCrop(width: Int): Bitmap {
     val cropped = Bitmap.createBitmap(full, r.left, r.top, r.width(), r.height())
     val m = Matrix().apply { postRotate(imageInfo.rotationDegrees.toFloat()) }
     val upright = Bitmap.createBitmap(cropped, 0, 0, cropped.width, cropped.height, m, true)
-    return ImageOps.centerCrop34(upright, width)
+    val out = ImageOps.centerCrop34(upright, width)
+    // liberar intermedios (≈ 15 bitmaps/s): menos presión sobre la memoria y el recolector
+    for (b in listOf(full, cropped, upright)) if (b !== out && !b.isRecycled) b.recycle()
+    return out
 }
 
 /** Focal de la cámara en unidades de alto de imagen (lado largo del sensor), para la corrección de perspectiva. */

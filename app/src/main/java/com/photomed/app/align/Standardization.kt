@@ -74,6 +74,12 @@ object Standardization {
             det.pitch?.let { if (abs(it) > PITCH_TOL) { hints += "Frankfort: " + (if (it > 0) "baje" else "suba") + " un poco la barbilla (%.0f°)".format(abs(it)); off += abs(it) / PITCH_TOL } }
             det.roll?.let { if (abs(it) > ROLL_TOL) { hints += "Enderece la cabeza (inclinada %.0f°)".format(abs(it)); off += abs(it) / ROLL_TOL } }
         }
+        det.gaze?.let { g ->
+            if (kotlin.math.abs(g.x) > Gaze.TOL_X * 1.2f || kotlin.math.abs(g.y) > Gaze.TOL_Y * 1.2f) {
+                hints += "Mirada: pida que mire al frente, en la dirección de la cabeza"
+                off += 0.6f
+            }
+        }
         lighting?.let { l ->
             val m = maxOf(l.leftCheek, l.rightCheek)
             if (m > 0f && abs(l.leftCheek - l.rightCheek) / m > LIGHT_ASYM) {
@@ -89,7 +95,7 @@ object Standardization {
             else -> MatchStatus.FAR
         }
         return MatchEval(status, (1f - off / 5f).coerceIn(0f, 1f), hints, threshold = 1f,
-            headYawDelta = det.yaw ?: 0f, headPitchDelta = det.pitch ?: 0f)
+            headYawDelta = det.yaw ?: 0f, headPitchDelta = det.pitch ?: 0f, gazeDelta = det.gaze)
     }
 
     /** Muestreo de luminancia en las mejillas (entre ojo y borde del óvalo) y en el centro del rostro. */

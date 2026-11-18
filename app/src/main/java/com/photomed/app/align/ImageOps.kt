@@ -30,7 +30,9 @@ object ImageOps {
         val scale = maxOf(width.toFloat() / src.width, targetH.toFloat() / src.height)
         val scaled = Bitmap.createScaledBitmap(src, (src.width * scale).toInt().coerceAtLeast(width),
             (src.height * scale).toInt().coerceAtLeast(targetH), true)
-        return Bitmap.createBitmap(scaled, (scaled.width - width) / 2, (scaled.height - targetH) / 2, width, targetH)
+        val out = Bitmap.createBitmap(scaled, (scaled.width - width) / 2, (scaled.height - targetH) / 2, width, targetH)
+        if (scaled !== src && scaled !== out) scaled.recycle()
+        return out
     }
 
     /** Endereza la perspectiva vertical (ver [Perspective]); con 0° devuelve la misma imagen. */

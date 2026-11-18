@@ -17,7 +17,8 @@ object LiveDecision {
     const val POSE_MAX = 6f
     const val MIN_POINTS = 4
 
-    fun evaluate(spec: ZoneAlignment, ref: Detection, cur: Detection, threshold: Float, wasMatched: Boolean): MatchEval {
+    fun evaluate(spec: ZoneAlignment, ref: Detection, cur: Detection, threshold: Float, wasMatched: Boolean,
+                 useGaze: Boolean = true): MatchEval {
         val keys = spec.landmarks.filter { it in ref.points && it in cur.points }
         if (keys.size < MIN_POINTS) {
             val what = if (spec.detector == Detector.FACE) "No se detecta el rostro" else "No se detecta el cuerpo"
@@ -28,8 +29,18 @@ object LiveDecision {
         val ks = KeystoneFit.fromLandmarks(rp, cp)?.keystoneDeg ?: 0f
         val dYaw = if (ref.yaw != null && cur.yaw != null) cur.yaw - ref.yaw else 0f
         val dPitch = if (ref.pitch != null && cur.pitch != null) cur.pitch - ref.pitch else 0f
-        return LiveMatch.evaluate(t, spec.pivot, wasMatched, LiveMatch.pointFraction(rp, cp), threshold, ks,
+        val e = LiveMatch.evaluate(t, spec.pivot, wasMatched, LiveMatch.pointFraction(rp, cp), threshold, ks,
             dYaw, dPitch, gate = true)
+        // Mirada: debe coincidir con la de la referencia (si ambas se midieron)
+        val rg = ref.gaze; val cg = cur.gaze
+        if (!useGaze || rg == null || cg == null) return e
+        val d = Pt(cg.x - rg.x, cg.y - rg.y)
+        if (Gaze.matches(rg, cg)) return e.copy(gazeDelta = d)
+        val hint = Gaze.hint(d)
+        return e.copy(
+            status = if (e.status == MatchStatus.MATCH) MatchStatus.CLOSE else e.status,
+            hints = e.hints + listOfNotNull(hint), gazeDelta = d,
+        )
     }
 
     fun poseOk(dYaw: Float, dPitch: Float) = abs(dYaw) <= POSE_MAX && abs(dPitch) <= POSE_MAX

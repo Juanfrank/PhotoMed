@@ -21,7 +21,9 @@ import java.io.Closeable
  * normalizadas por el ancho. Llamadas bloqueantes: usar fuera del hilo principal.
  */
 /** Puntos detectados + pose de la cabeza (Euler, °) si es un rostro. */
-data class Detection(val points: Map<String, Pt>, val yaw: Float? = null, val pitch: Float? = null, val roll: Float? = null) {
+data class Detection(val points: Map<String, Pt>, val yaw: Float? = null, val pitch: Float? = null, val roll: Float? = null,
+                     /** Dirección de la mirada (ver [Gaze]); null si no hay ojos. */
+                     val gaze: Pt? = null) {
     companion object { val EMPTY = Detection(emptyMap()) }
 }
 
@@ -50,7 +52,11 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
 
     fun detectFull(detector: Detector, bmp: Bitmap): Detection = try {
         when (detector) {
-            Detector.FACE -> mediaPipe?.detect(bmp) ?: detectFace(bmp)
+            Detector.FACE -> {
+                val mp = mediaPipe?.detect(bmp)
+                if (mp != null && mp.points.isNotEmpty()) mp.copy(gaze = Gaze.fromIris(mp.points))
+                else detectFace(bmp).let { d -> if (d.points.isEmpty()) d else d.copy(gaze = Gaze.fromImage(d.points, bmp.rgb(), bmp.width, bmp.height)) }
+            }
             Detector.POSE -> Detection(detectPose(bmp))
             Detector.NONE -> Detection.EMPTY
         }

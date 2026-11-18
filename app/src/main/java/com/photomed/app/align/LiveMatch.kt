@@ -26,6 +26,8 @@ data class MatchEval(
     val scale: Float = 1f,
     val headYawDelta: Float = 0f,
     val headPitchDelta: Float = 0f,
+    /** Diferencia de mirada actual − referencia (o mirada absoluta en estandarización). */
+    val gazeDelta: Pt? = null,
 )
 
 /**
