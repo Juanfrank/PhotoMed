@@ -1,0 +1,314 @@
+package com.photomed.app.ui.camera
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.dp
+import com.photomed.app.data.GuideType
+import com.photomed.app.data.Zone
+
+/**
+ * Guía anatómica en coordenadas normalizadas (0..1) dentro de un encuadre 3:4.
+ * [contours]: siluetas (trazo continuo). [lines]: líneas de referencia (discontinuas).
+ * [marks]: puntos de referencia (círculos pequeños).
+ */
+class Guide(
+    val contours: List<Pair<List<Offset>, Boolean>>, // puntos + cerrado
+    val lines: List<Pair<Offset, Offset>>,
+    val marks: List<Offset> = emptyList(),
+)
+
+private val ContourColor = Color(0xFF7CF5E4)
+private val LineColor = Color(0xFFFFD54F)
+private val GridColor = Color(0x99FFFFFF)
+private val Shadow = Color(0x66000000)
+
+@Composable
+fun GuideOverlay(
+    zone: Zone,
+    showContour: Boolean,
+    showGrid: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val guide = guideFor(zone.guide)
+    Canvas(modifier) {
+        if (showGrid) drawGrid()
+        if (showContour) drawGuide(guide, zone.mirrored)
+    }
+}
+
+private fun DrawScope.drawGrid() {
+    val w = size.width
+    val h = size.height
+    val stroke = 1.dp.toPx()
+    for (i in 1..2) {
+        drawLine(GridColor, Offset(w * i / 3f, 0f), Offset(w * i / 3f, h), stroke)
+        drawLine(GridColor, Offset(0f, h * i / 3f), Offset(w, h * i / 3f), stroke)
+    }
+    // Cruz central
+    val c = Offset(w / 2, h / 2)
+    val s = 14.dp.toPx()
+    drawLine(Color.White, c - Offset(s, 0f), c + Offset(s, 0f), 1.5f.dp.toPx())
+    drawLine(Color.White, c - Offset(0f, s), c + Offset(0f, s), 1.5f.dp.toPx())
+}
+
+private fun DrawScope.drawGuide(guide: Guide, mirror: Boolean) {
+    fun map(p: Offset) = Offset((if (mirror) 1f - p.x else p.x) * size.width, p.y * size.height)
+
+    val dash = PathEffect.dashPathEffect(floatArrayOf(10.dp.toPx(), 8.dp.toPx()))
+    guide.lines.forEach { (a, b) ->
+        drawLine(Shadow, map(a), map(b), 3.dp.toPx(), pathEffect = dash)
+        drawLine(LineColor, map(a), map(b), 1.5f.dp.toPx(), pathEffect = dash)
+    }
+    guide.contours.forEach { (points, closed) ->
+        val path = smoothPath(points.map(::map), closed)
+        drawPath(path, Shadow, style = Stroke(4.5f.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(path, ContourColor, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
+    }
+    guide.marks.forEach { m ->
+        drawCircle(Shadow, 6.dp.toPx(), map(m), style = Stroke(3.dp.toPx()))
+        drawCircle(LineColor, 6.dp.toPx(), map(m), style = Stroke(1.5f.dp.toPx()))
+    }
+}
+
+
+/** Curva Catmull-Rom suave que pasa por todos los puntos. */
+fun smoothPath(pts: List<Offset>, closed: Boolean): Path {
+    val path = Path()
+    if (pts.size < 2) return path
+    val n = pts.size
+    fun at(i: Int): Offset = if (closed) pts[(i + n) % n] else pts[i.coerceIn(0, n - 1)]
+    path.moveTo(pts[0].x, pts[0].y)
+    val segments = if (closed) n else n - 1
+    for (i in 0 until segments) {
+        val p0 = at(i - 1)
+        val p1 = at(i)
+        val p2 = at(i + 1)
+        val p3 = at(i + 2)
+        val c1 = p1 + (p2 - p0) / 6f
+        val c2 = p2 - (p3 - p1) / 6f
+        path.cubicTo(c1.x, c1.y, c2.x, c2.y, p2.x, p2.y)
+    }
+    if (closed) path.close()
+    return path
+}
+
+private fun o(x: Float, y: Float) = Offset(x, y)
+private fun hLine(y: Float, x0: Float = 0.04f, x1: Float = 0.96f) = o(x0, y) to o(x1, y)
+private fun vLine(x: Float, y0: Float = 0.03f, y1: Float = 0.97f) = o(x, y0) to o(x, y1)
+private fun mirrorX(points: List<Offset>) = points.map { o(1f - it.x, it.y) }
+private fun open(p: List<Offset>) = p to false
+private fun closed(p: List<Offset>) = p to true
+
+fun guideFor(type: GuideType): Guide = when (type) {
+    GuideType.FACE_FRONT -> Guide(
+        contours = listOf(
+            // Óvalo facial
+            closed(listOf(
+                o(0.50f, 0.14f), o(0.68f, 0.18f), o(0.77f, 0.32f), o(0.76f, 0.46f),
+                o(0.71f, 0.60f), o(0.61f, 0.71f), o(0.50f, 0.75f), o(0.39f, 0.71f),
+                o(0.29f, 0.60f), o(0.24f, 0.46f), o(0.23f, 0.32f), o(0.32f, 0.18f),
+            )),
+            // Cuello y hombros
+            open(listOf(o(0.38f, 0.70f), o(0.37f, 0.84f), o(0.20f, 0.91f), o(0.04f, 0.95f))),
+            open(listOf(o(0.62f, 0.70f), o(0.63f, 0.84f), o(0.80f, 0.91f), o(0.96f, 0.95f))),
+        ),
+        lines = listOf(
+            vLine(0.5f),
+            hLine(0.18f, 0.2f, 0.8f), // implantación capilar
+            hLine(0.37f, 0.15f, 0.85f), // cejas / glabela
+            hLine(0.42f, 0.15f, 0.85f), // línea pupilar
+            hLine(0.56f, 0.2f, 0.8f), // base nasal
+            hLine(0.75f, 0.3f, 0.7f), // mentón
+            vLine(0.385f, 0.38f, 0.66f), vLine(0.615f, 0.38f, 0.66f), // líneas medio-pupilares
+        ),
+        marks = listOf(o(0.385f, 0.42f), o(0.615f, 0.42f)),
+    )
+
+    GuideType.FACE_OBLIQUE -> Guide(
+        contours = listOf(
+            closed(listOf(
+                o(0.47f, 0.14f), o(0.64f, 0.18f), o(0.71f, 0.32f), o(0.72f, 0.45f),
+                o(0.68f, 0.58f), o(0.60f, 0.70f), o(0.50f, 0.75f), o(0.40f, 0.71f),
+                o(0.30f, 0.60f), o(0.25f, 0.46f), o(0.24f, 0.32f), o(0.31f, 0.18f),
+            )),
+            // Dorso nasal desplazado hacia el lado visible
+            open(listOf(o(0.53f, 0.38f), o(0.58f, 0.46f), o(0.70f, 0.53f), o(0.66f, 0.56f), o(0.61f, 0.555f))),
+            open(listOf(o(0.42f, 0.70f), o(0.40f, 0.84f), o(0.20f, 0.92f), o(0.04f, 0.95f))),
+            open(listOf(o(0.60f, 0.70f), o(0.62f, 0.84f), o(0.80f, 0.91f), o(0.96f, 0.94f))),
+        ),
+        lines = listOf(
+            vLine(0.70f, 0.10f, 0.80f), // eje: punta nasal alineada con mejilla
+            hLine(0.37f, 0.15f, 0.85f),
+            hLine(0.42f, 0.15f, 0.85f),
+            hLine(0.56f, 0.2f, 0.8f),
+        ),
+        marks = listOf(o(0.40f, 0.42f), o(0.64f, 0.42f)),
+    )
+
+    GuideType.FACE_PROFILE -> Guide(
+        contours = listOf(
+            open(listOf(
+                o(0.30f, 0.12f), o(0.50f, 0.12f), o(0.62f, 0.22f), o(0.65f, 0.33f),
+                o(0.645f, 0.38f), o(0.69f, 0.45f), o(0.74f, 0.50f), o(0.67f, 0.535f),
+                o(0.685f, 0.575f), o(0.665f, 0.60f), o(0.68f, 0.63f), o(0.65f, 0.665f),
+                o(0.67f, 0.71f), o(0.61f, 0.76f), o(0.55f, 0.78f), o(0.55f, 0.95f),
+            )),
+            open(listOf(o(0.30f, 0.12f), o(0.22f, 0.25f), o(0.22f, 0.42f), o(0.29f, 0.58f), o(0.34f, 0.70f), o(0.34f, 0.95f))),
+            // Oreja
+            closed(listOf(o(0.40f, 0.40f), o(0.45f, 0.39f), o(0.46f, 0.46f), o(0.43f, 0.53f), o(0.39f, 0.50f))),
+        ),
+        lines = listOf(
+            hLine(0.42f, 0.10f, 0.90f), // plano de Frankfort
+            vLine(0.65f, 0.08f, 0.85f), // vertical verdadera por glabela
+            hLine(0.535f, 0.55f, 0.90f), // subnasal
+        ),
+        marks = listOf(o(0.395f, 0.42f), o(0.585f, 0.42f)), // tragion / orbitale
+    )
+
+    GuideType.FOREHEAD -> Guide(
+        contours = listOf(
+            // Cejas
+            open(listOf(o(0.12f, 0.70f), o(0.24f, 0.63f), o(0.38f, 0.64f), o(0.45f, 0.68f))),
+            open(listOf(o(0.88f, 0.70f), o(0.76f, 0.63f), o(0.62f, 0.64f), o(0.55f, 0.68f))),
+            // Implantación capilar
+            open(listOf(o(0.06f, 0.30f), o(0.20f, 0.17f), o(0.50f, 0.12f), o(0.80f, 0.17f), o(0.94f, 0.30f))),
+            // Contorno lateral
+            open(listOf(o(0.06f, 0.30f), o(0.05f, 0.60f), o(0.08f, 0.92f))),
+            open(listOf(o(0.94f, 0.30f), o(0.95f, 0.60f), o(0.92f, 0.92f))),
+        ),
+        lines = listOf(vLine(0.5f), hLine(0.68f), hLine(0.40f, 0.15f, 0.85f)),
+    )
+
+    GuideType.PERIOCULAR -> Guide(
+        contours = listOf(
+            closed(listOf(o(0.12f, 0.52f), o(0.22f, 0.45f), o(0.34f, 0.46f), o(0.43f, 0.53f), o(0.32f, 0.57f), o(0.20f, 0.56f))),
+            closed(listOf(o(0.88f, 0.52f), o(0.78f, 0.45f), o(0.66f, 0.46f), o(0.57f, 0.53f), o(0.68f, 0.57f), o(0.80f, 0.56f))),
+            open(listOf(o(0.06f, 0.36f), o(0.20f, 0.29f), o(0.36f, 0.30f), o(0.45f, 0.35f))),
+            open(listOf(o(0.94f, 0.36f), o(0.80f, 0.29f), o(0.64f, 0.30f), o(0.55f, 0.35f))),
+            // Surco nasoyugal / ojera
+            open(listOf(o(0.40f, 0.62f), o(0.28f, 0.70f), o(0.15f, 0.70f))),
+            open(listOf(o(0.60f, 0.62f), o(0.72f, 0.70f), o(0.85f, 0.70f))),
+        ),
+        lines = listOf(vLine(0.5f), hLine(0.515f)),
+        marks = listOf(o(0.275f, 0.515f), o(0.725f, 0.515f)),
+    )
+
+    GuideType.LIPS -> Guide(
+        contours = listOf(
+            // Labio superior
+            open(listOf(o(0.18f, 0.52f), o(0.30f, 0.44f), o(0.42f, 0.39f), o(0.50f, 0.42f),
+                o(0.58f, 0.39f), o(0.70f, 0.44f), o(0.82f, 0.52f))),
+            // Labio inferior
+            open(listOf(o(0.18f, 0.52f), o(0.30f, 0.60f), o(0.50f, 0.65f), o(0.70f, 0.60f), o(0.82f, 0.52f))),
+            // Línea de cierre
+            open(listOf(o(0.18f, 0.52f), o(0.35f, 0.515f), o(0.50f, 0.525f), o(0.65f, 0.515f), o(0.82f, 0.52f))),
+            // Surcos nasogenianos
+            open(listOf(o(0.24f, 0.18f), o(0.14f, 0.40f), o(0.10f, 0.62f))),
+            open(listOf(o(0.76f, 0.18f), o(0.86f, 0.40f), o(0.90f, 0.62f))),
+            // Base nasal
+            open(listOf(o(0.36f, 0.20f), o(0.44f, 0.24f), o(0.50f, 0.23f), o(0.56f, 0.24f), o(0.64f, 0.20f))),
+        ),
+        lines = listOf(vLine(0.5f), hLine(0.52f)),
+    )
+
+    GuideType.NECK -> Guide(
+        contours = listOf(
+            open(listOf(o(0.20f, 0.04f), o(0.27f, 0.18f), o(0.40f, 0.27f), o(0.50f, 0.29f),
+                o(0.60f, 0.27f), o(0.73f, 0.18f), o(0.80f, 0.04f))),
+            open(listOf(o(0.34f, 0.24f), o(0.33f, 0.45f), o(0.30f, 0.58f), o(0.15f, 0.66f), o(0.03f, 0.72f))),
+            open(listOf(o(0.66f, 0.24f), o(0.67f, 0.45f), o(0.70f, 0.58f), o(0.85f, 0.66f), o(0.97f, 0.72f))),
+            // Clavículas
+            open(listOf(o(0.45f, 0.64f), o(0.30f, 0.66f), o(0.12f, 0.70f))),
+            open(listOf(o(0.55f, 0.64f), o(0.70f, 0.66f), o(0.88f, 0.70f))),
+        ),
+        lines = listOf(vLine(0.5f), hLine(0.29f, 0.2f, 0.8f), hLine(0.64f)),
+        marks = listOf(o(0.5f, 0.62f)),
+    )
+
+    GuideType.TORSO_FRONT -> Guide(
+        contours = listOf(torsoLeft, mirrorX(torsoLeft)).map { it to false },
+        lines = listOf(vLine(0.5f), hLine(0.66f, 0.2f, 0.8f), hLine(0.90f, 0.15f, 0.85f)),
+        marks = listOf(o(0.5f, 0.66f)),
+    )
+
+    GuideType.BREASTS -> Guide(
+        contours = listOf(torsoLeft, mirrorX(torsoLeft)).map { it to false } + listOf(
+            open(listOf(o(0.25f, 0.30f), o(0.26f, 0.42f), o(0.36f, 0.48f), o(0.46f, 0.43f))),
+            open(listOf(o(0.75f, 0.30f), o(0.74f, 0.42f), o(0.64f, 0.48f), o(0.54f, 0.43f))),
+        ),
+        lines = listOf(vLine(0.5f), hLine(0.38f, 0.15f, 0.85f), hLine(0.47f, 0.2f, 0.8f)),
+        marks = listOf(o(0.36f, 0.38f), o(0.64f, 0.38f), o(0.5f, 0.12f)),
+    )
+
+    GuideType.TORSO_SIDE -> Guide(
+        contours = listOf(
+            open(listOf(o(0.42f, 0.03f), o(0.40f, 0.20f), o(0.39f, 0.40f), o(0.37f, 0.55f),
+                o(0.33f, 0.70f), o(0.34f, 0.82f), o(0.40f, 0.97f))),
+            open(listOf(o(0.56f, 0.03f), o(0.62f, 0.15f), o(0.66f, 0.27f), o(0.60f, 0.36f),
+                o(0.60f, 0.48f), o(0.64f, 0.62f), o(0.60f, 0.76f), o(0.58f, 0.97f))),
+        ),
+        lines = listOf(vLine(0.48f), hLine(0.62f, 0.2f, 0.8f), hLine(0.80f, 0.2f, 0.8f)),
+        marks = listOf(o(0.64f, 0.62f)),
+    )
+
+    GuideType.BACK -> Guide(
+        contours = listOf(torsoLeft, mirrorX(torsoLeft)).map { it to false } + listOf(
+            // Escápulas
+            open(listOf(o(0.30f, 0.16f), o(0.40f, 0.20f), o(0.40f, 0.33f), o(0.33f, 0.40f))),
+            open(listOf(o(0.70f, 0.16f), o(0.60f, 0.20f), o(0.60f, 0.33f), o(0.67f, 0.40f))),
+        ),
+        lines = listOf(vLine(0.5f), hLine(0.40f, 0.2f, 0.8f), hLine(0.70f, 0.2f, 0.8f)),
+    )
+
+    GuideType.GLUTES -> Guide(
+        contours = listOf(
+            open(listOf(o(0.24f, 0.04f), o(0.20f, 0.22f), o(0.13f, 0.42f), o(0.14f, 0.62f), o(0.20f, 0.80f), o(0.24f, 0.97f))),
+            open(listOf(o(0.76f, 0.04f), o(0.80f, 0.22f), o(0.87f, 0.42f), o(0.86f, 0.62f), o(0.80f, 0.80f), o(0.76f, 0.97f))),
+            // Pliegues glúteos
+            open(listOf(o(0.49f, 0.60f), o(0.40f, 0.66f), o(0.28f, 0.66f), o(0.18f, 0.62f))),
+            open(listOf(o(0.51f, 0.60f), o(0.60f, 0.66f), o(0.72f, 0.66f), o(0.82f, 0.62f))),
+            // Pliegue interglúteo
+            open(listOf(o(0.50f, 0.30f), o(0.50f, 0.58f))),
+            // Muslos (cara interna)
+            open(listOf(o(0.49f, 0.66f), o(0.47f, 0.80f), o(0.46f, 0.97f))),
+            open(listOf(o(0.51f, 0.66f), o(0.53f, 0.80f), o(0.54f, 0.97f))),
+        ),
+        lines = listOf(vLine(0.5f), hLine(0.30f, 0.15f, 0.85f), hLine(0.64f, 0.1f, 0.9f)),
+    )
+
+    GuideType.LEGS -> Guide(
+        contours = listOf(legLeft, mirrorX(legLeft), legLeftInner, mirrorX(legLeftInner)).map { it to false },
+        lines = listOf(vLine(0.5f), hLine(0.58f, 0.1f, 0.9f), hLine(0.08f, 0.1f, 0.9f)),
+        marks = listOf(o(0.31f, 0.58f), o(0.69f, 0.58f)),
+    )
+
+    GuideType.ARM -> Guide(
+        // Brazo en abducción (vista posterior): hombro a la izquierda, mano hacia arriba
+        contours = listOf(
+            open(listOf(o(0.04f, 0.42f), o(0.25f, 0.40f), o(0.50f, 0.42f), o(0.70f, 0.44f), o(0.76f, 0.40f), o(0.78f, 0.20f), o(0.79f, 0.04f))),
+            open(listOf(o(0.04f, 0.62f), o(0.25f, 0.64f), o(0.50f, 0.60f), o(0.72f, 0.58f), o(0.86f, 0.52f), o(0.90f, 0.30f), o(0.89f, 0.04f))),
+        ),
+        lines = listOf(hLine(0.52f), vLine(0.80f, 0.04f, 0.70f)),
+        marks = listOf(o(0.82f, 0.56f)),
+    )
+}
+
+private val torsoLeft = listOf(
+    o(0.40f, 0.03f), o(0.38f, 0.08f), o(0.20f, 0.12f), o(0.14f, 0.18f),
+    o(0.19f, 0.32f), o(0.24f, 0.50f), o(0.26f, 0.62f), o(0.22f, 0.78f), o(0.19f, 0.97f),
+)
+
+private val legLeft = listOf(
+    o(0.14f, 0.03f), o(0.13f, 0.20f), o(0.19f, 0.42f), o(0.24f, 0.58f), o(0.22f, 0.72f), o(0.27f, 0.90f), o(0.30f, 0.97f),
+)
+private val legLeftInner = listOf(
+    o(0.49f, 0.10f), o(0.44f, 0.30f), o(0.40f, 0.50f), o(0.39f, 0.60f), o(0.40f, 0.75f), o(0.38f, 0.97f),
+)
