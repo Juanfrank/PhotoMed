@@ -245,6 +245,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     var zoomRange by remember { mutableStateOf(1f..4f) }
     var refPoints by remember { mutableStateOf<Map<String, Pt>>(emptyMap()) }
     var refSilhouette by remember { mutableStateOf<com.photomed.app.align.Silhouette?>(null) }
+    var refFree by remember { mutableStateOf<com.photomed.app.align.FreeContour?>(null) }
     var adaptGuide by remember { mutableStateOf(true) }
     var autoArmed by remember { mutableStateOf(true) }
     var live by remember { mutableStateOf<LiveFrame?>(null) }
@@ -272,12 +273,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
         val g = ghost ?: return@LaunchedEffect
         live = null
         refSilhouette = null
+        refFree = null
         val bmp = runCatching { ImageOps.load34(context, g.uri, 360) }.getOrNull() ?: return@LaunchedEffect
         val m = matcher
         pipeline.post {
             runCatching { m.setReference(bmp) }
             refPoints = m.referencePoints
             refSilhouette = m.referenceSilhouette
+            refFree = m.referenceFree
         }
     }
     val status = live?.eval?.status
@@ -559,7 +562,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                     GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize(),
                         tone = tone, adaptTo = if (adaptGuide && showGhost) refPoints else emptyMap(),
                         silhouette = if (adaptGuide && showGhost) refSilhouette else null,
-                        side = if (zone.hasLimbSides) limbSide else LimbSide.BOTH)
+                        side = if (zone.hasLimbSides) limbSide else LimbSide.BOTH,
+                        // modo libre: contorno de la referencia (si se superpone) o de lo que se ve ahora
+                        free = if (showGhost && refFree != null) refFree else live?.freeContour)
                     if (matchingEnabled) live?.let { LivePoints(it, tone, mirror = false) }
                 }
 

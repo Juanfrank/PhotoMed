@@ -28,6 +28,8 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
 - **Medición de contornos**: selección automática (óvalo facial / silueta, como los stickers) o con
   **varita mágica**; alto, anchos por nivel, área y proporciones antes/después.
 
+- **Modo libre**: zona sin dibujo cuya guía es el contorno de lo visible (silueta o bordes).
+- **Extremidades en modo individual**: una sola mano, pie o pierna dentro de la misma zona.
 - **Zoom manual** con deslizador o pellizco (pausa el zoom asistido; “Auto” lo reanuda).
 - **Guía adaptada a la referencia**: sigue la inclinación de la cabeza (línea entre los ojos) y la
   forma del cráneo, mejillas, mandíbula y mentón (óvalo facial detectado, fila a fila).

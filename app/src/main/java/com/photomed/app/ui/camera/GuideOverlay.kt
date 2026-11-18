@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,7 +75,13 @@ fun GuideOverlay(
     silhouette: com.photomed.app.align.Silhouette? = null,
     /** Modo individual de extremidades: una sola mano, pie o pierna (ver [LimbSide]). */
     side: LimbSide = LimbSide.BOTH,
+    /** Modo libre: contorno de lo visible (referencia o cuadro actual). */
+    free: com.photomed.app.align.FreeContour? = null,
 ) {
+    if (zone.guide == com.photomed.app.data.GuideType.FREE) {
+        FreeGuide(free, showContour, showGrid, modifier, tone)
+        return
+    }
     val base = GuideArtByZone[zone.id]
     val frame = base?.limbFrame(side)
     if (base == null || frame == null) {
@@ -480,6 +487,7 @@ fun guideFor(type: GuideType): Guide = when (type) {
     )
 
     GuideType.HANDS, GuideType.FEET -> Guide(emptyList(), listOf(vLine(0.5f)))
+    GuideType.FREE -> Guide(emptyList(), emptyList())
 
     GuideType.ARM -> Guide(
         // Brazo en abducción (vista posterior): hombro a la izquierda, mano hacia arriba
@@ -503,3 +511,33 @@ private val legLeft = listOf(
 private val legLeftInner = listOf(
     o(0.49f, 0.10f), o(0.44f, 0.30f), o(0.40f, 0.50f), o(0.39f, 0.60f), o(0.40f, 0.75f), o(0.38f, 0.97f),
 )
+
+
+/**
+ * Guía del modo libre: el borde exterior de lo visible (trazo con halo, en el color de la guía) o,
+ * si no se pudo aislar un sujeto, el dibujo lineal de sus bordes dominantes.
+ */
+@Composable
+private fun FreeGuide(free: com.photomed.app.align.FreeContour?, showContour: Boolean, showGrid: Boolean, modifier: Modifier, tone: GuideTone) {
+    val edgeBmp = remember(free) {
+        val f = free?.takeIf { it.edges != null } ?: return@remember null
+        val px = IntArray(f.edgeW * f.edgeH) { if (f.edges!![it]) 0xFFFFFFFF.toInt() else 0 }
+        android.graphics.Bitmap.createBitmap(px, f.edgeW, f.edgeH, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
+    }
+    Canvas(modifier) {
+        if (showGrid) drawGrid()
+        if (!showContour || free == null) return@Canvas
+        if (free.outline.size >= 3) {
+            val path = Path().apply {
+                moveTo(free.outline[0].x * size.width, free.outline[0].y * size.width)
+                free.outline.drop(1).forEach { lineTo(it.x * size.width, it.y * size.width) }
+                close()
+            }
+            drawPath(path, Color.Black.copy(alpha = 0.45f), style = Stroke(5.dp.toPx(), join = androidx.compose.ui.graphics.StrokeJoin.Round))
+            drawPath(path, tone.color, style = Stroke(2.5f.dp.toPx(), join = androidx.compose.ui.graphics.StrokeJoin.Round))
+        } else if (edgeBmp != null) {
+            drawImage(edgeBmp, dstSize = IntSize(size.width.toInt(), size.height.toInt()),
+                colorFilter = ColorFilter.tint(tone.color), filterQuality = androidx.compose.ui.graphics.FilterQuality.Low)
+        }
+    }
+}

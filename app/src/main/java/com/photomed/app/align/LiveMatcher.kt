@@ -19,6 +19,8 @@ data class LiveFrame(
     /** Cabeceo (°, + = barbilla arriba): geométrico si hay pose, si no del motor. */
     val headPitch: Float? = null,
     val gaze: Pt? = null,
+    /** Modo libre sin referencia: contorno de lo visible en el cuadro actual. */
+    val freeContour: FreeContour? = null,
 )
 
 /**
@@ -51,9 +53,19 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     /** Silueta del sujeto en la referencia (segmentación), para adaptar la guía corporal y de perfil. */
     @Volatile var referenceSilhouette: Silhouette? = null
         private set
+    /** Modo libre: contorno de lo visible en la referencia. */
+    @Volatile var referenceFree: FreeContour? = null
+        private set
+    private var lastFree: FreeContour? = null
+    private var lastFreeAt = 0L
+    private var segmenterOrNull: SubjectSegmenter? = null
+    private val segmenter: SubjectSegmenter?
+        get() = segmenterOrNull ?: runCatching { SubjectSegmenter() }.getOrNull()?.also { segmenterOrNull = it }
 
     fun setReference(bmp: Bitmap) {
         ref = detector.detectFull(spec.detector, bmp)
+        referenceFree = if (zone.guide == com.photomed.app.data.GuideType.FREE)
+            runCatching { FreeContour.from(bmp) { b -> segmenter?.segment(b) } }.getOrNull() else null
         referenceSilhouette = runCatching {
             val plain = zone.guide == com.photomed.app.data.GuideType.HANDS || zone.guide == com.photomed.app.data.GuideType.FEET
             val mask = if (plain) ForegroundOnPlain.mask(bmp.rgb(), bmp.width, bmp.height)
@@ -72,7 +84,13 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val light = if (spec.detector == Detector.FACE && cur.points.isNotEmpty())
             Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) else null
         val eval = withDiagnostic(Standardization.evaluate(zone, cur, light), cur)
-        return LiveFrame(eval, method = "estandarización", currentPointsAll = cur.points, standard = true,
+        // Modo libre: el contorno se diseña con lo visible en el cuadro (como mucho cada 0,6 s)
+        val free = if (zone.guide != com.photomed.app.data.GuideType.FREE) null else {
+            val now = System.currentTimeMillis()
+            if (now - lastFreeAt > 600) { lastFreeAt = now; lastFree = runCatching { FreeContour.from(frame) { b -> segmenter?.segment(b) } }.getOrNull() }
+            lastFree
+        }
+        return LiveFrame(eval, method = "estandarización", currentPointsAll = cur.points, standard = true, freeContour = free,
             headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze)
     }
 
@@ -117,7 +135,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         return e.copy(hints = e.hints + "Detector ($engine): $d")
     }
 
-    override fun close() = detector.close()
+    override fun close() { detector.close(); runCatching { segmenterOrNull?.close() } }
 
     companion object {
         const val EDGE_W = 96

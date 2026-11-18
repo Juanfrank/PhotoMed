@@ -139,6 +139,12 @@ data class ZoneAlignment(
                     listOf("Punta del dedo medio derecho", "Punta del dedo medio izquierdo"),
                     "falanges, muñecas y bordes de las manos",
                 )
+                GuideType.FREE -> ZoneAlignment(
+                    Detector.NONE, emptySet(),
+                    listOf(r("encuadre", 0.5f, 0.667f, 0.46f, 0.62f)),
+                    emptyList(),
+                    "contornos de todo lo visible (silueta y bordes)",
+                )
                 GuideType.FEET -> ZoneAlignment(
                     Detector.POSE, setOf(L.ANKLE_L, L.ANKLE_R, L.HEEL_L, L.HEEL_R, L.FOOT_INDEX_L, L.FOOT_INDEX_R),
                     listOf(r("falanges", 0.5f, 0.98f, 0.45f, 0.1f), r("tobillos y talones", 0.5f, 0.55f, 0.45f, 0.15f, 0.8f)),

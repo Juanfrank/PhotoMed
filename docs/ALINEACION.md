@@ -255,6 +255,19 @@ verdoso con menos contraste); ΔE2000 medio píxel a píxel en la piel frente a 
 |---|---|---|---|
 | media de 108 casos | 7,08 | 1,68 | **0,81** |
 
+## Modo libre
+
+Zona "Modo libre" (categoría Libre) para cualquier región sin dibujo anatómico: la guía es el
+**contorno de lo visible**. En la primera toma se diseña en vivo con el cuadro de la cámara (cada
+~0,6 s); con foto de referencia superpuesta, con la de la referencia (`FreeContour`):
+
+1. silueta del sujeto sobre fondo liso (sustracción de fondo por color) o de la persona
+   (segmentación), y su borde exterior suavizado;
+2. si no se puede aislar un sujeto, los bordes dominantes de la imagen (Sobel, 7 % más fuerte, sin
+   puntos aislados) como dibujo lineal.
+
+La coincidencia en vivo y la alineación usan los contornos de todo el encuadre.
+
 ## Guía adaptada a la foto de referencia
 
 **Extremidades (manos, pies, piernas): modo individual.** En la cámara, "Ambas · Derecha ·

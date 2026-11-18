@@ -378,4 +378,32 @@ class GuideAdaptTest {
             }
         }
     }
+
+    @Test
+    fun freeModeContourFromVisible() {
+        val hand = BitmapFactory.decodeStream(javaClass.getResourceAsStream("/demo/limb_hand.png"))
+        val foot = BitmapFactory.decodeStream(javaClass.getResourceAsStream("/demo/limb_foot.png"))
+        val face = BitmapFactory.decodeStream(javaClass.getResourceAsStream("/demo/face_2.jpg"))
+        val fh = com.photomed.app.align.FreeContour.from(hand)!!
+        assertEquals("silueta sobre fondo liso", fh.source)
+        assertTrue(fh.outline.size > 40)
+        // el contorno rodea la mano: su recuadro coincide con el de la máscara
+        val xs = fh.outline.map { it.x }
+        assertTrue(xs.min() > 0.02f && xs.max() < 0.98f)
+        val ff = com.photomed.app.align.FreeContour.from(face)!!
+        assertTrue("fondo no liso y sin segmentador: bordes", ff.edges != null)
+        paparazzi.snapshot {
+            Row(Modifier.background(Color(0xFF1B1B1F)).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf(hand to fh, foot to com.photomed.app.align.FreeContour.from(foot)!!, face to ff).forEach { (b, f) ->
+                    Column(Modifier.width(120.dp)) {
+                        Box(Modifier.aspectRatio(3f / 4f)) {
+                            Image(b.asImageBitmap(), null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
+                            GuideOverlay(Zone.FREE, showContour = true, showGrid = true, modifier = Modifier.fillMaxSize(), free = f)
+                        }
+                        Text("Modo libre · ${f.source}", color = Color.White, fontSize = 8.sp)
+                    }
+                }
+            }
+        }
+    }
 }

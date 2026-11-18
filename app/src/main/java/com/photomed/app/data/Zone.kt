@@ -1,11 +1,13 @@
 package com.photomed.app.data
 
-enum class ZoneCategory(val label: String) { FACIAL("Facial"), CORPORAL("Corporal") }
+enum class ZoneCategory(val label: String) { FACIAL("Facial"), CORPORAL("Corporal"), FREE("Libre") }
 
 /** Tipo de guía (contorno) que se dibuja sobre la cámara para cada zona. */
 enum class GuideType {
     FACE_FRONT, FACE_OBLIQUE, FACE_PROFILE, FOREHEAD, PERIOCULAR, LIPS, NECK,
-    TORSO_FRONT, BREASTS, TORSO_SIDE, BACK, GLUTES, LEGS, ARM, HANDS, FEET
+    TORSO_FRONT, BREASTS, TORSO_SIDE, BACK, GLUTES, LEGS, ARM, HANDS, FEET,
+    /** Modo libre: la guía es el contorno de lo visible (referencia o cuadro actual). */
+    FREE
 }
 
 /**
@@ -63,7 +65,9 @@ enum class Zone(
     FEET_DORSAL("pies_dorso", "Pies (dorso)", ZoneCategory.CORPORAL, GuideType.FEET,
         hint = "Paciente de pie, pies paralelos separados; cámara cenital sobre el dorso."),
     FEET_PLANTAR("pies_planta", "Pies (planta)", ZoneCategory.CORPORAL, GuideType.FEET,
-        hint = "Paciente en decúbito prono, plantas hacia la cámara, talones arriba.");
+        hint = "Paciente en decúbito prono, plantas hacia la cámara, talones arriba."),
+    FREE("libre", "Modo libre", ZoneCategory.FREE, GuideType.FREE,
+        hint = "Cualquier región: la guía se diseña con el contorno de lo visible (fondo liso o persona); en las siguientes tomas, con el de la foto de referencia.");
 
     companion object {
         fun fromId(id: String?): Zone? = entries.firstOrNull { it.id == id }
