@@ -110,9 +110,23 @@ class Aligner(private val context: Context) {
 
     /** Región de piel para igualar color: óvalo facial reducido (sin pelo ni fondo) o centro de la silueta. */
     suspend fun skinMask(zone: Zone, bmp: Bitmap): BooleanArray? = withContext(Dispatchers.Default) {
-        val m = autoMask(ZoneAlignment.of(zone), bmp) ?: return@withContext null
+        val spec = ZoneAlignment.of(zone)
+        if (spec.detector == Detector.FACE) {
+            val pts = LandmarkDetector(stream = false, context, FaceEngine.get(context)).use { it.detect(Detector.FACE, bmp) }
+            faceSkin(pts, bmp.width, bmp.height)?.let { return@withContext it }
+        }
+        val m = when (zone.guide) {
+            com.photomed.app.data.GuideType.HANDS, com.photomed.app.data.GuideType.FEET -> ForegroundOnPlain.mask(bmp.rgb(), bmp.width, bmp.height)
+            else -> null
+        } ?: autoMask(spec, bmp) ?: return@withContext null
         MaskOps.erode(m, (bmp.width * 0.06f).toInt().coerceAtLeast(2)).data.takeIf { d -> d.count { it } > 50 }
     }
+
+    /**
+     * Piel del rostro a partir de los puntos: óvalo reducido, sin ojos, cejas, labios ni orificios
+     * nasales (dilatados), que no son piel y sesgarían el color medio.
+     */
+    fun faceSkin(points: Map<String, Pt>, w: Int, h: Int): BooleanArray? = faceSkinMask(points, w, h)
 
     private fun autoMask(spec: ZoneAlignment, bmp: Bitmap): Mask? {
         if (spec.detector == Detector.FACE) {
@@ -146,4 +160,27 @@ class Aligner(private val context: Context) {
         const val REFINE_W = 192
         const val MEASURE_W = 360
     }
+}
+
+/**
+ * Piel del rostro a partir de los puntos: óvalo reducido, sin ojos, cejas, labios ni orificios
+ * nasales (dilatados), que no son piel y sesgarían el color medio.
+ */
+fun faceSkinMask(points: Map<String, Pt>, w: Int, h: Int): BooleanArray? {
+    val p = FaceKeys.canonical(points)
+    val oval = (0 until 36).mapNotNull { p["oval_$it"] }
+    if (oval.size < 30) return null
+    val skin = MaskOps.erode(MaskOps.polygon(oval, w, h), (w * 0.04f).toInt().coerceAtLeast(2))
+    fun group(g: String) = (0 until 20).mapNotNull { p["$g$it"] }
+    val holes = listOf(
+        group("eye_l_"), group("eye_r_"),
+        group("brow_l_top_") + group("brow_l_bottom_").reversed(), group("brow_r_top_") + group("brow_r_bottom_").reversed(),
+        group("lip_upper_top_") + group("lip_lower_bottom_"),
+        group("nose_bottom_"),
+    ).filter { it.size >= 3 }
+    for (poly in holes) {
+        val d = MaskOps.dilate(MaskOps.polygon(poly, w, h), (w * 0.025f).toInt().coerceAtLeast(2))
+        for (i in skin.data.indices) if (d.data[i]) skin.data[i] = false
+    }
+    return skin.data.takeIf { d -> d.count { it } > 200 }
 }

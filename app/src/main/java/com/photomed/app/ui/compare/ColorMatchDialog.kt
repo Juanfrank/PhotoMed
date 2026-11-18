@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Colorize
 import androidx.compose.material3.AssistChip
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -89,6 +91,9 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
     var preview by remember { mutableStateOf<Bitmap?>(null) }
     var busy by remember { mutableStateOf(true) }
     var source by remember { mutableStateOf("") }
+    /** Modo: piel automática, punto de piel o punto neutro (carta gris/blanca). */
+    var mode by remember { mutableStateOf(ColorMode.AUTO) }
+    var deltaE by remember { mutableStateOf<Pair<Double, Double>?>(null) }
 
     var job by remember { mutableStateOf<Job?>(null) }
     // El último cálculo pedido gana: se cancela el anterior para no mostrar un resultado obsoleto.
@@ -97,29 +102,36 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
         val b = bitmaps[0] ?: return@launch; val a = bitmaps[1] ?: return@launch
         busy = true
         try {
-            val masks = if (auto) listOf(aligner.skinMask(before.zone, b), aligner.skinMask(after.zone, a))
+            val m = if (auto) ColorMode.AUTO else mode
+            val masks = if (m == ColorMode.AUTO) listOf(aligner.skinMask(before.zone, b), aligner.skinMask(after.zone, a))
             else listOf(points[0]?.let { ColorMatch.patch(b.width, b.height, it) }, points[1]?.let { ColorMatch.patch(a.width, a.height, it) })
             val res = withContext(Dispatchers.Default) {
                 val sb = masks[0]?.let { ColorMatch.stats(b.rgb(), it) }
                 val sa = masks[1]?.let { ColorMatch.stats(a.rgb(), it) }
                 if (sb == null || sa == null) null else {
-                    val adj = ColorMatch.fit(sa, sb)
+                    val adj = when (m) {
+                        ColorMode.AUTO -> ColorMatch.fit(sa, sb)
+                        ColorMode.SKIN_POINT -> ColorMatch.fit(sa, sb, tone = false)
+                        ColorMode.NEUTRAL -> ColorMatch.fitNeutral(sa, sb)
+                    }
                     val px = adj.apply(a.rgb())
-                    adj to Bitmap.createBitmap(a.width, a.height, Bitmap.Config.ARGB_8888).apply { setPixels(px, 0, a.width, 0, 0, a.width, a.height) }
+                    // ΔE2000 de la región usada, antes y después del ajuste
+                    val after2 = ColorMatch.stats(px, masks[1]!!)
+                    val de = ColorMatch.deltaE(sa, sb) to (after2?.let { ColorMatch.deltaE(it, sb) } ?: Double.NaN)
+                    Triple(adj, Bitmap.createBitmap(a.width, a.height, Bitmap.Config.ARGB_8888).apply { setPixels(px, 0, a.width, 0, 0, a.width, a.height) }, de)
                 }
             }
             ensureActive()
-            adjust = res?.first; preview = res?.second
+            adjust = res?.first; preview = res?.second; deltaE = res?.third
             source = when {
-                res != null && auto -> "piel detectada automáticamente"
-                res != null -> "puntos de referencia"
-                auto -> "no se encontró piel: toque un punto de referencia en cada foto"
-                else -> "toque un punto en cada foto"
+                res != null -> m.done
+                m == ColorMode.AUTO -> "no se encontró piel: use un punto de piel o un punto neutro"
+                else -> m.ask
             }
         } catch (e: kotlinx.coroutines.CancellationException) { throw e
         } catch (e: Exception) {
-            adjust = null; preview = null
-            source = "No se pudo analizar la piel: toque un punto de referencia en cada foto"
+            adjust = null; preview = null; deltaE = null
+            source = "No se pudo analizar la imagen: use un punto de referencia"
         } finally { busy = false }
     } }
 
@@ -144,7 +156,7 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
             verticalArrangement = Arrangement.spacedBy(Md3Spacing.s2),
         ) {
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth()) else Box(Modifier.height(4.dp))
-            Text("Toque la misma zona de piel en cada foto para usarla como punto de referencia, o use la detección automática.",
+            Text(mode.help,
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
                 listOf("Antes", "Después (ajustada)").forEachIndexed { i, label ->
@@ -154,6 +166,7 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
                                 .pointerInput(i) {
                                     detectTapGestures { pos ->
                                         points[i] = Pt(pos.x / size.width, pos.y / size.width)
+                                        if (mode == ColorMode.AUTO) mode = ColorMode.SKIN_POINT
                                         if (points[0] != null && points[1] != null) compute(false)
                                     }
                                 },
@@ -172,14 +185,25 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
-                AssistChip(onClick = { points[0] = null; points[1] = null; compute(true) }, label = { Text("Automático (piel)") },
-                    leadingIcon = { Icon(Icons.Default.AutoFixHigh, null) })
-                AssistChip(onClick = { job?.cancel(); points[0] = null; points[1] = null; adjust = null; preview = null; source = "toque un punto en cada foto" },
-                    label = { Text("Punto de referencia") }, leadingIcon = { Icon(Icons.Default.Colorize, null) })
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
+                ColorMode.entries.forEach { cm ->
+                    FilterChip(
+                        selected = mode == cm,
+                        onClick = {
+                            job?.cancel(); mode = cm; points[0] = null; points[1] = null
+                            if (cm == ColorMode.AUTO) compute(true) else { adjust = null; preview = null; deltaE = null; source = cm.ask }
+                        },
+                        label = { Text(cm.label) },
+                        leadingIcon = { Icon(if (cm == ColorMode.AUTO) Icons.Default.AutoFixHigh else Icons.Default.Colorize, null) },
+                    )
+                }
             }
             Text(source, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             adjust?.let { Text(it.describe(), style = MaterialTheme.typography.bodyMedium) }
+            deltaE?.let { (b0, a0) ->
+                Text("Diferencia de color ΔE2000: %.1f → %.1f  (≤ 2: apenas perceptible)".format(b0, a0),
+                    style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            }
             Button(onClick = { adjust?.let(onApply) }, enabled = adjust != null, modifier = Modifier.fillMaxWidth()) {
                 Text("Aplicar a la comparación")
             }
@@ -198,4 +222,17 @@ suspend fun autoColorAdjust(context: android.content.Context, aligner: Aligner, 
         val sa = ColorMatch.stats(a.rgb(), ma); val sb = ColorMatch.stats(b.rgb(), mb)
         if (sa != null && sb != null) ColorMatch.fit(sa, sb) else null
     }
+}
+
+/** Modos de igualación de color. */
+enum class ColorMode(val label: String, val help: String, val ask: String, val done: String) {
+    AUTO("Automático (piel)",
+        "Piel del rostro (sin ojos, cejas, labios ni fosas nasales) o de la extremidad: balance de blancos y exposición (Bradford) y gradación tonal.",
+        "", "piel detectada automáticamente"),
+    SKIN_POINT("Punto de piel",
+        "Toque la misma zona de piel en cada foto (p. ej. el centro de la mejilla).",
+        "toque la misma zona de piel en cada foto", "puntos de piel"),
+    NEUTRAL("Punto neutro (carta gris)",
+        "Toque una referencia neutra en cada foto (carta gris o blanca, bata): corrige el balance de blancos y la exposición sin suponer nada de la piel. Es lo más fiable si se fotografía una carta.",
+        "toque la carta gris o blanca en cada foto", "punto neutro"),
 }

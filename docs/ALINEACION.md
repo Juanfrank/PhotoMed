@@ -229,16 +229,40 @@ el nivel y la superposición de la foto anterior reducen estas diferencias en el
 
 ### Igualación del color de la piel
 
-Menú ⋮ → “Igualar color de piel” (Reinhard et al., 2001): estadísticos de la piel en CIELAB (región
-automática —óvalo facial reducido o silueta— o un punto de referencia tocado en cada foto) y ajuste
-de “después”: gamma (tonos medios), contraste y brillo (L*), temperatura (b*) y tinte (a*). En la
-prueba con una foto real distorsionada (más oscura, más contraste, luz cálida) la piel pasa de
-ΔE 10,8 a **ΔE 0,4**.
+Métodos establecidos, en tres modos (Comparar → Igualar color de piel):
 
-![Igualar color](referencias/igualar_color.png)
+1. **Automático (piel)**: piel del rostro a partir de los puntos (óvalo reducido sin ojos, cejas,
+   labios ni fosas nasales) o de la extremidad (sustracción de fondo); se descartan sombras y brillos
+   especulares (percentiles 5 y 95 de L*). Se supone la misma reflectancia de la piel en ambas
+   sesiones, así que su cambio de color es el del iluminante y la exposición:
+   - **adaptación cromática de Bradford** (von Kries en espacio de conos; la usada por ICC) que lleva
+     el color medio de la piel de "después" al de "antes": balance de blancos y exposición sin las
+     desviaciones de tono de escalar RGB o desplazar a*/b*;
+   - **gradación tonal** por cuantiles de L* de la piel (5–95 %, curva monótona): contraste y gamma.
+2. **Punto de piel**: lo mismo con la zona tocada en cada foto (sin gradación: la muestra es pequeña).
+3. **Punto neutro (carta gris o blanca)**: Bradford desde una referencia neutra tocada en cada foto,
+   sin suponer nada de la piel. Es la práctica de referencia en fotografía clínica: incluir una carta
+   gris (o de color) en la toma.
 
+Se muestra la diferencia **ΔE2000** (CIEDE2000; Sharma et al., 2005) de la piel antes y después
+(≤ 1 imperceptible, ≤ 2–3 apenas perceptible).
+
+Evaluación (`ColorMatchTest`): 27 rostros reales (3 de demostración + 24 de stock) con cambios de
+sesión conocidos (luz cálida −0,5 EV, luz fría +0,4 EV, flash con más contraste, fluorescente
+verdoso con menos contraste); ΔE2000 medio píxel a píxel en la piel frente a la foto original:
+
+| | sin corregir | Reinhard (método anterior) | Bradford + gradación |
+|---|---|---|---|
+| media de 108 casos | 7,08 | 1,68 | **0,81** |
 
 ## Guía adaptada a la foto de referencia
+
+**Extremidades (manos, pies, piernas): modo individual.** En la cámara, "Ambas · Derecha ·
+Izquierda" (en la misma zona). La guía se acerca a la mitad del dibujo de ese lado (lado anatómico
+según el dibujo: pulgar / dedo gordo; piernas de frente) y oculta la otra; se ajusta a la silueta de
+la extremidad en la referencia (manos y pies: sustracción de fondo liso por color; piernas:
+segmentación de la persona), con escala y desplazamiento robustos por filas. El lado se guarda en el
+nombre (`manos_dorso_der_…`) y en los metadatos; Comparar avisa si se comparan lados distintos.
 
 **Rostro (frontal, tercio superior, periocular, labios): rasgo a rasgo.** Thin-plate spline
 (Bookstein, 1989) con ~140 puntos de control: los de la malla de MediaPipe detectada sobre el propio
