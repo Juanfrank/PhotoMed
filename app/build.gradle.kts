@@ -96,6 +96,7 @@ dependencies {
     // Puntos anatómicos en el dispositivo (modelos incluidos en el APK, sin red)
     implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.google.mlkit:pose-detection:18.0.0-beta5")
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

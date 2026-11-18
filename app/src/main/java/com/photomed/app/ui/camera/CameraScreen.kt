@@ -1,6 +1,16 @@
 package com.photomed.app.ui.camera
 
 import android.Manifest
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.IconToggleButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.semantics.Role
+import com.photomed.app.align.LiveMatch
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.hardware.camera2.CameraCharacteristics
@@ -211,11 +221,17 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     var lastSaved by remember { mutableStateOf<Photo?>(null) }
     var liveMatch by remember { mutableStateOf(true) }
+    val prefs = remember { context.getSharedPreferences("photomed", android.content.Context.MODE_PRIVATE) }
+    var autoCapture by remember { mutableStateOf(prefs.getBoolean("auto_capture", false)) }
+    var threshold by remember { mutableFloatStateOf(prefs.getFloat("match_threshold", LiveMatch.DEFAULT_THRESHOLD)) }
+    var showSettings by remember { mutableStateOf(false) }
+    var autoArmed by remember { mutableStateOf(true) }
     var live by remember { mutableStateOf<LiveFrame?>(null) }
     var focalNorm by remember { mutableStateOf<Float?>(null) }
     val tilt = rememberTilt(true)
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
     val matcher = remember(zone) { LiveMatcher(zone) }
+    matcher.threshold = threshold
     val lastAnalysis = remember { AtomicLong(0L) }
     val matchingEnabled = liveMatch && showGhost && ghost != null
     val matchingFlag = remember { AtomicBoolean(false) }
@@ -367,6 +383,18 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     }
 
 
+    // Disparo automático: coincidencia sostenida ~0,4 s; una captura por cada coincidencia.
+    LaunchedEffect(status, autoCapture, matchingEnabled) {
+        if (status != MatchStatus.MATCH || !matchingEnabled) { autoArmed = true; return@LaunchedEffect }
+        if (autoCapture && autoArmed && !capturing) {
+            kotlinx.coroutines.delay(400)
+            if (live?.eval?.status == MatchStatus.MATCH && !capturing) {
+                autoArmed = false
+                capture()
+            }
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         // Barra superior
@@ -376,6 +404,15 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                 Text(zone.label, color = Color.White, style = MaterialTheme.typography.titleMedium)
                 Text(exp?.patientName.orEmpty(), color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
             }
+            IconToggleButton(
+                checked = autoCapture,
+                onCheckedChange = { autoCapture = it; prefs.edit().putBoolean("auto_capture", it).apply() },
+                enabled = photos.isNotEmpty(),
+            ) {
+                Icon(Icons.Default.AutoMode, if (autoCapture) "Disparo automático activado" else "Disparo automático desactivado",
+                    tint = if (autoCapture) GuideTone.MATCH.color else Color.White)
+            }
+            IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.Tune, "Ajustes de coincidencia", tint = Color.White) }
             IconButton(onClick = {
                 flashMode = when (flashMode) {
                     ImageCapture.FLASH_MODE_OFF -> ImageCapture.FLASH_MODE_ON
@@ -428,7 +465,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                     LevelIndicator(tilt.value, Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
                 }
                 if (matchingEnabled) {
-                    MatchBanner(live, Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp))
+                    MatchBanner(live, autoCapture, Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp))
                 }
                 if (showGhost && g != null) {
                     Text(
@@ -516,6 +553,15 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
         }
     }
     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 120.dp))
+    if (showSettings) {
+        MatchSettingsSheet(
+            autoCapture = autoCapture,
+            threshold = threshold,
+            onAutoCapture = { autoCapture = it; prefs.edit().putBoolean("auto_capture", it).apply() },
+            onThreshold = { threshold = it; prefs.edit().putFloat("match_threshold", it).apply() },
+            onDismiss = { showSettings = false },
+        )
+    }
     }
 }
 
@@ -546,11 +592,13 @@ private fun LivePoints(frame: LiveFrame, tone: GuideTone, mirror: Boolean) {
 
 /** Estado de la coincidencia con la foto de referencia e indicaciones para conseguirla. */
 @Composable
-private fun MatchBanner(frame: LiveFrame?, modifier: Modifier = Modifier) {
+private fun MatchBanner(frame: LiveFrame?, autoCapture: Boolean, modifier: Modifier = Modifier) {
     val eval = frame?.eval
+    val pct = eval?.pointFraction?.let { (it * 100).toInt() }
+    val thr = ((eval?.threshold ?: LiveMatch.DEFAULT_THRESHOLD) * 100).toInt()
     val (color, title) = when (eval?.status) {
-        MatchStatus.MATCH -> GuideTone.MATCH.color to "✓ Coincide con la referencia"
-        MatchStatus.CLOSE -> GuideTone.CLOSE.color to "Casi alineado · ${((eval.quality) * 100).toInt()}%"
+        MatchStatus.MATCH -> GuideTone.MATCH.color to (if (autoCapture) "✓ Coincide · capturando" else "✓ Coincide con la referencia")
+        MatchStatus.CLOSE -> GuideTone.CLOSE.color to "Casi alineado"
         MatchStatus.FAR -> Color.White to "Alinee con la referencia"
         else -> Color.White to "Buscando referencias anatómicas…"
     }
@@ -560,10 +608,60 @@ private fun MatchBanner(frame: LiveFrame?, modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(title, color = color, style = MaterialTheme.typography.labelLarge)
+        if (pct != null) {
+            Text("Puntos coincidentes $pct % · umbral $thr %" + (frame.totalPoints.takeIf { it > 0 }?.let { " · $it puntos" } ?: ""),
+                color = color, style = MaterialTheme.typography.labelSmall)
+            LinearProgressIndicator(
+                progress = { eval.pointFraction ?: 0f },
+                color = color, trackColor = Color(0x55FFFFFF),
+                modifier = Modifier.width(180.dp).padding(vertical = 3.dp),
+            )
+        }
         eval?.hints?.take(2)?.forEach { Text(it, color = Color.White, style = MaterialTheme.typography.labelSmall) }
         if (frame != null && frame.method.isNotEmpty() && eval?.status != MatchStatus.SEARCHING) {
-            Text("por ${frame.method}", color = Color(0xFFBDBDBD), style = MaterialTheme.typography.labelSmall)
+            Text("por ${frame.method}" + if (autoCapture) " · disparo automático" else "",
+                color = Color(0xFFBDBDBD), style = MaterialTheme.typography.labelSmall)
         }
+    }
+}
+
+/** Ajustes de coincidencia: disparo automático y umbral mínimo de puntos coincidentes. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun MatchSettingsSheet(
+    autoCapture: Boolean,
+    threshold: Float,
+    onAutoCapture: (Boolean) -> Unit,
+    onThreshold: (Float) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) { MatchSettingsContent(autoCapture, threshold, onAutoCapture, onThreshold) }
+}
+
+@Composable
+fun MatchSettingsContent(autoCapture: Boolean, threshold: Float, onAutoCapture: (Boolean) -> Unit, onThreshold: (Float) -> Unit) {
+    Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Coincidencia con la referencia", style = MaterialTheme.typography.titleLarge)
+        Row(
+            Modifier.fillMaxWidth().toggleable(autoCapture, role = Role.Switch, onValueChange = onAutoCapture),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Disparo automático", style = MaterialTheme.typography.bodyLarge)
+                Text("Toma la foto sola cuando los puntos de referencia coinciden (se mantiene ~0,4 s).",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = autoCapture, onCheckedChange = null)
+        }
+        Text("Umbral mínimo de puntos coincidentes: ${(threshold * 100).toInt()} %", style = MaterialTheme.typography.bodyLarge)
+        Slider(
+            value = threshold * 100, onValueChange = { onThreshold((it.toInt()) / 100f) },
+            valueRange = 80f..100f, steps = 19,
+            modifier = Modifier.semantics { contentDescription = "Umbral de puntos coincidentes" },
+        )
+        Text("Un punto coincide si está a menos del 1,5 % del ancho de su posición en la foto de referencia. " +
+            "Por defecto 99 %.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(onClick = { onThreshold(LiveMatch.DEFAULT_THRESHOLD) }) { Text("Restablecer 99 %") }
     }
 }
 

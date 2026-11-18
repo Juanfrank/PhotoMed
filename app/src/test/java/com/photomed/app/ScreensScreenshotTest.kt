@@ -69,5 +69,12 @@ class ScreensScreenshotTest {
     }
 
     @Test
+    fun matchSettings() = shot("match_settings", dark = true) {
+        androidx.compose.material3.Surface {
+            com.photomed.app.ui.camera.MatchSettingsContent(autoCapture = true, threshold = 0.99f, onAutoCapture = {}, onThreshold = {})
+        }
+    }
+
+    @Test
     fun termsGate() = shot("terms") { TermsGate(onAccept = {}) }
 }

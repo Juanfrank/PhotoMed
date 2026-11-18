@@ -12,45 +12,81 @@ data class MatchEval(
     /** 0..1: cuán cerca está del encuadre de referencia. */
     val quality: Float,
     val hints: List<String>,
-    /** Desviación en el pivote anatómico (fracción del ancho), escala y rotación. */
     val offset: Float = 0f,
     val scaleError: Float = 0f,
     val rotationDeg: Float = 0f,
+    /** Fracción de puntos de referencia que coinciden con el cuadro actual (0..1), si se midió. */
+    val pointFraction: Float? = null,
+    val threshold: Float = LiveMatch.DEFAULT_THRESHOLD,
+    /** Diferencia de perspectiva vertical estimada por proporciones (°). */
+    val keystoneDeg: Float = 0f,
 )
 
 /**
- * Criterios de coincidencia en vivo. [t] lleva el cuadro actual sobre la referencia
- * (actual → referencia); se mide en el pivote anatómico de la zona.
+ * Criterios de coincidencia en vivo.
+ * - Principal: **porcentaje de puntos coincidentes** ≥ umbral (por defecto 99 %); un punto coincide
+ *   si está a ≤ [POINT_TOLERANCE] del ancho de su posición en la referencia.
+ * - Indicaciones: de la semejanza [t] (actual → referencia) medida en el pivote anatómico y de la
+ *   perspectiva vertical estimada por proporciones de contornos.
  */
 object LiveMatch {
-    const val MATCH_OFFSET = 0.02f      // 2 % del ancho
-    const val MATCH_SCALE = 0.03f       // 3 %
-    const val MATCH_ROT = 2f            // 2°
+    const val DEFAULT_THRESHOLD = 0.99f
+    const val POINT_TOLERANCE = 0.015f
+    const val MATCH_OFFSET = 0.02f
+    const val MATCH_SCALE = 0.03f
+    const val MATCH_ROT = 2f
     const val CLOSE_FACTOR = 2.5f
+    const val KEYSTONE_HINT = 1.5f
 
-    fun evaluate(t: Similarity?, pivot: Pt, wasMatched: Boolean = false): MatchEval {
-        if (t == null) return MatchEval(MatchStatus.SEARCHING, 0f, listOf("Buscando referencias anatómicas…"))
-        val d = t.apply(pivot) - pivot
+    fun evaluate(
+        t: Similarity?,
+        pivot: Pt,
+        wasMatched: Boolean = false,
+        pointFraction: Float? = null,
+        threshold: Float = DEFAULT_THRESHOLD,
+        keystoneDeg: Float = 0f,
+    ): MatchEval {
+        if (t == null && pointFraction == null) {
+            return MatchEval(MatchStatus.SEARCHING, 0f, listOf("Buscando referencias anatómicas…"), threshold = threshold)
+        }
+        val tt = t ?: Similarity.IDENTITY
+        val d = tt.apply(pivot) - pivot
         val off = hypot(d.x, d.y)
-        val se = abs(ln(t.scale))
-        val rd = abs(t.rotationDegrees)
-        // histéresis: una vez alineado, tolera un 30 % más antes de perder la coincidencia
+        val se = abs(ln(tt.scale))
+        val rd = abs(tt.rotationDegrees)
         val k = if (wasMatched) 1.3f else 1f
         val norm = maxOf(off / MATCH_OFFSET, se / MATCH_SCALE, rd / MATCH_ROT)
-        val status = when {
+        val status = if (pointFraction != null) {
+            // histéresis: una vez alineado, tolera 2 puntos porcentuales menos
+            val thr = if (wasMatched) threshold - 0.02f else threshold
+            when {
+                pointFraction >= thr -> MatchStatus.MATCH
+                pointFraction >= threshold - 0.25f || norm <= CLOSE_FACTOR -> MatchStatus.CLOSE
+                else -> MatchStatus.FAR
+            }
+        } else when {
             norm <= k -> MatchStatus.MATCH
             norm <= CLOSE_FACTOR -> MatchStatus.CLOSE
             else -> MatchStatus.FAR
         }
         val hints = mutableListOf<String>()
-        if (status != MatchStatus.MATCH) {
-            // El contenido debe desplazarse d para coincidir: mover la cámara en sentido contrario.
+        if (status != MatchStatus.MATCH && t != null) {
             if (abs(d.x) > MATCH_OFFSET * 0.7f) hints += if (d.x > 0) "← Mueva la cámara a la izquierda" else "Mueva la cámara a la derecha →"
             if (abs(d.y) > MATCH_OFFSET * 0.7f) hints += if (d.y > 0) "↑ Suba la cámara" else "↓ Baje la cámara"
-            if (se > MATCH_SCALE * 0.7f) hints += if (t.scale > 1f) "Acérquese" else "Aléjese"
-            if (rd > MATCH_ROT * 0.7f) hints += if (t.rotationDegrees > 0) "Gire la cámara ↺" else "Gire la cámara ↻"
+            if (se > MATCH_SCALE * 0.7f) hints += if (tt.scale > 1f) "Acérquese" else "Aléjese"
+            if (rd > MATCH_ROT * 0.7f) hints += if (tt.rotationDegrees > 0) "Gire la cámara ↺" else "Gire la cámara ↻"
         }
-        val quality = (1f - (norm - 1f) / (CLOSE_FACTOR * 2f)).coerceIn(0f, 1f).let { if (norm <= 1f) 1f else it }
-        return MatchEval(status, quality, hints, off, se, t.rotationDegrees)
+        // keystoneDeg > 0: el cuadro actual necesita "nivelar" una cámara elevada → inclinarla hacia abajo
+        if (status != MatchStatus.MATCH && abs(keystoneDeg) >= KEYSTONE_HINT) {
+            hints += if (keystoneDeg > 0) "Incline la cámara hacia abajo" else "Incline la cámara hacia arriba"
+        }
+        val quality = pointFraction ?: (1f - (norm - 1f) / (CLOSE_FACTOR * 2f)).coerceIn(0f, 1f).let { if (norm <= 1f) 1f else it }
+        return MatchEval(status, quality, hints, off, se, tt.rotationDegrees, pointFraction, threshold, keystoneDeg)
+    }
+
+    /** Fracción de pares (referencia, actual) a ≤ [tol] de distancia (posiciones sin transformar). */
+    fun pointFraction(ref: List<Pt>, cur: List<Pt>, tol: Float = POINT_TOLERANCE): Float {
+        if (ref.isEmpty()) return 0f
+        return ref.indices.count { hypot(ref[it].x - cur[it].x, ref[it].y - cur[it].y) <= tol } / ref.size.toFloat()
     }
 }

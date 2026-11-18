@@ -16,7 +16,10 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
 - **Superposición de la foto anterior** con opacidad ajustable, cuadrícula, **nivel** (inclinación y
   cabeceo), toque para enfocar, flash y cámara frontal/trasera. Encuadre 3:4 idéntico en vista previa y captura.
 - **Coincidencia en vivo**: la guía cambia de color (cian → ámbar → verde, con vibración) cuando el
-  encuadre actual coincide con la foto de referencia, con puntos anatómicos e indicaciones de movimiento.
+  porcentaje de puntos coincidentes con la foto de referencia alcanza el umbral (por defecto 99 %,
+  configurable), con indicaciones de movimiento y **disparo automático** opcional.
+- **Medición de contornos**: selección automática (óvalo facial / silueta, como los stickers) o con
+  **varita mágica**; alto, anchos por nivel, área y proporciones antes/después.
 
 ### Galería del teléfono y metadatos
 - Las fotos se guardan en la galería, en un **álbum por paciente**: `Pictures/PhotoMed/<expediente>/`.
@@ -32,7 +35,8 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
   filtro por zona y zoom sincronizado.
 - **Alineación automática por zona**: hasta 140 puntos faciales o 33 corporales detectados en el
   dispositivo + coincidencia por **contornos anatómicos** (mandíbula, frente, orejas, caderas,
-  falanges…) y **corrección de perspectiva vertical** con la inclinación registrada; o **manual con 2 puntos** —
+  falanges…) y **corrección de perspectiva vertical por proporciones de los contornos** (sin sensores);
+  o **manual con 2 puntos** —
   ver [docs/ALINEACION.md](docs/ALINEACION.md).
 
 ### Expedientes

@@ -53,8 +53,9 @@ Revise esa configuración y excluya el álbum PhotoMed si su normativa lo exige.
 
 ## 6. Componentes de terceros
 
-Para detectar puntos anatómicos (ojos, oreja, hombros, caderas, etc.) PhotoMed usa **Google ML
-Kit** con modelos incluidos en la aplicación: las imágenes se procesan en el dispositivo y **no se
+Para detectar puntos anatómicos (ojos, oreja, hombros, caderas, etc.) y separar la silueta del
+paciente del fondo (medición de contornos) PhotoMed usa **Google ML Kit** (detección de rostro, de
+pose y segmentación de personas) con modelos incluidos en la aplicación: las imágenes se procesan en el dispositivo y **no se
 envían a Google**. Según la documentación de Google, ML Kit puede enviar información técnica
 anónima de uso y rendimiento de la API (no imágenes ni resultados). Más información en
 <https://developers.google.com/ml-kit/terms>.

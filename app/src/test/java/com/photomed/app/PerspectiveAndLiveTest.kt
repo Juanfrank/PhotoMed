@@ -76,6 +76,28 @@ class PerspectiveAndLiveTest {
     }
 
     @Test
+    fun pointThresholdDecidesMatch() {
+        val pivot = Pt(0.5f, 0.66f)
+        val ref = (0 until 100).map { Pt(0.2f + (it % 10) * 0.06f, 0.3f + (it / 10) * 0.08f) }
+        // 99 de 100 puntos en su sitio, uno desplazado 5 %
+        val cur99 = ref.mapIndexed { i, p -> if (i == 0) Pt(p.x + 0.05f, p.y) else Pt(p.x + 0.004f, p.y) }
+        val f99 = LiveMatch.pointFraction(ref, cur99)
+        assertEquals(0.99f, f99, 1e-6f)
+        assertEquals(MatchStatus.MATCH, LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = f99).status)
+        // 98 %: con el umbral por defecto (99 %) aún no coincide; con 95 % sí
+        assertEquals(MatchStatus.CLOSE, LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.98f).status)
+        assertEquals(MatchStatus.MATCH, LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.98f, threshold = 0.95f).status)
+        // histéresis: si ya coincidía, 97,5 % la mantiene
+        assertEquals(MatchStatus.MATCH, LiveMatch.evaluate(Similarity.IDENTITY, pivot, wasMatched = true, pointFraction = 0.975f).status)
+        assertEquals(MatchStatus.FAR, LiveMatch.evaluate(Similarity(tx = 0.2f), pivot, pointFraction = 0.4f).status)
+        // perspectiva vertical: indicación de inclinación
+        val tilt = LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.9f, keystoneDeg = 4f)
+        assertTrue(tilt.hints.contains("Incline la cámara hacia abajo"))
+        assertTrue(LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.9f, keystoneDeg = -4f)
+            .hints.contains("Incline la cámara hacia arriba"))
+    }
+
+    @Test
     fun manyLandmarksWithSeveralOutliers() {
         val truth = Similarity(1.04f, 0.03f, -0.02f, 0.01f)
         val after = (0 until 36).associate { i ->

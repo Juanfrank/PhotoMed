@@ -14,20 +14,43 @@ transformación es independiente de la resolución. En pantalla se aplica con
 
 ## Etapas
 
-### 0. Corrección de perspectiva vertical
+### 0. Perspectiva vertical por proporciones de contornos (sin sensores)
 
-Al capturar se registran en el XMP la inclinación de la cámara respecto de la horizontal
-(`pm:CameraPitch`, del sensor de gravedad), el giro (`pm:Roll`) y la focal en unidades de alto de
-imagen (`pm:FocalNorm`, de Camera2: focal / lado largo del sensor). Antes de comparar o alinear, cada
-foto se re-proyecta como si la cámara hubiera estado nivelada:
+Una diferencia de inclinación de la cámara entre tomas (keystone) hace que el ancho de cada franja
+horizontal cambie en proporción a su altura: p. ej. la frente se ensancha respecto de la mandíbula.
+**No se usa el giroscopio**: la inclinación φ se estima de la geometría de los contornos
+(`KeystoneFit`) y se corrige re-proyectando la foto “después” como con una cámara nivelada
+(homografía H = K·R_x(φ)·K⁻¹ + recorte 3:4):
 
-```
-d = ((x − cx)/f, (y − cy)/f, 1)   →   R_x(φ)·d   →   x' = cx + f·d'x/d'z,  y' = cy + f·d'y/d'z
-```
+1. **Puntos de contorno** (hasta 133 del contorno facial, o los puntos corporales): para cada φ
+   candidato se transforman los puntos de “después”, se ajusta la semejanza a “antes” y se mide el
+   residuo; búsqueda en rejilla (±15°, paso 1°) + sección áurea. Solo se acepta si reduce el residuo
+   ≥ 10 % (evita sobreajuste).
+2. **Proporciones de la silueta** (cuando no hay puntos suficientes): con el contorno del óvalo
+   facial o de la silueta del sujeto (ver “Medición de contornos”), el perfil de anchos del polígono
+   a 61 alturas, normalizado por su altura (invariante a escala y posición), se calcula de forma
+   exacta por intersección con las aristas; se busca el φ que iguala el perfil de “después” con el de
+   “antes”. Se acepta si reduce el error ≥ 20 %.
 
-(homografía H = K·R·K⁻¹). Las verticales del paciente dejan de converger; después se recorta el
-mayor rectángulo 3:4 dentro del trapecio y se escala al encuadre. En el comparador: menú ⋮ →
-“Perspectiva y ajustes” (automática con los datos registrados, ajustable ±20° por foto).
+En el comparador: menú ⋮ → “Perspectiva y ajustes” (automática o ajuste manual ±15°); el resultado de
+la alineación indica el valor estimado y su origen. La inclinación del sensor se sigue guardando en
+el XMP solo como dato informativo.
+
+### Medición de contornos (varita mágica / selección automática)
+
+Menú ⋮ → “Medir contornos”:
+
+- **Automática** (como al crear stickers): óvalo facial de ML Kit rasterizado, o silueta de la
+  persona con ML Kit Selfie Segmentation (modelo incluido, en el dispositivo).
+- **Varita mágica**: toque sobre la región; crecimiento desde la semilla con similitud de color en
+  CIELAB (ΔE ≤ tolerancia respecto de la media de la región, que se adapta a degradados) y parada en
+  bordes fuertes; después apertura/cierre, relleno de huecos y mayor componente conexo.
+- **Métricas** (normalizadas por el ancho de la imagen): alto, ancho máximo, anchos al 25/50/75 % de
+  la altura (frente, pómulos, mandíbula en el rostro), área, proporción ancho/alto, proporción
+  superior/inferior y trazado del contorno; tabla antes/después con Δ % y perspectiva estimada por
+  proporciones, aplicable a la comparación.
+
+![Varita mágica](referencias/varita_magica.png)
 
 ### 1. Puntos anatómicos según la zona (automático, en el dispositivo)
 
@@ -80,18 +103,27 @@ nasal, comisuras, pezones, rodillas, puntas de los dedos…), afinados después 
 ### 5. Coincidencia en vivo en la cámara
 
 Con una foto de referencia superpuesta y la capa **Coincidir** activa, `LiveMatcher` analiza ~5
-cuadros por segundo (ImageAnalysis en el mismo encuadre 3:4): puntos anatómicos en modo continuo o,
-si no hay, contornos anatómicos en baja resolución partiendo de la última estimación. `LiveMatch`
-mide la desviación en el pivote anatómico de la zona:
+cuadros por segundo (ImageAnalysis en el mismo encuadre 3:4):
+
+- **Porcentaje de puntos coincidentes**: con puntos anatómicos, fracción de los puntos de la
+  referencia que están a ≤ 1,5 % del ancho de su posición en el cuadro actual; sin puntos, fracción
+  de los 300 puntos de contorno más fuertes de la referencia (dentro de las regiones anatómicas)
+  que encuentran borde en el cuadro actual a esa distancia.
+- **Umbral mínimo** configurable (⚙ en la cámara): 80–100 %, **por defecto 99 %**; histéresis de 2
+  puntos porcentuales para no parpadear.
 
 | Estado | Criterio | Guía |
 |---|---|---|
-| Coincide | desplazamiento ≤ 2 % del ancho, escala ≤ 3 %, rotación ≤ 2° (con histéresis del 30 %) | verde + vibración |
-| Casi | hasta 2,5 × esos umbrales | ámbar |
+| Coincide | puntos coincidentes ≥ umbral | verde + vibración |
+| Casi | ≥ umbral − 25 pp, o desviación ≤ 2,5 × (2 %, 3 %, 2°) | ámbar |
 | Lejos / buscando | resto | cian |
 
-Se dibujan los puntos de la referencia (anillos) y los actuales (puntos) y se dan indicaciones
-(“Mueva la cámara a la izquierda”, “Acérquese”, “Gire la cámara ↺”…).
+Indicaciones a partir de la semejanza actual → referencia y de la perspectiva vertical estimada por
+proporciones (“Mueva la cámara a la izquierda”, “Acérquese”, “Gire la cámara ↺”, “Incline la cámara
+hacia abajo”…).
+
+**Disparo automático** (botón AUTO en la barra superior o en ⚙): si la coincidencia se mantiene
+~0,4 s se toma la foto; una sola captura por cada coincidencia (se rearma al perderla).
 
 ## Resultado
 
@@ -114,8 +146,14 @@ la foto original o la alineada en los tres modos (deslizador, lado a lado, fundi
 (−12° y +8°) y deja verticales las verticales del mundo; estados e indicaciones de la coincidencia en
 vivo, incluida la histéresis.
 
-**Pendiente de verificar en un teléfono real:** el signo de la inclinación del sensor de gravedad
-(cámara trasera / frontal) y el rendimiento del análisis en vivo.
+`KeystoneAndWandTest.kt`: la perspectiva se recupera desde puntos del contorno facial (±0,3°) y
+desde las proporciones de la silueta con otra escala y encuadre (±1°); sin inclinación no se inventa
+corrección; la varita mágica selecciona una región de piel con degradado y ruido (área ±6 %) y mide
+alto y anchos (±3 %). `PerspectiveAndLiveTest.kt`: umbral de puntos (99 %, 98 %, histéresis) e
+indicaciones de inclinación.
+
+**Pendiente de verificar en un teléfono real:** rendimiento del análisis en vivo y de la
+segmentación, y ajuste fino de la tolerancia por punto (1,5 %) con fotos reales.
 
 Limitaciones: la corrección de perspectiva cubre la inclinación vertical, no la distancia ni giros laterales de la cámara;
 ni cambios de postura no rígidos (por ejemplo, un brazo en otra posición). Las guías de la cámara,

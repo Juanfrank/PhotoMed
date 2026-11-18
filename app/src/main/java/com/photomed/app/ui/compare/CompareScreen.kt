@@ -2,11 +2,10 @@ package com.photomed.app.ui.compare
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material3.ModalBottomSheet
-import com.photomed.app.align.AlignInput
 import com.photomed.app.align.ImageOps
 import com.photomed.app.align.Perspective
-import com.photomed.app.data.PhotoInfo
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -122,11 +121,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
     var manual by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     var settings by remember { mutableStateOf(false) }
-    var perspectiveOn by remember { mutableStateOf(true) }
-    var pitchBefore by remember { mutableFloatStateOf(0f) }
-    var pitchAfter by remember { mutableFloatStateOf(0f) }
-    var infoBefore by remember { mutableStateOf<PhotoInfo?>(null) }
-    var infoAfter by remember { mutableStateOf<PhotoInfo?>(null) }
+    var keystoneAuto by remember { mutableStateOf(true) }
+    var keystoneManual by remember { mutableFloatStateOf(0f) }
+    var measure by remember { mutableStateOf(false) }
 
     LaunchedEffect(expId) {
         withContext(Dispatchers.IO) {
@@ -147,20 +144,11 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
     val pair = if (chosen.size == 2) (if (swapped) chosen.reversed() else chosen) else null
     val transform = alignment?.transform?.takeIf { useAligned }
 
-    // Metadatos de captura del par (inclinación de la cámara y focal) → perspectiva automática.
-    LaunchedEffect(pair?.getOrNull(0)?.key, pair?.getOrNull(1)?.key) {
-        val (b, a) = pair ?: return@LaunchedEffect
-        infoBefore = withContext(Dispatchers.IO) { repo.readInfo(b) }
-        infoAfter = withContext(Dispatchers.IO) { repo.readInfo(a) }
-        pitchBefore = infoBefore?.cameraPitch ?: 0f
-        pitchAfter = infoAfter?.cameraPitch ?: 0f
-    }
-    val corrB = if (perspectiveOn) pitchBefore else 0f
-    val corrA = if (perspectiveOn) pitchAfter else 0f
-    val focalB = infoBefore?.focalNorm ?: Perspective.DEFAULT_FOCAL
-    val focalA = infoAfter?.focalNorm ?: Perspective.DEFAULT_FOCAL
-    val beforeModel = pair?.let { rememberCorrected(it[0].uri, corrB, focalB) }
-    val afterModel = pair?.let { rememberCorrected(it[1].uri, corrA, focalA) }
+    // Perspectiva vertical de "después": la estimada por proporciones de contornos al alinear.
+    val keystone = alignment?.keystoneDeg?.takeIf { useAligned } ?: 0f
+    val beforeModel: Any? = pair?.get(0)?.uri
+    val afterModel: Any? = pair?.let { rememberCorrected(it[1].uri, keystone, Perspective.DEFAULT_FOCAL) }
+    val manualK = keystoneManual.takeIf { !keystoneAuto }
 
     fun resetAlignment() { alignment = null; zoom = ZoomState() }
 
@@ -210,6 +198,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                                 leadingIcon = { Icon(Icons.Default.TouchApp, null) },
                                 enabled = pair != null,
                                 onClick = { menu = false; manual = true },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Medir contornos") },
+                                leadingIcon = { Icon(Icons.Default.Straighten, null) },
+                                enabled = pair != null,
+                                onClick = { menu = false; measure = true },
                             )
                             DropdownMenuItem(
                                 text = { Text("Perspectiva y ajustes") },
@@ -303,7 +297,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                     if (res == null) {
                         InputChip(
                             selected = false,
-                            onClick = { runAlign { bp, ap -> aligner.auto(bp.zone, AlignInput(bp.uri, corrB, focalB), AlignInput(ap.uri, corrA, focalA)) } },
+                            onClick = { runAlign { bp, ap -> aligner.auto(bp.zone, bp.uri, ap.uri, manualK) } },
                             enabled = !aligning,
                             label = { Text("Alinear automáticamente") },
                             leadingIcon = { Icon(Icons.Default.AutoFixHigh, null, Modifier.size(18.dp)) },
@@ -323,6 +317,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                                     ),
                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                if (res.keystoneDeg != 0f) {
+                                    Text(
+                                        "Perspectiva vertical %+.1f° (%s)".format(res.keystoneDeg, res.keystoneSource),
+                                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                                 if (res.regionScores.isNotEmpty()) {
                                     Text(
                                         "Contornos: " + res.regionScores.sortedByDescending { it.second }.take(4)
@@ -412,34 +412,45 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
                 Text("Perspectiva vertical", style = MaterialTheme.typography.titleLarge)
                 Row(
-                    Modifier.fillMaxWidth().toggleable(perspectiveOn, role = Role.Switch) { perspectiveOn = it; resetAlignment() },
+                    Modifier.fillMaxWidth().toggleable(keystoneAuto, role = Role.Switch) { keystoneAuto = it; resetAlignment() },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Corregir inclinación de la cámara", style = MaterialTheme.typography.bodyLarge)
+                        Text("Automática por proporciones de contornos", style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "Endereza las verticales convergentes con la inclinación registrada al tomar cada foto.",
+                            "Estima la inclinación entre tomas con la geometría del contorno (puntos faciales o anchos de " +
+                                "la silueta a cada altura), sin usar sensores.",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(checked = perspectiveOn, onCheckedChange = null)
+                    Switch(checked = keystoneAuto, onCheckedChange = null)
                 }
-                listOf(
-                    Triple("Antes", pitchBefore, infoBefore?.cameraPitch),
-                    Triple("Después", pitchAfter, infoAfter?.cameraPitch),
-                ).forEachIndexed { i, (label, value, recorded) ->
-                    Text(
-                        "$label: %+.1f° ".format(value) + (recorded?.let { "(registrado %+.1f°)".format(it) } ?: "(sin datos de inclinación)"),
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                    Slider(
-                        value = value, onValueChange = { if (i == 0) pitchBefore = it else pitchAfter = it; resetAlignment() },
-                        valueRange = -20f..20f, enabled = perspectiveOn,
-                        modifier = Modifier.semantics { contentDescription = "Perspectiva vertical $label" },
-                    )
+                alignment?.let {
+                    Text("Última estimación: %+.1f°".format(it.keystoneDeg) +
+                        (it.keystoneSource.takeIf { s -> s.isNotEmpty() }?.let { s -> " · $s" } ?: ""),
+                        style = MaterialTheme.typography.labelLarge)
                 }
+                Text("Ajuste manual de “Después”: %+.1f°".format(keystoneManual), style = MaterialTheme.typography.labelLarge)
+                Slider(
+                    value = keystoneManual, onValueChange = { keystoneManual = it; resetAlignment() },
+                    valueRange = -15f..15f, enabled = !keystoneAuto,
+                    modifier = Modifier.semantics { contentDescription = "Perspectiva vertical manual" },
+                )
+                Text("Vuelva a alinear para aplicar los cambios.", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
+
+    if (measure && pair != null) {
+        ContourMeasureDialog(
+            before = pair[0], after = pair[1],
+            onDismiss = { measure = false },
+            onApplyKeystone = { deg ->
+                measure = false; keystoneAuto = false; keystoneManual = deg; resetAlignment()
+                scope.launch { snackbar.showSnackbar("Perspectiva %+.1f° aplicada. Pulse “Alinear automáticamente”.".format(deg)) }
+            },
+        )
     }
 
     if (manual && pair != null) {
@@ -449,7 +460,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
             onDismiss = { manual = false },
             onDone = { bp: List<Pt>, ap: List<Pt> ->
                 manual = false
-                runAlign { bb, aa -> aligner.manual(bb.zone, AlignInput(bb.uri, corrB, focalB), AlignInput(aa.uri, corrA, focalA), bp, ap) }
+                runAlign { bb, aa -> aligner.manual(bb.zone, bb.uri, aa.uri, bp, ap, manualK) }
             },
         )
     }
