@@ -1,28 +1,27 @@
 package com.photomed.app.ui.gallery
 
-import android.content.Intent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Compare
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -30,7 +29,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -38,26 +36,26 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.photomed.app.data.Expediente
 import com.photomed.app.data.Photo
 import com.photomed.app.data.Zone
 import com.photomed.app.ui.LocalRepository
+import com.photomed.app.ui.components.EmptyState
+import com.photomed.app.ui.components.SectionHeader
 import com.photomed.app.ui.formatDateTime
+import com.photomed.app.ui.formatDayHeader
+import com.photomed.app.ui.theme.Md3Spacing
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +69,7 @@ fun ZoneGalleryScreen(
 ) {
     val repo = LocalRepository.current
     var exp by remember { mutableStateOf<Expediente?>(null) }
-    var photos by remember { mutableStateOf<List<Photo>>(emptyList()) }
+    var photos by remember { mutableStateOf<List<Photo>?>(null) }
 
     LaunchedEffect(expId, zone) {
         withContext(Dispatchers.IO) {
@@ -79,20 +77,24 @@ fun ZoneGalleryScreen(
             photos = exp?.let { repo.photos(it, zone) }.orEmpty().reversed()
         }
     }
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 title = {
                     Column {
                         Text(zone.label)
-                        Text(exp?.patientName.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                        Text(exp?.patientName.orEmpty(), style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
                 actions = {
-                    if (photos.size >= 2) IconButton(onClick = onCompare) { Icon(Icons.Default.Compare, "Comparar") }
-                }
+                    if ((photos?.size ?: 0) >= 2) IconButton(onClick = onCompare) { Icon(Icons.Default.Compare, "Comparar") }
+                },
+                scrollBehavior = scrollBehavior,
             )
         },
         floatingActionButton = {
@@ -103,107 +105,64 @@ fun ZoneGalleryScreen(
             )
         }
     ) { padding ->
+        val list = photos ?: return@Scaffold
+        if (list.isEmpty()) {
+            Column(Modifier.padding(padding)) {
+                HintCard(zone, Modifier.padding(Md3Spacing.marginCompact))
+                EmptyState(
+                    icon = Icons.Default.AddAPhoto,
+                    title = "Sin fotografías de esta zona",
+                    body = "La cámara mostrará el contorno y las líneas de referencia de ${zone.label.lowercase()}.",
+                    actionLabel = "Tomar la primera",
+                    actionIcon = Icons.Default.CameraAlt,
+                    onAction = onCamera,
+                )
+            }
+            return@Scaffold
+        }
+        val first = list.last().takenAt
+        val byDay = list.groupBy { TimeUnit.MILLISECONDS.toDays(it.takenAt + java.util.TimeZone.getDefault().getOffset(it.takenAt)) }
         LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
+            columns = GridCells.Adaptive(minSize = 104.dp),
             modifier = Modifier.padding(padding).fillMaxSize(),
-            contentPadding = PaddingValues(8.dp, 4.dp, 8.dp, 96.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(Md3Spacing.marginCompact, Md3Spacing.s2, Md3Spacing.marginCompact, 96.dp),
+            horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s1),
+            verticalArrangement = Arrangement.spacedBy(Md3Spacing.s1),
         ) {
-            item(span = { GridItemSpan(3) }) {
-                Text(zone.hint, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(6.dp))
-            }
-            if (photos.isEmpty()) {
-                item(span = { GridItemSpan(3) }) {
-                    Text("No hay fotografías de esta zona.", modifier = Modifier.padding(24.dp))
+            item(span = { GridItemSpan(maxLineSpan) }) { HintCard(zone) }
+            byDay.forEach { (_, dayPhotos) ->
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    val days = TimeUnit.MILLISECONDS.toDays(dayPhotos.first().takenAt - first)
+                    SectionHeader(formatDayHeader(dayPhotos.first().takenAt) + if (days > 0) " · día $days" else " · basal")
                 }
-            }
-            items(photos, key = { it.key }) { photo ->
-                Box(
-                    Modifier.fillMaxWidth().aspectRatio(3f / 4f).clip(RoundedCornerShape(8.dp))
-                        .clickable { onPhoto(photo) }
-                ) {
-                    AsyncImage(photo.file, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    Text(
-                        formatDateTime(photo.takenAt),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
-                            .background(Color(0x88000000)).padding(4.dp)
-                    )
+                items(dayPhotos, key = { it.key }) { photo ->
+                    Card(
+                        onClick = { onPhoto(photo) },
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f),
+                    ) {
+                        AsyncImage(photo.uri, "Fotografía del ${formatDateTime(photo.takenAt)}",
+                            contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.small))
+                    }
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PhotoViewerScreen(expId: String, zone: Zone, fileName: String, onBack: () -> Unit) {
-    val repo = LocalRepository.current
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val file = remember { File(File(repo.root, expId), "${zone.id}/$fileName") }
-    var photo by remember { mutableStateOf<Photo?>(null) }
-    var confirmDelete by remember { mutableStateOf(false) }
-
-    LaunchedEffect(file) {
-        photo = withContext(Dispatchers.IO) {
-            repo.getExpediente(expId)?.let { repo.photos(it, zone) }?.firstOrNull { it.file == file }
+private fun HintCard(zone: Zone, modifier: Modifier = Modifier) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(Md3Spacing.s4), verticalAlignment = Alignment.Top) {
+            Icon(Icons.Outlined.Lightbulb, null, Modifier.size(20.dp))
+            Spacer(Modifier.size(Md3Spacing.s3))
+            Text(zone.hint, style = MaterialTheme.typography.bodyMedium)
         }
-    }
-
-    Scaffold(
-        containerColor = Color.Black,
-        topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Black, titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White, actionIconContentColor = Color.White,
-                ),
-                title = {
-                    Column {
-                        Text(zone.label)
-                        photo?.let { Text(formatDateTime(it.takenAt), style = MaterialTheme.typography.bodySmall) }
-                    }
-                },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
-                actions = {
-                    IconButton(onClick = {
-                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "image/jpeg"
-                            putExtra(Intent.EXTRA_STREAM, uri)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        context.startActivity(Intent.createChooser(intent, "Compartir fotografía"))
-                    }) { Icon(Icons.Default.Share, "Compartir") }
-                    IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Eliminar") }
-                }
-            )
-        }
-    ) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-            ZoomableImage(model = file, modifier = Modifier.fillMaxSize())
-        }
-    }
-
-    if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text("Eliminar fotografía") },
-            text = { Text("¿Desea eliminar esta fotografía del expediente?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = false
-                    scope.launch {
-                        withContext(Dispatchers.IO) { file.delete() }
-                        onBack()
-                    }
-                }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } },
-        )
     }
 }

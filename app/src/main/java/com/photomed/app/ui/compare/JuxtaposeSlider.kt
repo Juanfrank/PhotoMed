@@ -28,7 +28,8 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import java.io.File
+import com.photomed.app.align.Similarity
+import androidx.compose.ui.graphics.TransformOrigin
 
 /** Estado de zoom compartido entre ambas imágenes, para que siempre coincidan. */
 data class ZoomState(val scale: Float = 1f, val offset: Offset = Offset.Zero)
@@ -40,8 +41,9 @@ data class ZoomState(val scale: Float = 1f, val offset: Offset = Offset.Zero)
  */
 @Composable
 fun JuxtaposeSlider(
-    before: File,
-    after: File,
+    before: Any,
+    after: Any,
+    afterTransform: Similarity? = null,
     position: Float,
     onPositionChange: (Float) -> Unit,
     zoom: ZoomState,
@@ -50,6 +52,7 @@ fun JuxtaposeSlider(
     afterLabel: String,
     modifier: Modifier = Modifier,
 ) {
+    val handleColor = MaterialTheme.colorScheme.primary
     val currentZoom by rememberUpdatedState(zoom)
     val setPosition by rememberUpdatedState(onPositionChange)
     val setZoom by rememberUpdatedState(onZoomChange)
@@ -86,7 +89,7 @@ fun JuxtaposeSlider(
             scaleX = zoom.scale; scaleY = zoom.scale
             translationX = zoom.offset.x; translationY = zoom.offset.y
         }
-        AsyncImage(after, "Después", contentScale = ContentScale.Crop, modifier = layer)
+        AsyncImage(after, "Después", contentScale = ContentScale.Crop, modifier = layer.alignedBy(afterTransform))
         Box(Modifier.fillMaxSize().drawWithContent {
             clipRect(right = size.width * position) { this@drawWithContent.drawContent() }
         }) {
@@ -100,7 +103,7 @@ fun JuxtaposeSlider(
             drawLine(Color.White, Offset(x, 0f), Offset(x, size.height), 2.dp.toPx())
             val c = Offset(x, size.height / 2)
             drawCircle(Color.White, 18.dp.toPx(), c)
-            drawCircle(Color(0xFF00796B), 15.dp.toPx(), c)
+            drawCircle(handleColor, 15.dp.toPx(), c)
             val a = 5.dp.toPx()
             val gap = 4.dp.toPx()
             // flechas ◀ ▶
@@ -129,4 +132,17 @@ fun Label(text: String, modifier: Modifier = Modifier) {
             .background(Color(0x99000000), RoundedCornerShape(6.dp))
             .padding(horizontal = 8.dp, vertical = 3.dp)
     )
+}
+
+/**
+ * Aplica la semejanza de alineación (después → antes, unidades = ancho de la imagen):
+ * con origen en (0,0), graphicsLayer compone T·R·S, igual que [Similarity.apply].
+ */
+fun Modifier.alignedBy(t: Similarity?): Modifier = if (t == null) this else this.graphicsLayer {
+    transformOrigin = TransformOrigin(0f, 0f)
+    scaleX = t.scale
+    scaleY = t.scale
+    rotationZ = t.rotationDegrees
+    translationX = t.tx * size.width
+    translationY = t.ty * size.width
 }

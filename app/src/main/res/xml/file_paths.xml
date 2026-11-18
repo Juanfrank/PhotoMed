@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <external-files-path name="photos" path="Pictures/" />
+    <!-- Copias temporales para compartir (con o sin datos del paciente) -->
+    <cache-path name="share" path="share/" />
 </paths>

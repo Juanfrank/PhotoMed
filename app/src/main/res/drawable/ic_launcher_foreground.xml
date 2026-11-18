@@ -4,9 +4,9 @@
     <!-- camera body -->
     <path android:fillColor="#FFFFFF"
         android:pathData="M34,40h10l4,-6h12l4,6h10a4,4 0,0 1,4 4v26a4,4 0,0 1,-4 4H34a4,4 0,0 1,-4 -4V44a4,4 0,0 1,4 -4z"/>
-    <path android:fillColor="#00796B"
+    <path android:fillColor="#6750A4"
         android:pathData="M54,47a10,10 0,1 0,0.01 0z"/>
     <!-- split line (comparison) -->
     <path android:fillColor="#FFFFFF" android:pathData="M53,45h2v24h-2z"/>
-    <path android:fillColor="#4DB6AC" android:pathData="M54,49a8,8 0,0 1,0 16z"/>
+    <path android:fillColor="#D0BCFF" android:pathData="M54,49a8,8 0,0 1,0 16z"/>
 </vector>

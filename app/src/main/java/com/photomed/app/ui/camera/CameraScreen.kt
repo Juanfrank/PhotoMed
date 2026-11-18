@@ -1,6 +1,27 @@
 package com.photomed.app.ui.camera
 
 import android.Manifest
+import android.os.Build
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.NoPhotography
+import androidx.compose.material.icons.filled.Straighten
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconToggleButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import com.photomed.app.ui.components.EmptyState
+import com.photomed.app.ui.theme.ImmersiveTheme
+import com.photomed.app.ui.theme.Md3Motion
+import com.photomed.app.ui.theme.Md3Spacing
+import java.io.File
 import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.Sensor
@@ -108,31 +129,35 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
-private val Accent = Color(0xFF4DD0C2)
 
 @Composable
-fun CameraScreen(expId: String, zone: Zone, onBack: () -> Unit) {
+fun CameraScreen(expId: String, zone: Zone, onBack: () -> Unit) = ImmersiveTheme {
     val context = LocalContext.current
-    var hasPermission by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+    val needed = remember {
+        buildList {
+            add(Manifest.permission.CAMERA)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
     }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasPermission = it }
-    LaunchedEffect(Unit) { if (!hasPermission) launcher.launch(Manifest.permission.CAMERA) }
+    fun granted() = needed.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
+    var hasPermission by remember { mutableStateOf(granted()) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { hasPermission = granted() }
+    LaunchedEffect(Unit) { if (!hasPermission) launcher.launch(needed.toTypedArray()) }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (hasPermission) {
             CameraContent(expId, zone, onBack)
         } else {
-            Column(
-                Modifier.fillMaxSize().padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text("Se requiere permiso de cámara para tomar fotografías.", color = Color.White, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(16.dp))
-                Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) { Text("Conceder permiso") }
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = onBack) { Text("Volver") }
+            EmptyState(
+                icon = Icons.Default.NoPhotography,
+                title = "Se necesita acceso a la cámara",
+                body = "PhotoMed usa la cámara solo para tomar las fotografías clínicas del expediente." +
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) " En esta versión de Android también necesita permiso para guardar en la galería." else "",
+                actionLabel = "Conceder permiso",
+                onAction = { launcher.launch(needed.toTypedArray()) },
+            )
+            IconButton(onClick = onBack, modifier = Modifier.statusBarsPadding().padding(4.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás")
             }
         }
     }
@@ -160,6 +185,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     var capturing by remember { mutableStateOf(false) }
     var camera by remember { mutableStateOf<Camera?>(null) }
     val shutterFlash = remember { Animatable(0f) }
+    val haptics = LocalHapticFeedback.current
+    val snackbar = remember { SnackbarHostState() }
+    var lastSaved by remember { mutableStateOf<Photo?>(null) }
 
     LaunchedEffect(reload) {
         withContext(Dispatchers.IO) {
@@ -216,30 +244,42 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
         val e = exp ?: return
         if (capturing) return
         capturing = true
-        val file = repo.newPhotoFile(e, zone)
-        val options = ImageCapture.OutputFileOptions.Builder(file).build()
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        val temp = File(context.cacheDir, "capture_${System.currentTimeMillis()}.jpg")
+        val options = ImageCapture.OutputFileOptions.Builder(temp).build()
         scope.launch {
             shutterFlash.snapTo(0.8f)
-            shutterFlash.animateTo(0f, tween(300))
+            shutterFlash.animateTo(0f, tween(Md3Motion.durationMedium2, easing = Md3Motion.easingStandard))
         }
         imageCapture.takePicture(options, ContextCompat.getMainExecutor(context),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    capturing = false
-                    Toast.makeText(context, "Fotografía guardada en ${zone.label}", Toast.LENGTH_SHORT).show()
-                    reload++
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            runCatching { repo.savePhoto(e, zone, temp) }.also { temp.delete() }
+                        }
+                        capturing = false
+                        result.onSuccess {
+                            lastSaved = it
+                            reload++
+                            snackbar.showSnackbar("Guardada en el álbum ${e.id}")
+                        }.onFailure {
+                            snackbar.showSnackbar("No se pudo guardar: ${it.message}")
+                        }
+                    }
                 }
 
                 override fun onError(exception: ImageCaptureException) {
                     capturing = false
-                    file.delete()
-                    Toast.makeText(context, "Error al capturar: ${exception.message}", Toast.LENGTH_LONG).show()
+                    temp.delete()
+                    scope.launch { snackbar.showSnackbar("Error al capturar: ${exception.message}") }
                 }
             })
     }
 
     val tilt = rememberTilt(showLevel)
 
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         // Barra superior
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -273,7 +313,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                 val g = ghost
                 if (showGhost && g != null) {
                     AsyncImage(
-                        model = g.file,
+                        model = g.uri,
                         contentDescription = "Foto anterior superpuesta",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize().graphicsLayer {
@@ -309,15 +349,15 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             }
         }
 
-        // Controles
+        // Controles de capas (objetivo táctil ≥ 48 dp, etiquetas visibles)
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.s2, vertical = Md3Spacing.s1),
+            horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            ToggleChip("Cuadrícula", showGrid) { showGrid = it }
-            ToggleChip("Contorno", showContour) { showContour = it }
-            ToggleChip("Superposición", showGhost, enabled = photos.isNotEmpty()) { showGhost = it }
-            ToggleChip("Nivel", showLevel) { showLevel = it }
+            LayerToggle("Cuadrícula", Icons.Default.GridOn, showGrid) { showGrid = it }
+            LayerToggle("Contorno", Icons.Default.Face, showContour) { showContour = it }
+            LayerToggle("Superponer", Icons.Default.Layers, showGhost, enabled = photos.isNotEmpty()) { showGhost = it }
+            LayerToggle("Nivel", Icons.Default.Straighten, showLevel) { showLevel = it }
         }
 
         if (showGhost && photos.isNotEmpty()) {
@@ -328,7 +368,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                     onValueChange = { ghostAlpha = it },
                     valueRange = 0.05f..0.9f,
                     modifier = Modifier.weight(1f).padding(horizontal = 8.dp).height(32.dp),
-                    colors = SliderDefaults.colors(thumbColor = Accent, activeTrackColor = Accent),
+                    
                 )
                 Text("${(ghostAlpha * 100).toInt()}%", color = Color.White, style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.width(36.dp))
@@ -341,11 +381,11 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                 items(photos.reversed(), key = { it.key }) { p ->
                     val selected = p.key == ghost?.key
                     AsyncImage(
-                        model = p.file,
+                        model = p.uri,
                         contentDescription = formatDate(p.takenAt),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.size(42.dp, 56.dp).clip(RoundedCornerShape(6.dp))
-                            .border(if (selected) BorderStroke(2.dp, Accent) else BorderStroke(1.dp, Color.DarkGray), RoundedCornerShape(6.dp))
+                            .border(if (selected) BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(6.dp))
                             .clickable { ghost = p; showGhost = true }
                     )
                 }
@@ -360,15 +400,17 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
         ) {
             Box(Modifier.size(52.dp)) {
                 photos.lastOrNull()?.let {
-                    AsyncImage(it.file, null, contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)))
+                    AsyncImage(it.uri, "Última fotografía", contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.small))
                 }
             }
             Box(
                 Modifier.size(76.dp).border(4.dp, Color.White, CircleShape).padding(8.dp).clip(CircleShape)
-                    .background(if (capturing) Color.Gray else Color.White)
-                    .clickable(enabled = !capturing && exp != null) { capture() }
-            )
+                    .background(if (capturing) MaterialTheme.colorScheme.outline else Color.White)
+                    .clickable(enabled = !capturing && exp != null, onClickLabel = "Tomar fotografía") { capture() }
+                    .semantics { contentDescription = "Disparador" },
+                contentAlignment = Alignment.Center,
+            ) { if (capturing) CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp) }
             IconButton(
                 onClick = {
                     lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT
@@ -378,22 +420,23 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             ) { Icon(Icons.Default.FlipCameraAndroid, "Cambiar cámara", tint = Color.White, modifier = Modifier.size(30.dp)) }
         }
     }
+    SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 120.dp))
+    }
 }
 
+
 @Composable
-private fun ToggleChip(label: String, selected: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    FilterChip(
-        selected = selected && enabled,
-        enabled = enabled,
-        onClick = { onChange(!selected) },
-        label = { Text(label) },
-        colors = FilterChipDefaults.filterChipColors(
-            labelColor = Color.White,
-            selectedContainerColor = Accent,
-            selectedLabelColor = Color.Black,
-            disabledLabelColor = Color.Gray,
-        ),
-    )
+private fun LayerToggle(label: String, icon: ImageVector, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        FilledTonalIconToggleButton(
+            checked = checked && enabled,
+            onCheckedChange = onChange,
+            enabled = enabled,
+            modifier = Modifier.size(48.dp).semantics { stateDescription = if (checked) "Activado" else "Desactivado" },
+        ) { Icon(icon, label) }
+        Text(label, style = MaterialTheme.typography.labelSmall,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
+    }
 }
 
 /** Inclinación lateral (roll) y cabeceo (pitch) en grados. */

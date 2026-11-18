@@ -1,0 +1,147 @@
+package com.photomed.app.data
+
+import android.app.RecoverableSecurityException
+import android.content.ContentResolver
+import android.content.ContentUris
+import android.content.ContentValues
+import android.content.Context
+import android.content.IntentSender
+import android.media.MediaScannerConnection
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import androidx.annotation.RequiresApi
+import java.io.File
+
+/** Foto tal como existe en la galería. */
+data class StoredPhoto(val uri: Uri, val displayName: String, val dateTaken: Long)
+
+/** Resultado de un borrado: puede requerir confirmación del usuario (fotos de otra instalación). */
+sealed interface DeleteResult {
+    data object Done : DeleteResult
+    data class NeedsConfirmation(val intentSender: IntentSender) : DeleteResult
+}
+
+/**
+ * Almacén de fotos visible en la galería del teléfono: un álbum por paciente en
+ * `Pictures/PhotoMed/<carpeta del expediente>/`.
+ */
+interface PhotoStore {
+    fun list(folder: String): List<StoredPhoto>
+    fun folders(): List<String>
+    fun save(folder: String, displayName: String, source: File, dateTaken: Long): Uri
+    fun delete(uris: List<Uri>): DeleteResult
+
+    companion object {
+        const val ALBUM = "PhotoMed"
+
+        fun create(context: Context): PhotoStore =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaStorePhotoStore(context.contentResolver)
+            else FilePhotoStore(
+                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), ALBUM),
+                onChanged = { paths -> MediaScannerConnection.scanFile(context, paths.toTypedArray(), null, null) },
+            )
+    }
+}
+
+/** Android 10+: MediaStore con RELATIVE_PATH; no requiere permisos para escribir. */
+@RequiresApi(Build.VERSION_CODES.Q)
+class MediaStorePhotoStore(private val resolver: ContentResolver) : PhotoStore {
+    private val collection: Uri = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+    private val base = "${Environment.DIRECTORY_PICTURES}/${PhotoStore.ALBUM}/"
+
+    override fun list(folder: String): List<StoredPhoto> = query(
+        "${MediaStore.MediaColumns.RELATIVE_PATH} = ?", arrayOf("$base$folder/")
+    ).map { it.second }
+
+    override fun folders(): List<String> = query(
+        "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?", arrayOf("$base%")
+    ).map { it.first.removePrefix(base).trimEnd('/') }.filter { it.isNotBlank() && '/' !in it }.distinct()
+
+    private fun query(selection: String, args: Array<String>): List<Pair<String, StoredPhoto>> {
+        val projection = arrayOf(
+            MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.DATE_TAKEN, MediaStore.MediaColumns.RELATIVE_PATH,
+        )
+        val out = mutableListOf<Pair<String, StoredPhoto>>()
+        resolver.query(collection, projection, selection, args, null)?.use { c ->
+            val id = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+            val name = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+            val taken = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_TAKEN)
+            val path = c.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)
+            while (c.moveToNext()) {
+                out += c.getString(path) to StoredPhoto(
+                    ContentUris.withAppendedId(collection, c.getLong(id)), c.getString(name), c.getLong(taken),
+                )
+            }
+        }
+        return out
+    }
+
+    override fun save(folder: String, displayName: String, source: File, dateTaken: Long): Uri {
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "$base$folder/")
+            put(MediaStore.MediaColumns.DATE_TAKEN, dateTaken)
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(collection, values) ?: error("No se pudo crear la imagen en la galería")
+        try {
+            resolver.openOutputStream(uri)!!.use { out -> source.inputStream().use { it.copyTo(out) } }
+            resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+        } catch (e: Exception) {
+            resolver.delete(uri, null, null)
+            throw e
+        }
+        return uri
+    }
+
+    override fun delete(uris: List<Uri>): DeleteResult {
+        val notOwned = mutableListOf<Uri>()
+        for (uri in uris) {
+            try {
+                resolver.delete(uri, null, null)
+            } catch (e: SecurityException) {
+                if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && e is RecoverableSecurityException) {
+                    return DeleteResult.NeedsConfirmation(e.userAction.actionIntent.intentSender)
+                }
+                notOwned += uri
+            }
+        }
+        if (notOwned.isNotEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return DeleteResult.NeedsConfirmation(MediaStore.createDeleteRequest(resolver, notOwned).intentSender)
+        }
+        return DeleteResult.Done
+    }
+}
+
+/** Android 8–9 (y pruebas): archivos en la carpeta pública + escaneo de medios. */
+class FilePhotoStore(
+    private val root: File,
+    private val onChanged: (List<String>) -> Unit = {},
+) : PhotoStore {
+    override fun list(folder: String): List<StoredPhoto> =
+        File(root, folder).listFiles { f -> f.isFile && f.extension.equals("jpg", true) }.orEmpty()
+            .map { StoredPhoto(Uri.fromFile(it), it.name, it.lastModified()) }
+
+    override fun folders(): List<String> =
+        root.listFiles { f -> f.isDirectory }.orEmpty().map { it.name }
+
+    override fun save(folder: String, displayName: String, source: File, dateTaken: Long): Uri {
+        val dir = File(root, folder).apply { mkdirs() }
+        val target = File(dir, displayName)
+        source.copyTo(target, overwrite = true)
+        target.setLastModified(dateTaken)
+        onChanged(listOf(target.absolutePath))
+        return Uri.fromFile(target)
+    }
+
+    override fun delete(uris: List<Uri>): DeleteResult {
+        val paths = uris.mapNotNull { it.path }
+        paths.forEach { File(it).delete() }
+        onChanged(paths)
+        return DeleteResult.Done
+    }
+}
