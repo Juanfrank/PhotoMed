@@ -242,6 +242,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     var manualZoom by remember { mutableStateOf(false) }
     var zoomRange by remember { mutableStateOf(1f..4f) }
     var refPoints by remember { mutableStateOf<Map<String, Pt>>(emptyMap()) }
+    var refSilhouette by remember { mutableStateOf<com.photomed.app.align.Silhouette?>(null) }
     var adaptGuide by remember { mutableStateOf(true) }
     var autoArmed by remember { mutableStateOf(true) }
     var live by remember { mutableStateOf<LiveFrame?>(null) }
@@ -268,11 +269,13 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     LaunchedEffect(ghost?.key, matcher) {
         val g = ghost ?: return@LaunchedEffect
         live = null
+        refSilhouette = null
         val bmp = runCatching { ImageOps.load34(context, g.uri, 360) }.getOrNull() ?: return@LaunchedEffect
         val m = matcher
         pipeline.post {
             runCatching { m.setReference(bmp) }
             refPoints = m.referencePoints
+            refSilhouette = m.referenceSilhouette
         }
     }
     val status = live?.eval?.status
@@ -549,7 +552,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                         )
                     }
                     GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize(),
-                        tone = tone, adaptTo = if (adaptGuide && showGhost) refPoints else emptyMap())
+                        tone = tone, adaptTo = if (adaptGuide && showGhost) refPoints else emptyMap(),
+                        silhouette = if (adaptGuide && showGhost) refSilhouette else null)
                     if (matchingEnabled) live?.let { LivePoints(it, tone, mirror = false) }
                 }
 
@@ -616,7 +620,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             LayerToggle("Espejo", Icons.Default.Flip, mirrorOn, enabled = lensFacing == CameraSelector.LENS_FACING_FRONT) {
                 mirrorOn = it; prefs.edit().putBoolean("mirror_front", it).apply()
             }
-            LayerToggle("Adaptar", Icons.Default.AutoFixHigh, adaptGuide, enabled = refPoints.isNotEmpty()) { adaptGuide = it }
+            LayerToggle("Adaptar", Icons.Default.AutoFixHigh, adaptGuide, enabled = refPoints.isNotEmpty() || refSilhouette != null) { adaptGuide = it }
         }
 
         if (showGhost && photos.isNotEmpty()) {

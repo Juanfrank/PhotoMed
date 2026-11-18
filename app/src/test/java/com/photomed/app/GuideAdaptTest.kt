@@ -201,4 +201,99 @@ class GuideAdaptTest {
             assertTrue("$f oreja por fuera del ojo", ear.x < eye.x)
         }
     }
+
+    /** Silueta sintética a partir del contorno del dibujo, con anchos modificados por [widen](y). */
+    private fun silhouetteOf(outline: FloatArray, widen: (Float) -> Float = { 1f }, shiftFront: (Float) -> Float = { 0f }): com.photomed.app.align.Silhouette {
+        val n = outline.size / 3
+        val rows = com.photomed.app.align.Silhouette.ROWS
+        val l = FloatArray(rows) { Float.NaN }; val r = FloatArray(rows) { Float.NaN }
+        for (i in 0 until rows) {
+            val y = (i + 0.5f) / rows
+            val k = (0 until n).minBy { kotlin.math.abs(outline[it * 3] - y) }
+            if (kotlin.math.abs(outline[k * 3] - y) > 1.2f / 64) continue
+            val c = (outline[k * 3 + 1] + outline[k * 3 + 2]) / 2; val f = widen(y)
+            l[i] = c + (outline[k * 3 + 1] - c) * f; r[i] = c + (outline[k * 3 + 2] - c) * f + shiftFront(y)
+        }
+        return com.photomed.app.align.Silhouette(l, r)
+    }
+
+    @Test
+    fun profileAnchorsMatchDrawingAlgorithm() {
+        for (z in listOf("rostro_perfil_der", "rostro_perfil_izq")) {
+            val art = GuideArtByZone[z]!!
+            val sil = silhouetteOf(art.outline)
+            val a = sil.profileAnchors(art.anchors["x:frente"]!! > 0.5f)
+            assertEquals("$z punta nasal", art.anchors["punta nasal"]!!, a["punta nasal"]!!, 0.03f)
+            assertEquals("$z pogonion", art.anchors["pogonion"]!!, a["pogonion"]!!, 0.04f)
+        }
+    }
+
+    @Test
+    fun bodyGuideFollowsSilhouette() {
+        val art = GuideArtByZone["abdomen_frontal"]!!
+        assertTrue(art.outline.size >= 48)
+        // cuerpo más ancho de cintura hacia abajo (+25 %)
+        val sil = silhouetteOf(art.outline, widen = { y -> if (y > 0.45f) 1.25f else 1f })
+        val det = GuideWarp.analyze(emptyMap(), sil, art.anchors)
+        // anclas verticales: las del propio dibujo (mismo encuadre), como si la pose las diera
+        val anchors = art.anchors.filterKeys { !it.startsWith("x:") }
+        val w = GuideWarp.fit(art.anchors, GuideWarp.Detected(anchors + det.anchors, emptyList(), 0f, androidx.compose.ui.geometry.Offset(0.5f, 0.5f), silhouette = sil), art.outline)!!
+        assertTrue(w.followsOutline)
+        val k = (0 until art.outline.size / 3).first { art.outline[it * 3] > 0.7f }
+        val ay = art.outline[k * 3]
+        val (dl, dr) = sil.span(w.y(ay))!!
+        assertEquals("izq", dl, w.x(art.outline[k * 3 + 1], ay), 0.02f)
+        assertEquals("der", dr, w.x(art.outline[k * 3 + 2], ay), 0.02f)
+    }
+
+    /** Puntos del modelo canónico con guiñada (rostro oblicuo sintético). */
+    private fun synthYaw(yawDeg: Double): Map<String, Pt> {
+        val t = Math.toRadians(yawDeg); val c = kotlin.math.cos(t); val sn = kotlin.math.sin(t)
+        val inst = Class.forName("com.photomed.app.align.HeadModel").getDeclaredField("INSTANCE").get(null)
+        @Suppress("UNCHECKED_CAST")
+        val model = inst.javaClass.getDeclaredMethod("getPOINTS").invoke(inst) as Map<String, FloatArray>
+        return model.filterKeys { !it.startsWith("ear_") && it != "vertex" }.mapValues { (_, v) ->
+            val x = c * v[0] + sn * v[2]
+            Pt((0.5 + 0.026 * x).toFloat(), (0.70 - 0.026 * v[1]).toFloat())
+        }
+    }
+
+    @Test
+    fun obliqueProfileAndBodyGuides() {
+        val obl = GuideArtByZone["rostro_oblicuo_der"]!!
+        assertTrue("controles oblicuos", obl.controls.count { !it.isNaN() } > 200)
+        val p = synthYaw(40.0)
+        val w = com.photomed.app.ui.camera.FaceMeshWarp.fit(com.photomed.app.ui.camera.FaceControlKeys, obl.controls, p)
+        assertTrue("oblicuo: deformación rasgo a rasgo", w != null && w.controlCount > 80)
+        val prof = GuideArtByZone["rostro_perfil_der"]!!
+        val body = GuideArtByZone["abdomen_frontal"]!!
+        paparazzi.snapshot {
+            Row(Modifier.background(Color(0xFF1B1B1F)).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                @androidx.compose.runtime.Composable
+                fun cell(label: String, sil: com.photomed.app.align.Silhouette?, pts: Map<String, Pt>, zone: Zone) {
+                    Column(Modifier.width(88.dp)) {
+                        Box(Modifier.aspectRatio(3f / 4f).background(Color(0xFF30303A))) {
+                            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                                sil?.let { s -> for (i in 0 until s.rows) if (!s.left[i].isNaN())
+                                    drawRect(Color(0xFF5A5470), androidx.compose.ui.geometry.Offset(s.left[i] * size.width, i * size.height / s.rows),
+                                        androidx.compose.ui.geometry.Size((s.right[i] - s.left[i]) * size.width, size.height / s.rows + 1)) }
+                                pts.values.forEach { drawCircle(Color(0xFFFFD54F), 1.4f, androidx.compose.ui.geometry.Offset(it.x * size.width, it.y * size.width)) }
+                            }
+                            GuideOverlay(zone, showContour = true, showGrid = false, modifier = Modifier.fillMaxSize(), adaptTo = pts, silhouette = sil)
+                        }
+                        Text(label, color = Color.White, fontSize = 9.sp)
+                    }
+                }
+                cell("Oblicuo 40°", null, p, Zone.FACE_OBLIQUE_R)
+                cell("Perfil: nariz +", silhouetteOf(prof.outline, shiftFront = { y -> if (y in 0.48f..0.6f) 0.05f else 0f }), emptyMap(), Zone.FACE_PROFILE_R)
+                val ab = body.anchors.filterKeys { !it.startsWith("x:") }
+                cell("Abdomen ancho", silhouetteOf(body.outline, widen = { y -> if (y > 0.45f) 1.25f else 1f }),
+                    mapOf(com.photomed.app.align.Landmarks.HIP_L to Pt(0.62f, (ab["caderas"] ?: 0.8f) * 4f / 3f), com.photomed.app.align.Landmarks.HIP_R to Pt(0.38f, (ab["caderas"] ?: 0.8f) * 4f / 3f)),
+                    Zone.TORSO_FRONT)
+                cell("Abdomen estrecho", silhouetteOf(body.outline, widen = { y -> if (y > 0.3f) 0.8f else 1f }),
+                    mapOf(com.photomed.app.align.Landmarks.HIP_L to Pt(0.62f, (ab["caderas"] ?: 0.8f) * 4f / 3f), com.photomed.app.align.Landmarks.HIP_R to Pt(0.38f, (ab["caderas"] ?: 0.8f) * 4f / 3f)),
+                    Zone.TORSO_FRONT)
+            }
+        }
+    }
 }

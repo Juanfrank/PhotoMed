@@ -144,3 +144,26 @@ info = {
 import json
 (SRC / "face_oblique.json").write_text(json.dumps({k: round(float(v), 1) for k, v in info.items()}, indent=1))
 print({k: round(float(v), 1) for k, v in info.items()})
+
+
+# --- puntos de control para la deformación rasgo a rasgo (misma proyección que el dibujo) ---
+# Cada punto de control del frontal se lleva a la superficie de la cabeza girada 45°; los de la
+# nariz (línea media) usan el perfil con la nariz. Orejas: solo la cercana (la lejana no se ve).
+fc = json.loads((SRC / "face_front_controls.json").read_text())
+ctrl = {}
+for k, (x, y) in fc.items():
+    yi = int(round(min(max(y, TOP_F + 2), FH - 1)))
+    dx = x - CX
+    if k.startswith("ear_l_"): continue
+    if k.startswith("ear_r_"):
+        # oreja cercana: marcada sobre el dibujo sintetizado (borde superior, hélice, lóbulo)
+        ctrl[k] = {"ear_r_top": [272.0, 816.0], "ear_r_out": [228.0, 905.0], "ear_r_low": [392.0, 1236.0]}[k]
+        continue
+    if k == "vertex":
+        ctrl[k] = [round(float(proj(0, (zs[yi] + zb[yi]) / 2) + off), 1), round(y, 1)]; continue
+    u = max(min(dx / w[yi], 0.999), -0.999)
+    nose = k.startswith("nose_") and abs(dx) < 60
+    z = zf[yi] if nose else surface(np.array([u]), yi, 1)[0]
+    ctrl[k] = [round(float(proj(dx, z) + off), 1), round(y, 1)]
+(SRC / "face_oblique_controls.json").write_text(json.dumps(ctrl))
+print(len(ctrl), "puntos de control oblicuos")

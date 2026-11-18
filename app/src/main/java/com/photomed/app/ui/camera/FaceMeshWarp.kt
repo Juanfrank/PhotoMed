@@ -75,6 +75,7 @@ class FaceMeshWarp private constructor(
                     ?: (if (k.startsWith("ear_")) pose?.let { p -> HeadModel.POINTS[k]?.let(p::project) } else null)
                     ?: (if (k == "vertex") pose?.let(HeadPose::vertex) else null)
                     ?: continue
+                if (art[i * 2].isNaN()) continue   // punto que no existe en este dibujo (p. ej. oreja oculta)
                 val a = Pt(art[i * 2], art[i * 2 + 1] * H)
                 // puntos repetidos en la ilustración (p. ej. comisuras compartidas): solo el primero
                 if (s.any { kotlin.math.abs(it.x - a.x) < 1e-4f && kotlin.math.abs(it.y - a.y) < 1e-4f }) continue

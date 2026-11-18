@@ -89,7 +89,12 @@ class GuideWarp(
         val pivot: Offset,
         /** Cabeceo de la cabeza en la foto (°, + = barbilla arriba), si se pudo estimar. */
         val pitchDeg: Float? = null,
-    )
+        /** Silueta segmentada del sujeto (cuerpo, perfil): bordes por fila. */
+        val silhouette: com.photomed.app.align.Silhouette? = null,
+    ) {
+        /** Bordes del sujeto a la altura [y]: óvalo facial si lo hay; si no, la silueta. */
+        fun span(y: Float): Pair<Float, Float>? = if (oval.isNotEmpty()) span(oval, y) else silhouette?.span(y)
+    }
 
     companion object {
         const val ROWS = 160
@@ -111,7 +116,8 @@ class GuideWarp(
         }
 
         /** Enderezar los puntos (girar −roll) y medir anclas y óvalo. */
-        fun analyze(points: Map<String, Pt>): Detected {
+        fun analyze(points: Map<String, Pt>, silhouette: com.photomed.app.align.Silhouette? = null,
+                    artAnchors: Map<String, Float> = emptyMap()): Detected {
             val r = roll(points)
             val upright = if (r == null || abs(r.first) < 0.3f) points else points.mapValues { rotate(it.value, r.second, -r.first) }
             val oval = (0 until 64).mapNotNull { upright["oval_$it"] }.map { Offset(it.x, it.y / H) }
@@ -123,8 +129,15 @@ class GuideWarp(
                 pitch = f.pitch
                 anchors["vértice"] = com.photomed.app.align.HeadPose.vertex(f).y / H
             }
+            if (silhouette != null) {
+                // Perfil: punta nasal y pogonion del borde facial de la silueta (mismo algoritmo que el dibujo)
+                artAnchors["x:frente"]?.let { f -> silhouette.profileAnchors(f > 0.5f).forEach { (k, v) -> anchors.putIfAbsent(k, v) } }
+                // Rostro (perfil, oblicuo): vértice = parte alta de la silueta, si no lo dio la pose 3D
+                val face = listOf("pupilas", "punta nasal", "cejas").any { it in artAnchors }
+                if (face) silhouette.top?.let { anchors.putIfAbsent("vértice", it) }
+            }
             return Detected(anchors, if (oval.size >= 12) oval else emptyList(),
-                r?.first ?: 0f, r?.second?.let { Offset(it.x, it.y / H) } ?: Offset(0.5f, 0.5f), pitch)
+                r?.first ?: 0f, r?.second?.let { Offset(it.x, it.y / H) } ?: Offset(0.5f, 0.5f), pitch, silhouette)
         }
 
         /** Posiciones anatómicas detectadas en la foto (mismas claves que las anclas de la guía). */
@@ -197,7 +210,8 @@ class GuideWarp(
             val cxArt = art["x:centro"] ?: 0.5f
             val cxRef = ref["x:centro"] ?: cxArt
             val base = GuideWarp(pairs, sx.coerceIn(0.3f, 3f), cxArt, cxRef, rollDeg = det.rollDeg, pivot = det.pivot)
-            if (outline.size < 6 || det.oval.isEmpty()) return base
+            val useOval = det.oval.isNotEmpty()
+            if (outline.size < 6 || (!useOval && det.silhouette == null)) return base
 
             // Escalas por fila: borde de la ilustración → borde del óvalo a la misma altura.
             val sxc = base.sx
@@ -208,7 +222,8 @@ class GuideWarp(
             // ilustración: solo se usan las filas desde las cejas hacia abajo y con el óvalo ancho.
             var detMaxHalf = 0f
             for (o in det.oval) detMaxHalf = max(detMaxHalf, abs(o.x - (ref["x:centro"] ?: 0.5f)))
-            val browArt = art["cejas"] ?: art["pupilas"]
+            // con el óvalo facial, el cráneo (sobre las cejas) conserva la forma del dibujo
+            val browArt = if (useOval) art["cejas"] ?: art["pupilas"] else null
             for (i in 0..ROWS) {
                 val ay = i / ROWS.toFloat()
                 if (browArt != null && ay < browArt) continue
@@ -216,8 +231,8 @@ class GuideWarp(
                 val hl = cxArt - a.first; val hr = a.second - cxArt
                 // cerca del mentón el ancho tiende a 0: escala inestable, se usa la vecina
                 if (hl < 0.3f * maxHalf || hr < 0.3f * maxHalf) continue
-                val d = span(det.oval, base.y(ay)) ?: continue
-                if ((d.second - d.first) / 2 < 0.45f * detMaxHalf) continue
+                val d = det.span(base.y(ay)) ?: continue
+                if (useOval && (d.second - d.first) / 2 < 0.45f * detMaxHalf) continue
                 val center = (d.first + d.second) / 2
                 // centro del óvalo y escala de cada lado, acotados respecto de la escala por pupilas
                 l[i] = ((center - d.first) / hl).coerceIn(sxc * 0.6f, sxc * 1.6f)

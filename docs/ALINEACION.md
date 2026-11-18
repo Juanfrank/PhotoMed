@@ -249,6 +249,21 @@ hélice, lóbulo) y vértice del cráneo se proyectan desde el modelo 3D con la 
 siguen giro, inclinación y cabeceo. La ilustración se dibuja como malla deformada (36×48 celdas).
 Sin puntos suficientes se usa el ajuste por franjas descrito abajo.
 
+**Oblicuos 45°:** la misma deformación rasgo a rasgo. Sus puntos de control salen de proyectar los
+del frontal con la misma superficie de cabeza girada que sintetizó el dibujo
+(`tools/guides/synth_oblique.py`); el izquierdo es el reflejo del derecho (claves simétricas de la
+malla canónica, `art/source/face_key_mirror.json`). Oreja cercana marcada en el dibujo.
+
+**Perfiles y cuerpo: silueta.** Al fijar la referencia se segmenta el sujeto (ML Kit Selfie
+Segmentation) y se mide, por filas, el tramo que contiene el eje (pose u ojos). El dibujo tiene el
+mismo contorno por filas (`build_guides.py`) y cada franja se escala a cada lado hasta los bordes de
+la silueta: hombros, cintura, caderas, cuello, espalda, glúteos, brazos; nuca y borde facial en el
+perfil. Anclas verticales: pose (hombros, codos, caderas, rodillas) en el cuerpo; en el perfil,
+punta nasal y pogonion de la silueta (máxima protrusión del borde anterior y tras el surco
+mentolabial, mismo algoritmo en el dibujo y en la foto) y la parte alta de la cabeza. Inclinación:
+línea de hombros. Manos y pies: sin detector ni silueta fiable (la segmentación es de personas),
+mantienen la guía estándar.
+
 1. **Inclinación**: ángulo de la línea entre los centros de los contornos de los ojos (o pupilas;
    hombros en el cuerpo). Los puntos se enderezan antes de ajustar y la guía se dibuja girada ese
    ángulo. La misma medida se usa en la estandarización ("Enderece la cabeza: inclinada N° hacia…"),

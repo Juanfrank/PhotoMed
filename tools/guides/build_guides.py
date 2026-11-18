@@ -92,6 +92,7 @@ ANCHORS = {
     "rostro_oblicuo_der": OBL_A, "rostro_oblicuo_izq": OBL_A,
     "rostro_perfil_der": PROF_A, "rostro_perfil_izq": PROF_A,
     "cuello": BODY_F, "abdomen_frontal": BODY_F, "torax_mamas": BODY_F, "muslos": BODY_F,
+    "abdomen_lateral": {"hombros": 640, "caderas": 1470}, "abdomen_lateral_izq": {"hombros": 640, "caderas": 1470},
     "espalda": BODY_B, "gluteos": BODY_B, "brazo_der": BODY_B, "brazo_izq": BODY_B,
 }
 
@@ -105,6 +106,55 @@ for i in range(9):
     a, b = FACE_CONTROLS[f"lip_upper_bottom_{i}"], FACE_CONTROLS[f"lip_lower_top_{i}"]
     FACE_CONTROLS[f"lip_mid_{i}"] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
 FACE_CONTROLS = {k: v for k, v in FACE_CONTROLS.items() if not k.startswith(("lip_upper_bottom_", "lip_lower_top_"))}
+
+def silhouette(src, frame, cx):
+    """Contorno del sujeto por filas (px de la fuente): (y, x izquierda, x derecha), 64 filas.
+    Dibujos con relleno: tramo relleno que contiene el eje [cx]. Solo trazo (lateral): tinta
+    más externa de la fila. Para ajustar la guía a la silueta segmentada de la foto."""
+    g = np.array(Image.open(SRC / f"{src}.png").convert("L")).astype(int)
+    filled = ((g < 250) & (g >= 100)).mean() > 0.05
+    m = g < 250 if filled else g < 100
+    x0, y0, fw, fh = frame
+    out = []
+    for t in np.linspace(0.0, 1.0, 64):
+        y = int(round(y0 + t * fh))
+        if y < 0 or y >= g.shape[0]: continue
+        row = m[y]
+        if filled:
+            c = int(round(cx))
+            if c < 0 or c >= len(row) or not row[c]: continue
+            # se toleran huecos pequeños (marcas blancas dentro del dibujo)
+            def walk(i, step):
+                gap = 0
+                while 0 <= i + step < len(row) and gap < 40:
+                    i += step
+                    gap = 0 if row[i] else gap + 1
+                return i - step * gap
+            l, r = walk(c, -1), walk(c, 1)
+        else:
+            xs = np.where(row[max(int(x0), 0):min(int(x0 + fw), len(row))])[0]
+            if len(xs) < 2: continue
+            l, r = xs.min() + max(int(x0), 0), xs.max() + max(int(x0), 0)
+        if r - l < 8: continue
+        out.append((y, l, r))
+    return out
+
+def profile_anchors(out, front_right):
+    """Perfil: punta nasal (máxima protrusión del borde anterior en el tercio medio) y pogonion
+    (máxima protrusión tras el surco mentolabial, antes de que el borde retroceda al cuello).
+    Mismo algoritmo que Silhouette.profileAnchors en la app."""
+    ys = np.array([o[0] for o in out], float)
+    fx = np.array([o[2] if front_right else -o[1] for o in out], float)
+    wd = np.array([o[2] - o[1] for o in out], float)
+    n = len(ys)
+    lo, hi = int(n * 0.30), int(n * 0.75)
+    i_nose = lo + int(np.argmax(fx[lo:hi]))
+    neck = next((i for i in range(i_nose + 2, n) if fx[i - 1] - fx[i] > 0.12 * wd[i_nose]), n)
+    a = i_nose + max(1, int((neck - i_nose) * 0.2))
+    if neck - a < 3: return {"punta nasal": ys[i_nose]}
+    i_min = a + int(np.argmin(fx[a:neck]))
+    i_pog = i_min + int(np.argmax(fx[i_min:neck]))
+    return {"punta nasal": ys[i_nose], "pogonion": ys[i_pog]}
 
 def render(src, crop):
     im = Image.open(SRC / f"{src}.png").convert("L")
@@ -180,7 +230,42 @@ for zone, (src, crop, refs) in Z.items():
         else:
             items.append(f'"{name}" to {(v - y0) / fh:.4f}f')
     kt.append(f"        listOf({', '.join(marks)}),")
-    if src == "face_front":
+    outline_src = None
+    if src != "face_front" and src.startswith(("face_", "body_")):
+        cxs = (anc.get("x:centro") if anc.get("x:centro") else frame[0] + frame[2] / 2)
+        if src.startswith("face_profiles"):
+            cxs = frame[0] + frame[2] * 0.42 if zone.endswith("_der") else frame[0] + frame[2] * 0.58
+        outline_src = silhouette(src, frame, cxs)
+        if len(outline_src) < 16: outline_src = None   # p. ej. muslos: el eje cae entre las piernas
+        if outline_src and zone.startswith("rostro_perfil") and len(outline_src) > 20:
+            # cara a la derecha de la imagen si el borde derecho es el más irregular (nariz, labios)
+            rr = np.array([o[2] for o in outline_src], float); ll = np.array([o[1] for o in outline_src], float)
+            front_right = np.abs(np.diff(rr, 2)).sum() > np.abs(np.diff(ll, 2)).sum()
+            pa = profile_anchors(outline_src, front_right)
+            items += [f'"{k}" to {(v - y0) / fh:.4f}f' for k, v in pa.items()]
+            items.append(f'"x:frente" to {1.0 if front_right else 0.0:.1f}f')
+    if src.startswith("face_oblique"):
+        oc = json.loads((SRC / "face_oblique_controls.json").read_text())
+        oc.pop("lip_upper_bottom_0", None)
+        if zone.endswith("_izq"):
+            mk = json.loads((SRC / "face_key_mirror.json").read_text())
+            oc = {mk[k]: [OW - x, y] for k, (x, y) in oc.items() if k in mk}
+        for i in range(9):
+            a, b = oc.get(f"lip_upper_bottom_{i}"), oc.get(f"lip_lower_top_{i}")
+            if a and b: oc[f"lip_mid_{i}"] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+        ol = [v for o in outline_src for v in ((o[0] - y0) / fh, (o[1] - x0) / fw, (o[2] - x0) / fw)] if outline_src else []
+        cc = []
+        for k in FACE_CONTROLS:
+            v = oc.get(k)
+            cc += [(v[0] - x0) / fw, (v[1] - y0) / fh] if v else [float("nan"), float("nan")]
+        kt.append(f"        mapOf({', '.join(items)}),")
+        kt.append(f"        floatArrayOf({', '.join(f'{v:.4f}f' for v in ol)}),")
+        kt.append(f"        floatArrayOf({', '.join('Float.NaN' if v != v else f'{v:.4f}f' for v in cc)})),")
+    elif outline_src:
+        ol = [v for o in outline_src for v in ((o[0] - y0) / fh, (o[1] - x0) / fw, (o[2] - x0) / fw)]
+        kt.append(f"        mapOf({', '.join(items)}),")
+        kt.append(f"        floatArrayOf({', '.join(f'{v:.4f}f' for v in ol)})),")
+    elif src == "face_front":
         ol = []
         for y, l, r in FACE_PROFILE:
             ol += [(y - y0) / fh, (l - x0) / fw, (r - x0) / fw]

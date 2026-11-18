@@ -41,3 +41,19 @@ out += [f'        "{k}" to floatArrayOf({v[0]:.3f}f, {v[1]:.3f}f, {v[2]:.3f}f),'
 out += ["    )", "}"]
 (ROOT / "app/src/main/java/com/photomed/app/align/HeadModel.kt").write_text("\n".join(out) + "\n")
 print(len(model), "puntos")
+
+# Claves simétricas (izquierda ↔ derecha) por la malla canónica: para reflejar los puntos de control.
+mir = [int(np.argmin(np.linalg.norm(V - np.array([-v[0], v[1], v[2]]), axis=1))) for v in V]
+idx_key = {}
+for g, idx in groups.items():
+    for k, i in enumerate(idx): idx_key.setdefault(i, f"{g}{k}")
+mkeys = {}
+for g, idx in groups.items():
+    for k, i in enumerate(idx):
+        j = mir[i]
+        if j in idx_key: mkeys[f"{g}{k}"] = idx_key[j]
+mkeys.update({"eye_l": "eye_r", "eye_r": "eye_l", "mouth_l": "mouth_r", "mouth_r": "mouth_l", "nose_base": "nose_base", "vertex": "vertex"})
+for s_ in ("top", "out", "low"): mkeys[f"ear_r_{s_}"] = f"ear_l_{s_}"; mkeys[f"ear_l_{s_}"] = f"ear_r_{s_}"
+for i in range(9): mkeys[f"lip_mid_{i}"] = f"lip_mid_{8 - i}"
+(ROOT / "art/source/face_key_mirror.json").write_text(__import__("json").dumps(mkeys))
+print(len(mkeys), "claves simétricas")

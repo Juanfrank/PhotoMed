@@ -48,8 +48,15 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     /** Umbral de puntos coincidentes (0..1). */
     @Volatile var threshold: Float = LiveMatch.DEFAULT_THRESHOLD
 
+    /** Silueta del sujeto en la referencia (segmentación), para adaptar la guía corporal y de perfil. */
+    @Volatile var referenceSilhouette: Silhouette? = null
+        private set
+
     fun setReference(bmp: Bitmap) {
         ref = detector.detectFull(spec.detector, bmp)
+        referenceSilhouette = runCatching {
+            SubjectSegmenter().use { s -> s.segment(bmp) }?.let { Silhouette.fromMask(it, Silhouette.axisOf(ref.points)) }
+        }.getOrNull()
         val g = ImageOps.gray(bmp, EDGE_W)
         refGray = g
         refEdgePts = ContourMatch.referencePoints(g, spec.contours)

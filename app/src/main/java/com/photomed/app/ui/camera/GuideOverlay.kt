@@ -62,6 +62,8 @@ fun GuideOverlay(
     tone: GuideTone = GuideTone.NORMAL,
     /** Puntos detectados en la foto de referencia: si hay, la guía se adapta a ellos. */
     adaptTo: Map<String, Pt> = emptyMap(),
+    /** Silueta segmentada de la referencia (cuerpo y perfil): la guía se ajusta a sus bordes. */
+    silhouette: com.photomed.app.align.Silhouette? = null,
 ) {
     val art = GuideArtByZone[zone.id]
     // Rostro: deformación rasgo a rasgo (thin-plate spline con ~140 puntos de control).
@@ -87,11 +89,12 @@ fun GuideOverlay(
         }
         return
     }
-    val warp = remember(art, adaptTo) {
-        if (art == null || adaptTo.isEmpty()) null else {
-            val det = GuideWarp.analyze(adaptTo)
-            // El borde superior del contorno de la ilustración es su vértice del cráneo.
-            val artAnchors = if (art.outline.size >= 3) art.anchors + ("vértice" to art.outline[0]) else art.anchors
+    val warp = remember(art, adaptTo, silhouette) {
+        if (art == null || (adaptTo.isEmpty() && silhouette == null)) null else {
+            val det = GuideWarp.analyze(adaptTo, silhouette, art.anchors)
+            // Rostro: el borde superior del contorno de la ilustración es su vértice del cráneo.
+            val face = zone.category == com.photomed.app.data.ZoneCategory.FACIAL
+            val artAnchors = if (face && art.outline.size >= 3) art.anchors + ("vértice" to art.outline[0]) else art.anchors
             GuideWarp.fit(artAnchors, det, art.outline)?.let { it to det.anchors }
         }
     }
