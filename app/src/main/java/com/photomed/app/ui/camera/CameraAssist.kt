@@ -285,3 +285,43 @@ fun LayerToggle(
             .background(if (on) cs.primary else Color.Transparent))
     }
 }
+
+
+/** Zoom máximo ofrecido en el deslizador (más allá el zoom digital degrada la imagen clínica). */
+const val MAX_MANUAL_ZOOM = 8f
+
+/**
+ * Zoom manual: deslizador (escala logarítmica, como las cámaras) con el valor actual y, si el zoom
+ * asistido estaba activo y el usuario tomó el control, botón para reanudarlo. También se puede
+ * hacer zoom con el pellizco sobre la vista previa.
+ */
+@Composable
+fun ZoomBar(
+    ratio: Float,
+    range: ClosedFloatingPointRange<Float>,
+    manual: Boolean,
+    assist: Boolean,
+    onZoom: (Float) -> Unit,
+    onResumeAssist: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val lo = ln(range.start.coerceAtLeast(0.1f)); val hi = ln(range.endInclusive.coerceAtLeast(range.start + 0.01f))
+    val pos = ((ln(ratio.coerceIn(range.start, range.endInclusive)) - lo) / (hi - lo)).coerceIn(0f, 1f)
+    Row(modifier.fillMaxWidth().padding(horizontal = 12.dp).height(40.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.ZoomOut, null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
+        androidx.compose.material3.Slider(
+            value = pos,
+            onValueChange = { onZoom(kotlin.math.exp(lo + it * (hi - lo))) },
+            modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
+                .semantics { contentDescription = "Zoom" },
+        )
+        Icon(Icons.Default.ZoomIn, null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
+        Text("%.1f×".format(ratio), color = Color.White, style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.width(44.dp).padding(start = 6.dp))
+        if (assist && manual) {
+            androidx.compose.material3.TextButton(onClick = onResumeAssist, modifier = Modifier.height(36.dp)) {
+                Text("Auto", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}

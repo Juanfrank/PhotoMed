@@ -2,6 +2,7 @@ package com.photomed.app.ui.compare
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.Palette
 import com.photomed.app.align.ColorAdjust
 import androidx.compose.material.icons.filled.Straighten
@@ -148,6 +149,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     var colorAdjusts by remember { mutableStateOf<Map<String, ColorAdjust>>(emptyMap()) }
     var contourOutlines by remember { mutableStateOf<Map<String, List<Pt>>>(emptyMap()) }
     var conditionsWarning by remember { mutableStateOf<String?>(null) }
+    var exportSheet by remember { mutableStateOf(false) }
     var options by remember { mutableStateOf(AlignOptions.fromPrefs(prefs)) }
     /** Cambia con cada reinicio de la alineación: un cálculo en curso solo se aplica si sigue vigente. */
     var alignToken by remember { mutableStateOf(0) }
@@ -303,6 +305,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                                         snackbar.showSnackbar(if (out.isEmpty()) "No se encontró piel para igualar" else "Color igualado en ${out.size} fotos")
                                     }
                                 },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Exportar imágenes ajustadas") },
+                                leadingIcon = { Icon(Icons.Default.IosShare, null) },
+                                enabled = seq != null,
+                                onClick = { menu = false; exportSheet = true },
                             )
                             DropdownMenuItem(
                                 text = { Text("Contornos (configuración)") },
@@ -579,6 +587,29 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
+
+    if (exportSheet && seq != null) {
+        val shown = seq.mapNotNull { p -> resultOf(p)?.let { p.key to it } }.toMap()
+        ExportSheet(
+            count = seq.size, aligned = shown.isNotEmpty(), colorMatched = colorAdjusts.isNotEmpty(),
+            onDismiss = { exportSheet = false },
+            onExport = { individual, grid, anonymize, toGallery, progress ->
+                val e = exp
+                val dir = java.io.File(context.cacheDir, "share/export").apply { deleteRecursively(); mkdirs() }
+                val r = CompareExport.build(context, repo, seq, shown, colorAdjusts, individual, grid, anonymize, dir, progress)
+                when {
+                    r.files.isEmpty() -> "No se pudo exportar ninguna imagen"
+                    toGallery && e != null -> {
+                        val ok = CompareExport.saveToGallery(repo, e, r.files)
+                        "Guardadas $ok imágenes en la galería: PhotoMed/${e.id}/${com.photomed.app.data.PhotoRepository.EXPORT_DIR}" +
+                            if (r.failed > 0) " (${r.failed} no se pudieron leer)" else ""
+                    }
+                    else -> { CompareExport.share(context, r.files, anonymize); null }
+                }
+            },
+            onMessage = { m -> scope.launch { snackbar.showSnackbar(m) } },
+        )
     }
 
     if (colorDialog && reference != null && target != null) {

@@ -28,6 +28,7 @@ import com.photomed.app.ui.camera.GuideOverlay
 import com.photomed.app.ui.camera.GuideWarp
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -75,6 +76,62 @@ class GuideAdaptTest {
                                 Text(if (adapt) "Adaptada a la referencia" else "Guía estándar", color = Color.White, fontSize = 10.sp)
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun rotated(p: Map<String, Pt>, deg: Float, c: Pt = Pt(0.5f, 0.6667f)): Map<String, Pt> {
+        val t = Math.toRadians(deg.toDouble()); val cs = kotlin.math.cos(t).toFloat(); val sn = kotlin.math.sin(t).toFloat()
+        return p.mapValues { (_, v) -> Pt(c.x + cs * (v.x - c.x) - sn * (v.y - c.y), c.y + sn * (v.x - c.x) + cs * (v.y - c.y)) }
+    }
+
+    @Test
+    fun rollIsDetectedAndUndone() {
+        val base = pts("face_1")
+        val r0 = GuideWarp.roll(base)!!.first
+        for (deg in listOf(-15f, -6f, 8f, 12f)) {
+            val r = GuideWarp.roll(rotated(base, deg))!!.first
+            assertEquals("roll $deg", r0 + deg, r, 0.3f)
+            // anclas enderezadas ≈ las del rostro original (salvo el giro propio de la foto)
+            val a = GuideWarp.analyze(rotated(base, deg)).anchors
+            val b = GuideWarp.analyze(base).anchors
+            for (k in listOf("pupilas", "boca", "mentón")) assertEquals("$k @ $deg°", b[k]!!, a[k]!!, 0.01f)
+        }
+    }
+
+    @Test
+    fun outlineFollowsDetectedOval() {
+        val art = GuideArtByZone["rostro_frontal"]!!
+        assertTrue("contorno de la ilustración", art.outline.size >= 30)
+        for (f in listOf("face_1", "face_2", "face_3")) {
+            val det = GuideWarp.analyze(pts(f))
+            val w = GuideWarp.fit(art.anchors, det, art.outline)!!
+            assertTrue(w.followsOutline)
+            // a la altura de la boca, el borde de la guía cae sobre el óvalo detectado (±1,5 % del ancho)
+            val ay = art.anchors["boca"]!!
+            val k = (0 until art.outline.size / 3).minBy { kotlin.math.abs(art.outline[it * 3] - ay) }
+            val (dl, dr) = GuideWarp.span(det.oval, w.y(art.outline[k * 3]))!!
+            assertEquals("$f izq", dl, w.x(art.outline[k * 3 + 1], art.outline[k * 3]), 0.015f)
+            assertEquals("$f der", dr, w.x(art.outline[k * 3 + 2], art.outline[k * 3]), 0.015f)
+        }
+    }
+
+    @Test
+    fun adaptedGuideOnTiltedFaces() {
+        paparazzi.snapshot {
+            Row(Modifier.background(Color(0xFF1B1B1F)).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("face_1" to 10f, "face_2" to -12f).forEach { (f, deg) ->
+                    val src = BitmapFactory.decodeStream(javaClass.getResourceAsStream("/demo/$f.jpg"))
+                    val m = android.graphics.Matrix().apply { postRotate(deg, src.width / 2f, src.height * 0.5f) }
+                    val bmp = android.graphics.Bitmap.createBitmap(src.width, src.height, android.graphics.Bitmap.Config.ARGB_8888)
+                    android.graphics.Canvas(bmp).apply { drawColor(android.graphics.Color.BLACK); drawBitmap(src, m, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)) }
+                    // mismos puntos girados alrededor del centro de la imagen (y en unidades del ancho)
+                    val p = rotated(pts(f), deg, Pt(0.5f, 0.5f * src.height / src.width))
+                    Box(Modifier.width(190.dp).aspectRatio(3f / 4f)) {
+                        Image(bmp.asImageBitmap(), null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
+                        GuideOverlay(Zone.FACE_FRONTAL, showContour = true, showGrid = false, modifier = Modifier.fillMaxSize(), adaptTo = p)
                     }
                 }
             }

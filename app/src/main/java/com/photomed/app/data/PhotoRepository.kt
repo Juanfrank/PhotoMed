@@ -144,6 +144,13 @@ class PhotoRepository(
         return Photo(uri, name, zone, takenAt)
     }
 
+    /**
+     * Guarda una imagen exportada (ajustada o composición) en el subálbum `<expediente>/Exportadas`:
+     * visible en la galería, pero fuera de las fotos clínicas del expediente.
+     */
+    fun saveExport(exp: Expediente, file: File, displayName: String, takenAt: Long = System.currentTimeMillis()): Uri =
+        store.save("${exp.id}/$EXPORT_DIR", displayName, file, takenAt)
+
     fun deletePhotos(photos: List<Photo>): DeleteResult = store.delete(photos.map { it.uri })
 
     fun readInfo(photo: Photo): PhotoInfo? = openStream(photo.uri)?.use { PhotoMetadata.read(it) }
@@ -180,6 +187,7 @@ class PhotoRepository(
     }
 
     companion object {
+        const val EXPORT_DIR = "Exportadas"
         private const val META = "expediente.json"
 
         fun create(context: Context): PhotoRepository {

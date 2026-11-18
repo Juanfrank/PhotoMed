@@ -94,6 +94,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -237,6 +238,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     var zoomAssist by remember { mutableStateOf(prefs.getBoolean("zoom_assist", true)) }
     var useGaze by remember { mutableStateOf(prefs.getBoolean(com.photomed.app.align.AlignOptions.PREF_GAZE, true)) }
     var zoomRatio by remember { mutableFloatStateOf(1f) }
+    /** Zoom manual (deslizador o pellizco): pausa el zoom asistido hasta que se reanude. */
+    var manualZoom by remember { mutableStateOf(false) }
+    var zoomRange by remember { mutableStateOf(1f..4f) }
     var refPoints by remember { mutableStateOf<Map<String, Pt>>(emptyMap()) }
     var adaptGuide by remember { mutableStateOf(true) }
     var autoArmed by remember { mutableStateOf(true) }
@@ -361,6 +365,15 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             provider.unbindAll()
             camera = provider.bindToLifecycle(lifecycleOwner, selector, group)
             focalNorm = camera?.let { focalNormOf(it) }
+            zoomRatio = 1f
+            // rango de zoom de esta cámara (el estado llega tras enlazar)
+            repeat(20) {
+                camera?.cameraInfo?.zoomState?.value?.let { zs ->
+                    zoomRange = zs.minZoomRatio..minOf(zs.maxZoomRatio, MAX_MANUAL_ZOOM).coerceAtLeast(zs.minZoomRatio + 0.01f)
+                    return@repeat
+                }
+                kotlinx.coroutines.delay(50)
+            }
         } catch (e: Exception) {
             Toast.makeText(context, "No se pudo iniciar la cámara: ${e.message}", Toast.LENGTH_LONG).show()
         }
@@ -439,10 +452,18 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             FocusMeteringAction.Builder(point).setAutoCancelDuration(4, java.util.concurrent.TimeUnit.SECONDS).build())
         f.addListener({ onDone(runCatching { f.get().isFocusSuccessful }.getOrDefault(false)) }, ContextCompat.getMainExecutor(context))
     }
-    LaunchedEffect(live, zoomAssist) {
+    fun setZoom(r: Float) {
+        val cam = camera ?: return
+        val z = r.coerceIn(zoomRange.start, zoomRange.endInclusive)
+        manualZoom = true
+        zoomCtl.reset()
+        zoomRatio = z
+        cam.cameraControl.setZoomRatio(z)
+    }
+    LaunchedEffect(live, zoomAssist, manualZoom) {
         val e = live?.eval ?: return@LaunchedEffect
         val cam = camera ?: return@LaunchedEffect
-        if (!zoomAssist || !matchingEnabled || e.status == MatchStatus.SEARCHING) return@LaunchedEffect
+        if (!zoomAssist || manualZoom || !matchingEnabled || e.status == MatchStatus.SEARCHING) return@LaunchedEffect
         val zs = cam.cameraInfo.zoomState.value ?: return@LaunchedEffect
         val target = zoomCtl.update(e.scale, zs.zoomRatio, System.currentTimeMillis())
             ?.coerceIn(zs.minZoomRatio, minOf(zs.maxZoomRatio, 4f)) ?: return@LaunchedEffect
@@ -532,11 +553,17 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                 }
 
                 // Toque para enfocar
+                // Toque para enfocar; pellizco para zoom manual
+                val currentZoom by androidx.compose.runtime.rememberUpdatedState(zoomRatio)
                 Box(Modifier.fillMaxSize().pointerInput(camera, mirrorOn, front) {
                     detectTapGestures { pos ->
                         val x = if (front && !mirrorOn) size.width - pos.x else pos.x
                         val point = previewView.meteringPointFactory.createPoint(x, pos.y)
                         camera?.cameraControl?.startFocusAndMetering(FocusMeteringAction.Builder(point).build())
+                    }
+                }.pointerInput(camera) {
+                    detectTransformGestures { _, _, zoomChange, _ ->
+                        if (zoomChange != 1f) setZoom(currentZoom * zoomChange)
                     }
                 })
 
@@ -562,12 +589,18 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                 live?.let { CameraGuidance.faceDistanceCm(it.currentPointsAll, focalNorm, zoomRatio) } else null
             RecommendationStrip(
                 live, guidance, autoCapture,
-                zoomInfo = if (zoomAssist && zoomRatio > 1.01f) "zoom asistido %.1f×".format(zoomRatio) else null,
+                zoomInfo = if (zoomAssist && !manualZoom && zoomRatio > 1.01f) "zoom asistido %.1f×".format(zoomRatio) else null,
                 distanceHint = dist?.let { d ->
                     if (d < 80f) "≈ %.0f cm: aléjese ≥ 1 m y use zoom (evita el efecto selfie)".format(d) else "≈ %.0f cm".format(d)
                 },
             )
         }
+
+        ZoomBar(
+            ratio = zoomRatio, range = zoomRange, manual = manualZoom, assist = zoomAssist,
+            onZoom = { setZoom(it) },
+            onResumeAssist = { manualZoom = false; zoomCtl.reset() },
+        )
 
         // Controles de capas (objetivo táctil ≥ 48 dp, etiquetas visibles)
         Row(

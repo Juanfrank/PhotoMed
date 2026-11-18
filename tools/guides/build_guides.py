@@ -95,6 +95,10 @@ ANCHORS = {
     "espalda": BODY_B, "gluteos": BODY_B, "brazo_der": BODY_B, "brazo_izq": BODY_B,
 }
 
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+from face_profile import face_profile
+FACE_PROFILE = face_profile()[1]
+
 def render(src, crop):
     im = Image.open(SRC / f"{src}.png").convert("L")
     cx, cy, h = crop if crop else auto(src)
@@ -139,7 +143,9 @@ kt = ["// ARCHIVO GENERADO por tools/guides/build_guides.py — no editar a mano
       "/** Ilustración de la guía (trazo ya coloreado) y referencias en coordenadas normalizadas del encuadre 3:4. */",
       "class GuideArt(val drawable: Int, val lines: List<Pair<Offset, Offset>>, val marks: List<Offset>,",
       "    /** Anclas anatómicas: nombre → y (o x si empieza por \"x:\") en coordenadas normalizadas del encuadre. */",
-      "    val anchors: Map<String, Float> = emptyMap())", "",
+      "    val anchors: Map<String, Float> = emptyMap(),",
+      "    /** Contorno de la cabeza (cráneo → mentón): y, x izquierda, x derecha (normalizadas), por filas. */",
+      "    val outline: FloatArray = FloatArray(0))", "",
       "val GuideArtByZone: Map<String, GuideArt> = mapOf("]
 previews = []
 for zone, (src, crop, refs) in Z.items():
@@ -163,7 +169,14 @@ for zone, (src, crop, refs) in Z.items():
         else:
             items.append(f'"{name}" to {(v - y0) / fh:.4f}f')
     kt.append(f"        listOf({', '.join(marks)}),")
-    kt.append(f"        mapOf({', '.join(items)})),")
+    if src == "face_front":
+        ol = []
+        for y, l, r in FACE_PROFILE:
+            ol += [(y - y0) / fh, (l - x0) / fw, (r - x0) / fw]
+        kt.append(f"        mapOf({', '.join(items)}),")
+        kt.append(f"        floatArrayOf({', '.join(f'{v:.4f}f' for v in ol)})),")
+    else:
+        kt.append(f"        mapOf({', '.join(items)})),")
     # vista previa
     tinted = img.copy(); a = np.array(tinted); white = a[..., 0] > 128; a[white, 0:3] = (0x7C, 0xF5, 0xE4)
     tinted = Image.fromarray(a, "RGBA")

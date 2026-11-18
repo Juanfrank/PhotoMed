@@ -249,3 +249,53 @@ class CompareNCaptureTest {
         compose.onNodeWithContentDescription("Más opciones").performClick(); shot("menu")
     }
 }
+
+/** Exportación de la comparación: archivos, anonimización, subálbum y misma transformación que la vista previa. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class CompareExportTest {
+    @get:Rule
+    val tmp = TemporaryFolder()
+
+    @Test
+    fun matrixMatchesPreviewTransform() {
+        val t = com.photomed.app.align.Similarity(1.08f, Math.toRadians(4.0).toFloat(), 0.03f, -0.02f)
+        val m = com.photomed.app.ui.compare.CompareExport.matrixOf(t, 1080f)
+        for (p in listOf(com.photomed.app.align.Pt(0.2f, 0.3f), com.photomed.app.align.Pt(0.7f, 1.1f))) {
+            val v = floatArrayOf(p.x * 1080f, p.y * 1080f); m.mapPoints(v)
+            val e = t.apply(p)
+            assertEquals(e.x * 1080f, v[0], 0.5f); assertEquals(e.y * 1080f, v[1], 0.5f)
+        }
+    }
+
+    @Test
+    fun exportsAdjustedPhotosAndGrid() = kotlinx.coroutines.runBlocking {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val repo = PhotoRepository(File(tmp.root, "private"), FilePhotoStore(File(tmp.root, "Pictures/PhotoMed")),
+            openStream = { uri -> File(uri.path!!).inputStream() })
+        val exp = repo.createExpediente("Ana Pérez", "077", "", consent = true)
+        val photos = (1..3).map { i ->
+            val f = File(tmp.root, "f$i.jpg").apply { writeBytes(this@CompareExportTest.javaClass.getResourceAsStream("/demo/face_$i.jpg")!!.readBytes()) }
+            repo.savePhoto(exp, Zone.FACE_FRONTAL, f, takenAt = 1_763_400_000_000L + i * 86_400_000L)
+        }
+        val shift = com.photomed.app.align.AlignmentResult(com.photomed.app.align.Similarity(1.05f, 0.02f, 0.01f, 0f), "test", emptyList(), 0.5f)
+        val dir = File(tmp.root, "out")
+        val r = com.photomed.app.ui.compare.CompareExport.build(ctx, repo, photos, mapOf(photos[1].key to shift), emptyMap(),
+            individual = true, grid = true, anonymize = true, dir = dir)
+        assertEquals(0, r.failed)
+        assertEquals(4, r.files.size)
+        assertTrue(r.files.none { it.name.contains("Ana") || it.name.contains("Perez") || it.name.contains("077") })
+        val grid = android.graphics.BitmapFactory.decodeFile(r.files.last().absolutePath)
+        assertTrue("cuadrícula 3 en fila", grid.width > grid.height)
+        val one = android.graphics.BitmapFactory.decodeFile(r.files[1].absolutePath)
+        assertEquals(1080, one.width); assertEquals(1440, one.height)
+        // anonimizadas: sin metadatos del paciente
+        assertTrue(r.files.take(3).all { f -> f.inputStream().use { com.photomed.app.data.PhotoMetadata.read(it) }?.patientName.isNullOrEmpty() })
+        // en la galería: subálbum Exportadas, fuera de las fotos clínicas del expediente
+        val saved = com.photomed.app.ui.compare.CompareExport.saveToGallery(repo, exp, r.files)
+        assertEquals(4, saved)
+        assertTrue(File(tmp.root, "Pictures/PhotoMed/${exp.id}/Exportadas").listFiles()!!.size == 4)
+        assertEquals(3, repo.photos(exp).size)
+    }
+}

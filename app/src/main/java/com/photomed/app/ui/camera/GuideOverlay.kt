@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.photomed.app.data.GuideType
@@ -61,8 +62,8 @@ fun GuideOverlay(
     val art = GuideArtByZone[zone.id]
     val warp = remember(art, adaptTo) {
         if (art == null || adaptTo.isEmpty()) null else {
-            val det = GuideWarp.detected(adaptTo)
-            GuideWarp.fit(art.anchors, det)?.let { it to det }
+            val det = GuideWarp.analyze(adaptTo)
+            GuideWarp.fit(art.anchors, det, art.outline)?.let { it to det.anchors }
         }
     }
     if (art != null && warp != null) {
@@ -72,19 +73,31 @@ fun GuideOverlay(
         Canvas(modifier) {
             if (showGrid) drawGrid()
             if (showContour) {
-                // deformación por franjas horizontales
-                val n = 48
-                for (i in 0 until n) {
-                    val a0 = i / n.toFloat(); val a1 = (i + 1) / n.toFloat()
-                    val y0 = w.y(a0) * size.height; val y1 = w.y(a1) * size.height
-                    if (y1 - y0 < 0.5f) continue
-                    val sy0 = (a0 * bmp.height).toInt(); val sy1 = ((a1 * bmp.height).toInt()).coerceAtMost(bmp.height)
-                    val left = w.x(0f) * size.width; val right = w.x(1f) * size.width
-                    drawImage(bmp, srcOffset = IntOffset(0, sy0), srcSize = IntSize(bmp.width, (sy1 - sy0).coerceAtLeast(1)),
-                        dstOffset = IntOffset(left.toInt(), y0.toInt()), dstSize = IntSize((right - left).toInt(), (y1 - y0).toInt() + 1),
-                        colorFilter = filter)
+                // La guía sigue la inclinación de la cabeza de la referencia.
+                rotate(w.rollDeg, Offset(w.pivot.x * size.width, w.pivot.y * size.height)) {
+                    // Deformación por franjas horizontales; cada franja por mitades (izquierda/derecha
+                    // de la línea media) para seguir el contorno del cráneo, mejillas y mandíbula.
+                    val n = 160
+                    val cSrc = (w.artCenter * bmp.width).toInt().coerceIn(1, bmp.width - 1)
+                    for (i in 0 until n) {
+                        val a0 = i / n.toFloat(); val a1 = (i + 1) / n.toFloat(); val am = (a0 + a1) / 2
+                        val y0 = w.y(a0) * size.height; val y1 = w.y(a1) * size.height
+                        if (y1 - y0 < 0.5f) continue
+                        val sy0 = (a0 * bmp.height).toInt(); val sy1 = ((a1 * bmp.height).toInt()).coerceAtMost(bmp.height)
+                        val center = w.rowCenter(am) * size.width
+                        val left = center - w.artCenter * w.rowLeftScale(am) * size.width
+                        val right = center + (1f - w.artCenter) * w.rowRightScale(am) * size.width
+                        val dy = IntOffset(0, y0.toInt()); val dh = (y1 - y0).toInt() + 1
+                        val sh = (sy1 - sy0).coerceAtLeast(1)
+                        drawImage(bmp, srcOffset = IntOffset(0, sy0), srcSize = IntSize(cSrc, sh),
+                            dstOffset = dy.copy(x = left.toInt()), dstSize = IntSize((center - left).toInt().coerceAtLeast(1), dh),
+                            colorFilter = filter)
+                        drawImage(bmp, srcOffset = IntOffset(cSrc, sy0), srcSize = IntSize(bmp.width - cSrc, sh),
+                            dstOffset = dy.copy(x = center.toInt()), dstSize = IntSize((right - center).toInt().coerceAtLeast(1), dh),
+                            colorFilter = filter)
+                    }
+                    drawGuide(Guide(emptyList(), art.lines.map { (a, b) -> w.line(a, b, art.anchors, det) }, art.marks.map { w.map(it) }), mirror = false)
                 }
-                drawGuide(Guide(emptyList(), art.lines.map { (a, b) -> w.line(a, b, art.anchors, det) }, art.marks.map { w.map(it) }), mirror = false)
             }
         }
         return

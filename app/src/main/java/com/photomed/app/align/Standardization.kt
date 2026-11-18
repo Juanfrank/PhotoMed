@@ -72,7 +72,14 @@ object Standardization {
                 off += abs(err) / t.yawTol
             }
             det.pitch?.let { if (abs(it) > PITCH_TOL) { hints += "Frankfort: " + (if (it > 0) "baje" else "suba") + " un poco la barbilla (%.0f°)".format(abs(it)); off += abs(it) / PITCH_TOL } }
-            det.roll?.let { if (abs(it) > ROLL_TOL) { hints += "Enderece la cabeza (inclinada %.0f°)".format(abs(it)); off += abs(it) / ROLL_TOL } }
+            // Inclinación: línea entre los ojos en la imagen (de frente u oblicuo); Euler Z si no hay ojos.
+            val roll = (if (yawAbs < 30f) HeadRoll.of(det.points)?.first else null) ?: det.roll
+            roll?.let {
+                if (abs(it) > ROLL_TOL) {
+                    hints += "Enderece la cabeza: inclinada %.0f° hacia la %s de la imagen".format(abs(it), if (it > 0) "derecha" else "izquierda")
+                    off += abs(it) / ROLL_TOL
+                }
+            }
         }
         det.gaze?.let { g ->
             if (kotlin.math.abs(g.x) > Gaze.TOL_X * 1.2f || kotlin.math.abs(g.y) > Gaze.TOL_Y * 1.2f) {
