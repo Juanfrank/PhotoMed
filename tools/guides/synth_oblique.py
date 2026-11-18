@@ -48,7 +48,11 @@ zf = np.interp(ys, ys[valid], zf[valid]); zb = np.interp(ys, ys[valid], zb[valid
 zs = zf.copy()
 a, b = NASION_F, SUBNASAL_F
 zs[a:b] = np.interp(np.arange(a, b), [a, b], [zf[a], zf[b]])
-zs = uniform_filter1d(zs, 25)
+# sin labios: de la base nasal al pogonion la mejilla/mandíbula es una curva suave
+POGONION_F = 1619
+c = POGONION_F
+zs[b:c] = np.interp(np.arange(b, c), [b, c], [zf[b] - 25 * K, zf[c]])
+zs = uniform_filter1d(zs, 41)
 
 # --- frontal: semiancho por fila (sin orejas) ---
 w = np.full(FH, np.nan)
@@ -74,9 +78,12 @@ U = np.linspace(-1, 1, 241)
 for y in range(TOP_F + 2, FH):
     xx = w[y] * U
     xp = np.concatenate([proj(xx, surface(U, y, 1)), proj(xx, surface(U, y, -1))])
-    hi = max(xp.max(), proj(0, zf[y]))
-    near.append((xp.min(), y)); far.append((hi, y))
+    near.append((xp.min(), y)); far.append((xp.max(), y))   # mejilla lejana: superficie lisa, sin perfil
 
+# nariz: solo la parte del perfil que sobresale de la mejilla lejana (dorso → punta → subnasal)
+far_x = dict((y, x) for x, y in far)
+nose = [(proj(0, zf[y]), y) for y in range(NASION_F - 10, SUBNASAL_F + 15)]
+nose_out = [(x, y) for x, y in nose if x > far_x.get(y, 1e9) - 4]
 # rasgos frontales (sin contorno exterior, orejas ni líneas del cuello)
 lab, n = label(front)
 sizes = np.bincount(lab.ravel())
@@ -107,12 +114,19 @@ for yy, xx in zip(*np.where(ear)):
 for yf in range(NASION_F - 40, SUBNASAL_F + 8):
     pts.append((proj(0, zf[yf]), yf))
 
-allx = [p[0] for p in near + far + pts]
+allx = [p[0] for p in near + far + pts + nose_out]
 x0, x1 = min(allx), max(allx)
 OW = int(x1 - x0 + 160); off = -x0 + 80
 img = Image.new("L", (OW, FH), 255); d = ImageDraw.Draw(img)
+# suavizado vertical de las siluetas (evita escalones)
+def smooth(line, k=15):
+    xs = uniform_filter1d(np.array([p[0] for p in line]), k, mode="nearest")
+    return list(zip(xs, [p[1] for p in line]))
+near, far = smooth(near), smooth(far)
 for line in (near, far):
     d.line([(x + off, y) for x, y in line], fill=0, width=16)
+if nose_out:
+    d.line([(x + off, y) for x, y in nose_out], fill=0, width=16)
 d.line([(near[0][0] + off, near[0][1]), (far[0][0] + off, far[0][1])], fill=0, width=16)  # coronilla
 for x, y in pts:
     d.ellipse([x + off - 5, y - 5, x + off + 5, y + 5], fill=0)

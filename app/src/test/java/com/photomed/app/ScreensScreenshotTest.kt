@@ -64,5 +64,10 @@ class ScreensScreenshotTest {
     }
 
     @Test
+    fun manualAlign() = shot("manual_align", dark = true) {
+        com.photomed.app.ui.compare.ManualAlignContent(com.photomed.app.data.Zone.FACE_FRONTAL, null, null, {}, { _, _ -> })
+    }
+
+    @Test
     fun termsGate() = shot("terms") { TermsGate(onAccept = {}) }
 }

@@ -19,7 +19,7 @@ SRC = ROOT / "art/source"
 OUT = ROOT / "app/src/main/res/drawable-nodpi"
 KT = ROOT / "app/src/main/java/com/photomed/app/ui/camera/GuideArt.kt"
 W, H = 600, 800
-LINE = (0x7C, 0xF5, 0xE4)
+LINE = (0xFF, 0xFF, 0xFF)  # la app aplica el color (normal / coincidencia)
 LINE_R, HALO_R = 2, 5
 
 def auto(name, pad=0.04):
@@ -38,6 +38,7 @@ for script in ("synth_oblique.py", "synth_side.py"):
 OB = json.loads((SRC / "face_oblique.json").read_text())
 OW = OB["width"]
 SIDE_AX = 640
+W_SRC = 1366
 
 # zona: (fuente, (cx, cy, alto) en px de la fuente, refs)
 # refs: ("h", y, x0, x1) | ("v", x, y0, y1) | ("m", x, y)  — en px de la fuente; None = todo el ancho/alto
@@ -54,8 +55,11 @@ Z = {
  "rostro_oblicuo_izq": ("face_oblique_left", (OW / 2, 948, OW * 4 / 3), [
     ("h", 770, None, None), ("h", 903, None, None), ("h", 1250, None, None),
     ("v", OW - OB["nose_x"], 640, 1560), ("m", OW - OB["pupil_r"], 903), ("m", OW - OB["pupil_l"], 903)]),
- "abdomen_lateral": ("body_side", (680, 1180, 1120), [
-    ("v", SIDE_AX, 660, 1640), ("h", 1221, 420, 940), ("h", 1628, 380, 900), ("m", SIDE_AX + 168, 1221)]),
+ "abdomen_lateral": ("body_side_right", (680, 1130, 1240), [
+    ("v", SIDE_AX, 640, 1700), ("h", 1221, 420, 940), ("h", 1628, 380, 900), ("m", SIDE_AX + 172, 1222)]),
+ "abdomen_lateral_izq": ("body_side_left", (W_SRC - 680, 1130, 1240), [
+    ("v", W_SRC - SIDE_AX, 640, 1700), ("h", 1221, W_SRC - 940, W_SRC - 420), ("h", 1628, W_SRC - 900, W_SRC - 380),
+    ("m", W_SRC - SIDE_AX - 172, 1222)]),
  "rostro_perfil_der": ("face_profiles", (867, 1050, 1600), [
     ("h", 976, 250, 1550), ("v", 1354, 300, 1800), ("m", 802, 1004), ("m", 1275, 948)]),
  "rostro_perfil_izq": ("face_profiles", (3240 - 867, 1050, 1600), [
@@ -134,7 +138,9 @@ for zone, (src, crop, refs) in Z.items():
     kt.append(f"        listOf({', '.join(lines)}),")
     kt.append(f"        listOf({', '.join(marks)})),")
     # vista previa
-    p = Image.new("RGB", (W, H), (0x2B, 0x29, 0x30)); p.paste(img, (0, 0), img)
+    tinted = img.copy(); a = np.array(tinted); white = a[..., 0] > 128; a[white, 0:3] = (0x7C, 0xF5, 0xE4)
+    tinted = Image.fromarray(a, "RGBA")
+    p = Image.new("RGB", (W, H), (0x2B, 0x29, 0x30)); p.paste(tinted, (0, 0), tinted)
     d = ImageDraw.Draw(p)
     for k, *v in n:
         if k == "h":

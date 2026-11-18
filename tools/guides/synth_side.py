@@ -1,64 +1,54 @@
 #!/usr/bin/env python3
 """Sintetiza la silueta lateral del tronco (abdomen lateral) a partir de las vistas frontal y posterior.
 
-Las alturas de las referencias (escotadura yugular, pezón, pliegue inframamario, ombligo,
-cresta ilíaca, pliegue interglúteo y glúteo, rodilla) y los anchos del tronco se toman de las
-ilustraciones frontal y posterior (mismas coordenadas: 1366×3096). La profundidad
-anteroposterior se obtiene del ancho frontal con proporciones antropométricas habituales
-(profundidad/ancho ≈ 0,7 en tórax y cintura, ≈ 0,85 en caderas), repartida entre el contorno
-anterior y el posterior respecto del eje acromion–trocánter (x = 0).
+Alturas de las referencias (escotadura yugular, pezón, pliegue inframamario, ombligo, cresta
+ilíaca, pliegue interglúteo y glúteo, rodilla) y anchos del tronco medidos en las ilustraciones
+frontal y posterior (1366×3096). La profundidad anteroposterior sale del ancho frontal con
+proporciones antropométricas habituales (≈ 0,7 en tórax y cintura, ≈ 0,85 en caderas).
+Postura clínica estándar del perfil: brazos elevados (axila visible) para no ocultar el flanco.
+Las curvas se generan con splines suavizados (sin aristas).
 """
 import pathlib
 import numpy as np
 from PIL import Image, ImageDraw
-from scipy.interpolate import PchipInterpolator
+from scipy.interpolate import make_interp_spline
+from scipy.ndimage import gaussian_filter1d
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "art/source"
-W, H, AX = 1366, 3096, 640           # lienzo como las vistas frontal/posterior; eje x=AX
+W, H, AX = 1366, 3096, 640
+LW = 4
 
-# (y, contorno anterior, contorno posterior) en px respecto del eje; alturas de las vistas F/P
-CTRL = [
-    (500, 55, -60),    # cuello bajo el mentón
-    (600, 72, -82),    # base del cuello
-    (650, 95, -125),   # escotadura yugular / trapecio
-    (760, 150, -168),  # tórax superior / escápula
-    (863, 228, -172),  # pezón (vértice mamario)
-    (935, 212, -168),
-    (1000, 168, -160), # pliegue inframamario
-    (1139, 160, -146), # reborde costal
-    (1221, 178, -138), # ombligo (abdomen) / lordosis lumbar
-    (1300, 184, -150), # cresta ilíaca
-    (1442, 168, -208), # inicio del pliegue interglúteo / sacro
-    (1530, 150, -236), # máximo glúteo / pubis
-    (1628, 140, -188), # pliegue glúteo
-    (1750, 136, -136), # muslo
-    (2000, 116, -110), # suprarrotuliano
-    (2061, 122, -96),  # rodilla
-    (2200, 100, -104),
-]
-ys = np.arange(500, 2201)
-cy = np.array([c[0] for c in CTRL])
-fr = PchipInterpolator(cy, [c[1] for c in CTRL])(ys)
-bk = PchipInterpolator(cy, [c[2] for c in CTRL])(ys)
-# ombligo: pequeña depresión del contorno anterior
-fr -= 10 * np.exp(-((ys - 1221) / 9.0) ** 2)
+def curve(pts, n=600, sigma=6):
+    """Spline cúbico paramétrico por longitud de arco + suavizado gaussiano."""
+    p = np.array(pts, float)
+    t = np.concatenate([[0], np.cumsum(np.hypot(*np.diff(p, axis=0).T))])
+    sx = make_interp_spline(t, p[:, 0], k=min(3, len(p) - 1))(np.linspace(0, t[-1], n))
+    sy = make_interp_spline(t, p[:, 1], k=min(3, len(p) - 1))(np.linspace(0, t[-1], n))
+    return list(zip(gaussian_filter1d(sx, sigma, mode="nearest") + AX, gaussian_filter1d(sy, sigma, mode="nearest")))
+
+# Contorno anterior (de arriba abajo): brazo elevado → pliegue axilar anterior → mama → abdomen → muslo
+front = [(70, 430), (78, 560), (98, 680), (132, 760), (186, 820), (228, 866), (220, 925), (172, 1000),
+         (160, 1080), (166, 1160), (180, 1235), (186, 1310), (172, 1420), (152, 1530), (140, 1630),
+         (136, 1760), (124, 1900), (116, 2000), (122, 2061), (102, 2200)]
+# Contorno posterior: brazo elevado → pliegue axilar posterior → escápula → lordosis → glúteo → muslo
+back = [(-62, 430), (-80, 560), (-112, 680), (-150, 790), (-168, 880), (-164, 980), (-150, 1080),
+        (-138, 1180), (-142, 1260), (-160, 1340), (-196, 1430), (-228, 1500), (-238, 1550),
+        (-222, 1600), (-190, 1645), (-150, 1700), (-134, 1800), (-118, 1950), (-98, 2061), (-104, 2200)]
+# Axila: hueco entre los pliegues axilares, bajo el brazo
+axilla = [(118, 790), (70, 822), (10, 838), (-60, 832), (-118, 812)]
+inframammary = [(205, 990), (176, 1004), (138, 1008)]
+gluteal = [(-212, 1622), (-170, 1640), (-122, 1644)]
+crest = [(-96, 1318), (-40, 1296), (24, 1298), (70, 1318)]
 
 img = Image.new("L", (W, H), 255); d = ImageDraw.Draw(img)
-LW = 4
-d.line([(AX + x, y) for x, y in zip(fr, ys)], fill=0, width=LW)
-d.line([(AX + x, y) for x, y in zip(bk, ys)], fill=0, width=LW)
-
-def at(arr, y): return float(arr[int(y) - 500])
-# pliegue inframamario (curva corta desde el contorno anterior hacia dentro)
-yb = 1000
-d.line([(AX + at(fr, yb) - 2, yb - 4), (AX + at(fr, yb) - 30, yb + 6), (AX + at(fr, yb) - 62, yb + 4)], fill=0, width=LW, joint="curve")
-# pezón
-d.ellipse([AX + at(fr, 863) - 16, 856, AX + at(fr, 863) - 4, 870], outline=0, width=LW)
-# pliegue glúteo
-yg = 1628
-d.line([(AX + at(bk, yg) + 2, yg), (AX + at(bk, yg) + 40, yg + 8), (AX + at(bk, yg) + 80, yg + 6)], fill=0, width=LW, joint="curve")
-# cresta ilíaca (marca lateral)
-d.arc([AX - 70, 1280, AX + 60, 1360], start=200, end=330, fill=0, width=LW)
-img.save(SRC / "body_side.png")
+for c in (front, back):
+    d.line(curve(c, 1400, 5), fill=0, width=LW, joint="curve")
+for c in (axilla, inframammary, gluteal, crest):
+    d.line(curve(c, 200, 3), fill=0, width=LW, joint="curve")
+# ombligo y pezón
+d.arc([AX + 172, 1214, AX + 190, 1232], start=90, end=270, fill=0, width=LW)
+d.ellipse([AX + 206, 858, AX + 218, 872], outline=0, width=LW)
+img.save(SRC / "body_side_right.png")
+img.transpose(Image.FLIP_LEFT_RIGHT).save(SRC / "body_side_left.png")
 print("ok", AX)

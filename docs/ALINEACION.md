@@ -14,63 +14,84 @@ transformación es independiente de la resolución. En pantalla se aplica con
 
 ## Etapas
 
+### 0. Corrección de perspectiva vertical
+
+Al capturar se registran en el XMP la inclinación de la cámara respecto de la horizontal
+(`pm:CameraPitch`, del sensor de gravedad), el giro (`pm:Roll`) y la focal en unidades de alto de
+imagen (`pm:FocalNorm`, de Camera2: focal / lado largo del sensor). Antes de comparar o alinear, cada
+foto se re-proyecta como si la cámara hubiera estado nivelada:
+
+```
+d = ((x − cx)/f, (y − cy)/f, 1)   →   R_x(φ)·d   →   x' = cx + f·d'x/d'z,  y' = cy + f·d'y/d'z
+```
+
+(homografía H = K·R·K⁻¹). Las verticales del paciente dejan de converger; después se recorta el
+mayor rectángulo 3:4 dentro del trapecio y se escala al encuadre. En el comparador: menú ⋮ →
+“Perspectiva y ajustes” (automática con los datos registrados, ajustable ±20° por foto).
+
 ### 1. Puntos anatómicos según la zona (automático, en el dispositivo)
 
-`ZoneAlignment.of(zone)` decide el detector y los puntos que se usan:
-
-| Zona | Detector | Puntos |
-|---|---|---|
-| Rostro frontal | ML Kit rostro | ojos, base nasal, comisuras + 36 puntos del óvalo facial |
-| Oblicuos 45° | ML Kit rostro | ojos, base nasal, comisuras |
-| Perfiles | ML Kit rostro | **oreja (tragus)**, ojo visible, base nasal, comisura |
-| Frente / periocular | ML Kit rostro | ojos |
-| Labios | ML Kit rostro | comisuras, base nasal |
-| Cuello | ML Kit pose | hombros, boca |
-| Abdomen, tórax, espalda | ML Kit pose | hombros, caderas |
-| Abdomen lateral | ML Kit pose | hombro, cadera, rodilla |
-| Glúteos, muslos | ML Kit pose | caderas, rodillas, tobillos |
-| Brazos | ML Kit pose | hombro, codo, muñeca |
-
-Se usan solo los puntos detectados **en ambas** fotos (pose: probabilidad en cuadro ≥ 0,8).
+`LandmarkDetector` (ML Kit, modelos incluidos) entrega hasta **140 puntos faciales** (7 puntos +
+133 de contorno: óvalo —frente, mejillas, mandíbula—, cejas, ojos, labios y nariz) o **33 puntos
+corporales** (hombros, codos, muñecas, dedos índice/meñique/pulgar, caderas, rodillas, tobillos,
+talones, dedos de los pies). `ZoneAlignment.of(zone)` elige el subconjunto de cada zona
+(p. ej. periocular: contornos de ojos y cejas; labios: bermellón y base nasal; frente: cejas y
+óvalo superior; manos: muñecas y dedos; pies: tobillos, talones y dedos).
 
 ### 2. Estimación robusta de la semejanza
 
-Con ≥ 2 pares de puntos se resuelve por mínimos cuadrados (Umeyama, 1991) en forma cerrada:
+Mínimos cuadrados de Umeyama en forma cerrada (ver más abajo) con **rechazo iterativo de atípicos**:
+mientras queden ≥ 4 puntos se descarta el par con residuo > 9 × la mediana, hasta un 25 % de los puntos.
+
+### 3. Coincidencia por contornos anatómicos
+
+`EdgeAligner` compara **la orientación de los contornos** (campo de gradiente en “ángulo doble”
+(gx² − gy², 2·gx·gy)/|g|), que es invariante a la polaridad del borde: funciona igual con fondo claro
+u oscuro y tolera cambios de iluminación. La puntuación es una correlación ponderada
 
 ```
-a = Σ (s̃·d̃)   b = Σ (s̃ × d̃)   σ² = Σ |s̃|²      (s̃, d̃ centrados en sus medias)
-θ = atan2(b, a)   s = √(a² + b²) / σ²   t = μ_d − s·R(θ)·μ_s
+Σ w·⟨b(p), R(2θ)·a(T⁻¹p)⟩ / √(Σ w|b|² · Σ w|a|²)
 ```
 
-Con ≥ 4 puntos se descarta el par con residuo > 9 × mediana (detección errónea) y se reestima.
+donde los pesos `w` vienen de **regiones anatómicas por zona** (gaussianas en el encuadre 3:4):
 
-### 3. Coincidencia de contornos (afinado o búsqueda completa)
+| Zona | Regiones de contorno |
+|---|---|
+| Rostro frontal | mandíbula, frente, orejas, ojos y cejas |
+| Oblicuos 45° | mandíbula, frente, oreja, mejilla y nariz |
+| Perfiles | frente, nariz y labios, mandíbula, oreja, occipucio |
+| Frente / periocular / labios | cejas y frente / ojos y cejas / labios, base nasal y mentón |
+| Cuello | mandíbula, hombros y clavículas |
+| Abdomen, tórax, espalda | cintura, caderas, ombligo / contorno mamario, hombros / escápulas, cintura |
+| Abdomen lateral | silueta abdominal, glúteo, axila |
+| Glúteos, muslos, brazos | pliegues glúteos, caderas / rodillas, muslos / codo, brazo |
+| Manos, pies | falanges, dorso o palma / falanges, tobillos y talones |
 
-`EdgeAligner` compara **mapas de bordes**, no colores, para tolerar cambios de iluminación, de
-maquillaje o de tono de piel entre sesiones:
-
-1. Escala de grises 192×256, estandarizada (media 0, desviación 1).
-2. Pirámide de 3 niveles (192×256 → 96×128 → 48×64).
-3. En cada nivel: suavizado → magnitud de gradiente **Sobel** → desenfoque de caja (amplía la cuenca
-   de convergencia). Resultado: un “mapa de contornos” (silueta corporal, ojos, labios, oreja…).
-4. Función objetivo: **correlación cruzada normalizada (NCC)** ponderada entre el mapa “antes” y el
-   mapa “después” deformado por `T⁻¹` (muestreo bilineal), con pesos gaussianos centrados en la
-   región de interés de la zona (el paciente pesa más que el fondo) y penalización por la parte que
-   queda fuera del encuadre.
-5. Optimización:
-   - **Sin puntos anatómicos** (close-ups, glúteos, detección fallida): búsqueda exhaustiva en el
-     nivel grueso de desplazamiento (±18 %), escala (±16 %) y rotación (±12°) alrededor del centro de
-     la región de interés.
-   - **Con puntos anatómicos**: se parte de su estimación y se busca solo en una ventana estrecha
-     (±6 % de traslación, ±5°, ±8 % de escala).
-   - Descenso por coordenadas sobre `(tx, ty, θ, ln s)` de grueso a fino; al cambiar la escala, la
-     traslación se compensa para mantener fijo el centro de la región de interés.
+El resultado informa la coincidencia de cada región (p. ej. “mandíbula 92 % · frente 88 %”).
+Optimización: búsqueda exhaustiva gruesa (desplazamiento ±18 %, escala ±16 %, rotación ±12°) cuando
+no hay puntos, o ventana estrecha alrededor de la estimación anatómica; descenso por coordenadas de
+grueso a fino escalando alrededor del centroide de las regiones.
 
 ### 4. Alternativa manual
 
-Menú ⋮ → “Alinear manualmente”: el usuario marca dos puntos anatómicos propios de la zona (por
-ejemplo, ambas pupilas; tragus y punta nasal en perfil; pezones en tórax; rodillas en muslos) en
-cada foto. Dos pares determinan la semejanza de forma exacta y después se afina por contornos.
+Menú ⋮ → “Alinear manualmente”: dos puntos propios de la zona en cada foto (pupilas, tragus y punta
+nasal, comisuras, pezones, rodillas, puntas de los dedos…), afinados después por contornos.
+
+### 5. Coincidencia en vivo en la cámara
+
+Con una foto de referencia superpuesta y la capa **Coincidir** activa, `LiveMatcher` analiza ~5
+cuadros por segundo (ImageAnalysis en el mismo encuadre 3:4): puntos anatómicos en modo continuo o,
+si no hay, contornos anatómicos en baja resolución partiendo de la última estimación. `LiveMatch`
+mide la desviación en el pivote anatómico de la zona:
+
+| Estado | Criterio | Guía |
+|---|---|---|
+| Coincide | desplazamiento ≤ 2 % del ancho, escala ≤ 3 %, rotación ≤ 2° (con histéresis del 30 %) | verde + vibración |
+| Casi | hasta 2,5 × esos umbrales | ámbar |
+| Lejos / buscando | resto | cian |
+
+Se dibujan los puntos de la referencia (anillos) y los actuales (puntos) y se dan indicaciones
+(“Mueva la cámara a la izquierda”, “Acérquese”, “Gire la cámara ↺”…).
 
 ## Resultado
 
@@ -85,8 +106,17 @@ la foto original o la alineada en los tres modos (deslizador, lado a lado, fundi
 - rechazo de un punto anatómico erróneo;
 - recuperación de una transformación conocida (escala 1,08, rotación 4°, desplazamiento 7 %) **solo
   por contornos**, con error < 1,2 % del ancho;
-- afinado de una estimación anatómica ruidosa: el error se reduce a menos de un tercio y < 1 %.
+- afinado de una estimación anatómica ruidosa: el error se reduce a menos de un tercio y < 1 %;
+- coincidencia guiada por regiones anatómicas con puntuación por región;
+- rechazo de varios puntos erróneos entre 36 del óvalo facial.
 
-Limitaciones: no corrige cambios de perspectiva (distancia o inclinación de la cámara muy distintas),
+`PerspectiveAndLiveTest.kt`: la corrección nivela exactamente una cámara inclinada sintética
+(−12° y +8°) y deja verticales las verticales del mundo; estados e indicaciones de la coincidencia en
+vivo, incluida la histéresis.
+
+**Pendiente de verificar en un teléfono real:** el signo de la inclinación del sensor de gravedad
+(cámara trasera / frontal) y el rendimiento del análisis en vivo.
+
+Limitaciones: la corrección de perspectiva cubre la inclinación vertical, no la distancia ni giros laterales de la cámara;
 ni cambios de postura no rígidos (por ejemplo, un brazo en otra posición). Las guías de la cámara,
 el nivel y la superposición de la foto anterior reducen estas diferencias en el momento de la toma.

@@ -22,6 +22,7 @@ class MetadataTest {
     private val info = PhotoInfo(
         patientName = "María José Peña & \"Hijos\"", recordNumber = "0012", expedienteId = "0012_Maria_Jose_Pena",
         zoneId = "labios", zoneLabel = "Labios / peribucal", capturedAt = 1_763_400_000_000, consent = true,
+        cameraPitch = -6.5f, roll = 1.25f, focalNorm = 0.7531f,
     )
 
     @Test

@@ -18,6 +18,12 @@ data class PhotoInfo(
     val zoneLabel: String,
     val capturedAt: Long,
     val consent: Boolean,
+    /** Ángulo de la cámara respecto de la horizontal al capturar (°; + = hacia arriba). */
+    val cameraPitch: Float? = null,
+    /** Giro del teléfono al capturar (°). */
+    val roll: Float? = null,
+    /** Focal en unidades de alto de imagen (para la corrección de perspectiva). */
+    val focalNorm: Float? = null,
 )
 
 /**
@@ -77,6 +83,11 @@ object PhotoMetadata {
         .put("zoneLabel", i.zoneLabel)
         .put("capturedAt", i.capturedAt)
         .put("consent", i.consent)
+        .apply {
+            i.cameraPitch?.let { put("cameraPitch", it.toDouble()) }
+            i.roll?.let { put("roll", it.toDouble()) }
+            i.focalNorm?.let { put("focalNorm", it.toDouble()) }
+        }
 
     private fun fromJson(j: JSONObject) = PhotoInfo(
         patientName = j.optString("patientName"),
@@ -86,6 +97,9 @@ object PhotoMetadata {
         zoneLabel = j.optString("zoneLabel"),
         capturedAt = j.optLong("capturedAt"),
         consent = j.optBoolean("consent"),
+        cameraPitch = j.optDouble("cameraPitch").takeUnless { it.isNaN() }?.toFloat(),
+        roll = j.optDouble("roll").takeUnless { it.isNaN() }?.toFloat(),
+        focalNorm = j.optDouble("focalNorm").takeUnless { it.isNaN() }?.toFloat(),
     )
 
     /** Escapa para XML y codifica lo no-ASCII como referencias de carácter (&#NNN;): XMP 100 % ASCII. */
@@ -134,7 +148,7 @@ object PhotoMetadata {
     pm:Zone="${esc(i.zoneId)}"
     pm:ZoneLabel="${esc(i.zoneLabel)}"
     pm:CapturedAt="${i.capturedAt}"
-    pm:Consent="${i.consent}">
+    pm:Consent="${i.consent}"${i.cameraPitch?.let { "\n    pm:CameraPitch=\"%.2f\"".format(java.util.Locale.US, it) } ?: ""}${i.roll?.let { "\n    pm:Roll=\"%.2f\"".format(java.util.Locale.US, it) } ?: ""}${i.focalNorm?.let { "\n    pm:FocalNorm=\"%.4f\"".format(java.util.Locale.US, it) } ?: ""}>
    <dc:title><rdf:Alt><rdf:li xml:lang="x-default">${esc(i.patientName)} — ${esc(i.zoneLabel)}</rdf:li></rdf:Alt></dc:title>
    <dc:description><rdf:Alt><rdf:li xml:lang="x-default">${esc(description)}</rdf:li></rdf:Alt></dc:description>
    <dc:subject><rdf:Bag><rdf:li>PhotoMed</rdf:li><rdf:li>${esc(i.zoneLabel)}</rdf:li><rdf:li>${esc(i.expedienteId)}</rdf:li></rdf:Bag></dc:subject>
@@ -154,6 +168,9 @@ object PhotoMetadata {
             zoneLabel = attr("ZoneLabel").orEmpty(),
             capturedAt = attr("CapturedAt")?.toLongOrNull() ?: 0L,
             consent = attr("Consent") == "true",
+            cameraPitch = attr("CameraPitch")?.toFloatOrNull(),
+            roll = attr("Roll")?.toFloatOrNull(),
+            focalNorm = attr("FocalNorm")?.toFloatOrNull(),
         )
     }
 }

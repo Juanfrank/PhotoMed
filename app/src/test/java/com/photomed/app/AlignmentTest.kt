@@ -1,5 +1,6 @@
 package com.photomed.app
 
+import com.photomed.app.align.ContourRegion
 import com.photomed.app.align.EdgeAligner
 import com.photomed.app.align.GrayImage
 import com.photomed.app.align.Landmarks
@@ -99,5 +100,28 @@ class AlignmentTest {
         val errAfter = probe.maxOf { val d = result.transform.apply(it) - truth.apply(it); hypot(d.x, d.y) }
         assertNotNull(result)
         assertTrue("error inicial $errBefore, final $errAfter", errAfter < errBefore / 3 && errAfter < 0.01f)
+    }
+}
+
+class ContourRegionAlignmentTest {
+    @Test
+    fun anatomicalRegionsGuideMatchingAndReportScores() {
+        val t = AlignmentTest()
+        val truth = Similarity(0.95f, Math.toRadians(-3.0).toFloat(), 0.04f, -0.03f)
+        val m = AlignmentTest::class.java.getDeclaredMethod("synthetic", Int::class.java, Int::class.java, Similarity::class.java)
+        m.isAccessible = true
+        val before = m.invoke(t, 192, 256, Similarity.IDENTITY) as GrayImage
+        val after = m.invoke(t, 192, 256, truth.inverse()) as GrayImage
+        val regions = listOf(
+            ContourRegion("mandíbula", Pt(0.5f, 1.0f), Pt(0.3f, 0.1f)),
+            ContourRegion("ojos", Pt(0.5f, 0.52f), Pt(0.2f, 0.06f)),
+        )
+        val r = EdgeAligner(regions).align(before, after, null, EdgeAligner.Window.WIDE)
+        for (p in listOf(Pt(0.4f, 0.52f), Pt(0.6f, 0.52f), Pt(0.5f, 0.82f))) {
+            val d = r.transform.apply(p) - truth.apply(p)
+            assertTrue("error ${hypot(d.x, d.y)}", hypot(d.x, d.y) < 0.012f)
+        }
+        assertEquals(listOf("mandíbula", "ojos"), r.regionScores.map { it.first })
+        assertTrue(r.regionScores.all { it.second > 0.5f })
     }
 }

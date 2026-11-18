@@ -129,10 +129,14 @@ class PhotoRepository(
     /**
      * Guarda en la galería una captura (archivo temporal), incrustando los datos del paciente.
      */
-    fun savePhoto(exp: Expediente, zone: Zone, capture: File, takenAt: Long = System.currentTimeMillis()): Photo {
+    fun savePhoto(
+        exp: Expediente, zone: Zone, capture: File, takenAt: Long = System.currentTimeMillis(),
+        cameraPitch: Float? = null, roll: Float? = null, focalNorm: Float? = null,
+    ): Photo {
         PhotoMetadata.write(
             capture,
-            PhotoInfo(exp.patientName, exp.recordNumber, exp.id, zone.id, zone.label, takenAt, exp.consent),
+            PhotoInfo(exp.patientName, exp.recordNumber, exp.id, zone.id, zone.label, takenAt, exp.consent,
+                cameraPitch, roll, focalNorm),
         )
         val name = "${zone.id}_${stampFormat.format(Date(takenAt))}.jpg"
         val uri = store.save(exp.id, name, capture, takenAt)

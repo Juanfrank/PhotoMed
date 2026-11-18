@@ -9,12 +9,14 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
 ## Funciones
 
 ### Captura por zonas
-- 21 zonas estandarizadas (9 faciales, 12 corporales, incluidas manos y pies) con **contornos anatómicos ilustrados** y
+- 22 zonas estandarizadas (9 faciales, 13 corporales, incluidas manos y pies) con **contornos anatómicos ilustrados** y
   **líneas de referencia** (tercios faciales, Frankfort, línea media, ombligo, pliegues…) —
   ver [docs/CONTORNOS.md](docs/CONTORNOS.md). Ilustraciones base: *Open Pain Illustration*
   (Digital Health Zurich, CC BY 4.0).
 - **Superposición de la foto anterior** con opacidad ajustable, cuadrícula, **nivel** (inclinación y
   cabeceo), toque para enfocar, flash y cámara frontal/trasera. Encuadre 3:4 idéntico en vista previa y captura.
+- **Coincidencia en vivo**: la guía cambia de color (cian → ámbar → verde, con vibración) cuando el
+  encuadre actual coincide con la foto de referencia, con puntos anatómicos e indicaciones de movimiento.
 
 ### Galería del teléfono y metadatos
 - Las fotos se guardan en la galería, en un **álbum por paciente**: `Pictures/PhotoMed/<expediente>/`.
@@ -28,8 +30,9 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
 ### Comparación
 - **Juxtaposition slider**, lado a lado y fundido; selección por toggle (A = antes, B = después),
   filtro por zona y zoom sincronizado.
-- **Alineación automática por zona** (ojos, oreja, comisuras, hombros, caderas, rodillas… detectados
-  en el dispositivo + coincidencia de contornos) o **manual con 2 puntos** —
+- **Alineación automática por zona**: hasta 140 puntos faciales o 33 corporales detectados en el
+  dispositivo + coincidencia por **contornos anatómicos** (mandíbula, frente, orejas, caderas,
+  falanges…) y **corrección de perspectiva vertical** con la inclinación registrada; o **manual con 2 puntos** —
   ver [docs/ALINEACION.md](docs/ALINEACION.md).
 
 ### Expedientes

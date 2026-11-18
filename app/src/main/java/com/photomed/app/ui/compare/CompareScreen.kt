@@ -1,6 +1,12 @@
 package com.photomed.app.ui.compare
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.ModalBottomSheet
+import com.photomed.app.align.AlignInput
+import com.photomed.app.align.ImageOps
+import com.photomed.app.align.Perspective
+import com.photomed.app.data.PhotoInfo
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -115,6 +121,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
     var aligning by remember { mutableStateOf(false) }
     var manual by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
+    var settings by remember { mutableStateOf(false) }
+    var perspectiveOn by remember { mutableStateOf(true) }
+    var pitchBefore by remember { mutableFloatStateOf(0f) }
+    var pitchAfter by remember { mutableFloatStateOf(0f) }
+    var infoBefore by remember { mutableStateOf<PhotoInfo?>(null) }
+    var infoAfter by remember { mutableStateOf<PhotoInfo?>(null) }
 
     LaunchedEffect(expId) {
         withContext(Dispatchers.IO) {
@@ -135,6 +147,21 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
     val pair = if (chosen.size == 2) (if (swapped) chosen.reversed() else chosen) else null
     val transform = alignment?.transform?.takeIf { useAligned }
 
+    // Metadatos de captura del par (inclinación de la cámara y focal) → perspectiva automática.
+    LaunchedEffect(pair?.getOrNull(0)?.key, pair?.getOrNull(1)?.key) {
+        val (b, a) = pair ?: return@LaunchedEffect
+        infoBefore = withContext(Dispatchers.IO) { repo.readInfo(b) }
+        infoAfter = withContext(Dispatchers.IO) { repo.readInfo(a) }
+        pitchBefore = infoBefore?.cameraPitch ?: 0f
+        pitchAfter = infoAfter?.cameraPitch ?: 0f
+    }
+    val corrB = if (perspectiveOn) pitchBefore else 0f
+    val corrA = if (perspectiveOn) pitchAfter else 0f
+    val focalB = infoBefore?.focalNorm ?: Perspective.DEFAULT_FOCAL
+    val focalA = infoAfter?.focalNorm ?: Perspective.DEFAULT_FOCAL
+    val beforeModel = pair?.let { rememberCorrected(it[0].uri, corrB, focalB) }
+    val afterModel = pair?.let { rememberCorrected(it[1].uri, corrA, focalA) }
+
     fun resetAlignment() { alignment = null; zoom = ZoomState() }
 
     fun toggle(p: Photo) {
@@ -154,7 +181,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
             aligning = false
             r.onSuccess {
                 alignment = it; useAligned = true
-                val quality = if (it.score.isNaN()) "" else " · coincidencia ${(it.score.coerceIn(0f, 1f) * 100).roundToInt()}%"
+                val quality = if (it.score.isNaN()) "" else " · contornos ${(it.score.coerceIn(0f, 1f) * 100).roundToInt()}%"
                 snackbar.showSnackbar("Alineado: ${it.method}$quality")
             }.onFailure { snackbar.showSnackbar("No se pudo alinear: ${it.message}") }
         }
@@ -183,6 +210,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                                 leadingIcon = { Icon(Icons.Default.TouchApp, null) },
                                 enabled = pair != null,
                                 onClick = { menu = false; manual = true },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Perspectiva y ajustes") },
+                                leadingIcon = { Icon(Icons.Default.Tune, null) },
+                                enabled = pair != null,
+                                onClick = { menu = false; settings = true },
                             )
                             DropdownMenuItem(
                                 text = { Text("Restablecer zoom") },
@@ -227,7 +260,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                     val afterLabel = "Después · ${formatDate(after.takenAt)}"
                     when (mode) {
                         Mode.SLIDER -> JuxtaposeSlider(
-                            before = before.uri, after = after.uri, afterTransform = transform,
+                            before = beforeModel!!, after = afterModel!!, afterTransform = transform,
                             position = position, onPositionChange = { position = it },
                             zoom = zoom, onZoomChange = { zoom = it },
                             beforeLabel = beforeLabel, afterLabel = afterLabel,
@@ -235,9 +268,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                         )
 
                         Mode.SIDE -> Row(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s1)) {
-                            listOf(Triple(before, beforeLabel, null), Triple(after, afterLabel, transform)).forEach { (p, label, t) ->
+                            listOf(Triple(beforeModel, beforeLabel, null), Triple(afterModel, afterLabel, transform)).forEach { (m, label, t) ->
                                 Box(Modifier.weight(1f).aspectRatio(3f / 4f).clip(MaterialTheme.shapes.small).background(Color.Black)) {
-                                    AsyncImage(p.uri, label, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().alignedBy(t))
+                                    AsyncImage(m, label, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().alignedBy(t))
                                     Label(label, Modifier.align(Alignment.TopStart))
                                 }
                             }
@@ -248,8 +281,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                                 Modifier.weight(1f, fill = false).aspectRatio(3f / 4f).clip(MaterialTheme.shapes.medium)
                                     .background(Color.Black).clipToBounds()
                             ) {
-                                AsyncImage(before.uri, beforeLabel, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                                AsyncImage(after.uri, afterLabel, contentScale = ContentScale.Crop,
+                                AsyncImage(beforeModel, beforeLabel, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                AsyncImage(afterModel, afterLabel, contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize().alignedBy(transform).graphicsLayer { alpha = fade })
                                 Label(if (fade < 0.5f) beforeLabel else afterLabel, Modifier.align(Alignment.TopStart))
                             }
@@ -270,7 +303,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                     if (res == null) {
                         InputChip(
                             selected = false,
-                            onClick = { runAlign { bp, ap -> aligner.auto(bp.zone, bp.uri, ap.uri) } },
+                            onClick = { runAlign { bp, ap -> aligner.auto(bp.zone, AlignInput(bp.uri, corrB, focalB), AlignInput(ap.uri, corrA, focalA)) } },
                             enabled = !aligning,
                             label = { Text("Alinear automáticamente") },
                             leadingIcon = { Icon(Icons.Default.AutoFixHigh, null, Modifier.size(18.dp)) },
@@ -284,11 +317,19 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                                 Text("Alineado", style = MaterialTheme.typography.labelLarge)
                                 Text(
                                     "%s · %.0f%% escala · %.1f°".format(
-                                        res.landmarks.takeIf { it.isNotEmpty() }?.let { "${it.size} puntos" } ?: "contornos",
+                                        res.landmarks.takeIf { it.isNotEmpty() }?.let { "${it.size} puntos (${res.landmarkRegions.take(4).joinToString(", ")})" }
+                                            ?: "solo contornos",
                                         res.transform.scale * 100, res.transform.rotationDegrees,
                                     ),
                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                if (res.regionScores.isNotEmpty()) {
+                                    Text(
+                                        "Contornos: " + res.regionScores.sortedByDescending { it.second }.take(4)
+                                            .joinToString(" · ") { (n, v) -> "$n ${(v.coerceIn(0f, 1f) * 100).roundToInt()}%" },
+                                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                             Switch(checked = useAligned, onCheckedChange = null)
                         }
@@ -365,6 +406,42 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
         }
     }
 
+    if (settings && pair != null) {
+        ModalBottomSheet(onDismissRequest = { settings = false }) {
+            Column(Modifier.padding(horizontal = Md3Spacing.s6).padding(bottom = Md3Spacing.s8),
+                verticalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
+                Text("Perspectiva vertical", style = MaterialTheme.typography.titleLarge)
+                Row(
+                    Modifier.fillMaxWidth().toggleable(perspectiveOn, role = Role.Switch) { perspectiveOn = it; resetAlignment() },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Corregir inclinación de la cámara", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            "Endereza las verticales convergentes con la inclinación registrada al tomar cada foto.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = perspectiveOn, onCheckedChange = null)
+                }
+                listOf(
+                    Triple("Antes", pitchBefore, infoBefore?.cameraPitch),
+                    Triple("Después", pitchAfter, infoAfter?.cameraPitch),
+                ).forEachIndexed { i, (label, value, recorded) ->
+                    Text(
+                        "$label: %+.1f° ".format(value) + (recorded?.let { "(registrado %+.1f°)".format(it) } ?: "(sin datos de inclinación)"),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Slider(
+                        value = value, onValueChange = { if (i == 0) pitchBefore = it else pitchAfter = it; resetAlignment() },
+                        valueRange = -20f..20f, enabled = perspectiveOn,
+                        modifier = Modifier.semantics { contentDescription = "Perspectiva vertical $label" },
+                    )
+                }
+            }
+        }
+    }
+
     if (manual && pair != null) {
         val (b, a) = pair
         ManualAlignDialog(
@@ -372,7 +449,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
             onDismiss = { manual = false },
             onDone = { bp: List<Pt>, ap: List<Pt> ->
                 manual = false
-                runAlign { bb, aa -> aligner.manual(bb.zone, bb.uri, aa.uri, bp, ap, refine = true) }
+                runAlign { bb, aa -> aligner.manual(bb.zone, AlignInput(bb.uri, corrB, focalB), AlignInput(aa.uri, corrA, focalA), bp, ap) }
             },
         )
     }
@@ -380,3 +457,17 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
 
 /** Descripción de la estrategia de la zona (para ayudas contextuales). */
 fun alignmentHint(zone: Zone) = ZoneAlignment.of(zone).description
+
+/** Imagen con la perspectiva vertical corregida (o la URI tal cual si no hay corrección). */
+@Composable
+private fun rememberCorrected(uri: android.net.Uri, pitchDeg: Float, focalNorm: Float): Any {
+    val context = LocalContext.current
+    val key = (pitchDeg * 2).roundToInt() / 2f
+    val state = androidx.compose.runtime.produceState<Any>(uri, uri, key, focalNorm) {
+        if (key == 0f) { value = uri; return@produceState }
+        value = withContext(Dispatchers.Default) {
+            runCatching { ImageOps.correctPerspective(ImageOps.load34(context, uri, 1080), key, focalNorm) }.getOrNull()
+        } ?: uri
+    }
+    return state.value
+}

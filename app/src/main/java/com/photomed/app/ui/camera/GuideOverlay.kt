@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -29,10 +30,17 @@ class Guide(
     val marks: List<Offset> = emptyList(),
 )
 
-private val ContourColor = Color(0xFF7CF5E4)
+internal val ContourColor = Color(0xFF7CF5E4)
 private val LineColor = Color(0xFFFFD54F)
 private val GridColor = Color(0x99FFFFFF)
 private val Shadow = Color(0x66000000)
+
+/** Color de la guía según la coincidencia en vivo con la foto de referencia. */
+enum class GuideTone(val color: Color) {
+    NORMAL(ContourColor),
+    CLOSE(Color(0xFFFFD54F)),
+    MATCH(Color(0xFF69F0AE)),
+}
 
 @Composable
 fun GuideOverlay(
@@ -40,14 +48,17 @@ fun GuideOverlay(
     showContour: Boolean,
     showGrid: Boolean,
     modifier: Modifier = Modifier,
+    tone: GuideTone = GuideTone.NORMAL,
 ) {
     val art = GuideArtByZone[zone.id]
     if (art != null) {
-        // Ilustración anatómica (trazo y halo ya coloreados) + referencias calculadas sobre ella.
+        // Ilustración anatómica (trazo blanco + halo oscuro): el color se aplica aquí,
+        // multiplicando (blanco → color de la guía, el halo negro no cambia).
         Box(modifier) {
             if (showContour) {
                 Image(painterResource(art.drawable), contentDescription = null,
-                    contentScale = ContentScale.FillBounds, modifier = Modifier.matchParentSize())
+                    contentScale = ContentScale.FillBounds, modifier = Modifier.matchParentSize(),
+                    colorFilter = ColorFilter.lighting(tone.color, Color.Black))
             }
             Canvas(Modifier.matchParentSize()) {
                 if (showGrid) drawGrid()

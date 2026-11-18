@@ -1,6 +1,28 @@
 package com.photomed.app.ui.camera
 
 import android.Manifest
+import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.hardware.camera2.CameraCharacteristics
+import android.util.Size
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
+import androidx.camera.core.resolutionselector.ResolutionStrategy
+import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import com.photomed.app.align.ImageOps
+import com.photomed.app.align.LiveFrame
+import com.photomed.app.align.LiveMatcher
+import com.photomed.app.align.MatchStatus
+import com.photomed.app.align.Perspective
+import com.photomed.app.align.Pt
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import android.os.Build
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.GridOn
@@ -188,6 +210,38 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     val haptics = LocalHapticFeedback.current
     val snackbar = remember { SnackbarHostState() }
     var lastSaved by remember { mutableStateOf<Photo?>(null) }
+    var liveMatch by remember { mutableStateOf(true) }
+    var live by remember { mutableStateOf<LiveFrame?>(null) }
+    var focalNorm by remember { mutableStateOf<Float?>(null) }
+    val tilt = rememberTilt(true)
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+    val matcher = remember(zone) { LiveMatcher(zone) }
+    val lastAnalysis = remember { AtomicLong(0L) }
+    val matchingEnabled = liveMatch && showGhost && ghost != null
+    val matchingFlag = remember { AtomicBoolean(false) }
+    matchingFlag.set(matchingEnabled)
+    DisposableEffect(matcher) {
+        onDispose { analysisExecutor.execute { matcher.close() } }
+    }
+    DisposableEffect(Unit) { onDispose { analysisExecutor.shutdown() } }
+
+    // Referencia para la coincidencia en vivo: la foto superpuesta (encuadre 3:4).
+    LaunchedEffect(ghost?.key) {
+        val g = ghost ?: return@LaunchedEffect
+        live = null
+        val bmp = runCatching { ImageOps.load34(context, g.uri, 360) }.getOrNull() ?: return@LaunchedEffect
+        analysisExecutor.execute { runCatching { matcher.setReference(bmp) } }
+    }
+    val status = live?.eval?.status
+    LaunchedEffect(status) {
+        if (status == MatchStatus.MATCH) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+    val tone = when {
+        !matchingEnabled -> GuideTone.NORMAL
+        status == MatchStatus.MATCH -> GuideTone.MATCH
+        status == MatchStatus.CLOSE -> GuideTone.CLOSE
+        else -> GuideTone.NORMAL
+    }
 
     LaunchedEffect(reload) {
         withContext(Dispatchers.IO) {
@@ -217,6 +271,31 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             .build()
     }
     LaunchedEffect(imageCapture, flashMode) { imageCapture.flashMode = flashMode }
+    val analysis = remember(lensFacing) {
+        ImageAnalysis.Builder()
+            .setResolutionSelector(
+                ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                    .setResolutionStrategy(ResolutionStrategy(Size(640, 480), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
+                    .build()
+            )
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+            .build().also { a ->
+                a.setAnalyzer(analysisExecutor) { proxy ->
+                    try {
+                        val now = System.currentTimeMillis()
+                        if (matchingFlag.get() && now - lastAnalysis.get() >= 180) {
+                            lastAnalysis.set(now)
+                            live = matcher.analyze(proxy.toUprightCrop(360))
+                        }
+                    } catch (_: Exception) {
+                    } finally {
+                        proxy.close()
+                    }
+                }
+            }
+    }
 
     LaunchedEffect(lensFacing) {
         val provider = context.cameraProvider()
@@ -229,12 +308,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
         val group = UseCaseGroup.Builder()
             .addUseCase(preview)
             .addUseCase(imageCapture)
+            .addUseCase(analysis)
             .setViewPort(viewPort)
             .build()
         val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
         try {
             provider.unbindAll()
             camera = provider.bindToLifecycle(lifecycleOwner, selector, group)
+            focalNorm = camera?.let { focalNormOf(it) }
         } catch (e: Exception) {
             Toast.makeText(context, "No se pudo iniciar la cámara: ${e.message}", Toast.LENGTH_LONG).show()
         }
@@ -256,7 +337,15 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     scope.launch {
                         val result = withContext(Dispatchers.IO) {
-                            runCatching { repo.savePhoto(e, zone, temp) }.also { temp.delete() }
+                            runCatching {
+                                repo.savePhoto(
+                                    e, zone, temp,
+                                    cameraPitch = Perspective.cameraPitchFromDevice(
+                                        tilt.value.pitch, lensFacing == CameraSelector.LENS_FACING_FRONT),
+                                    roll = tilt.value.roll,
+                                    focalNorm = focalNorm,
+                                )
+                            }.also { temp.delete() }
                         }
                         capturing = false
                         result.onSuccess {
@@ -277,7 +366,6 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             })
     }
 
-    val tilt = rememberTilt(showLevel)
 
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -323,7 +411,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                         }
                     )
                 }
-                GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize())
+                GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize(), tone = tone)
+                if (matchingEnabled) {
+                    live?.let { LivePoints(it, tone, mirror = lensFacing == CameraSelector.LENS_FACING_FRONT) }
+                }
 
                 // Toque para enfocar
                 Box(Modifier.fillMaxSize().pointerInput(camera) {
@@ -335,6 +426,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
 
                 if (showLevel) {
                     LevelIndicator(tilt.value, Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
+                }
+                if (matchingEnabled) {
+                    MatchBanner(live, Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp))
                 }
                 if (showGhost && g != null) {
                     Text(
@@ -358,6 +452,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             LayerToggle("Contorno", Icons.Default.Face, showContour) { showContour = it }
             LayerToggle("Superponer", Icons.Default.Layers, showGhost, enabled = photos.isNotEmpty()) { showGhost = it }
             LayerToggle("Nivel", Icons.Default.Straighten, showLevel) { showLevel = it }
+            LayerToggle("Coincidir", Icons.Default.CenterFocusStrong, liveMatch, enabled = photos.isNotEmpty()) { liveMatch = it }
         }
 
         if (showGhost && photos.isNotEmpty()) {
@@ -438,6 +533,58 @@ private fun LayerToggle(label: String, icon: ImageVector, checked: Boolean, enab
             color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
     }
 }
+
+/** Puntos anatómicos: referencia (anillos) y cuadro actual (puntos), en el color de la guía. */
+@Composable
+private fun LivePoints(frame: LiveFrame, tone: GuideTone, mirror: Boolean) {
+    Canvas(Modifier.fillMaxSize()) {
+        fun map(p: Pt) = Offset((if (mirror) 1f - p.x else p.x) * size.width, p.y * size.width)
+        frame.referencePoints.forEach { drawCircle(Color(0xFFFFD54F), 4.dp.toPx(), map(it), style = Stroke(1.2f.dp.toPx())) }
+        frame.currentPoints.forEach { drawCircle(tone.color, 2.2f.dp.toPx(), map(it)) }
+    }
+}
+
+/** Estado de la coincidencia con la foto de referencia e indicaciones para conseguirla. */
+@Composable
+private fun MatchBanner(frame: LiveFrame?, modifier: Modifier = Modifier) {
+    val eval = frame?.eval
+    val (color, title) = when (eval?.status) {
+        MatchStatus.MATCH -> GuideTone.MATCH.color to "✓ Coincide con la referencia"
+        MatchStatus.CLOSE -> GuideTone.CLOSE.color to "Casi alineado · ${((eval.quality) * 100).toInt()}%"
+        MatchStatus.FAR -> Color.White to "Alinee con la referencia"
+        else -> Color.White to "Buscando referencias anatómicas…"
+    }
+    Column(
+        modifier.background(Color(0xB0000000), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 6.dp)
+            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(title, color = color, style = MaterialTheme.typography.labelLarge)
+        eval?.hints?.take(2)?.forEach { Text(it, color = Color.White, style = MaterialTheme.typography.labelSmall) }
+        if (frame != null && frame.method.isNotEmpty() && eval?.status != MatchStatus.SEARCHING) {
+            Text("por ${frame.method}", color = Color(0xFFBDBDBD), style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+/** Cuadro de análisis enderezado (rotación del sensor) y recortado al encuadre 3:4 del viewport. */
+private fun ImageProxy.toUprightCrop(width: Int): Bitmap {
+    val full = toBitmap()
+    val r = cropRect
+    val cropped = Bitmap.createBitmap(full, r.left, r.top, r.width(), r.height())
+    val m = Matrix().apply { postRotate(imageInfo.rotationDegrees.toFloat()) }
+    val upright = Bitmap.createBitmap(cropped, 0, 0, cropped.width, cropped.height, m, true)
+    return ImageOps.centerCrop34(upright, width)
+}
+
+/** Focal de la cámara en unidades de alto de imagen (lado largo del sensor), para la corrección de perspectiva. */
+@OptIn(ExperimentalCamera2Interop::class)
+private fun focalNormOf(camera: Camera): Float? = runCatching {
+    val info = Camera2CameraInfo.from(camera.cameraInfo)
+    val focal = info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.firstOrNull()
+    val size = info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
+    if (focal == null || size == null) null else focal / maxOf(size.width, size.height)
+}.getOrNull()
 
 /** Inclinación lateral (roll) y cabeceo (pitch) en grados. */
 data class Tilt(val roll: Float, val pitch: Float)
