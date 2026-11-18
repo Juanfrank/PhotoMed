@@ -63,7 +63,9 @@ fun GuideOverlay(
     val warp = remember(art, adaptTo) {
         if (art == null || adaptTo.isEmpty()) null else {
             val det = GuideWarp.analyze(adaptTo)
-            GuideWarp.fit(art.anchors, det, art.outline)?.let { it to det.anchors }
+            // El borde superior del contorno de la ilustración es su vértice del cráneo.
+            val artAnchors = if (art.outline.size >= 3) art.anchors + ("vértice" to art.outline[0]) else art.anchors
+            GuideWarp.fit(artAnchors, det, art.outline)?.let { it to det.anchors }
         }
     }
     if (art != null && warp != null) {

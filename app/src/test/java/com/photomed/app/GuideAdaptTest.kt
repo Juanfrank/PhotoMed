@@ -137,4 +137,47 @@ class GuideAdaptTest {
             }
         }
     }
+
+    /** Puntos del modelo 3D canónico proyectados con un cabeceo (convención del modelo: + = mira abajo). */
+    private fun synthPitch(pitchModel: Double): Map<String, Pt> {
+        val p = Math.toRadians(pitchModel); val cp = kotlin.math.cos(p); val sp = kotlin.math.sin(p)
+        val inst = Class.forName("com.photomed.app.align.HeadModel").getDeclaredField("INSTANCE").get(null)
+        @Suppress("UNCHECKED_CAST")
+        val model = inst.javaClass.getDeclaredMethod("getPOINTS").invoke(inst) as Map<String, FloatArray>
+        return model.mapValues { (_, v) ->
+            val y = cp * v[1] - sp * v[2]
+            Pt((0.5 + 0.026 * v[0]).toFloat(), (0.70 - 0.026 * y).toFloat())
+        }
+    }
+
+    @Test
+    fun guideFollowsHeadPitch() {
+        // barbilla arriba → el cráneo se acorta en la imagen (vértice más bajo respecto de los ojos)
+        val art = GuideArtByZone["rostro_frontal"]!!
+        val anchors = art.anchors + ("vértice" to art.outline[0])
+        fun skull(pitchModel: Double): Float {
+            val det = GuideWarp.analyze(synthPitch(pitchModel))
+            val w = GuideWarp.fit(anchors, det, art.outline)!!
+            return w.y(art.anchors["pupilas"]!!) - w.y(art.outline[0])   // alto del cráneo sobre los ojos
+        }
+        val up = skull(-20.0); val level = skull(0.0); val down = skull(20.0)
+        assertTrue("barbilla arriba acorta el cráneo ($up < $level)", up < level)
+        assertTrue("barbilla abajo lo alarga ($down > $level)", down > level)
+        paparazzi.snapshot {
+            Row(Modifier.background(Color(0xFF1B1B1F)).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(-20.0 to "Barbilla arriba 20°", 0.0 to "Neutro", 20.0 to "Barbilla abajo 20°").forEach { (pm, label) ->
+                    val pts = synthPitch(pm)
+                    Column(Modifier.width(118.dp)) {
+                        Box(Modifier.aspectRatio(3f / 4f).background(Color(0xFF30303A))) {
+                            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                                pts.values.forEach { drawCircle(Color(0xFFFFD54F), 1.6f, androidx.compose.ui.geometry.Offset(it.x * size.width, it.y * size.width)) }
+                            }
+                            GuideOverlay(Zone.FACE_FRONTAL, showContour = true, showGrid = false, modifier = Modifier.fillMaxSize(), adaptTo = pts)
+                        }
+                        Text(label, color = Color.White, fontSize = 10.sp)
+                    }
+                }
+            }
+        }
+    }
 }

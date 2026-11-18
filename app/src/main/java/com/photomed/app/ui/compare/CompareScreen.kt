@@ -722,6 +722,8 @@ fun captureConditionsWarning(b: Map<String, String>, a: Map<String, String>): St
     val issues = mutableListOf<String>()
     val yb = b["HeadYaw"]?.toFloatOrNull(); val ya = a["HeadYaw"]?.toFloatOrNull()
     if (yb != null && ya != null && kotlin.math.abs(yb - ya) > 6f) issues += "giro de la cabeza %.0f° vs %.0f°".format(yb, ya)
+    val pb = b["HeadPitch"]?.toFloatOrNull(); val pa = a["HeadPitch"]?.toFloatOrNull()
+    if (pb != null && pa != null && kotlin.math.abs(pb - pa) > 6f) issues += "cabeceo (barbilla) %+.0f° vs %+.0f°".format(pb, pa)
     val db = b["DistanceCm"]?.toFloatOrNull(); val da = a["DistanceCm"]?.toFloatOrNull()
     if (db != null && da != null && kotlin.math.abs(db - da) / maxOf(db, da) > 0.25f) issues += "distancia %.0f vs %.0f cm".format(db, da)
     if (b["Engine"] != null && a["Engine"] != null && b["Engine"] != a["Engine"]) issues += "motor de puntos distinto"

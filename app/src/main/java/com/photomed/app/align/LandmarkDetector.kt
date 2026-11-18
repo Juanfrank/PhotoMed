@@ -23,7 +23,9 @@ import java.io.Closeable
 /** Puntos detectados + pose de la cabeza (Euler, °) si es un rostro. */
 data class Detection(val points: Map<String, Pt>, val yaw: Float? = null, val pitch: Float? = null, val roll: Float? = null,
                      /** Dirección de la mirada (ver [Gaze]); null si no hay ojos. */
-                     val gaze: Pt? = null) {
+                     val gaze: Pt? = null,
+                     /** Pose por ajuste geométrico al modelo 3D ([HeadPose]); null si no es un rostro. */
+                     val pose: HeadPose.Fit? = null) {
     companion object { val EMPTY = Detection(emptyMap()) }
 }
 
@@ -85,12 +87,23 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
                 lastError = "MediaPipe: " + e.javaClass.simpleName
                 null
             }
-            if (mp != null && mp.points.isNotEmpty()) return mp.copy(gaze = runCatching { Gaze.fromIris(mp.points) }.getOrNull())
+            if (mp != null && mp.points.isNotEmpty()) {
+                val pose = runCatching { HeadPose.fit(mp.points) }.getOrNull()
+                return mp.copy(gaze = runCatching { Gaze.fromIris(mp.points) }.getOrNull(), pose = pose)
+            }
         }
         val d = detectFace(bmp)
         if (d.points.isEmpty()) return d
-        // La mirada es un dato adicional: un error al estimarla no debe anular la detección.
-        return d.copy(gaze = runCatching { Gaze.fromImage(d.points, bmp.rgb(), bmp.width, bmp.height) }.getOrNull())
+        // Mirada y pose geométrica son datos adicionales: un error al estimarlos no anula la detección.
+        val pose = runCatching { HeadPose.fit(d.points) }.getOrNull()
+        // ML Kit (modo rápido): el cabeceo de Euler es ruidoso; se promedia con el geométrico.
+        val pitch = when {
+            pose == null -> d.pitch
+            d.pitch == null -> pose.pitch
+            else -> (d.pitch + pose.pitch) / 2f
+        }
+        return d.copy(gaze = runCatching { Gaze.fromImage(d.points, bmp.rgb(), bmp.width, bmp.height) }.getOrNull(),
+            pose = pose, pitch = pitch)
     }
 
     /** true si se pidió MediaPipe pero no se pudo iniciar o se desactivó por fallos. */

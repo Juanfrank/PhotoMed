@@ -28,7 +28,13 @@ object LiveDecision {
         val t = landmarkTransform(spec.landmarks, ref.points, cur.points)?.first
         val ks = KeystoneFit.fromLandmarks(rp, cp)?.keystoneDeg ?: 0f
         val dYaw = if (ref.yaw != null && cur.yaw != null) cur.yaw - ref.yaw else 0f
-        val dPitch = if (ref.pitch != null && cur.pitch != null) cur.pitch - ref.pitch else 0f
+        // Cabeceo relativo: con pose geométrica en ambas (mismo modelo, mismo paciente) el sesgo
+        // anatómico se cancela; si no, Euler del motor.
+        val dPitch = when {
+            ref.pose != null && cur.pose != null -> cur.pose.pitch - ref.pose.pitch
+            ref.pitch != null && cur.pitch != null -> cur.pitch - ref.pitch
+            else -> 0f
+        }
         val e = LiveMatch.evaluate(t, spec.pivot, wasMatched, LiveMatch.pointFraction(rp, cp), threshold, ks,
             dYaw, dPitch, gate = true)
         // Mirada: debe coincidir con la de la referencia (si ambas se midieron)

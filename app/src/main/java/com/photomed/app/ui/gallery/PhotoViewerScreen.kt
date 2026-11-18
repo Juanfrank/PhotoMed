@@ -145,7 +145,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 InfoRow("Consentimiento", if (meta?.consent == true) "Registrado" else "No registrado")
                 meta?.conditions?.takeIf { it.isNotEmpty() }?.let { c ->
                     val labels = mapOf("Engine" to "Motor de puntos", "Assist" to "Asistencia", "MatchPercent" to "Puntos coincidentes (%)",
-                        "HeadYaw" to "Giro de la cabeza (°)", "DistanceCm" to "Distancia estimada (cm)", "Zoom" to "Zoom", "Status" to "Estado")
+                        "HeadYaw" to "Giro de la cabeza (°)", "HeadPitch" to "Cabeceo, barbilla arriba + (°)", "DistanceCm" to "Distancia estimada (cm)", "Zoom" to "Zoom", "Status" to "Estado")
                     c.forEach { (k, v) -> InfoRow(labels[k] ?: k, v) }
                 }
                 InfoRow("Archivo", "Pictures/PhotoMed/$expId/${photo.displayName}")

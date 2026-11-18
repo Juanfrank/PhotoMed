@@ -92,7 +92,8 @@ object LiveMatch {
         if (status != MatchStatus.MATCH && abs(headYawDelta) > LiveDecision.POSE_MAX)
             hints += "Corrija el giro de la cabeza (%.0f°)".format(headYawDelta)
         if (status != MatchStatus.MATCH && abs(headPitchDelta) > LiveDecision.POSE_MAX)
-            hints += "Corrija la inclinación de la cabeza / barbilla (%.0f°)".format(headPitchDelta)
+            hints += (if (headPitchDelta > 0) "Baje la barbilla" else "Suba la barbilla") +
+                " %.0f° (cabeceo distinto al de la referencia)".format(abs(headPitchDelta))
         // keystoneDeg > 0: el cuadro actual necesita "nivelar" una cámara elevada → inclinarla hacia abajo
         if (status != MatchStatus.MATCH && abs(keystoneDeg) >= KEYSTONE_HINT) {
             hints += if (keystoneDeg > 0) "Incline la cámara hacia abajo" else "Incline la cámara hacia arriba"

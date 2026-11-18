@@ -88,7 +88,8 @@ class MediaPipeFace(context: Context) : Closeable {
         val pts = FaceMeshMap.toKeys({ i -> face[i].x() to face[i].y() }, face.size, bmp.width, bmp.height)
         val m = r.facialTransformationMatrixes().orElse(null)?.firstOrNull()
         val e = m?.let { FaceMeshMap.euler(it) }
-        return Detection(pts, e?.first, e?.second, e?.third)
+        // Cabeceo en la convención de ML Kit (positivo = barbilla arriba); la matriz de MediaPipe usa la opuesta.
+        return Detection(pts, e?.first, e?.second?.let { -it }, e?.third)
     }
 
     override fun close() = lm.close()

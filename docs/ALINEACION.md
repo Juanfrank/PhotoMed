@@ -245,9 +245,20 @@ prueba con una foto real distorsionada (más oscura, más contraste, luz cálida
    ángulo. La misma medida se usa en la estandarización ("Enderece la cabeza: inclinada N° hacia…"),
    más estable que el ángulo de Euler del modo rápido de ML Kit.
 2. **Vertical**: anclas (cejas, pupilas, base nasal, boca, mentón) a su altura detectada.
-3. **Contorno de la cabeza** (`tools/guides/face_profile.py`): bordes izquierdo/derecho del cráneo,
+3. **Cabeceo (barbilla arriba/abajo)**: pose 3D de la cabeza por ajuste de los puntos al modelo
+   canónico del rostro de MediaPipe (`HeadPose`, perspectiva débil, mínimos cuadrados). El vértice del
+   cráneo se proyecta con esa pose y se usa como ancla: con la barbilla arriba el cráneo se acorta en
+   la imagen; con la barbilla abajo se alarga. Validado con 536 rostros de LFW frente a la pose de
+   MediaPipe (r = 0,958; error medio 1,96°). La misma pose se usa en la cámara: el cabeceo relativo
+   a la referencia ("Suba/Baje la barbilla N°"), el plano de Frankfort sin referencia (con ML Kit se
+   promedia con su ángulo de Euler) y se guarda en la foto (`HeadPitch`); Comparar avisa si el
+   cabeceo de dos fotos difiere más de 6°. Corregido: el cabeceo de MediaPipe tenía el signo opuesto
+   al de ML Kit.
+4. **Contorno de la cabeza** (`tools/guides/face_profile.py`): bordes izquierdo/derecho del cráneo,
    sienes, mejillas, mandíbula y mentón de la ilustración, por filas. En la app cada franja de la
    guía se escala por separado a cada lado de la línea media hasta el óvalo facial detectado a esa
    altura (desde las cejas; el cráneo conserva la forma de la ilustración con el ancho de la frente).
+
+![Guía con distintos cabeceos](capturas/guia_cabeceo.png)
 
 ![Guía adaptada a rostros inclinados](../app/src/test/snapshots/images/com.photomed.app_GuideAdaptTest_adaptedGuideOnTiltedFaces.png)

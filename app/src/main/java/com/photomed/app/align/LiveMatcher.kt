@@ -16,6 +16,8 @@ data class LiveFrame(
     /** Evaluación de estandarización (sin foto de referencia). */
     val standard: Boolean = false,
     val headYaw: Float? = null,
+    /** Cabeceo (°, + = barbilla arriba): geométrico si hay pose, si no del motor. */
+    val headPitch: Float? = null,
     val gaze: Pt? = null,
 )
 
@@ -61,7 +63,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) else null
         val eval = withDiagnostic(Standardization.evaluate(zone, cur, light), cur)
         return LiveFrame(eval, method = "estandarización", currentPointsAll = cur.points, standard = true,
-            headYaw = cur.yaw, gaze = cur.gaze)
+            headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze)
     }
 
     /** Exigir que la mirada coincida con la de la referencia. */
@@ -95,7 +97,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         matched = eval.status == MatchStatus.MATCH
         eval = withDiagnostic(eval, cur)
         val shown = if (drawKeys.size > MAX_DRAWN) drawKeys.filterIndexed { i, _ -> i % (drawKeys.size / MAX_DRAWN + 1) == 0 } else drawKeys
-        return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points, headYaw = cur.yaw, gaze = cur.gaze)
+        return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points, headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze)
     }
 
     /** Sin puntos y con un error del detector: mostrarlo para poder diagnosticar en el dispositivo. */

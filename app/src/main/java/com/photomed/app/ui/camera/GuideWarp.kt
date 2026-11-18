@@ -87,6 +87,8 @@ class GuideWarp(
         val oval: List<Offset>,
         val rollDeg: Float,
         val pivot: Offset,
+        /** Cabeceo de la cabeza en la foto (°, + = barbilla arriba), si se pudo estimar. */
+        val pitchDeg: Float? = null,
     )
 
     companion object {
@@ -113,8 +115,16 @@ class GuideWarp(
             val r = roll(points)
             val upright = if (r == null || abs(r.first) < 0.3f) points else points.mapValues { rotate(it.value, r.second, -r.first) }
             val oval = (0 until 64).mapNotNull { upright["oval_$it"] }.map { Offset(it.x, it.y / H) }
-            return Detected(detected(upright), if (oval.size >= 12) oval else emptyList(),
-                r?.first ?: 0f, r?.second?.let { Offset(it.x, it.y / H) } ?: Offset(0.5f, 0.5f))
+            val anchors = detected(upright).toMutableMap()
+            // Cabeceo: vértice del cráneo proyectado con la pose 3D del rostro (con la barbilla
+            // arriba el cráneo se acorta en la imagen; con la barbilla abajo se ve más alto).
+            var pitch: Float? = null
+            com.photomed.app.align.HeadPose.fit(upright)?.let { f ->
+                pitch = f.pitch
+                anchors["vértice"] = com.photomed.app.align.HeadPose.vertex(f).y / H
+            }
+            return Detected(anchors, if (oval.size >= 12) oval else emptyList(),
+                r?.first ?: 0f, r?.second?.let { Offset(it.x, it.y / H) } ?: Offset(0.5f, 0.5f), pitch)
         }
 
         /** Posiciones anatómicas detectadas en la foto (mismas claves que las anclas de la guía). */

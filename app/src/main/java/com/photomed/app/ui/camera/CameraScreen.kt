@@ -387,6 +387,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             put("Assist", if (f.standard) "estandarización" else "coincidencia con referencia")
             put("Status", f.eval.status.name)
             f.headYaw?.let { put("HeadYaw", "%.1f".format(java.util.Locale.US, it)) }
+            f.headPitch?.let { put("HeadPitch", "%.1f".format(java.util.Locale.US, it)) }
             f.gaze?.let { put("Gaze", "%.2f,%.2f".format(java.util.Locale.US, it.x, it.y)) }
             CameraGuidance.faceDistanceCm(f.currentPointsAll, focalNorm, zoomRatio)?.let {
                 put("DistanceCm", "%.0f".format(java.util.Locale.US, it))
