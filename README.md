@@ -9,7 +9,7 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
 ## Funciones
 
 ### Captura por zonas
-- 17 zonas estandarizadas (9 faciales, 8 corporales) con **contornos anatómicos propios** y
+- 21 zonas estandarizadas (9 faciales, 12 corporales, incluidas manos y pies) con **contornos anatómicos ilustrados** y
   **líneas de referencia** (tercios faciales, Frankfort, línea media, ombligo, pliegues…) —
   ver [docs/CONTORNOS.md](docs/CONTORNOS.md).
 - **Superposición de la foto anterior** con opacidad ajustable, cuadrícula, **nivel** (inclinación y

@@ -5,7 +5,7 @@ enum class ZoneCategory(val label: String) { FACIAL("Facial"), CORPORAL("Corpora
 /** Tipo de guía (contorno) que se dibuja sobre la cámara para cada zona. */
 enum class GuideType {
     FACE_FRONT, FACE_OBLIQUE, FACE_PROFILE, FOREHEAD, PERIOCULAR, LIPS, NECK,
-    TORSO_FRONT, BREASTS, TORSO_SIDE, BACK, GLUTES, LEGS, ARM
+    TORSO_FRONT, BREASTS, TORSO_SIDE, BACK, GLUTES, LEGS, ARM, HANDS, FEET
 }
 
 /**
@@ -47,13 +47,21 @@ enum class Zone(
     BACK("espalda", "Espalda", ZoneCategory.CORPORAL, GuideType.BACK,
         hint = "Columna sobre la línea media, brazos relajados."),
     GLUTES("gluteos", "Glúteos", ZoneCategory.CORPORAL, GuideType.GLUTES,
-        hint = "Pies juntos, peso distribuido; pliegue glúteo sobre la guía."),
+        hint = "Pies ligeramente separados, peso distribuido; pliegue glúteo sobre la línea inferior."),
     LEGS("muslos", "Muslos / piernas", ZoneCategory.CORPORAL, GuideType.LEGS,
-        hint = "Pies separados a la anchura de las caderas; rodillas sobre la línea."),
+        hint = "Vista frontal, pies ligeramente separados; rótulas sobre las marcas."),
     ARM_R("brazo_der", "Brazo derecho", ZoneCategory.CORPORAL, GuideType.ARM,
-        hint = "Brazo en abducción de 90°, codo flexionado; tomar posterior."),
+        hint = "Vista posterior, brazo relajado junto al cuerpo y palma hacia el muslo; codo sobre la línea."),
     ARM_L("brazo_izq", "Brazo izquierdo", ZoneCategory.CORPORAL, GuideType.ARM, mirrored = true,
-        hint = "Brazo en abducción de 90°, codo flexionado; tomar posterior.");
+        hint = "Vista posterior, brazo relajado junto al cuerpo y palma hacia el muslo; codo sobre la línea."),
+    HANDS_DORSAL("manos_dorso", "Manos (dorso)", ZoneCategory.CORPORAL, GuideType.HANDS,
+        hint = "Ambas manos sobre fondo liso, dedos ligeramente separados, cámara paralela a la superficie."),
+    HANDS_PALMAR("manos_palma", "Manos (palma)", ZoneCategory.CORPORAL, GuideType.HANDS,
+        hint = "Palmas hacia la cámara, dedos ligeramente separados, muñecas en el borde superior."),
+    FEET_DORSAL("pies_dorso", "Pies (dorso)", ZoneCategory.CORPORAL, GuideType.FEET,
+        hint = "Paciente de pie, pies paralelos separados; cámara cenital sobre el dorso."),
+    FEET_PLANTAR("pies_planta", "Pies (planta)", ZoneCategory.CORPORAL, GuideType.FEET,
+        hint = "Paciente en decúbito prono, plantas hacia la cámara, talones arriba.");
 
     companion object {
         fun fromId(id: String?): Zone? = entries.firstOrNull { it.id == id }

@@ -81,11 +81,23 @@ data class ZoneAlignment(
                     Landmarks.ANKLE_L, Landmarks.ANKLE_R),
                 listOf("Rodilla derecha (centro)", "Rodilla izquierda (centro)"), "Caderas, rodillas, tobillos y bordes",
             )
+            GuideType.HANDS -> ZoneAlignment(
+                Detector.POSE, setOf(Landmarks.WRIST_L, Landmarks.WRIST_R, Landmarks.INDEX_L, Landmarks.INDEX_R,
+                    Landmarks.PINKY_L, Landmarks.PINKY_R, Landmarks.THUMB_L, Landmarks.THUMB_R),
+                listOf("Punta del dedo medio derecho", "Punta del dedo medio izquierdo"),
+                "Muñecas, dedos y bordes de las manos", Pt(0.5f, 0.66f), Pt(0.45f, 0.3f),
+            )
+            GuideType.FEET -> ZoneAlignment(
+                Detector.POSE, setOf(Landmarks.ANKLE_L, Landmarks.ANKLE_R, Landmarks.HEEL_L, Landmarks.HEEL_R,
+                    Landmarks.FOOT_INDEX_L, Landmarks.FOOT_INDEX_R),
+                listOf("Punta del primer dedo derecho", "Punta del primer dedo izquierdo"),
+                "Tobillos, talones, dedos y bordes de los pies", Pt(0.5f, 0.66f), Pt(0.45f, 0.32f),
+            )
             GuideType.ARM -> ZoneAlignment(
                 Detector.POSE, setOf(Landmarks.SHOULDER_L, Landmarks.SHOULDER_R, Landmarks.ELBOW_L, Landmarks.ELBOW_R,
                     Landmarks.WRIST_L, Landmarks.WRIST_R),
                 listOf("Acromion (hombro)", "Olécranon (codo)"), "Hombro, codo, muñeca y bordes del brazo",
-                Pt(0.5f, 0.55f), Pt(0.4f, 0.3f),
+                Pt(0.5f, 0.6f), Pt(0.35f, 0.45f),
             )
         }
     }
@@ -112,6 +124,16 @@ object Landmarks {
     const val KNEE_R = "knee_r"
     const val ANKLE_L = "ankle_l"
     const val ANKLE_R = "ankle_r"
+    const val INDEX_L = "index_l"
+    const val INDEX_R = "index_r"
+    const val PINKY_L = "pinky_l"
+    const val PINKY_R = "pinky_r"
+    const val THUMB_L = "thumb_l"
+    const val THUMB_R = "thumb_r"
+    const val HEEL_L = "heel_l"
+    const val HEEL_R = "heel_r"
+    const val FOOT_INDEX_L = "foot_index_l"
+    const val FOOT_INDEX_R = "foot_index_r"
 
     /** 36 puntos del contorno del óvalo facial (ML Kit FaceContour.FACE). */
     val FACE_OVAL: Set<String> = (0 until 36).map { "face_$it" }.toSet()

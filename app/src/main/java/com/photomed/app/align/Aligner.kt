@@ -151,6 +151,11 @@ class Aligner(private val context: Context) {
             PoseLandmark.LEFT_KNEE to Landmarks.KNEE_L, PoseLandmark.RIGHT_KNEE to Landmarks.KNEE_R,
             PoseLandmark.LEFT_ANKLE to Landmarks.ANKLE_L, PoseLandmark.RIGHT_ANKLE to Landmarks.ANKLE_R,
             PoseLandmark.LEFT_MOUTH to Landmarks.MOUTH_L, PoseLandmark.RIGHT_MOUTH to Landmarks.MOUTH_R,
+            PoseLandmark.LEFT_INDEX to Landmarks.INDEX_L, PoseLandmark.RIGHT_INDEX to Landmarks.INDEX_R,
+            PoseLandmark.LEFT_PINKY to Landmarks.PINKY_L, PoseLandmark.RIGHT_PINKY to Landmarks.PINKY_R,
+            PoseLandmark.LEFT_THUMB to Landmarks.THUMB_L, PoseLandmark.RIGHT_THUMB to Landmarks.THUMB_R,
+            PoseLandmark.LEFT_HEEL to Landmarks.HEEL_L, PoseLandmark.RIGHT_HEEL to Landmarks.HEEL_R,
+            PoseLandmark.LEFT_FOOT_INDEX to Landmarks.FOOT_INDEX_L, PoseLandmark.RIGHT_FOOT_INDEX to Landmarks.FOOT_INDEX_R,
         ).forEach { (type, key) ->
             pose.getPoseLandmark(type)?.takeIf { it.inFrameLikelihood >= 0.8f }?.position?.let { out[key] = Pt(it.x / w, it.y / w) }
         }

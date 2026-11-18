@@ -1,13 +1,33 @@
 # Contornos anatómicos de referencia
 
-Los 17 contornos de la cámara (`app/src/main/java/com/photomed/app/ui/camera/GuideOverlay.kt`) son
-**dibujos propios** de este proyecto, publicados bajo la licencia MIT del repositorio. Se definen
-como puntos normalizados en un encuadre 3:4 y se trazan con curvas Catmull-Rom; las líneas
-discontinuas son referencias anatómicas y los círculos son puntos de referencia.
+Las guías de la cámara se generan a partir de ilustraciones anatómicas de línea (rostro de frente,
+perfiles, cuerpo de frente y de espalda, manos y pies) guardadas en `art/source/`, aportadas por el
+autor del proyecto. **Fuente y licencia de estas ilustraciones: pendiente de documentar** (completar
+aquí y en “Acerca de y legal” la atribución que corresponda).
+
+`tools/guides/build_guides.py` recorta cada zona en 3:4, extrae los trazos negros, los esqueletiza y
+los vuelve a engrosar de forma uniforme, y los colorea (trazo cian con halo oscuro) en
+`app/src/main/res/drawable-nodpi/guide_<zona>.webp` (60 KB en total). También genera `GuideArt.kt`
+con las líneas y marcas de referencia, definidas sobre la anatomía de la ilustración:
+
+| Zona | Fuente | Referencias |
+|---|---|---|
+| Rostro frontal | rostro de frente | línea media, cejas, línea pupilar, base nasal, mentón, medio-pupilares, pupilas |
+| Frente y glabela · Periocular · Labios | rostro de frente (recortes) | línea media; cejas / pupilas / comisuras |
+| Perfiles derecho e izquierdo | perfiles | plano de Frankfort, vertical por glabela, tragion y orbitale |
+| Cuello y escote | cuerpo de frente | línea media, mentón, escotadura yugular |
+| Tórax / mamas · Abdomen frontal · Muslos | cuerpo de frente | línea media, pezones, pliegue inframamario, ombligo, ingle, rótulas |
+| Espalda · Glúteos · Brazos | cuerpo de espalda | línea media, C7, escápulas, crestas ilíacas, pliegue interglúteo y glúteo, codo |
+| Manos (dorso, palma) · Pies (dorso, planta) | manos y pies | línea media |
+
+Los oblicuos 45° y el abdomen lateral aún usan el contorno vectorial propio (no hay ilustración de
+esas vistas); se dibujan con el mismo grosor y color para mantener la coherencia.
 
 ![Guías](../app/src/test/snapshots/images/com.photomed.app_GuideScreenshotTest_allGuides.png)
 
-## Referencias libres consultadas
+## Historial de búsqueda de referencias
+
+### Referencias libres consultadas (no usadas)
 
 Se buscaron siluetas de dominio público **sin requisito de atribución** como inspiración para las
 proporciones generales:

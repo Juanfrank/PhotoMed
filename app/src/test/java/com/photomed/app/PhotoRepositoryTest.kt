@@ -37,6 +37,8 @@ class PhotoRepositoryTest {
         assertEquals("0012_Maria_Jose_Pena", PhotoRepository.sanitize(" 0012 María José Peña "))
         assertEquals(Zone.FACE_PROFILE_R, PhotoRepository.zoneOf("rostro_perfil_der_20261118_101530_123.jpg"))
         assertEquals(Zone.FACE_FRONTAL, PhotoRepository.zoneOf("rostro_frontal_20261118_101530_123.jpg"))
+        assertEquals(Zone.HANDS_PALMAR, PhotoRepository.zoneOf("manos_palma_20261118_101530_123.jpg"))
+        assertEquals(Zone.FEET_DORSAL, PhotoRepository.zoneOf("pies_dorso_20261118_101530_123.jpg"))
     }
 
     @Test

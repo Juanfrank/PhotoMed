@@ -1,6 +1,10 @@
 package com.photomed.app.ui.camera
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -37,6 +41,22 @@ fun GuideOverlay(
     showGrid: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val art = GuideArtByZone[zone.id]
+    if (art != null) {
+        // Ilustración anatómica (trazo y halo ya coloreados) + referencias calculadas sobre ella.
+        Box(modifier) {
+            if (showContour) {
+                Image(painterResource(art.drawable), contentDescription = null,
+                    contentScale = ContentScale.FillBounds, modifier = Modifier.matchParentSize())
+            }
+            Canvas(Modifier.matchParentSize()) {
+                if (showGrid) drawGrid()
+                if (showContour) drawGuide(Guide(emptyList(), art.lines, art.marks), mirror = false)
+            }
+        }
+        return
+    }
+    // Zonas sin ilustración (oblicuos 45°, abdomen lateral): contorno vectorial.
     val guide = guideFor(zone.guide)
     Canvas(modifier) {
         if (showGrid) drawGrid()
@@ -61,23 +81,26 @@ private fun DrawScope.drawGrid() {
 
 private fun DrawScope.drawGuide(guide: Guide, mirror: Boolean) {
     fun map(p: Offset) = Offset((if (mirror) 1f - p.x else p.x) * size.width, p.y * size.height)
+    // Grosores proporcionales al tamaño (referencia: guía de 360 dp de ancho en la cámara),
+    // para que miniaturas y cámara mantengan la misma jerarquía visual.
+    val k = (size.width / 360.dp.toPx()).coerceIn(0.35f, 1.4f)
+    fun d(v: Float) = v.dp.toPx() * k
 
-    val dash = PathEffect.dashPathEffect(floatArrayOf(10.dp.toPx(), 8.dp.toPx()))
+    val dash = PathEffect.dashPathEffect(floatArrayOf(d(9f), d(7f)))
     guide.lines.forEach { (a, b) ->
-        drawLine(Shadow, map(a), map(b), 3.dp.toPx(), pathEffect = dash)
-        drawLine(LineColor, map(a), map(b), 1.5f.dp.toPx(), pathEffect = dash)
+        drawLine(Shadow, map(a), map(b), d(2.5f), pathEffect = dash)
+        drawLine(LineColor, map(a), map(b), d(1.2f), pathEffect = dash)
     }
     guide.contours.forEach { (points, closed) ->
         val path = smoothPath(points.map(::map), closed)
-        drawPath(path, Shadow, style = Stroke(4.5f.dp.toPx(), cap = StrokeCap.Round))
-        drawPath(path, ContourColor, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(path, Shadow, style = Stroke(d(4f), cap = StrokeCap.Round))
+        drawPath(path, ContourColor, style = Stroke(d(1.6f), cap = StrokeCap.Round))
     }
     guide.marks.forEach { m ->
-        drawCircle(Shadow, 6.dp.toPx(), map(m), style = Stroke(3.dp.toPx()))
-        drawCircle(LineColor, 6.dp.toPx(), map(m), style = Stroke(1.5f.dp.toPx()))
+        drawCircle(Shadow, d(6f), map(m), style = Stroke(d(2.5f)))
+        drawCircle(LineColor, d(6f), map(m), style = Stroke(d(1.2f)))
     }
 }
-
 
 /** Curva Catmull-Rom suave que pasa por todos los puntos. */
 fun smoothPath(pts: List<Offset>, closed: Boolean): Path {
@@ -289,6 +312,8 @@ fun guideFor(type: GuideType): Guide = when (type) {
         lines = listOf(vLine(0.5f), hLine(0.58f, 0.1f, 0.9f), hLine(0.08f, 0.1f, 0.9f)),
         marks = listOf(o(0.31f, 0.58f), o(0.69f, 0.58f)),
     )
+
+    GuideType.HANDS, GuideType.FEET -> Guide(emptyList(), listOf(vLine(0.5f)))
 
     GuideType.ARM -> Guide(
         // Brazo en abducción (vista posterior): hombro a la izquierda, mano hacia arriba
