@@ -57,4 +57,20 @@ class GazeTest {
             assertTrue("$name: diferencia de mirada", Gaze.matches(model, image))
         }
     }
+
+    @Test
+    fun degenerateEyesNeverThrow() {
+        val w = 40; val h = 53; val rgb = IntArray(w * h) { 0xFF808080.toInt() }
+        val cases = listOf(
+            emptyMap(),
+            (0 until 16).associate { "eye_l_$it" to Pt(0.5f, 0.5f) },                               // ojo colapsado
+            (0 until 16).associate { "eye_l_$it" to Pt(-3f + it, 9f) },                              // fuera de la imagen
+            (0 until 16).associate { "eye_r_$it" to Pt(Float.NaN, 0.2f) },                           // NaN
+            (0 until 16).associate { i -> "eye_l_$i" to Pt(0.95f + 0.01f * i, 1.3f + 0.002f * i) },  // borde inferior
+        )
+        for (pts in cases) {
+            Gaze.fromImage(pts, rgb, w, h)
+            Gaze.fromIris(pts + (Landmarks.EYE_L to Pt(0.5f, 0.5f)))
+        }
+    }
 }

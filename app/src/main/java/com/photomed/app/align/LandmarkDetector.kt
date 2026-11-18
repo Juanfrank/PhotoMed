@@ -32,8 +32,13 @@ data class Detection(val points: Map<String, Pt>, val yaw: Float? = null, val pi
  * ML Kit Pose. Ambos motores devuelven las mismas claves de puntos.
  */
 class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: FaceEngine = FaceEngine.ML_KIT) : Closeable {
+    /** Motivo por el que MediaPipe no se pudo iniciar (si se pidió). */
+    var initError: String? = null
+        private set
     private val mediaPipe: MediaPipeFace? =
-        if (engine == FaceEngine.MEDIAPIPE && context != null) runCatching { MediaPipeFace(context.applicationContext) }.getOrNull() else null
+        if (engine == FaceEngine.MEDIAPIPE && context != null) runCatching { MediaPipeFace(context.applicationContext) }
+            .onFailure { initError = "MediaPipe no se pudo iniciar (${it.javaClass.simpleName}); se usa ML Kit" }.getOrNull()
+        else null
     private val face: FaceDetector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
             .setPerformanceMode(if (stream) FaceDetectorOptions.PERFORMANCE_MODE_FAST else FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
@@ -50,19 +55,49 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
 
     fun detect(detector: Detector, bmp: Bitmap): Map<String, Pt> = detectFull(detector, bmp).points
 
+    /** Último error del detector (para diagnóstico en pantalla); null si el último cuadro fue bien. */
+    @Volatile var lastError: String? = null
+        private set
+    private var mediaPipeFailures = 0
+
     fun detectFull(detector: Detector, bmp: Bitmap): Detection = try {
-        when (detector) {
-            Detector.FACE -> {
-                val mp = mediaPipe?.detect(bmp)
-                if (mp != null && mp.points.isNotEmpty()) mp.copy(gaze = Gaze.fromIris(mp.points))
-                else detectFace(bmp).let { d -> if (d.points.isEmpty()) d else d.copy(gaze = Gaze.fromImage(d.points, bmp.rgb(), bmp.width, bmp.height)) }
-            }
+        val d = when (detector) {
+            Detector.FACE -> detectFaceAny(bmp)
             Detector.POSE -> Detection(detectPose(bmp))
             Detector.NONE -> Detection.EMPTY
         }
+        lastError = null
+        d
     } catch (e: Exception) {
+        lastError = e.javaClass.simpleName + (e.message?.let { ": " + it.take(80) } ?: "")
         Detection.EMPTY
     }
+
+    /**
+     * Rostro con el motor elegido. Si MediaPipe falla (excepción) o no encuentra rostro, se intenta
+     * con ML Kit en ese mismo cuadro: un fallo de un motor nunca deja la app sin detección. Tras 5
+     * fallos seguidos de MediaPipe se deja de intentar con él en este detector.
+     */
+    private fun detectFaceAny(bmp: Bitmap): Detection {
+        if (mediaPipe != null && mediaPipeFailures < 5) {
+            val mp = try { mediaPipe.detect(bmp).also { mediaPipeFailures = 0 } } catch (e: Exception) {
+                mediaPipeFailures++
+                lastError = "MediaPipe: " + e.javaClass.simpleName
+                null
+            }
+            if (mp != null && mp.points.isNotEmpty()) return mp.copy(gaze = runCatching { Gaze.fromIris(mp.points) }.getOrNull())
+        }
+        val d = detectFace(bmp)
+        if (d.points.isEmpty()) return d
+        // La mirada es un dato adicional: un error al estimarla no debe anular la detección.
+        return d.copy(gaze = runCatching { Gaze.fromImage(d.points, bmp.rgb(), bmp.width, bmp.height) }.getOrNull())
+    }
+
+    /** true si se pidió MediaPipe pero no se pudo iniciar o se desactivó por fallos. */
+    val mediaPipeUnavailable: Boolean get() = engine == FaceEngine.MEDIAPIPE && (mediaPipe == null || mediaPipeFailures >= 5)
+
+    /** Texto de diagnóstico para mostrar cuando no hay puntos (null si no hay nada que reportar). */
+    val diagnostic: String? get() = lastError ?: initError ?: if (mediaPipeUnavailable) "MediaPipe desactivado por errores; se usa ML Kit" else null
 
     private fun detectFace(bmp: Bitmap): Detection {
         val faces = Tasks.await(face.process(InputImage.fromBitmap(bmp, 0)))

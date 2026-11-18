@@ -338,7 +338,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                 }
             }
     }
-    DisposableEffect(lensFacing) { onDispose { runCatching { analysisRef.get()?.clearAnalyzer() } } }
+    // Liberar el analizador de ESTA instancia al cambiar de cámara. (Antes se limpiaba el de
+    // analysisRef, que ya apuntaba al nuevo: al cambiar de cámara el análisis en vivo se detenía.)
+    DisposableEffect(analysis) { onDispose { runCatching { analysis.clearAnalyzer() } } }
 
     LaunchedEffect(lensFacing) {
         val provider = context.cameraProvider()

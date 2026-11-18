@@ -59,7 +59,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val cur = detector.detectFull(spec.detector, frame)
         val light = if (spec.detector == Detector.FACE && cur.points.isNotEmpty())
             Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) else null
-        val eval = Standardization.evaluate(zone, cur, light)
+        val eval = withDiagnostic(Standardization.evaluate(zone, cur, light), cur)
         return LiveFrame(eval, method = "estandarización", currentPointsAll = cur.points, standard = true,
             headYaw = cur.yaw, gaze = cur.gaze)
     }
@@ -72,7 +72,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
 
     fun analyze(frame: Bitmap): LiveFrame {
         val refG = refGray?.takeIf { useReference } ?: return standardize(frame)
-        val eval: MatchEval
+        var eval: MatchEval
         val method: String
         var drawKeys: List<String> = emptyList()
         val total: Int
@@ -93,8 +93,16 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             method = "puntos de contorno"; total = refEdgePts.size
         }
         matched = eval.status == MatchStatus.MATCH
+        eval = withDiagnostic(eval, cur)
         val shown = if (drawKeys.size > MAX_DRAWN) drawKeys.filterIndexed { i, _ -> i % (drawKeys.size / MAX_DRAWN + 1) == 0 } else drawKeys
         return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points, headYaw = cur.yaw, gaze = cur.gaze)
+    }
+
+    /** Sin puntos y con un error del detector: mostrarlo para poder diagnosticar en el dispositivo. */
+    private fun withDiagnostic(e: MatchEval, cur: Detection): MatchEval {
+        if (spec.detector == Detector.NONE || cur.points.isNotEmpty()) return e
+        val d = detector.diagnostic ?: return e
+        return e.copy(hints = e.hints + "Detector ($engine): $d")
     }
 
     override fun close() = detector.close()
