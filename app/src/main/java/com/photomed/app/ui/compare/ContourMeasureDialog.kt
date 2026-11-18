@@ -58,8 +58,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import com.photomed.app.ui.components.FullScreenOverlay
 import com.photomed.app.align.Aligner
 import com.photomed.app.align.ContourMetrics
 import com.photomed.app.align.KeystoneFit
@@ -81,8 +80,7 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun ContourMeasureDialog(before: Photo, after: Photo, onDismiss: () -> Unit, onApplyKeystone: (Float) -> Unit) {
-    Dialog(onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    FullScreenOverlay(onDismiss = onDismiss) {
         ImmersiveTheme { ContourMeasureContent(before, after, onDismiss, onApplyKeystone) }
     }
 }

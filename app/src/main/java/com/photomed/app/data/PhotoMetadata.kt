@@ -24,6 +24,8 @@ data class PhotoInfo(
     val roll: Float? = null,
     /** Focal en unidades de alto de imagen (para la corrección de perspectiva). */
     val focalNorm: Float? = null,
+    /** Condiciones de captura (motor, pose de la cabeza, coincidencia, zoom, distancia…). */
+    val conditions: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -87,6 +89,7 @@ object PhotoMetadata {
             i.cameraPitch?.let { put("cameraPitch", it.toDouble()) }
             i.roll?.let { put("roll", it.toDouble()) }
             i.focalNorm?.let { put("focalNorm", it.toDouble()) }
+            if (i.conditions.isNotEmpty()) put("conditions", JSONObject(i.conditions))
         }
 
     private fun fromJson(j: JSONObject) = PhotoInfo(
@@ -100,6 +103,7 @@ object PhotoMetadata {
         cameraPitch = j.optDouble("cameraPitch").takeUnless { it.isNaN() }?.toFloat(),
         roll = j.optDouble("roll").takeUnless { it.isNaN() }?.toFloat(),
         focalNorm = j.optDouble("focalNorm").takeUnless { it.isNaN() }?.toFloat(),
+        conditions = j.optJSONObject("conditions")?.let { o -> o.keys().asSequence().associateWith { o.getString(it) } }.orEmpty(),
     )
 
     /** Escapa para XML y codifica lo no-ASCII como referencias de carácter (&#NNN;): XMP 100 % ASCII. */
@@ -148,7 +152,7 @@ object PhotoMetadata {
     pm:Zone="${esc(i.zoneId)}"
     pm:ZoneLabel="${esc(i.zoneLabel)}"
     pm:CapturedAt="${i.capturedAt}"
-    pm:Consent="${i.consent}"${i.cameraPitch?.let { "\n    pm:CameraPitch=\"%.2f\"".format(java.util.Locale.US, it) } ?: ""}${i.roll?.let { "\n    pm:Roll=\"%.2f\"".format(java.util.Locale.US, it) } ?: ""}${i.focalNorm?.let { "\n    pm:FocalNorm=\"%.4f\"".format(java.util.Locale.US, it) } ?: ""}>
+    pm:Consent="${i.consent}"${i.cameraPitch?.let { "\n    pm:CameraPitch=\"%.2f\"".format(java.util.Locale.US, it) } ?: ""}${i.roll?.let { "\n    pm:Roll=\"%.2f\"".format(java.util.Locale.US, it) } ?: ""}${i.focalNorm?.let { "\n    pm:FocalNorm=\"%.4f\"".format(java.util.Locale.US, it) } ?: ""}${i.conditions.entries.joinToString("") { (k, v) -> "\n    pm:Cond_${k.filter { c -> c.isLetterOrDigit() }}=\"${esc(v)}\"" }}>
    <dc:title><rdf:Alt><rdf:li xml:lang="x-default">${esc(i.patientName)} — ${esc(i.zoneLabel)}</rdf:li></rdf:Alt></dc:title>
    <dc:description><rdf:Alt><rdf:li xml:lang="x-default">${esc(description)}</rdf:li></rdf:Alt></dc:description>
    <dc:subject><rdf:Bag><rdf:li>PhotoMed</rdf:li><rdf:li>${esc(i.zoneLabel)}</rdf:li><rdf:li>${esc(i.expedienteId)}</rdf:li></rdf:Bag></dc:subject>
@@ -171,6 +175,7 @@ object PhotoMetadata {
             cameraPitch = attr("CameraPitch")?.toFloatOrNull(),
             roll = attr("Roll")?.toFloatOrNull(),
             focalNorm = attr("FocalNorm")?.toFloatOrNull(),
+            conditions = Regex("""pm:Cond_(\w+)="([^"]*)"""").findAll(xmp).associate { it.groupValues[1] to unesc(it.groupValues[2]) },
         )
     }
 }

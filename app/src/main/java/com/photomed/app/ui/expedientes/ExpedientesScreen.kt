@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -71,7 +72,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun ExpedientesScreen(onOpen: (String) -> Unit, onAbout: () -> Unit) {
+fun ExpedientesScreen(onOpen: (String) -> Unit, onAbout: () -> Unit, onSettings: () -> Unit = {}) {
     val repo = LocalRepository.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -98,6 +99,7 @@ fun ExpedientesScreen(onOpen: (String) -> Unit, onAbout: () -> Unit) {
         onOpen = onOpen,
         onCreate = { showCreate = true },
         onAbout = onAbout,
+        onSettings = onSettings,
         onRecover = {
             readPermission.launch(
                 if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES
@@ -133,6 +135,7 @@ fun ExpedientesContent(
     onAbout: () -> Unit,
     onRecover: () -> Unit,
     initialQuery: String = "",
+    onSettings: () -> Unit = {},
 ) {
     var query by rememberSaveable { mutableStateOf(initialQuery) }
     var menu by remember { mutableStateOf(false) }
@@ -153,6 +156,11 @@ fun ExpedientesContent(
                                 text = { Text("Recuperar desde la galería") },
                                 leadingIcon = { Icon(Icons.Default.PhotoLibrary, null) },
                                 onClick = { menu = false; onRecover() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Ajustes") },
+                                leadingIcon = { Icon(Icons.Default.Settings, null) },
+                                onClick = { menu = false; onSettings() },
                             )
                             DropdownMenuItem(
                                 text = { Text("Acerca de y legal") },

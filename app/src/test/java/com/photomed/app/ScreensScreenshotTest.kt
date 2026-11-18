@@ -73,3 +73,13 @@ class ScreensScreenshotTest {
     @Test
     fun termsGate() = shot("terms") { TermsGate(onAccept = {}) }
 }
+
+class SettingsScreenshotTest {
+    @get:org.junit.Rule
+    val paparazzi = app.cash.paparazzi.Paparazzi(deviceConfig = app.cash.paparazzi.DeviceConfig.PIXEL_5.copy(screenHeight = 3000))
+
+    @org.junit.Test
+    fun settings() = paparazzi.snapshot {
+        com.photomed.app.ui.theme.PhotoMedTheme { com.photomed.app.ui.settings.SettingsScreen(onBack = {}) }
+    }
+}

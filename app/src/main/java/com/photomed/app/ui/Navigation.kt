@@ -59,7 +59,8 @@ fun AppNavigation() {
         popExitTransition = { slideOutHorizontally(exit) { it / 5 } + fadeOut(tween(Md3Motion.durationShort4)) },
     ) {
         composable("expedientes") {
-            ExpedientesScreen(onOpen = { nav.navigate("expediente/$it") }, onAbout = { nav.navigate("about") })
+            ExpedientesScreen(onOpen = { nav.navigate("expediente/$it") }, onAbout = { nav.navigate("about") },
+                onSettings = { nav.navigate("settings") })
         }
         composable("expediente/{exp}") { entry ->
             val exp = entry.arguments?.getString("exp").orEmpty()
@@ -101,6 +102,7 @@ fun AppNavigation() {
             val name = entry.arguments?.getString("name").orEmpty()
             PhotoViewerScreen(expId = exp, zone = zone, initialName = name, onBack = { nav.popBackStack() })
         }
+        composable("settings") { com.photomed.app.ui.settings.SettingsScreen(onBack = { nav.popBackStack() }) }
         composable("about") {
             AboutScreen(onBack = { nav.popBackStack() }, onDoc = { nav.navigate("legal/${it.name}") })
         }

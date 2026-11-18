@@ -50,7 +50,7 @@ derivan de **Open Pain Illustration** (Digital Health Zurich / Universidad de Z�
 CC BY 4.0 (<https://creativecommons.org/licenses/by/4.0/>), adaptados (recorte, extracción de trazos,
 recoloreado y vistas oblicua y lateral derivadas). El tema visual
 sigue los tokens de Material Design 3 (repositorio Juanfrank/MD, derivados de `@material/web`).
-Los componentes de terceros (AndroidX, Jetpack Compose, CameraX, Coil, Google ML Kit) se rigen por
+Los componentes de terceros (AndroidX, Jetpack Compose, CameraX, Coil, Google ML Kit, MediaPipe) se rigen por
 sus propias licencias y términos.
 
 ## 7. Garantía y responsabilidad

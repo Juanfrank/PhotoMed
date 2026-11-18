@@ -64,6 +64,10 @@ android {
         compose = true
         buildConfig = true
     }
+    androidResources {
+        // El modelo de MediaPipe se mapea en memoria: no debe comprimirse.
+        noCompress += listOf("task")
+    }
     testOptions {
         unitTests.isReturnDefaultValues = true
         unitTests.isIncludeAndroidResources = true
@@ -97,6 +101,8 @@ dependencies {
     implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.google.mlkit:pose-detection:18.0.0-beta5")
     implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
+    // Motor alternativo de puntos faciales (478 puntos + pose 3D), Apache 2.0
+    implementation("com.google.mediapipe:tasks-vision:1.2.3")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

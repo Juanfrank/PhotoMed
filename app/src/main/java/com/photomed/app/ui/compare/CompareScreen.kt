@@ -5,7 +5,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Palette
 import com.photomed.app.align.ColorAdjust
 import androidx.compose.material.icons.filled.Straighten
-import androidx.compose.material3.ModalBottomSheet
+import com.photomed.app.ui.components.SafeBottomSheet
 import com.photomed.app.align.ImageOps
 import com.photomed.app.align.Perspective
 import androidx.compose.foundation.background
@@ -126,6 +126,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
     var measure by remember { mutableStateOf(false) }
     var colorDialog by remember { mutableStateOf(false) }
     var colorAdjust by remember { mutableStateOf<ColorAdjust?>(null) }
+    var conditionsWarning by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(expId) {
         withContext(Dispatchers.IO) {
@@ -151,6 +152,13 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
     val beforeModel: Any? = pair?.get(0)?.uri
     val afterModel: Any? = pair?.let { rememberCorrected(it[1].uri, keystone, Perspective.DEFAULT_FOCAL, colorAdjust) }
     val manualK = keystoneManual.takeIf { !keystoneAuto }
+
+    // Condiciones de captura del par (registradas en el XMP): avisar si no son comparables.
+    LaunchedEffect(pair?.getOrNull(0)?.key, pair?.getOrNull(1)?.key) {
+        val p = pair ?: run { conditionsWarning = null; return@LaunchedEffect }
+        val (ib, ia) = withContext(Dispatchers.IO) { repo.readInfo(p[0]) to repo.readInfo(p[1]) }
+        conditionsWarning = captureConditionsWarning(ib?.conditions.orEmpty(), ia?.conditions.orEmpty())
+    }
 
     fun resetAlignment() { alignment = null; zoom = ZoomState() }
 
@@ -341,6 +349,10 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                         Text("$days días", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+                conditionsWarning?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.padding(horizontal = Md3Spacing.marginCompact))
+                }
                 if (b.zone != a.zone) {
                     Text(
                         "Atención: zonas distintas (${b.zone.label} / ${a.zone.label})",
@@ -409,7 +421,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
     }
 
     if (settings && pair != null) {
-        ModalBottomSheet(onDismissRequest = { settings = false }) {
+        SafeBottomSheet(onDismiss = { settings = false }) {
             Column(Modifier.padding(horizontal = Md3Spacing.s6).padding(bottom = Md3Spacing.s8),
                 verticalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
                 Text("Perspectiva vertical", style = MaterialTheme.typography.titleLarge)
@@ -489,4 +501,18 @@ private fun rememberCorrected(uri: android.net.Uri, pitchDeg: Float, focalNorm: 
         } ?: uri
     }
     return state.value
+}
+
+/** Diferencias relevantes entre las condiciones de captura de dos fotos (o null si son comparables). */
+fun captureConditionsWarning(b: Map<String, String>, a: Map<String, String>): String? {
+    val issues = mutableListOf<String>()
+    val yb = b["HeadYaw"]?.toFloatOrNull(); val ya = a["HeadYaw"]?.toFloatOrNull()
+    if (yb != null && ya != null && kotlin.math.abs(yb - ya) > 6f) issues += "giro de la cabeza %.0f° vs %.0f°".format(yb, ya)
+    val db = b["DistanceCm"]?.toFloatOrNull(); val da = a["DistanceCm"]?.toFloatOrNull()
+    if (db != null && da != null && kotlin.math.abs(db - da) / maxOf(db, da) > 0.25f) issues += "distancia %.0f vs %.0f cm".format(db, da)
+    if (b["Engine"] != null && a["Engine"] != null && b["Engine"] != a["Engine"]) issues += "motor de puntos distinto"
+    listOf(b, a).forEachIndexed { i, c ->
+        if (c["Status"] != null && c["Status"] != "MATCH") issues += (if (i == 0) "“antes”" else "“después”") + " sin encuadre confirmado"
+    }
+    return if (issues.isEmpty()) null else "Condiciones de captura distintas: " + issues.joinToString("; ")
 }

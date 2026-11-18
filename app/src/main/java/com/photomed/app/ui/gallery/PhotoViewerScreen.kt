@@ -25,7 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import com.photomed.app.ui.components.SafeBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -142,8 +142,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     }
 
     info?.let { (photo, meta) ->
-        ModalBottomSheet(onDismissRequest = { info = null }) {
-            Column(Modifier.navigationBarsPadding().padding(bottom = androidx.compose.ui.unit.Dp(16f))) {
+        SafeBottomSheet(onDismiss = { info = null }) {
+            Column(Modifier.padding(bottom = androidx.compose.ui.unit.Dp(16f))) {
                 Text("Información de la fotografía", style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(horizontal = androidx.compose.ui.unit.Dp(24f)))
                 InfoRow("Paciente", meta?.patientName ?: "—")
@@ -151,6 +151,11 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 InfoRow("Zona", meta?.zoneLabel ?: photo.zone.label)
                 InfoRow("Fecha de captura", formatDateTime(photo.takenAt))
                 InfoRow("Consentimiento", if (meta?.consent == true) "Registrado" else "No registrado")
+                meta?.conditions?.takeIf { it.isNotEmpty() }?.let { c ->
+                    val labels = mapOf("Engine" to "Motor de puntos", "Assist" to "Asistencia", "MatchPercent" to "Puntos coincidentes (%)",
+                        "HeadYaw" to "Giro de la cabeza (°)", "DistanceCm" to "Distancia estimada (cm)", "Zoom" to "Zoom", "Status" to "Estado")
+                    c.forEach { (k, v) -> InfoRow(labels[k] ?: k, v) }
+                }
                 InfoRow("Archivo", "Pictures/PhotoMed/$expId/${photo.displayName}")
                 Text(
                     "Estos datos están incrustados en la imagen (EXIF y XMP).",

@@ -13,6 +13,9 @@ data class LiveFrame(
     val totalPoints: Int = 0,
     /** Todos los puntos detectados en el cuadro (p. ej. para estimar la distancia por la interpupilar). */
     val currentPointsAll: Map<String, Pt> = emptyMap(),
+    /** Evaluación de estandarización (sin foto de referencia). */
+    val standard: Boolean = false,
+    val headYaw: Float? = null,
 )
 
 /**
@@ -25,9 +28,10 @@ data class LiveFrame(
  *   coincidencia de contornos.
  * Se llama desde el hilo de análisis (bloqueante).
  */
-class LiveMatcher(zone: Zone) : Closeable {
+class LiveMatcher(private val zone: Zone, context: android.content.Context? = null, engine: FaceEngine = FaceEngine.ML_KIT) : Closeable {
     private val spec = ZoneAlignment.of(zone)
-    private val detector = LandmarkDetector(stream = true)
+    private val detector = LandmarkDetector(stream = true, context, engine)
+    val engine: FaceEngine = detector.engine
     private val edges = EdgeAligner(spec.contours)
     private var ref: Detection = Detection.EMPTY
     private var refGray: GrayImage? = null
@@ -49,8 +53,20 @@ class LiveMatcher(zone: Zone) : Closeable {
         last = null; matched = false
     }
 
+    /** Sin referencia: estandarización de la toma (vista, Frankfort, iluminación). */
+    fun standardize(frame: Bitmap): LiveFrame {
+        val cur = detector.detectFull(spec.detector, frame)
+        val light = if (spec.detector == Detector.FACE && cur.points.isNotEmpty())
+            Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) else null
+        val eval = Standardization.evaluate(zone, cur, light)
+        return LiveFrame(eval, method = "estandarización", currentPointsAll = cur.points, standard = true)
+    }
+
+    /** false: ignorar la referencia (superposición apagada) y estandarizar. */
+    @Volatile var useReference: Boolean = true
+
     fun analyze(frame: Bitmap): LiveFrame {
-        val refG = refGray ?: return LiveFrame(LiveMatch.evaluate(null, spec.pivot, threshold = threshold))
+        val refG = refGray?.takeIf { useReference } ?: return standardize(frame)
         val eval: MatchEval
         val method: String
         var drawKeys: List<String> = emptyList()
@@ -73,7 +89,7 @@ class LiveMatcher(zone: Zone) : Closeable {
         }
         matched = eval.status == MatchStatus.MATCH
         val shown = if (drawKeys.size > MAX_DRAWN) drawKeys.filterIndexed { i, _ -> i % (drawKeys.size / MAX_DRAWN + 1) == 0 } else drawKeys
-        return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points)
+        return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points, headYaw = cur.yaw)
     }
 
     override fun close() = detector.close()

@@ -48,8 +48,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import com.photomed.app.ui.components.FullScreenOverlay
 import com.photomed.app.align.Aligner
 import com.photomed.app.align.ColorAdjust
 import com.photomed.app.align.ColorMatch
@@ -70,8 +69,7 @@ import kotlinx.coroutines.withContext
  */
 @Composable
 fun ColorMatchDialog(before: Photo, after: Photo, onDismiss: () -> Unit, onApply: (ColorAdjust) -> Unit) {
-    Dialog(onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    FullScreenOverlay(onDismiss = onDismiss) {
         ImmersiveTheme { ColorMatchContent(before, after, onDismiss, onApply) }
     }
 }

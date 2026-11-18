@@ -34,8 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import com.photomed.app.ui.components.FullScreenOverlay
 import com.photomed.app.ui.theme.Md3Spacing
 
 /**
@@ -60,7 +59,7 @@ fun ExpedienteForm(
     var triedSave by rememberSaveable { mutableStateOf(false) }
     val nameError = triedSave && name.isBlank()
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    FullScreenOverlay(onDismiss = onDismiss) {
         Scaffold(
             topBar = {
                 TopAppBar(

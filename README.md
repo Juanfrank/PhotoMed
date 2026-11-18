@@ -13,13 +13,17 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
   **líneas de referencia** (tercios faciales, Frankfort, línea media, ombligo, pliegues…) —
   ver [docs/CONTORNOS.md](docs/CONTORNOS.md). Ilustraciones base: *Open Pain Illustration*
   (Digital Health Zurich, CC BY 4.0).
+- **Asistencia sin referencia** (primera toma): vista estándar por la pose de la cabeza (0°/45°/perfil),
+  plano de Frankfort, iluminación y exposición; condiciones de captura guardadas en el XMP.
+- **Dos motores de puntos faciales** intercambiables en Ajustes: Google ML Kit o MediaPipe Face Landmarker.
 - **Guía adaptada a la foto de referencia**: el contorno y las líneas (cejas, ojos, nariz, boca,
   mandíbula; hombros, caderas, rodillas…) se desplazan a la anatomía detectada.
 - **Superposición de la foto anterior** con opacidad ajustable, vista en **espejo** (frontal, por defecto), cuadrícula, **nivel** (inclinación y
   cabeceo), toque para enfocar, flash y cámara frontal/trasera. Encuadre 3:4 idéntico en vista previa y captura.
 - **Coincidencia en vivo**: la guía cambia de color (cian → ámbar → verde, con vibración) cuando el
   porcentaje de puntos coincidentes (tolerancia 3 %) alcanza el umbral (80 % por defecto) con la
-  geometría y la pose de la cabeza; flechas en el borde, giro en el nivel, **zoom asistido** y
+  geometría y la pose de la cabeza; flechas en el borde, giro en el nivel, **zoom asistido estable**
+  (espera el enfoque) y
   **disparo automático** opcional. Validado con imágenes reales (ver docs/ALINEACION.md).
 - **Medición de contornos**: selección automática (óvalo facial / silueta, como los stickers) o con
   **varita mágica**; alto, anchos por nivel, área y proporciones antes/después.
@@ -75,4 +79,4 @@ Buenas prácticas y bibliografía: [docs/BUENAS_PRACTICAS.md](docs/BUENAS_PRACTI
 Logo: esfigmomanómetro cuyo manómetro es el lente de una cámara (`art/logo/logo.svg`).
 
 Stack: Kotlin, Jetpack Compose (Material 3), CameraX, MediaStore, ExifInterface, Navigation
-Compose, Coil, Google ML Kit (rostro y pose, modelos incluidos). minSdk 26.
+Compose, Coil, Google ML Kit (rostro, pose, segmentación) y MediaPipe Face Landmarker, modelos incluidos. minSdk 26.

@@ -130,15 +130,38 @@ de personas distintas se solapan: varían más con la pose y la expresión); y e
 forma cambia con el tratamiento. La identidad la garantiza el expediente; la coincidencia mide el
 **encuadre**.
 
+#### Motores de puntos faciales intercambiables
+
+Ajustes → “Motor de puntos faciales”: **Google ML Kit** (133 puntos de contorno + 7 puntos, ángulos de
+Euler) o **MediaPipe Face Landmarker** (478 puntos 3D + matriz de pose; Apache 2.0, modelo incluido).
+`FaceMeshMap` agrupa la malla de MediaPipe con las mismas claves que ML Kit (óvalo, cejas, ojos,
+labios, nariz, pupilas por el iris), de modo que alineación, coincidencia, perspectiva, guía adaptada
+y estandarización funcionan igual con ambos. Referencia y cuadro actual usan siempre el mismo motor
+(al cambiarlo se recalcula la referencia). La evaluación con LFW (`tools/eval`) se hizo con esta misma
+agrupación de MediaPipe.
+
+#### Estandarización sin foto de referencia (primera toma de una zona)
+
+`Standardization` aplica los estándares de fotografía clínica: vista (giro de la cabeza 0° frontal,
+45° oblicuo hacia el lado de la zona, ≥ 70° perfil), plano de Frankfort (cabeceo ≤ 7°), cabeza recta
+(alabeo ≤ 4°), iluminación uniforme (mejillas ±15 %) y exposición (L* del rostro 35–85). El sentido del
+giro se obtiene de la geometría (punta nasal frente al óvalo), común a ambos motores: concuerda con la
+pose 3D en el **100 %** de 227 rostros reales girados ≥ 10° (LFW).
+
 #### Asistencia al operador
 
 - Indicaciones **fuera de la imagen** (franja bajo la vista previa) y **flechas en el borde** hacia
   donde mover el teléfono, calculadas en coordenadas de pantalla según cámara y espejo.
 - El **giro** necesario se dibuja en el nivel (línea objetivo discontinua + ángulo).
-- **Zoom asistido**: lazo cerrado amortiguado que ajusta el zoom de la cámara para igualar la escala
-  de la referencia; con la distancia estimada (interpupilar ≈ 6,3 cm) se recomienda trabajar a
+- **Zoom asistido** (`ZoomController`): filtro del error de escala, zona muerta ±2 %, 3 cuadros de
+  tendencia, paso ≤ 12 %, amortiguación al sobrepasar y **espera a que el zoom se aplique y la cámara
+  reenfoque** (en el pivote anatómico) antes de volver a medir; probado con una planta simulada con
+  retraso y ruido (converge sin oscilar). El disparo automático también enfoca y espera; con la distancia estimada (interpupilar ≈ 6,3 cm) se recomienda trabajar a
   ≥ 1 m para evitar el “efecto selfie”.
-- **Disparo automático** tras ~0,4 s de coincidencia, una vez por coincidencia.
+- **Disparo automático** tras ~0,4 s de coincidencia (o de encuadre estándar), sin zoom en curso,
+  tras enfocar en el pivote anatómico; una vez por coincidencia.
+- **Condiciones de captura** en el XMP (`pm:Cond_*`: motor, asistencia, % de puntos, giro de la
+  cabeza, distancia estimada, zoom); el comparador avisa si un par no es comparable.
 
 ## Resultado
 

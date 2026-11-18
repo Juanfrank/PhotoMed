@@ -151,10 +151,11 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
         else -> Color.White
     }
     val title = when (eval?.status) {
-        MatchStatus.MATCH -> if (autoCapture) "Coincide · capturando" else "Coincide con la referencia"
+        MatchStatus.MATCH -> if (frame.standard) (if (autoCapture) "Encuadre estándar · capturando" else "Encuadre estándar correcto")
+            else if (autoCapture) "Coincide · capturando" else "Coincide con la referencia"
         MatchStatus.SEARCHING -> eval.hints.firstOrNull() ?: "Buscando referencias anatómicas…"
         null -> "Preparando la referencia…"
-        else -> g?.text ?: "Alinee con la referencia"
+        else -> g?.text ?: if (frame?.standard == true) (eval.hints.firstOrNull() ?: "Ajuste la pose") else "Alinee con la referencia"
     }
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
@@ -177,7 +178,8 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
                     style = MaterialTheme.typography.labelSmall)
             }
         }
-        val second = listOfNotNull(distanceHint, g?.extra?.firstOrNull(), zoomInfo).joinToString(" · ")
+        val extraHint = if (frame?.standard == true) eval?.hints?.drop(1)?.firstOrNull() else g?.extra?.firstOrNull()
+        val second = listOfNotNull(distanceHint, extraHint, zoomInfo).joinToString(" · ")
         if (second.isNotEmpty()) {
             Text(second, color = Color(0xFFCAC4D0), style = MaterialTheme.typography.labelSmall, maxLines = 1,
                 overflow = TextOverflow.Ellipsis)

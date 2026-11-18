@@ -1,5 +1,6 @@
 package com.photomed.app.align
 
+import android.content.Context
 import android.graphics.Bitmap
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
@@ -24,7 +25,13 @@ data class Detection(val points: Map<String, Pt>, val yaw: Float? = null, val pi
     companion object { val EMPTY = Detection(emptyMap()) }
 }
 
-class LandmarkDetector(stream: Boolean) : Closeable {
+/**
+ * Detector de puntos: rostro con el motor elegido ([FaceEngine]: ML Kit o MediaPipe) y cuerpo con
+ * ML Kit Pose. Ambos motores devuelven las mismas claves de puntos.
+ */
+class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: FaceEngine = FaceEngine.ML_KIT) : Closeable {
+    private val mediaPipe: MediaPipeFace? =
+        if (engine == FaceEngine.MEDIAPIPE && context != null) runCatching { MediaPipeFace(context.applicationContext) }.getOrNull() else null
     private val face: FaceDetector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
             .setPerformanceMode(if (stream) FaceDetectorOptions.PERFORMANCE_MODE_FAST else FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
@@ -43,7 +50,7 @@ class LandmarkDetector(stream: Boolean) : Closeable {
 
     fun detectFull(detector: Detector, bmp: Bitmap): Detection = try {
         when (detector) {
-            Detector.FACE -> detectFace(bmp)
+            Detector.FACE -> mediaPipe?.detect(bmp) ?: detectFace(bmp)
             Detector.POSE -> Detection(detectPose(bmp))
             Detector.NONE -> Detection.EMPTY
         }
@@ -102,6 +109,6 @@ class LandmarkDetector(stream: Boolean) : Closeable {
     }
 
     override fun close() {
-        face.close(); pose.close()
+        face.close(); pose.close(); mediaPipe?.close()
     }
 }

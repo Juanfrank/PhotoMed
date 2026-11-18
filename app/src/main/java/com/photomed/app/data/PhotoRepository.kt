@@ -132,11 +132,12 @@ class PhotoRepository(
     fun savePhoto(
         exp: Expediente, zone: Zone, capture: File, takenAt: Long = System.currentTimeMillis(),
         cameraPitch: Float? = null, roll: Float? = null, focalNorm: Float? = null,
+        conditions: Map<String, String> = emptyMap(),
     ): Photo {
         PhotoMetadata.write(
             capture,
             PhotoInfo(exp.patientName, exp.recordNumber, exp.id, zone.id, zone.label, takenAt, exp.consent,
-                cameraPitch, roll, focalNorm),
+                cameraPitch, roll, focalNorm, conditions),
         )
         val name = "${zone.id}_${stampFormat.format(Date(takenAt))}.jpg"
         val uri = store.save(exp.id, name, capture, takenAt)

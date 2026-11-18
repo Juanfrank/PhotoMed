@@ -42,7 +42,7 @@ class Aligner(private val context: Context) {
             val spec = ZoneAlignment.of(zone)
             val b = ImageOps.load34(context, before, DETECT_W)
             val a0 = ImageOps.load34(context, after, DETECT_W)
-            val (bPts, aPts0) = LandmarkDetector(stream = false).use { it.detect(spec.detector, b) to it.detect(spec.detector, a0) }
+            val (bPts, aPts0) = LandmarkDetector(stream = false, context, FaceEngine.get(context)).use { it.detect(spec.detector, b) to it.detect(spec.detector, a0) }
             val (phi, src) = manualKeystone?.let { it to "manual" } ?: estimateKeystone(spec, b, a0, bPts, aPts0)
             val a = ImageOps.correctPerspective(a0, phi, Perspective.DEFAULT_FOCAL)
             val aPts = aPts0.mapValues { Perspective.mapPt(it.value, phi) }
@@ -65,7 +65,7 @@ class Aligner(private val context: Context) {
 
     private fun autoMask(spec: ZoneAlignment, bmp: Bitmap): Mask? {
         if (spec.detector == Detector.FACE) {
-            val pts = LandmarkDetector(stream = false).use { it.detect(Detector.FACE, bmp) }
+            val pts = LandmarkDetector(stream = false, context, FaceEngine.get(context)).use { it.detect(Detector.FACE, bmp) }
             val oval = (0 until 36).mapNotNull { pts["oval_$it"] }
             if (oval.size == 36) return MaskOps.polygon(oval, bmp.width, bmp.height)
         }

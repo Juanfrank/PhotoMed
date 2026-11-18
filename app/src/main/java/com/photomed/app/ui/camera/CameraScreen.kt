@@ -8,11 +8,15 @@ import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ModalBottomSheet
+import com.photomed.app.ui.components.SafeBottomSheet
 import androidx.compose.material3.Switch
+import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.semantics.Role
 import com.photomed.app.align.LiveMatch
+import com.photomed.app.align.ZoomController
+import kotlin.coroutines.resume
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.hardware.camera2.CameraCharacteristics
@@ -158,7 +162,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.resume
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.sqrt
@@ -237,10 +240,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     var focalNorm by remember { mutableStateOf<Float?>(null) }
     val tilt = rememberTilt(true)
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
-    val matcher = remember(zone) { LiveMatcher(zone) }
+    var engine by remember { mutableStateOf(com.photomed.app.align.FaceEngine.get(context)) }
+    val matcher = remember(zone, engine) { LiveMatcher(zone, context.applicationContext, engine) }
     matcher.threshold = threshold
     val lastAnalysis = remember { AtomicLong(0L) }
-    val matchingEnabled = liveMatch && showGhost && ghost != null
+    // Asistencia en vivo: con referencia (foto superpuesta) iguala el encuadre; sin ella, estandariza la toma.
+    val matchingEnabled = liveMatch
+    val referenceMode = showGhost && ghost != null
+    matcher.useReference = referenceMode
     val matchingFlag = remember { AtomicBoolean(false) }
     matchingFlag.set(matchingEnabled)
     DisposableEffect(matcher) {
@@ -248,8 +255,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     }
     DisposableEffect(Unit) { onDispose { analysisExecutor.shutdown() } }
 
-    // Referencia para la coincidencia en vivo: la foto superpuesta (encuadre 3:4).
-    LaunchedEffect(ghost?.key) {
+    // Referencia para la coincidencia en vivo: la foto superpuesta (encuadre 3:4), con el motor elegido.
+    LaunchedEffect(ghost?.key, matcher) {
         val g = ghost ?: return@LaunchedEffect
         live = null
         val bmp = runCatching { ImageOps.load34(context, g.uri, 360) }.getOrNull() ?: return@LaunchedEffect
@@ -370,6 +377,19 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                                         tilt.value.pitch, lensFacing == CameraSelector.LENS_FACING_FRONT),
                                     roll = tilt.value.roll,
                                     focalNorm = focalNorm,
+                                    conditions = buildMap {
+                                        put("Engine", engine.label)
+                                        put("Zoom", "%.2f".format(java.util.Locale.US, zoomRatio))
+                                        live?.let { f ->
+                                            f.eval.pointFraction?.let { put("MatchPercent", "%.0f".format(java.util.Locale.US, it * 100)) }
+                                            put("Assist", if (f.standard) "estandarización" else "coincidencia con referencia")
+                                            put("Status", f.eval.status.name)
+                                            f.headYaw?.let { put("HeadYaw", "%.1f".format(java.util.Locale.US, it)) }
+                                            CameraGuidance.faceDistanceCm(f.currentPointsAll, focalNorm, zoomRatio)?.let {
+                                                put("DistanceCm", "%.0f".format(java.util.Locale.US, it))
+                                            }
+                                        }
+                                    },
                                 )
                             }.also { temp.delete() }
                         }
@@ -393,28 +413,45 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     }
 
 
-    // Zoom asistido: compensa la diferencia de escala con el zoom de la cámara (lazo cerrado,
-    // amortiguado), para no depender de acercarse con exactitud.
+    // Zoom asistido estable (ZoomController): zona muerta, tendencia sostenida, paso limitado y
+    // espera a que el zoom se aplique y la cámara vuelva a enfocar antes de medir de nuevo.
+    val zoomCtl = remember(lensFacing) { ZoomController() }
+    val pivot = remember(zone) { com.photomed.app.align.ZoneAlignment.of(zone).pivot }
+    fun focusOnPivot(onDone: (Boolean) -> Unit) {
+        val cam = camera ?: return onDone(false)
+        val w = previewView.width.toFloat(); val h = previewView.height.toFloat()
+        if (w <= 0f || h <= 0f) return onDone(false)
+        val point = previewView.meteringPointFactory.createPoint(pivot.x * w, (pivot.y / (4f / 3f)) * h)
+        val f = cam.cameraControl.startFocusAndMetering(
+            FocusMeteringAction.Builder(point).setAutoCancelDuration(4, java.util.concurrent.TimeUnit.SECONDS).build())
+        f.addListener({ onDone(runCatching { f.get().isFocusSuccessful }.getOrDefault(false)) }, ContextCompat.getMainExecutor(context))
+    }
     LaunchedEffect(live, zoomAssist) {
         val e = live?.eval ?: return@LaunchedEffect
         val cam = camera ?: return@LaunchedEffect
         if (!zoomAssist || !matchingEnabled || e.status == MatchStatus.SEARCHING) return@LaunchedEffect
         val zs = cam.cameraInfo.zoomState.value ?: return@LaunchedEffect
-        if (kotlin.math.abs(kotlin.math.ln(e.scale)) < 0.01f) return@LaunchedEffect
-        val target = (zs.zoomRatio * (1f + 0.6f * (e.scale - 1f))).coerceIn(zs.minZoomRatio, minOf(zs.maxZoomRatio, 4f))
-        if (kotlin.math.abs(target - zs.zoomRatio) >= 0.01f) {
-            cam.cameraControl.setZoomRatio(target)
-            zoomRatio = target
-        }
+        val target = zoomCtl.update(e.scale, zs.zoomRatio, System.currentTimeMillis())
+            ?.coerceIn(zs.minZoomRatio, minOf(zs.maxZoomRatio, 4f)) ?: return@LaunchedEffect
+        zoomCtl.focusing = true
+        val zf = cam.cameraControl.setZoomRatio(target)
+        zoomRatio = target
+        zf.addListener({ focusOnPivot { zoomCtl.focusing = false } }, ContextCompat.getMainExecutor(context))
     }
 
-    // Disparo automático: coincidencia sostenida ~0,4 s; una captura por cada coincidencia.
+    // Disparo automático: coincidencia sostenida ~0,4 s, sin zoom/enfoque en curso; enfoca en el
+    // pivote anatómico, espera el resultado y dispara solo si sigue coincidiendo. Una vez por coincidencia.
     LaunchedEffect(status, autoCapture, matchingEnabled) {
         if (status != MatchStatus.MATCH || !matchingEnabled) { autoArmed = true; return@LaunchedEffect }
         if (autoCapture && autoArmed && !capturing) {
             kotlinx.coroutines.delay(400)
+            while (zoomCtl.isSettling(System.currentTimeMillis())) kotlinx.coroutines.delay(100)
+            val focused = kotlinx.coroutines.withTimeoutOrNull(2500) {
+                kotlinx.coroutines.suspendCancellableCoroutine<Boolean> { c -> focusOnPivot { ok -> if (c.isActive) c.resume(ok) } }
+            }
             if (live?.eval?.status == MatchStatus.MATCH && !capturing) {
                 autoArmed = false
+                if (focused == false) snackbar.showSnackbar("Enfoque no confirmado: se tomó la foto igualmente")
                 capture()
             }
         }
@@ -528,7 +565,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             LayerToggle("Contorno", Icons.Default.Face, showContour) { showContour = it }
             LayerToggle("Superponer", Icons.Default.Layers, showGhost, enabled = photos.isNotEmpty()) { showGhost = it }
             LayerToggle("Nivel", Icons.Default.Straighten, showLevel) { showLevel = it }
-            LayerToggle("Coincidir", Icons.Default.CenterFocusStrong, liveMatch, enabled = photos.isNotEmpty()) { liveMatch = it }
+            LayerToggle("Asistir", Icons.Default.CenterFocusStrong, liveMatch) { liveMatch = it }
             LayerToggle("Espejo", Icons.Default.Flip, mirrorOn, enabled = lensFacing == CameraSelector.LENS_FACING_FRONT) {
                 mirrorOn = it; prefs.edit().putBoolean("mirror_front", it).apply()
             }
@@ -600,6 +637,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
         MatchSettingsSheet(
             autoCapture = autoCapture,
             threshold = threshold,
+            engine = engine,
+            onEngine = { engine = it; com.photomed.app.align.FaceEngine.set(context, it) },
             zoomAssist = zoomAssist,
             onZoomAssist = {
                 zoomAssist = it; prefs.edit().putBoolean("zoom_assist", it).apply()
@@ -646,12 +685,14 @@ fun MatchSettingsSheet(
     threshold: Float,
     zoomAssist: Boolean,
     onZoomAssist: (Boolean) -> Unit,
+    engine: com.photomed.app.align.FaceEngine = com.photomed.app.align.FaceEngine.ML_KIT,
+    onEngine: (com.photomed.app.align.FaceEngine) -> Unit = {},
     onAutoCapture: (Boolean) -> Unit,
     onThreshold: (Float) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        MatchSettingsContent(autoCapture, threshold, onAutoCapture, onThreshold, zoomAssist, onZoomAssist)
+    SafeBottomSheet(onDismiss = onDismiss) {
+        MatchSettingsContent(autoCapture, threshold, onAutoCapture, onThreshold, zoomAssist, onZoomAssist, engine, onEngine)
     }
 }
 
@@ -659,6 +700,8 @@ fun MatchSettingsSheet(
 fun MatchSettingsContent(
     autoCapture: Boolean, threshold: Float, onAutoCapture: (Boolean) -> Unit, onThreshold: (Float) -> Unit,
     zoomAssist: Boolean = true, onZoomAssist: (Boolean) -> Unit = {},
+    engine: com.photomed.app.align.FaceEngine = com.photomed.app.align.FaceEngine.ML_KIT,
+    onEngine: (com.photomed.app.align.FaceEngine) -> Unit = {},
 ) {
     Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Coincidencia con la referencia", style = MaterialTheme.typography.titleLarge)
@@ -684,10 +727,23 @@ fun MatchSettingsContent(
             }
             Switch(checked = zoomAssist, onCheckedChange = null)
         }
+        Text("Motor de puntos faciales", style = MaterialTheme.typography.bodyLarge)
+        com.photomed.app.align.FaceEngine.entries.forEach { e ->
+            Row(
+                Modifier.fillMaxWidth().selectable(engine == e, role = Role.RadioButton) { onEngine(e) }.padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = engine == e, onClick = null)
+                Column(Modifier.padding(start = 8.dp)) {
+                    Text(e.label, style = MaterialTheme.typography.bodyMedium)
+                    Text(e.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
         Text("Umbral mínimo de puntos coincidentes: ${(threshold * 100).toInt()} %", style = MaterialTheme.typography.bodyLarge)
         Slider(
             value = threshold * 100, onValueChange = { onThreshold((it.toInt()) / 100f) },
-            valueRange = 80f..100f, steps = 19,
+            valueRange = 50f..100f, steps = 49,
             modifier = Modifier.semantics { contentDescription = "Umbral de puntos coincidentes" },
         )
         Text("Un punto coincide si está a menos del 3 % del ancho de su posición en la foto de referencia. " +
