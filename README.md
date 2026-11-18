@@ -11,7 +11,8 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
 ### Captura por zonas
 - 21 zonas estandarizadas (9 faciales, 12 corporales, incluidas manos y pies) con **contornos anatómicos ilustrados** y
   **líneas de referencia** (tercios faciales, Frankfort, línea media, ombligo, pliegues…) —
-  ver [docs/CONTORNOS.md](docs/CONTORNOS.md).
+  ver [docs/CONTORNOS.md](docs/CONTORNOS.md). Ilustraciones base: *Open Pain Illustration*
+  (Digital Health Zurich, CC BY 4.0).
 - **Superposición de la foto anterior** con opacidad ajustable, cuadrícula, **nivel** (inclinación y
   cabeceo), toque para enfocar, flash y cámara frontal/trasera. Encuadre 3:4 idéntico en vista previa y captura.
 

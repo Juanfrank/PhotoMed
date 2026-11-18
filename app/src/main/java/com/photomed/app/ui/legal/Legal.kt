@@ -129,6 +129,18 @@ fun AboutScreen(onBack: () -> Unit, onDoc: (LegalDoc) -> Unit) {
                 leadingContent = { Icon(Icons.Outlined.Palette, null) },
             )
             ListItem(
+                overlineContent = { Text("Ilustraciones anatómicas") },
+                headlineContent = { Text("Open Pain Illustration — Digital Health Zurich (CC BY 4.0)") },
+                supportingContent = {
+                    Text("Universidad de Zúrich; JMIR Med Inform 2026;e75737. Adaptadas: recorte por zona, " +
+                        "extracción y recoloreado de trazos; vistas oblicua 45° y lateral derivadas.")
+                },
+                leadingContent = { Icon(Icons.Outlined.Palette, null) },
+                modifier = Modifier.clickableItem {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://creativecommons.org/licenses/by/4.0/")))
+                },
+            )
+            ListItem(
                 overlineContent = { Text("Componentes de terceros") },
                 headlineContent = { Text("AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), Google ML Kit (Términos de ML Kit)") },
             )

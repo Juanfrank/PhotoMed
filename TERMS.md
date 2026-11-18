@@ -45,8 +45,10 @@ datos ni a los de sus pacientes, que permanecen en su dispositivo.
 ## 6. Propiedad intelectual
 
 El código de PhotoMed es © 2026 Juan Medina y se licencia bajo **MIT**. Las fotografías y los datos
-que usted genera son suyos o de sus pacientes, según corresponda. Los contornos anatómicos de la
-aplicación son dibujos propios, basados en proporciones anatómicas de uso general. El tema visual
+que usted genera son suyos o de sus pacientes, según corresponda. Los contornos anatómicos se
+derivan de **Open Pain Illustration** (Digital Health Zurich / Universidad de Zúrich), con licencia
+CC BY 4.0 (<https://creativecommons.org/licenses/by/4.0/>), adaptados (recorte, extracción de trazos,
+recoloreado y vistas oblicua y lateral derivadas). El tema visual
 sigue los tokens de Material Design 3 (repositorio Juanfrank/MD, derivados de `@material/web`).
 Los componentes de terceros (AndroidX, Jetpack Compose, CameraX, Coil, Google ML Kit) se rigen por
 sus propias licencias y términos.

@@ -1,9 +1,21 @@
 # Contornos anatómicos de referencia
 
 Las guías de la cámara se generan a partir de ilustraciones anatómicas de línea (rostro de frente,
-perfiles, cuerpo de frente y de espalda, manos y pies) guardadas en `art/source/`, aportadas por el
-autor del proyecto. **Fuente y licencia de estas ilustraciones: pendiente de documentar** (completar
-aquí y en “Acerca de y legal” la atribución que corresponda).
+perfiles, cuerpo de frente y de espalda, manos y pies) guardadas en `art/source/`.
+
+Ilustraciones anatómicas base: **Open Pain Illustration** — Digital Health Zurich (DIZH) / Universidad de Zúrich, licencia [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Descripción: JMIR Medical Informatics 2026;e75737 (doi:10.2196/75737). Cambios: recorte por zona, extracción y recoloreado de trazos; las vistas oblicua 45° y lateral del tronco son derivadas (proyección 3D de las vistas frontal/lateral y reconstrucción a partir de las vistas frontal/posterior).
+
+### Vistas derivadas
+
+- **Oblicuos 45°** (`tools/guides/synth_oblique.py`): modelo 3D simplificado de la cabeza. El
+  semiancho de cada altura sale de la vista frontal y la profundidad (frente, nariz, labios, mentón,
+  nuca) del perfil, alineados por vértice, ojos y mentón. Cada sección es una superelipse; se rota 45°
+  y se proyecta: silueta (mín./máx. de la proyección + nariz), rasgos frontales escorzados y ocultos
+  cuando la superficie deja de mirar a la cámara, oreja cercana tomada del perfil y dorso nasal.
+- **Abdomen lateral** (`tools/guides/synth_side.py`): alturas de las referencias y anchos del tronco
+  medidos en las vistas frontal y posterior; profundidad anteroposterior por proporciones
+  antropométricas (≈ 0,7 del ancho en tórax y cintura, ≈ 0,85 en caderas), con mama, pliegue
+  inframamario, ombligo, lordosis lumbar, glúteo y pliegue glúteo.
 
 `tools/guides/build_guides.py` recorta cada zona en 3:4, extrae los trazos negros, los esqueletiza y
 los vuelve a engrosar de forma uniforme, y los colorea (trazo cian con halo oscuro) en
@@ -20,8 +32,8 @@ con las líneas y marcas de referencia, definidas sobre la anatomía de la ilust
 | Espalda · Glúteos · Brazos | cuerpo de espalda | línea media, C7, escápulas, crestas ilíacas, pliegue interglúteo y glúteo, codo |
 | Manos (dorso, palma) · Pies (dorso, planta) | manos y pies | línea media |
 
-Los oblicuos 45° y el abdomen lateral aún usan el contorno vectorial propio (no hay ilustración de
-esas vistas); se dibujan con el mismo grosor y color para mantener la coherencia.
+| Oblicuos 45° | derivada de frontal + perfil | cejas, línea pupilar, base nasal, vertical por la punta nasal, pupilas |
+| Abdomen lateral | derivada de frente + espalda | eje acromion–trocánter, ombligo, pliegue glúteo |
 
 ![Guías](../app/src/test/snapshots/images/com.photomed.app_GuideScreenshotTest_allGuides.png)
 

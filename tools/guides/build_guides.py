@@ -31,6 +31,14 @@ def auto(name, pad=0.04):
     h = max(h, w * 4 / 3)
     return ((x0 + x1) / 2, (y0 + y1) / 2, h)
 
+import json, subprocess, sys
+# Vistas derivadas: oblicuo 45° (de frontal + perfil) y lateral del tronco (de frente + espalda)
+for script in ("synth_oblique.py", "synth_side.py"):
+    subprocess.run([sys.executable, str(pathlib.Path(__file__).with_name(script))], check=True, stdout=subprocess.DEVNULL)
+OB = json.loads((SRC / "face_oblique.json").read_text())
+OW = OB["width"]
+SIDE_AX = 640
+
 # zona: (fuente, (cx, cy, alto) en px de la fuente, refs)
 # refs: ("h", y, x0, x1) | ("v", x, y0, y1) | ("m", x, y)  — en px de la fuente; None = todo el ancho/alto
 Z = {
@@ -40,6 +48,14 @@ Z = {
  "tercio_superior": ("face_front", (718, 610, 1100), [("v", 718, None, None), ("h", 770, None, None)]),
  "periocular": ("face_front", (716, 903, 1200), [("v", 716, None, None), ("h", 903, None, None), ("m", 483, 903), ("m", 949, 903)]),
  "labios": ("face_front", (722, 1430, 693), [("v", 722, None, None), ("h", 1430, None, None)]),
+ "rostro_oblicuo_der": ("face_oblique_right", (OW / 2, 948, OW * 4 / 3), [
+    ("h", 770, None, None), ("h", 903, None, None), ("h", 1250, None, None),
+    ("v", OB["nose_x"], 640, 1560), ("m", OB["pupil_r"], 903), ("m", OB["pupil_l"], 903)]),
+ "rostro_oblicuo_izq": ("face_oblique_left", (OW / 2, 948, OW * 4 / 3), [
+    ("h", 770, None, None), ("h", 903, None, None), ("h", 1250, None, None),
+    ("v", OW - OB["nose_x"], 640, 1560), ("m", OW - OB["pupil_r"], 903), ("m", OW - OB["pupil_l"], 903)]),
+ "abdomen_lateral": ("body_side", (680, 1180, 1120), [
+    ("v", SIDE_AX, 660, 1640), ("h", 1221, 420, 940), ("h", 1628, 380, 900), ("m", SIDE_AX + 168, 1221)]),
  "rostro_perfil_der": ("face_profiles", (867, 1050, 1600), [
     ("h", 976, 250, 1550), ("v", 1354, 300, 1800), ("m", 802, 1004), ("m", 1275, 948)]),
  "rostro_perfil_izq": ("face_profiles", (3240 - 867, 1050, 1600), [
