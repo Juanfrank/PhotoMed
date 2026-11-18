@@ -5,6 +5,15 @@ perfiles, cuerpo de frente y de espalda, manos y pies) guardadas en `art/source/
 
 Ilustraciones anatómicas base: **Open Pain Illustration** — Digital Health Zurich (DIZH) / Universidad de Zúrich, licencia [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Descripción: JMIR Medical Informatics 2026;e75737 (doi:10.2196/75737). Cambios: recorte por zona, extracción y recoloreado de trazos; las vistas oblicua 45° y lateral del tronco son derivadas (proyección 3D de las vistas frontal/lateral y reconstrucción a partir de las vistas frontal/posterior).
 
+### Guía adaptada a la foto de referencia
+
+Con una foto de referencia, la guía se ajusta a su anatomía (`GuideWarp`): las anclas de la
+ilustración (cejas, pupilas, base nasal, boca, mentón; hombros, codos, caderas, rodillas) se llevan a
+la posición detectada por ML Kit (deformación vertical por tramos + escala horizontal por la
+distancia interpupilar u hombros) y las líneas de referencia se colocan a la altura de cada rasgo.
+
+![Guía adaptada](referencias/guia_adaptada.png)
+
 ### Vistas derivadas
 
 - **Oblicuos 45°** (`tools/guides/synth_oblique.py`): modelo 3D simplificado de la cabeza. El

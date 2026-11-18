@@ -20,21 +20,27 @@ data class MatchEval(
     val threshold: Float = LiveMatch.DEFAULT_THRESHOLD,
     /** Diferencia de perspectiva vertical estimada por proporciones (°). */
     val keystoneDeg: Float = 0f,
+    /** Desplazamiento que necesita el contenido (fracción del ancho) y escala necesaria. */
+    val dx: Float = 0f,
+    val dy: Float = 0f,
+    val scale: Float = 1f,
+    val headYawDelta: Float = 0f,
+    val headPitchDelta: Float = 0f,
 )
 
 /**
  * Criterios de coincidencia en vivo.
- * - Principal: **porcentaje de puntos coincidentes** ≥ umbral (por defecto 99 %); un punto coincide
- *   si está a ≤ [POINT_TOLERANCE] del ancho de su posición en la referencia.
+ * - Principal: **porcentaje de puntos coincidentes** ≥ umbral (por defecto 80 %); un punto coincide
+ *   si está a ≤ [POINT_TOLERANCE] (3 %) del ancho de su posición en la referencia; umbral por defecto 80 %.
  * - Indicaciones: de la semejanza [t] (actual → referencia) medida en el pivote anatómico y de la
  *   perspectiva vertical estimada por proporciones de contornos.
  */
 object LiveMatch {
-    const val DEFAULT_THRESHOLD = 0.99f
-    const val POINT_TOLERANCE = 0.015f
-    const val MATCH_OFFSET = 0.02f
-    const val MATCH_SCALE = 0.03f
-    const val MATCH_ROT = 2f
+    const val DEFAULT_THRESHOLD = 0.80f
+    const val POINT_TOLERANCE = 0.03f
+    const val MATCH_OFFSET = 0.03f
+    const val MATCH_SCALE = 0.04f
+    const val MATCH_ROT = 3f
     const val CLOSE_FACTOR = 2.5f
     const val KEYSTONE_HINT = 1.5f
 
@@ -45,6 +51,10 @@ object LiveMatch {
         pointFraction: Float? = null,
         threshold: Float = DEFAULT_THRESHOLD,
         keystoneDeg: Float = 0f,
+        headYawDelta: Float = 0f,
+        headPitchDelta: Float = 0f,
+        /** Exigir también geometría y pose (no solo el % de puntos). */
+        gate: Boolean = false,
     ): MatchEval {
         if (t == null && pointFraction == null) {
             return MatchEval(MatchStatus.SEARCHING, 0f, listOf("Buscando referencias anatómicas…"), threshold = threshold)
@@ -57,10 +67,11 @@ object LiveMatch {
         val k = if (wasMatched) 1.3f else 1f
         val norm = maxOf(off / MATCH_OFFSET, se / MATCH_SCALE, rd / MATCH_ROT)
         val status = if (pointFraction != null) {
-            // histéresis: una vez alineado, tolera 2 puntos porcentuales menos
-            val thr = if (wasMatched) threshold - 0.02f else threshold
+            // histéresis: una vez alineado, tolera 3 puntos porcentuales menos
+            val thr = if (wasMatched) threshold - 0.03f else threshold
+            val geomOk = !gate || (norm <= k && LiveDecision.poseOk(headYawDelta, headPitchDelta))
             when {
-                pointFraction >= thr -> MatchStatus.MATCH
+                pointFraction >= thr && geomOk -> MatchStatus.MATCH
                 pointFraction >= threshold - 0.25f || norm <= CLOSE_FACTOR -> MatchStatus.CLOSE
                 else -> MatchStatus.FAR
             }
@@ -76,12 +87,17 @@ object LiveMatch {
             if (se > MATCH_SCALE * 0.7f) hints += if (tt.scale > 1f) "Acérquese" else "Aléjese"
             if (rd > MATCH_ROT * 0.7f) hints += if (tt.rotationDegrees > 0) "Gire la cámara ↺" else "Gire la cámara ↻"
         }
+        if (status != MatchStatus.MATCH && abs(headYawDelta) > LiveDecision.POSE_MAX)
+            hints += "Corrija el giro de la cabeza (%.0f°)".format(headYawDelta)
+        if (status != MatchStatus.MATCH && abs(headPitchDelta) > LiveDecision.POSE_MAX)
+            hints += "Corrija la inclinación de la cabeza / barbilla (%.0f°)".format(headPitchDelta)
         // keystoneDeg > 0: el cuadro actual necesita "nivelar" una cámara elevada → inclinarla hacia abajo
         if (status != MatchStatus.MATCH && abs(keystoneDeg) >= KEYSTONE_HINT) {
             hints += if (keystoneDeg > 0) "Incline la cámara hacia abajo" else "Incline la cámara hacia arriba"
         }
         val quality = pointFraction ?: (1f - (norm - 1f) / (CLOSE_FACTOR * 2f)).coerceIn(0f, 1f).let { if (norm <= 1f) 1f else it }
-        return MatchEval(status, quality, hints, off, se, tt.rotationDegrees, pointFraction, threshold, keystoneDeg)
+        return MatchEval(status, quality, hints, off, se, tt.rotationDegrees, pointFraction, threshold, keystoneDeg,
+            d.x, d.y, tt.scale, headYawDelta, headPitchDelta)
     }
 
     /** Fracción de pares (referencia, actual) a ≤ [tol] de distancia (posiciones sin transformar). */

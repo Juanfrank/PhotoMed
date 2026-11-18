@@ -64,11 +64,6 @@ class ScreensScreenshotTest {
     }
 
     @Test
-    fun manualAlign() = shot("manual_align", dark = true) {
-        com.photomed.app.ui.compare.ManualAlignContent(com.photomed.app.data.Zone.FACE_FRONTAL, null, null, {}, { _, _ -> })
-    }
-
-    @Test
     fun matchSettings() = shot("match_settings", dark = true) {
         androidx.compose.material3.Surface {
             com.photomed.app.ui.camera.MatchSettingsContent(autoCapture = true, threshold = 0.99f, onAutoCapture = {}, onThreshold = {})

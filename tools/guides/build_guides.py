@@ -80,6 +80,21 @@ Z = {
  "pies_planta": ("feet_plantar", None, [("v", "c", None, None)]),
 }
 
+# Anclas anatómicas (px de la fuente) para adaptar la guía a la foto de referencia.
+FACE_A = {"cejas": 770, "pupilas": 903, "base nasal": 1250, "boca": 1430, "mentón": 1740,
+          "x:pupila_der": 483, "x:pupila_izq": 949, "x:centro": 718}
+OBL_A = {"cejas": 770, "pupilas": 903, "base nasal": 1250, "boca": 1430}
+PROF_A = {"cejas": 761, "pupilas": 870, "base nasal": 1166}
+BODY_F = {"hombros": 640, "caderas": 1470, "rodillas": 2061, "x:centro": 710, "x:hombro_der": 400, "x:hombro_izq": 1023}
+BODY_B = {"hombros": 640, "caderas": 1470, "rodillas": 2139, "codos": 1108, "x:centro": 659, "x:hombro_der": 972, "x:hombro_izq": 349}
+ANCHORS = {
+    "rostro_frontal": FACE_A, "tercio_superior": FACE_A, "periocular": FACE_A, "labios": FACE_A,
+    "rostro_oblicuo_der": OBL_A, "rostro_oblicuo_izq": OBL_A,
+    "rostro_perfil_der": PROF_A, "rostro_perfil_izq": PROF_A,
+    "cuello": BODY_F, "abdomen_frontal": BODY_F, "torax_mamas": BODY_F, "muslos": BODY_F,
+    "espalda": BODY_B, "gluteos": BODY_B, "brazo_der": BODY_B, "brazo_izq": BODY_B,
+}
+
 def render(src, crop):
     im = Image.open(SRC / f"{src}.png").convert("L")
     cx, cy, h = crop if crop else auto(src)
@@ -122,7 +137,9 @@ kt = ["// ARCHIVO GENERADO por tools/guides/build_guides.py — no editar a mano
       "package com.photomed.app.ui.camera", "",
       "import androidx.compose.ui.geometry.Offset", "import com.photomed.app.R", "",
       "/** Ilustración de la guía (trazo ya coloreado) y referencias en coordenadas normalizadas del encuadre 3:4. */",
-      "class GuideArt(val drawable: Int, val lines: List<Pair<Offset, Offset>>, val marks: List<Offset>)", "",
+      "class GuideArt(val drawable: Int, val lines: List<Pair<Offset, Offset>>, val marks: List<Offset>,",
+      "    /** Anclas anatómicas: nombre → y (o x si empieza por \"x:\") en coordenadas normalizadas del encuadre. */",
+      "    val anchors: Map<String, Float> = emptyMap())", "",
       "val GuideArtByZone: Map<String, GuideArt> = mapOf("]
 previews = []
 for zone, (src, crop, refs) in Z.items():
@@ -136,7 +153,17 @@ for zone, (src, crop, refs) in Z.items():
     marks = [f"Offset({f(r[1])}, {f(r[2])})" for r in n if r[0] == "m"]
     kt.append(f'    "{zone}" to GuideArt(R.drawable.{name},')
     kt.append(f"        listOf({', '.join(lines)}),")
-    kt.append(f"        listOf({', '.join(marks)})),")
+    anc = ANCHORS.get(zone, {})
+    x0, y0, fw, fh = frame
+    items = []
+    for name, v in anc.items():
+        if name.startswith("x:"):
+            xx = (OW - v if zone.endswith("_izq") and src.startswith("face_oblique") else v)
+            items.append(f'"{name}" to {(xx - x0) / fw:.4f}f')
+        else:
+            items.append(f'"{name}" to {(v - y0) / fh:.4f}f')
+    kt.append(f"        listOf({', '.join(marks)}),")
+    kt.append(f"        mapOf({', '.join(items)})),")
     # vista previa
     tinted = img.copy(); a = np.array(tinted); white = a[..., 0] > 128; a[white, 0:3] = (0x7C, 0xF5, 0xE4)
     tinted = Image.fromarray(a, "RGBA")

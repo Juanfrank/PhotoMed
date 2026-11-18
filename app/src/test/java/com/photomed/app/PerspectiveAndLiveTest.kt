@@ -70,7 +70,7 @@ class PerspectiveAndLiveTest {
         assertEquals(listOf("Acérquese"), closer.hints)
 
         // histéresis: un error un poco mayor que el umbral mantiene la coincidencia si ya coincidía
-        val edge = Similarity(tx = 0.023f)
+        val edge = Similarity(tx = 0.034f)
         assertEquals(MatchStatus.CLOSE, LiveMatch.evaluate(edge, pivot, wasMatched = false).status)
         assertEquals(MatchStatus.MATCH, LiveMatch.evaluate(edge, pivot, wasMatched = true).status)
     }
@@ -79,21 +79,28 @@ class PerspectiveAndLiveTest {
     fun pointThresholdDecidesMatch() {
         val pivot = Pt(0.5f, 0.66f)
         val ref = (0 until 100).map { Pt(0.2f + (it % 10) * 0.06f, 0.3f + (it / 10) * 0.08f) }
-        // 99 de 100 puntos en su sitio, uno desplazado 5 %
-        val cur99 = ref.mapIndexed { i, p -> if (i == 0) Pt(p.x + 0.05f, p.y) else Pt(p.x + 0.004f, p.y) }
-        val f99 = LiveMatch.pointFraction(ref, cur99)
-        assertEquals(0.99f, f99, 1e-6f)
-        assertEquals(MatchStatus.MATCH, LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = f99).status)
-        // 98 %: con el umbral por defecto (99 %) aún no coincide; con 95 % sí
-        assertEquals(MatchStatus.CLOSE, LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.98f).status)
-        assertEquals(MatchStatus.MATCH, LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.98f, threshold = 0.95f).status)
-        // histéresis: si ya coincidía, 97,5 % la mantiene
-        assertEquals(MatchStatus.MATCH, LiveMatch.evaluate(Similarity.IDENTITY, pivot, wasMatched = true, pointFraction = 0.975f).status)
+        // tolerancia por punto 3 %: un desplazamiento de 2,5 % sigue contando
+        val cur = ref.mapIndexed { i, p -> if (i < 15) Pt(p.x + 0.05f, p.y) else Pt(p.x + 0.025f, p.y) }
+        val f = LiveMatch.pointFraction(ref, cur)
+        assertEquals(0.85f, f, 1e-6f)
+        assertEquals(0.80f, LiveMatch.DEFAULT_THRESHOLD)
+        assertEquals(MatchStatus.MATCH, LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = f).status)
+        // 78 %: con el umbral por defecto (80 %) aún no coincide; con 75 % sí
+        assertEquals(MatchStatus.CLOSE, LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.78f).status)
+        assertEquals(MatchStatus.MATCH, LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.78f, threshold = 0.75f).status)
+        // histéresis: si ya coincidía, 77,5 % la mantiene
+        assertEquals(MatchStatus.MATCH, LiveMatch.evaluate(Similarity.IDENTITY, pivot, wasMatched = true, pointFraction = 0.775f).status)
         assertEquals(MatchStatus.FAR, LiveMatch.evaluate(Similarity(tx = 0.2f), pivot, pointFraction = 0.4f).status)
+        // con la condición geométrica: muchos puntos "cerca" pero escala 8 % distinta → no coincide
+        val zoomed = Similarity(1.08f, 0f, 0.5f * (1 - 1.08f), 0.66f * (1 - 1.08f))
+        assertEquals(MatchStatus.CLOSE, LiveMatch.evaluate(zoomed, pivot, pointFraction = 0.95f, gate = true).status)
+        assertEquals(MatchStatus.MATCH, LiveMatch.evaluate(zoomed, pivot, pointFraction = 0.95f, gate = false).status)
+        // pose de la cabeza distinta → no coincide
+        assertEquals(MatchStatus.CLOSE, LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.95f, headYawDelta = 9f, gate = true).status)
         // perspectiva vertical: indicación de inclinación
-        val tilt = LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.9f, keystoneDeg = 4f)
+        val tilt = LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.6f, keystoneDeg = 4f)
         assertTrue(tilt.hints.contains("Incline la cámara hacia abajo"))
-        assertTrue(LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.9f, keystoneDeg = -4f)
+        assertTrue(LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.6f, keystoneDeg = -4f)
             .hints.contains("Incline la cámara hacia arriba"))
     }
 

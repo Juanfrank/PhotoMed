@@ -19,6 +19,11 @@ import java.io.Closeable
  * de contorno: óvalo, cejas, ojos, labios, nariz) o pose corporal (33 puntos). Coordenadas
  * normalizadas por el ancho. Llamadas bloqueantes: usar fuera del hilo principal.
  */
+/** Puntos detectados + pose de la cabeza (Euler, °) si es un rostro. */
+data class Detection(val points: Map<String, Pt>, val yaw: Float? = null, val pitch: Float? = null, val roll: Float? = null) {
+    companion object { val EMPTY = Detection(emptyMap()) }
+}
+
 class LandmarkDetector(stream: Boolean) : Closeable {
     private val face: FaceDetector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
@@ -34,19 +39,21 @@ class LandmarkDetector(stream: Boolean) : Closeable {
             .build()
     )
 
-    fun detect(detector: Detector, bmp: Bitmap): Map<String, Pt> = try {
+    fun detect(detector: Detector, bmp: Bitmap): Map<String, Pt> = detectFull(detector, bmp).points
+
+    fun detectFull(detector: Detector, bmp: Bitmap): Detection = try {
         when (detector) {
             Detector.FACE -> detectFace(bmp)
-            Detector.POSE -> detectPose(bmp)
-            Detector.NONE -> emptyMap()
+            Detector.POSE -> Detection(detectPose(bmp))
+            Detector.NONE -> Detection.EMPTY
         }
     } catch (e: Exception) {
-        emptyMap()
+        Detection.EMPTY
     }
 
-    private fun detectFace(bmp: Bitmap): Map<String, Pt> {
+    private fun detectFace(bmp: Bitmap): Detection {
         val faces = Tasks.await(face.process(InputImage.fromBitmap(bmp, 0)))
-        val f = faces.maxByOrNull { it.boundingBox.width() * it.boundingBox.height() } ?: return emptyMap()
+        val f = faces.maxByOrNull { it.boundingBox.width() * it.boundingBox.height() } ?: return Detection.EMPTY
         val w = bmp.width.toFloat()
         val out = mutableMapOf<String, Pt>()
         mapOf(
@@ -66,7 +73,7 @@ class LandmarkDetector(stream: Boolean) : Closeable {
         ).forEach { (type, prefix) ->
             f.getContour(type)?.points?.forEachIndexed { i, p -> out["$prefix$i"] = Pt(p.x / w, p.y / w) }
         }
-        return out
+        return Detection(out, f.headEulerAngleY, f.headEulerAngleX, f.headEulerAngleZ)
     }
 
     private fun detectPose(bmp: Bitmap): Map<String, Pt> {

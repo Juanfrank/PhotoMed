@@ -51,25 +51,16 @@ class Aligner(private val context: Context) {
                 if (lm != null) "Puntos anatómicos + contornos" else "Contornos anatómicos", phi, src)
         }
 
-    /** Alineación con dos puntos marcados por el usuario en cada foto (y perspectiva por proporciones). */
-    suspend fun manual(zone: Zone, before: Uri, after: Uri, beforePts: List<Pt>, afterPts: List<Pt>,
-                       manualKeystone: Float? = null): AlignmentResult = withContext(Dispatchers.Default) {
-        val spec = ZoneAlignment.of(zone)
-        val b = ImageOps.load34(context, before, DETECT_W)
-        val a0 = ImageOps.load34(context, after, DETECT_W)
-        val (phi, src) = manualKeystone?.let { it to "manual" } ?: run {
-            val (bp, ap) = LandmarkDetector(stream = false).use { it.detect(spec.detector, b) to it.detect(spec.detector, a0) }
-            estimateKeystone(spec, b, a0, bp, ap)
-        }
-        val a = ImageOps.correctPerspective(a0, phi, Perspective.DEFAULT_FOCAL)
-        val t = Similarity.estimate(afterPts.map { Perspective.mapPt(it, phi) }, beforePts) ?: Similarity.IDENTITY
-        refine(spec, b, a, t, emptyList(), "Puntos manuales + contornos", phi, src)
-    }
-
     /** Medición de contornos para una foto (óvalo facial si hay rostro, si no la silueta del sujeto). */
     suspend fun autoMask(zone: Zone, uri: Uri, width: Int = MEASURE_W): Pair<Bitmap, Mask?> = withContext(Dispatchers.Default) {
         val bmp = ImageOps.load34(context, uri, width)
         bmp to autoMask(ZoneAlignment.of(zone), bmp)
+    }
+
+    /** Región de piel para igualar color: óvalo facial reducido (sin pelo ni fondo) o centro de la silueta. */
+    suspend fun skinMask(zone: Zone, bmp: Bitmap): BooleanArray? = withContext(Dispatchers.Default) {
+        val m = autoMask(ZoneAlignment.of(zone), bmp) ?: return@withContext null
+        MaskOps.erode(m, (bmp.width * 0.06f).toInt().coerceAtLeast(2)).data.takeIf { d -> d.count { it } > 50 }
     }
 
     private fun autoMask(spec: ZoneAlignment, bmp: Bitmap): Mask? {

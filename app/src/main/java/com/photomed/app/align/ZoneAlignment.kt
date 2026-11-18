@@ -10,7 +10,6 @@ enum class Detector { FACE, POSE, NONE }
  * - [detector] y [landmarks]: puntos anatómicos automáticos (claves de [Landmarks]).
  * - [contours]: regiones anatómicas cuyos contornos se hacen coincidir (mandíbula, frente,
  *   orejas, caderas, falanges…), en coordenadas normalizadas del encuadre 3:4 (x ∈ [0,1], y ∈ [0,4/3]).
- * - [manual]: los dos puntos que el usuario marca en el modo manual.
  */
 data class ZoneAlignment(
     val detector: Detector,

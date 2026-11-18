@@ -95,35 +95,50 @@ Optimización: búsqueda exhaustiva gruesa (desplazamiento ±18 %, escala ±16 %
 no hay puntos, o ventana estrecha alrededor de la estimación anatómica; descenso por coordenadas de
 grueso a fino escalando alrededor del centroide de las regiones.
 
-### 4. Alternativa manual
-
-Menú ⋮ → “Alinear manualmente”: dos puntos propios de la zona en cada foto (pupilas, tragus y punta
-nasal, comisuras, pezones, rodillas, puntas de los dedos…), afinados después por contornos.
-
 ### 5. Coincidencia en vivo en la cámara
 
 Con una foto de referencia superpuesta y la capa **Coincidir** activa, `LiveMatcher` analiza ~5
-cuadros por segundo (ImageAnalysis en el mismo encuadre 3:4):
+cuadros por segundo (ImageAnalysis en el mismo encuadre 3:4). La decisión (`LiveDecision`) exige:
 
-- **Porcentaje de puntos coincidentes**: con puntos anatómicos, fracción de los puntos de la
-  referencia que están a ≤ 1,5 % del ancho de su posición en el cuadro actual; sin puntos, fracción
-  de los 300 puntos de contorno más fuertes de la referencia (dentro de las regiones anatómicas)
-  que encuentran borde en el cuadro actual a esa distancia.
-- **Umbral mínimo** configurable (⚙ en la cámara): 80–100 %, **por defecto 99 %**; histéresis de 2
-  puntos porcentuales para no parpadear.
+1. **% de puntos coincidentes ≥ umbral** (configurable, **80 % por defecto**): un punto coincide si
+   está a ≤ **3 %** del ancho de su posición en la referencia;
+2. **geometría**: desplazamiento del pivote anatómico ≤ 3 %, escala ≤ 4 %, giro ≤ 3°;
+3. **pose de la cabeza** (rostro): |Δ guiñada| y |Δ cabeceo| ≤ 6° (ángulos de Euler de ML Kit);
+4. **paciente presente**: si la zona usa detector y la referencia tiene puntos, un cuadro sin
+   puntos **nunca** coincide (antes, apuntar al piso podía coincidir por bordes).
 
-| Estado | Criterio | Guía |
+Zonas o referencias sin puntos anatómicos: `ContourMatch` compara los 300 bordes más fuertes de la
+referencia (en las regiones anatómicas) exigiendo **misma orientación** (±20°) y descuenta el azar
+(tasa de aciertos con los puntos desplazados lejos), que es alta en superficies muy texturizadas.
+
+#### Evaluación con imágenes reales (`FaceMatchingRealImagesTest`, `tools/eval`)
+
+Rostros reales de LFW (Labeled Faces in the Wild; puntos con MediaPipe agrupados como ML Kit),
+40 fotos de stock aleatorias (Unsplash) y 12 texturas/escenas reales (piso, ladrillo, césped, grava…):
+
+| Caso | Solo % de puntos | Regla final |
 |---|---|---|
-| Coincide | puntos coincidentes ≥ umbral | verde + vibración |
-| Casi | ≥ umbral − 25 pp, o desviación ≤ 2,5 × (2 %, 3 %, 2°) | ámbar |
-| Lejos / buscando | resto | cian |
+| Retoma (temblor ≤ 1 %, escala ≤ 1,5 %, ≤ 1°, brillo y ruido; detección repetida) | 100 % | **100 %** coincide |
+| Desalineación moderada (3,5 % / 5 % / 3°) | 48 % | 8 % (límite) |
+| Desalineación grande (8 % / 12 % / 6°) | 18 % ✗ | **0 %** |
+| Otra persona con el mismo encuadre | 1,8 % | **0,5 %** |
+| Sin paciente (piso, texturas, escenas) | — | **0 %** (sin rostro) |
+| Contornos: retoma / desplazamiento 8 % / sin paciente | — | 39/40 · 0/40 · **0/2080** |
 
-Indicaciones a partir de la semejanza actual → referencia y de la perspectiva vertical estimada por
-proporciones (“Mueva la cámara a la izquierda”, “Acérquese”, “Gire la cámara ↺”, “Incline la cámara
-hacia abajo”…).
+Distinguir *identidades* por la geometría no es fiable (las distancias de forma de la misma persona y
+de personas distintas se solapan: varían más con la pose y la expresión); y en estética médica la
+forma cambia con el tratamiento. La identidad la garantiza el expediente; la coincidencia mide el
+**encuadre**.
 
-**Disparo automático** (botón AUTO en la barra superior o en ⚙): si la coincidencia se mantiene
-~0,4 s se toma la foto; una sola captura por cada coincidencia (se rearma al perderla).
+#### Asistencia al operador
+
+- Indicaciones **fuera de la imagen** (franja bajo la vista previa) y **flechas en el borde** hacia
+  donde mover el teléfono, calculadas en coordenadas de pantalla según cámara y espejo.
+- El **giro** necesario se dibuja en el nivel (línea objetivo discontinua + ángulo).
+- **Zoom asistido**: lazo cerrado amortiguado que ajusta el zoom de la cámara para igualar la escala
+  de la referencia; con la distancia estimada (interpupilar ≈ 6,3 cm) se recomienda trabajar a
+  ≥ 1 m para evitar el “efecto selfie”.
+- **Disparo automático** tras ~0,4 s de coincidencia, una vez por coincidencia.
 
 ## Resultado
 
@@ -158,3 +173,13 @@ segmentación, y ajuste fino de la tolerancia por punto (1,5 %) con fotos reales
 Limitaciones: la corrección de perspectiva cubre la inclinación vertical, no la distancia ni giros laterales de la cámara;
 ni cambios de postura no rígidos (por ejemplo, un brazo en otra posición). Las guías de la cámara,
 el nivel y la superposición de la foto anterior reducen estas diferencias en el momento de la toma.
+
+### Igualación del color de la piel
+
+Menú ⋮ → “Igualar color de piel” (Reinhard et al., 2001): estadísticos de la piel en CIELAB (región
+automática —óvalo facial reducido o silueta— o un punto de referencia tocado en cada foto) y ajuste
+de “después”: gamma (tonos medios), contraste y brillo (L*), temperatura (b*) y tinte (a*). En la
+prueba con una foto real distorsionada (más oscura, más contraste, luz cálida) la piel pasa de
+ΔE 10,8 a **ΔE 0,4**.
+
+![Igualar color](referencias/igualar_color.png)

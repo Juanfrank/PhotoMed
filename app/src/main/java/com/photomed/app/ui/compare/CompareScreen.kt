@@ -2,6 +2,8 @@ package com.photomed.app.ui.compare
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Palette
+import com.photomed.app.align.ColorAdjust
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material3.ModalBottomSheet
 import com.photomed.app.align.ImageOps
@@ -34,7 +36,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.ZoomOutMap
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -118,12 +119,13 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
     var alignment by remember { mutableStateOf<AlignmentResult?>(null) }
     var useAligned by remember { mutableStateOf(true) }
     var aligning by remember { mutableStateOf(false) }
-    var manual by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     var settings by remember { mutableStateOf(false) }
     var keystoneAuto by remember { mutableStateOf(true) }
     var keystoneManual by remember { mutableFloatStateOf(0f) }
     var measure by remember { mutableStateOf(false) }
+    var colorDialog by remember { mutableStateOf(false) }
+    var colorAdjust by remember { mutableStateOf<ColorAdjust?>(null) }
 
     LaunchedEffect(expId) {
         withContext(Dispatchers.IO) {
@@ -147,7 +149,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
     // Perspectiva vertical de "después": la estimada por proporciones de contornos al alinear.
     val keystone = alignment?.keystoneDeg?.takeIf { useAligned } ?: 0f
     val beforeModel: Any? = pair?.get(0)?.uri
-    val afterModel: Any? = pair?.let { rememberCorrected(it[1].uri, keystone, Perspective.DEFAULT_FOCAL) }
+    val afterModel: Any? = pair?.let { rememberCorrected(it[1].uri, keystone, Perspective.DEFAULT_FOCAL, colorAdjust) }
     val manualK = keystoneManual.takeIf { !keystoneAuto }
 
     fun resetAlignment() { alignment = null; zoom = ZoomState() }
@@ -194,10 +196,10 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(
-                                text = { Text("Alinear manualmente (2 puntos)") },
-                                leadingIcon = { Icon(Icons.Default.TouchApp, null) },
+                                text = { Text(if (colorAdjust == null) "Igualar color de piel" else "Quitar igualación de color") },
+                                leadingIcon = { Icon(Icons.Default.Palette, null) },
                                 enabled = pair != null,
-                                onClick = { menu = false; manual = true },
+                                onClick = { menu = false; if (colorAdjust == null) colorDialog = true else colorAdjust = null },
                             )
                             DropdownMenuItem(
                                 text = { Text("Medir contornos") },
@@ -442,6 +444,13 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
         }
     }
 
+    if (colorDialog && pair != null) {
+        ColorMatchDialog(pair[0], pair[1], onDismiss = { colorDialog = false }, onApply = {
+            colorDialog = false; colorAdjust = it
+            scope.launch { snackbar.showSnackbar("Color igualado: ${it.describe()}") }
+        })
+    }
+
     if (measure && pair != null) {
         ContourMeasureDialog(
             before = pair[0], after = pair[1],
@@ -453,31 +462,30 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit) {
         )
     }
 
-    if (manual && pair != null) {
-        val (b, a) = pair
-        ManualAlignDialog(
-            before = b, after = a,
-            onDismiss = { manual = false },
-            onDone = { bp: List<Pt>, ap: List<Pt> ->
-                manual = false
-                runAlign { bb, aa -> aligner.manual(bb.zone, bb.uri, aa.uri, bp, ap, manualK) }
-            },
-        )
-    }
+
 }
 
 /** Descripción de la estrategia de la zona (para ayudas contextuales). */
 fun alignmentHint(zone: Zone) = ZoneAlignment.of(zone).description
 
-/** Imagen con la perspectiva vertical corregida (o la URI tal cual si no hay corrección). */
+/** Imagen con la perspectiva vertical corregida y el color igualado (o la URI tal cual si no hay cambios). */
 @Composable
-private fun rememberCorrected(uri: android.net.Uri, pitchDeg: Float, focalNorm: Float): Any {
+private fun rememberCorrected(uri: android.net.Uri, pitchDeg: Float, focalNorm: Float, color: ColorAdjust? = null): Any {
     val context = LocalContext.current
     val key = (pitchDeg * 2).roundToInt() / 2f
-    val state = androidx.compose.runtime.produceState<Any>(uri, uri, key, focalNorm) {
-        if (key == 0f) { value = uri; return@produceState }
+    val state = androidx.compose.runtime.produceState<Any>(uri, uri, key, focalNorm, color) {
+        if (key == 0f && color == null) { value = uri; return@produceState }
         value = withContext(Dispatchers.Default) {
-            runCatching { ImageOps.correctPerspective(ImageOps.load34(context, uri, 1080), key, focalNorm) }.getOrNull()
+            runCatching {
+                var bmp = ImageOps.correctPerspective(ImageOps.load34(context, uri, 1080), key, focalNorm)
+                if (color != null) {
+                    val px = IntArray(bmp.width * bmp.height).also { bmp.getPixels(it, 0, bmp.width, 0, 0, bmp.width, bmp.height) }
+                    val out = color.apply(px)
+                    bmp = android.graphics.Bitmap.createBitmap(bmp.width, bmp.height, android.graphics.Bitmap.Config.ARGB_8888)
+                        .apply { setPixels(out, 0, width, 0, 0, width, height) }
+                }
+                bmp
+            }.getOrNull()
         } ?: uri
     }
     return state.value

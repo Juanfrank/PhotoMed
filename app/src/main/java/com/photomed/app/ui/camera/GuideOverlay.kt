@@ -10,6 +10,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.runtime.remember
+import com.photomed.app.align.Pt
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -49,8 +55,40 @@ fun GuideOverlay(
     showGrid: Boolean,
     modifier: Modifier = Modifier,
     tone: GuideTone = GuideTone.NORMAL,
+    /** Puntos detectados en la foto de referencia: si hay, la guía se adapta a ellos. */
+    adaptTo: Map<String, Pt> = emptyMap(),
 ) {
     val art = GuideArtByZone[zone.id]
+    val warp = remember(art, adaptTo) {
+        if (art == null || adaptTo.isEmpty()) null else {
+            val det = GuideWarp.detected(adaptTo)
+            GuideWarp.fit(art.anchors, det)?.let { it to det }
+        }
+    }
+    if (art != null && warp != null) {
+        val (w, det) = warp
+        val bmp = ImageBitmap.imageResource(art.drawable)
+        val filter = ColorFilter.lighting(tone.color, Color.Black)
+        Canvas(modifier) {
+            if (showGrid) drawGrid()
+            if (showContour) {
+                // deformación por franjas horizontales
+                val n = 48
+                for (i in 0 until n) {
+                    val a0 = i / n.toFloat(); val a1 = (i + 1) / n.toFloat()
+                    val y0 = w.y(a0) * size.height; val y1 = w.y(a1) * size.height
+                    if (y1 - y0 < 0.5f) continue
+                    val sy0 = (a0 * bmp.height).toInt(); val sy1 = ((a1 * bmp.height).toInt()).coerceAtMost(bmp.height)
+                    val left = w.x(0f) * size.width; val right = w.x(1f) * size.width
+                    drawImage(bmp, srcOffset = IntOffset(0, sy0), srcSize = IntSize(bmp.width, (sy1 - sy0).coerceAtLeast(1)),
+                        dstOffset = IntOffset(left.toInt(), y0.toInt()), dstSize = IntSize((right - left).toInt(), (y1 - y0).toInt() + 1),
+                        colorFilter = filter)
+                }
+                drawGuide(Guide(emptyList(), art.lines.map { (a, b) -> w.line(a, b, art.anchors, det) }, art.marks.map { w.map(it) }), mirror = false)
+            }
+        }
+        return
+    }
     if (art != null) {
         // Ilustración anatómica (trazo blanco + halo oscuro): el color se aplica aquí,
         // multiplicando (blanco → color de la guía, el halo negro no cambia).

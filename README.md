@@ -13,11 +13,14 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
   **líneas de referencia** (tercios faciales, Frankfort, línea media, ombligo, pliegues…) —
   ver [docs/CONTORNOS.md](docs/CONTORNOS.md). Ilustraciones base: *Open Pain Illustration*
   (Digital Health Zurich, CC BY 4.0).
-- **Superposición de la foto anterior** con opacidad ajustable, cuadrícula, **nivel** (inclinación y
+- **Guía adaptada a la foto de referencia**: el contorno y las líneas (cejas, ojos, nariz, boca,
+  mandíbula; hombros, caderas, rodillas…) se desplazan a la anatomía detectada.
+- **Superposición de la foto anterior** con opacidad ajustable, vista en **espejo** (frontal, por defecto), cuadrícula, **nivel** (inclinación y
   cabeceo), toque para enfocar, flash y cámara frontal/trasera. Encuadre 3:4 idéntico en vista previa y captura.
 - **Coincidencia en vivo**: la guía cambia de color (cian → ámbar → verde, con vibración) cuando el
-  porcentaje de puntos coincidentes con la foto de referencia alcanza el umbral (por defecto 99 %,
-  configurable), con indicaciones de movimiento y **disparo automático** opcional.
+  porcentaje de puntos coincidentes (tolerancia 3 %) alcanza el umbral (80 % por defecto) con la
+  geometría y la pose de la cabeza; flechas en el borde, giro en el nivel, **zoom asistido** y
+  **disparo automático** opcional. Validado con imágenes reales (ver docs/ALINEACION.md).
 - **Medición de contornos**: selección automática (óvalo facial / silueta, como los stickers) o con
   **varita mágica**; alto, anchos por nivel, área y proporciones antes/después.
 
@@ -36,7 +39,7 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
 - **Alineación automática por zona**: hasta 140 puntos faciales o 33 corporales detectados en el
   dispositivo + coincidencia por **contornos anatómicos** (mandíbula, frente, orejas, caderas,
   falanges…) y **corrección de perspectiva vertical por proporciones de los contornos** (sin sensores);
-  o **manual con 2 puntos** —
+  e **igualación del color de la piel** (brillo, contraste, gamma, temperatura) —
   ver [docs/ALINEACION.md](docs/ALINEACION.md).
 
 ### Expedientes
@@ -67,6 +70,9 @@ Requisitos: JDK 17+ y Android SDK (API 35).
 ./gradlew testDebugUnitTest      # pruebas unitarias + verificación de capturas
 ./gradlew recordPaparazziDebug   # regenera las capturas de referencia (app/src/test/snapshots)
 ```
+
+Buenas prácticas y bibliografía: [docs/BUENAS_PRACTICAS.md](docs/BUENAS_PRACTICAS.md).
+Logo: esfigmomanómetro cuyo manómetro es el lente de una cámara (`art/logo/logo.svg`).
 
 Stack: Kotlin, Jetpack Compose (Material 3), CameraX, MediaStore, ExifInterface, Navigation
 Compose, Coil, Google ML Kit (rostro y pose, modelos incluidos). minSdk 26.
