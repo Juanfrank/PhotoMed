@@ -25,6 +25,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Straighten
+import androidx.compose.material.icons.filled.Flip
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import com.photomed.app.align.LiveFrame
@@ -107,6 +112,23 @@ class CameraAssistScreenshotTest {
     fun settings() {
         paparazzi.snapshot {
             ImmersiveTheme { Surface { MatchSettingsContent(true, LiveMatch.DEFAULT_THRESHOLD, {}, {}, true, {}) } }
+        }
+    }
+
+    @Test
+    fun layerToggles() {
+        paparazzi.snapshot {
+            ImmersiveTheme {
+                Box(Modifier.background(Color.Black).padding(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        com.photomed.app.ui.camera.LayerToggle("Cuadrícula", androidx.compose.material.icons.Icons.Default.GridOn, true) {}
+                        com.photomed.app.ui.camera.LayerToggle("Contorno", androidx.compose.material.icons.Icons.Default.Face, false) {}
+                        com.photomed.app.ui.camera.LayerToggle("Superponer", androidx.compose.material.icons.Icons.Default.Layers, true) {}
+                        com.photomed.app.ui.camera.LayerToggle("Nivel", androidx.compose.material.icons.Icons.Default.Straighten, false) {}
+                        com.photomed.app.ui.camera.LayerToggle("Espejo", androidx.compose.material.icons.Icons.Default.Flip, true, enabled = false) {}
+                    }
+                }
+            }
         }
     }
 }

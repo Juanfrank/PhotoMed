@@ -666,20 +666,6 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
 }
 
 
-@Composable
-private fun LayerToggle(label: String, icon: ImageVector, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        FilledTonalIconToggleButton(
-            checked = checked && enabled,
-            onCheckedChange = onChange,
-            enabled = enabled,
-            modifier = Modifier.size(48.dp).semantics { stateDescription = if (checked) "Activado" else "Desactivado" },
-        ) { Icon(icon, label) }
-        Text(label, style = MaterialTheme.typography.labelSmall,
-            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
-    }
-}
-
 /** Puntos anatómicos: referencia (anillos) y cuadro actual (puntos), en el color de la guía. */
 @Composable
 private fun LivePoints(frame: LiveFrame, tone: GuideTone, mirror: Boolean) {

@@ -7,6 +7,12 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -218,5 +224,64 @@ fun LevelIndicator(tilt: Tilt, rotateDeg: Float, modifier: Modifier = Modifier) 
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.background(Color(0x66000000), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 1.dp)
         )
+    }
+}
+
+
+/**
+ * Interruptor de capa de la cámara con estado inequívoco (no solo por el tono):
+ * - **Encendido**: círculo relleno del color primario, icono en contraste, insignia ✓ y etiqueta
+ *   en negrita con el color primario.
+ * - **Apagado**: solo contorno tenue, icono atenuado y etiqueta normal.
+ * - **No disponible**: todo al 38 %.
+ * El estado también se anuncia a TalkBack ("Activado"/"Desactivado").
+ */
+@androidx.compose.runtime.Composable
+fun LayerToggle(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onChange: (Boolean) -> Unit,
+) {
+    val on = checked && enabled
+    val cs = androidx.compose.material3.MaterialTheme.colorScheme
+    val disabledAlpha = if (enabled) 1f else 0.38f
+    val bg by androidx.compose.animation.animateColorAsState(if (on) cs.primary else Color.Transparent, label = "bg")
+    val fg by androidx.compose.animation.animateColorAsState(if (on) cs.onPrimary else Color.White.copy(alpha = 0.7f), label = "fg")
+    androidx.compose.foundation.layout.Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .toggleable(on, enabled = enabled, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = onChange)
+            .semantics { stateDescription = if (on) "Activado" else "Desactivado"; contentDescription = label }
+            .graphicsLayer { alpha = disabledAlpha }
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+    ) {
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.size(44.dp).clip(CircleShape).background(bg)
+                    .then(if (on) Modifier else Modifier.border(1.5.dp, Color.White.copy(alpha = 0.45f), CircleShape)),
+                contentAlignment = Alignment.Center,
+            ) { androidx.compose.material3.Icon(icon, null, tint = fg, modifier = Modifier.size(24.dp)) }
+            if (on) {
+                Box(
+                    Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape).background(cs.primaryContainer)
+                        .border(1.5.dp, Color.Black, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Default.Check, null,
+                        tint = cs.onPrimaryContainer, modifier = Modifier.size(12.dp))
+                }
+            }
+        }
+        Text(
+            label,
+            style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+            fontWeight = if (on) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal,
+            color = if (on) cs.primary else Color.White.copy(alpha = 0.7f),
+        )
+        // Barra indicadora bajo la etiqueta (como una pestaña activa).
+        Box(Modifier.padding(top = 2.dp).size(width = 16.dp, height = 3.dp).clip(RoundedCornerShape(2.dp))
+            .background(if (on) cs.primary else Color.Transparent))
     }
 }
