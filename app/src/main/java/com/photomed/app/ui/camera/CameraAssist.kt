@@ -156,6 +156,7 @@ fun isCameraMove(h: String): Boolean = h.startsWith("←") || h.startsWith("↑"
  * una línea por cada corrección pendiente (pose, mirada, luz, distancia…). Los movimientos de la
  * cámara no se escriben: los indican las flechas del borde y el nivel.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, zoomInfo: String?, distanceHint: String?) {
     val eval = frame?.eval
@@ -168,12 +169,12 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
     val title = when (eval?.status) {
         MatchStatus.MATCH -> if (frame.standard) (if (autoCapture) "Encuadre estándar · capturando" else "Encuadre estándar correcto")
             else if (autoCapture) "Coincide · capturando" else "Coincide con la referencia"
-        MatchStatus.SEARCHING -> eval.hints.firstOrNull() ?: "Buscando referencias anatómicas…"
+        MatchStatus.SEARCHING -> "Buscando al paciente…"
         null -> "Preparando la referencia…"
         else -> (if (frame.standard) "Ajuste la pose" else "Alinee con la referencia") + if (moving) " · siga las flechas" else ""
     }
     val items = buildList {
-        val hints = if (eval?.status == MatchStatus.SEARCHING) eval.hints.drop(1) else eval?.hints.orEmpty()
+        val hints = eval?.hints.orEmpty()
         addAll(hints.filterNot(::isCameraMove))
         distanceHint?.let { add(it) }
         zoomInfo?.let { add(it) }
@@ -198,12 +199,44 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
                     style = MaterialTheme.typography.labelSmall)
             }
         }
-        // una corrección por línea
-        items.forEach { item ->
+        // Correcciones como iconos (qué + hacia dónde + valor corto); las que no tienen icono, en texto,
+        // una por línea. El texto completo queda para TalkBack.
+        val cues = items.mapNotNull { HintCues.of(it) }
+        val texts = items.filter { HintCues.of(it) == null }
+        if (cues.isNotEmpty()) {
+            androidx.compose.foundation.layout.FlowRow(
+                Modifier.padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) { cues.forEach { CueChip(it, color) } }
+        }
+        texts.forEach { item ->
             Row(Modifier.padding(top = 2.dp)) {
                 Text("•  ", color = Color(0xFFCAC4D0), style = MaterialTheme.typography.labelMedium)
                 Text(item, color = Color(0xFFE6E0E9), style = MaterialTheme.typography.labelMedium)
             }
+        }
+    }
+}
+
+/** Ficha de una indicación: icono con insignia de dirección y valor corto. */
+@Composable
+fun CueChip(cue: HintCue, accent: Color) {
+    Row(
+        Modifier.background(Color(0x22FFFFFF), RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 4.dp)
+            .semantics(mergeDescendants = true) { contentDescription = cue.description },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(30.dp)) {
+            Icon(cue.icon, null, tint = Color.White, modifier = Modifier.size(24.dp).align(Alignment.TopStart))
+            cue.badge?.let { b ->
+                Box(Modifier.align(Alignment.BottomEnd).size(17.dp).background(accent, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(b, null, tint = Color(0xFF1E1E22), modifier = Modifier.size(13.dp))
+                }
+            }
+        }
+        cue.value?.let {
+            Text(it, color = Color.White, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp))
         }
     }
 }
