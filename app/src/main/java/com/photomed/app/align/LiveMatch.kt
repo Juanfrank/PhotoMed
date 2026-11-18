@@ -90,13 +90,13 @@ object LiveMatch {
             if (rd > MATCH_ROT * 0.7f) hints += if (tt.rotationDegrees > 0) "Gire la cámara ↺" else "Gire la cámara ↻"
         }
         if (status != MatchStatus.MATCH && abs(headYawDelta) > LiveDecision.POSE_MAX)
-            hints += "Corrija el giro de la cabeza (%.0f°)".format(headYawDelta)
+            hints += "Cabeza: corregir giro %.0f°".format(headYawDelta)
         if (status != MatchStatus.MATCH && abs(headPitchDelta) > LiveDecision.POSE_MAX)
-            hints += (if (headPitchDelta > 0) "Baje la barbilla" else "Suba la barbilla") +
-                " %.0f° (cabeceo distinto al de la referencia)".format(abs(headPitchDelta))
+            hints += (if (headPitchDelta > 0) "Barbilla: bajar" else "Barbilla: subir") +
+                " %.0f°".format(abs(headPitchDelta))
         // keystoneDeg > 0: el cuadro actual necesita "nivelar" una cámara elevada → inclinarla hacia abajo
         if (status != MatchStatus.MATCH && abs(keystoneDeg) >= KEYSTONE_HINT) {
-            hints += if (keystoneDeg > 0) "Incline la cámara hacia abajo" else "Incline la cámara hacia arriba"
+            hints += if (keystoneDeg > 0) "Cámara: inclinar hacia abajo" else "Cámara: inclinar hacia arriba"
         }
         val quality = pointFraction ?: (1f - (norm - 1f) / (CLOSE_FACTOR * 2f)).coerceIn(0f, 1f).let { if (norm <= 1f) 1f else it }
         return MatchEval(status, quality, hints, off, se, tt.rotationDegrees, pointFraction, threshold, keystoneDeg,

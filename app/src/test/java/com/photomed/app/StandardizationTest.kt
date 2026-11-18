@@ -65,9 +65,9 @@ class StandardizationTest {
         val ok = Standardization.evaluate(Zone.FACE_FRONTAL, det(frontal), Standardization.Lighting(0.6f, 0.62f, 0.6f))
         assertEquals(MatchStatus.MATCH, ok.status)
         val turned = Standardization.evaluate(Zone.FACE_FRONTAL, det(frontal, yaw = 14f), null)
-        assertTrue(turned.hints.any { it.startsWith("Gire la cabeza") })
+        assertTrue(turned.hints.any { it.startsWith("Cabeza: girar") })
         val chin = Standardization.evaluate(Zone.FACE_FRONTAL, det(frontal, pitch = 12f), null)
-        assertTrue(chin.hints.any { it.startsWith("Frankfort") })
+        assertTrue(chin.hints.any { it.startsWith("Barbilla:") })
         val light = Standardization.evaluate(Zone.FACE_FRONTAL, det(frontal), Standardization.Lighting(0.4f, 0.7f, 0.55f))
         assertTrue(light.hints.any { "izquierdo" in it })
         // oblicuo: frontal a 0° → hay que girar

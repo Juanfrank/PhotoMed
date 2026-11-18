@@ -607,7 +607,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                 live, guidance, autoCapture,
                 zoomInfo = if (zoomAssist && !manualZoom && zoomRatio > 1.01f) "zoom asistido %.1f×".format(zoomRatio) else null,
                 distanceHint = dist?.let { d ->
-                    if (d < 80f) "≈ %.0f cm: aléjese ≥ 1 m y use zoom (evita el efecto selfie)".format(d) else "≈ %.0f cm".format(d)
+                    if (d < 80f) "≈ %.0f cm: aléjese ≥ 1 m y use zoom".format(d) else "≈ %.0f cm".format(d)
                 },
             )
         }

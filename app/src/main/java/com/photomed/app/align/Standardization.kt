@@ -58,43 +58,43 @@ object Standardization {
             val side = facingSide(det.points) ?: 0f
             val sideSign = if (side > 0.08f) 1 else if (side < -0.08f) -1 else 0
             if (t.minYaw != null) {
-                if (yawAbs < t.minYaw) { hints += "Gire la cabeza hasta el perfil completo (faltan %.0f°)".format(t.minYaw - yawAbs); off += 1f }
+                if (yawAbs < t.minYaw) { hints += "Cabeza: girar hasta el perfil (faltan %.0f°)".format(t.minYaw - yawAbs); off += 1f }
             } else if (t.yaw == 0f) {
                 if (yawAbs > t.yawTol) {
-                    hints += "Gire la cabeza hacia la " + (if (sideSign > 0) "izquierda" else "derecha") + " de la imagen %.0f°".format(yawAbs)
+                    hints += "Cabeza: girar " + (if (sideSign > 0) "a la izquierda" else "a la derecha") + " %.0f°".format(yawAbs)
                     off += yawAbs / t.yawTol
                 }
             } else {
                 val wrongSide = sideSign != 0 && sideSign != t.side
                 val err = if (wrongSide) yawAbs + t.yaw!! else yawAbs - t.yaw!!
-                if (wrongSide) hints += "La cara debe mirar hacia la " + (if (t.side > 0) "derecha" else "izquierda") + " de la imagen"
-                else if (abs(err) > t.yawTol) hints += if (err < 0) "Gire más la cabeza (%.0f° de 45°)".format(yawAbs) else "Gire menos la cabeza (%.0f° de 45°)".format(yawAbs)
+                if (wrongSide) hints += "Cara: mirar a la " + (if (t.side > 0) "derecha" else "izquierda") + " de la imagen"
+                else if (abs(err) > t.yawTol) hints += if (err < 0) "Cabeza: girar más (%.0f° de 45°)".format(yawAbs) else "Cabeza: girar menos (%.0f° de 45°)".format(yawAbs)
                 off += abs(err) / t.yawTol
             }
-            det.pitch?.let { if (abs(it) > PITCH_TOL) { hints += "Frankfort: " + (if (it > 0) "baje" else "suba") + " un poco la barbilla (%.0f°)".format(abs(it)); off += abs(it) / PITCH_TOL } }
+            det.pitch?.let { if (abs(it) > PITCH_TOL) { hints += "Barbilla: " + (if (it > 0) "bajar" else "subir") + " %.0f° (Frankfort)".format(abs(it)); off += abs(it) / PITCH_TOL } }
             // Inclinación: línea entre los ojos en la imagen (de frente u oblicuo); Euler Z si no hay ojos.
             val roll = (if (yawAbs < 30f) HeadRoll.of(det.points)?.first else null) ?: det.roll
             roll?.let {
                 if (abs(it) > ROLL_TOL) {
-                    hints += "Enderece la cabeza: inclinada %.0f° hacia la %s de la imagen".format(abs(it), if (it > 0) "derecha" else "izquierda")
+                    hints += "Cabeza: enderezar %.0f° (inclinada a la %s)".format(abs(it), if (it > 0) "derecha" else "izquierda")
                     off += abs(it) / ROLL_TOL
                 }
             }
         }
         det.gaze?.let { g ->
             if (kotlin.math.abs(g.x) > Gaze.TOL_X * 1.2f || kotlin.math.abs(g.y) > Gaze.TOL_Y * 1.2f) {
-                hints += "Mirada: pida que mire al frente, en la dirección de la cabeza"
+                hints += "Mirada: al frente"
                 off += 0.6f
             }
         }
         lighting?.let { l ->
             val m = maxOf(l.leftCheek, l.rightCheek)
             if (m > 0f && abs(l.leftCheek - l.rightCheek) / m > LIGHT_ASYM) {
-                hints += "Iluminación desigual: lado " + (if (l.leftCheek < l.rightCheek) "izquierdo" else "derecho") + " de la imagen más oscuro"
+                hints += "Luz desigual: lado " + (if (l.leftCheek < l.rightCheek) "izquierdo" else "derecho") + " más oscuro"
                 off += 0.5f
             }
-            if (l.face < 0.35f) { hints += "Rostro subexpuesto: más luz"; off += 0.5f }
-            if (l.face > 0.85f) { hints += "Rostro sobreexpuesto: menos luz o sin flash"; off += 0.5f }
+            if (l.face < 0.35f) { hints += "Poca luz en el rostro"; off += 0.5f }
+            if (l.face > 0.85f) { hints += "Demasiada luz: sin flash"; off += 0.5f }
         }
         val status = when {
             hints.isEmpty() -> MatchStatus.MATCH

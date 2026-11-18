@@ -95,6 +95,6 @@ object Gaze {
             if (abs(d.x) > TOL_X) add(if (d.x > 0) "más a la izquierda" else "más a la derecha")
             if (abs(d.y) > TOL_Y) add(if (d.y > 0) "más arriba" else "más abajo")
         }
-        return if (parts.isEmpty()) null else "Mirada: pida que mire " + parts.joinToString(" y ") + " (de la imagen)"
+        return if (parts.isEmpty()) null else "Mirada: " + parts.joinToString(" y ")
     }
 }

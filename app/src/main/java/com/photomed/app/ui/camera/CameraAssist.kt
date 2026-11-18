@@ -147,7 +147,15 @@ fun BoxScope.EdgeArrows(g: Guidance?, color: Color) {
     }
 }
 
-/** Franja de recomendación bajo la vista previa (no tapa la imagen). */
+/** Indicaciones de movimiento de la cámara: se muestran solo con flechas (y el nivel), sin texto. */
+fun isCameraMove(h: String): Boolean = h.startsWith("←") || h.startsWith("↑") || h.startsWith("↓") || h.endsWith("→") ||
+    h.startsWith("Mueva") || h.startsWith("Acérquese") || h.startsWith("Aléjese") || h.startsWith("Gire la cámara") || h.startsWith("Gire el teléfono")
+
+/**
+ * Franja de recomendación bajo la vista previa (no tapa la imagen): una línea de estado y, debajo,
+ * una línea por cada corrección pendiente (pose, mirada, luz, distancia…). Los movimientos de la
+ * cámara no se escriben: los indican las flechas del borde y el nivel.
+ */
 @Composable
 fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, zoomInfo: String?, distanceHint: String?) {
     val eval = frame?.eval
@@ -156,13 +164,20 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
         MatchStatus.CLOSE -> GuideTone.CLOSE.color
         else -> Color.White
     }
+    val moving = g != null && (g.moveX != 0 || g.moveY != 0 || g.zoom != 0 || g.rotateDeg != 0f)
     val title = when (eval?.status) {
         MatchStatus.MATCH -> if (frame.standard) (if (autoCapture) "Encuadre estándar · capturando" else "Encuadre estándar correcto")
             else if (autoCapture) "Coincide · capturando" else "Coincide con la referencia"
         MatchStatus.SEARCHING -> eval.hints.firstOrNull() ?: "Buscando referencias anatómicas…"
         null -> "Preparando la referencia…"
-        else -> g?.text ?: if (frame?.standard == true) (eval.hints.firstOrNull() ?: "Ajuste la pose") else "Alinee con la referencia"
+        else -> (if (frame.standard) "Ajuste la pose" else "Alinee con la referencia") + if (moving) " · siga las flechas" else ""
     }
+    val items = buildList {
+        val hints = if (eval?.status == MatchStatus.SEARCHING) eval.hints.drop(1) else eval?.hints.orEmpty()
+        addAll(hints.filterNot(::isCameraMove))
+        distanceHint?.let { add(it) }
+        zoomInfo?.let { add(it) }
+    }.distinct()
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
             .background(Color(0xFF1E1E22), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 6.dp)
@@ -173,8 +188,7 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
                 Icon(Icons.Default.CheckCircle, null, tint = color, modifier = Modifier.size(18.dp))
                 Box(Modifier.width(6.dp))
             }
-            Text(title, color = color, style = MaterialTheme.typography.labelLarge, maxLines = 2,
-                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(title, color = color, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
         }
         eval?.pointFraction?.let {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -184,11 +198,12 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
                     style = MaterialTheme.typography.labelSmall)
             }
         }
-        val extraHint = if (frame?.standard == true) eval?.hints?.drop(1)?.firstOrNull() else g?.extra?.firstOrNull()
-        val second = listOfNotNull(distanceHint, extraHint, zoomInfo).joinToString(" · ")
-        if (second.isNotEmpty()) {
-            Text(second, color = Color(0xFFCAC4D0), style = MaterialTheme.typography.labelSmall, maxLines = 1,
-                overflow = TextOverflow.Ellipsis)
+        // una corrección por línea
+        items.forEach { item ->
+            Row(Modifier.padding(top = 2.dp)) {
+                Text("•  ", color = Color(0xFFCAC4D0), style = MaterialTheme.typography.labelMedium)
+                Text(item, color = Color(0xFFE6E0E9), style = MaterialTheme.typography.labelMedium)
+            }
         }
     }
 }

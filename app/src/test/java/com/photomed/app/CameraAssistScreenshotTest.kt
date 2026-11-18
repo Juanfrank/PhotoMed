@@ -91,6 +91,12 @@ class CameraAssistScreenshotTest {
                         }
                         RecommendationStrip(LiveFrame(eval, method = "puntos anatómicos", totalPoints = 140), g, autoCapture = true,
                             zoomInfo = "zoom asistido 1.3×", distanceHint = "≈ 45 cm: aléjese ≥ 1 m y use zoom")
+                        // sin referencia (estandarización): varias correcciones, una por línea
+                        val std = eval.copy(status = com.photomed.app.align.MatchStatus.CLOSE, pointFraction = null, hints = listOf(
+                            "Cabeza: girar a la izquierda 9°", "Barbilla: bajar 8° (Frankfort)", "Cabeza: enderezar 5° (inclinada a la derecha)",
+                            "Mirada: al frente", "Luz desigual: lado izquierdo más oscuro", "↑ Suba la cámara"))
+                        RecommendationStrip(LiveFrame(std, standard = true), null, autoCapture = false, zoomInfo = null,
+                            distanceHint = "≈ 60 cm: aléjese ≥ 1 m y use zoom")
                     }
                     Column(Modifier.width(110.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Box(Modifier.size(96.dp).clip(CircleShape)) {

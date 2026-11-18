@@ -99,9 +99,9 @@ class PerspectiveAndLiveTest {
         assertEquals(MatchStatus.CLOSE, LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.95f, headYawDelta = 9f, gate = true).status)
         // perspectiva vertical: indicación de inclinación
         val tilt = LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.6f, keystoneDeg = 4f)
-        assertTrue(tilt.hints.contains("Incline la cámara hacia abajo"))
+        assertTrue(tilt.hints.contains("Cámara: inclinar hacia abajo"))
         assertTrue(LiveMatch.evaluate(Similarity.IDENTITY, pivot, pointFraction = 0.6f, keystoneDeg = -4f)
-            .hints.contains("Incline la cámara hacia arriba"))
+            .hints.contains("Cámara: inclinar hacia arriba"))
     }
 
     @Test
