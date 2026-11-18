@@ -31,6 +31,12 @@ class Silhouette(val left: FloatArray, val right: FloatArray) {
         return if (i <= 0) null else rowY(i)
     }
 
+    /** Fila inferior con sujeto (null si la máscara toca el borde inferior). */
+    val bottom: Float? get() {
+        val i = left.indexOfLast { !it.isNaN() }
+        return if (i < 0 || i >= rows - 1) null else rowY(i)
+    }
+
     /**
      * Perfil: punta nasal (máxima protrusión del borde anterior en el tramo 30–75 % de las filas con
      * sujeto) y pogonion (máxima protrusión tras el surco mentolabial, antes de que el borde
@@ -83,6 +89,10 @@ class Silhouette(val left: FloatArray, val right: FloatArray) {
                 }
                 val a = walk(-1); val b = walk(1)
                 if (b - a < 3) continue
+                // filas con huecos dentro del tramo (dedos separados): no miden el ancho del sujeto
+                var holes = 0
+                for (x in a..b) if (!mask[x, y]) holes++
+                if (holes > (b - a) * 0.15f) continue
                 l[i] = a / w.toFloat(); r[i] = (b + 1) / w.toFloat()
             }
             return if (l.count { !it.isNaN() } < 8) null else Silhouette(l, r)

@@ -55,7 +55,10 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     fun setReference(bmp: Bitmap) {
         ref = detector.detectFull(spec.detector, bmp)
         referenceSilhouette = runCatching {
-            SubjectSegmenter().use { s -> s.segment(bmp) }?.let { Silhouette.fromMask(it, Silhouette.axisOf(ref.points)) }
+            val plain = zone.guide == com.photomed.app.data.GuideType.HANDS || zone.guide == com.photomed.app.data.GuideType.FEET
+            val mask = if (plain) ForegroundOnPlain.mask(bmp.rgb(), bmp.width, bmp.height)
+                else SubjectSegmenter().use { s -> s.segment(bmp) }
+            mask?.let { Silhouette.fromMask(it, Silhouette.axisOf(ref.points)) }
         }.getOrNull()
         val g = ImageOps.gray(bmp, EDGE_W)
         refGray = g

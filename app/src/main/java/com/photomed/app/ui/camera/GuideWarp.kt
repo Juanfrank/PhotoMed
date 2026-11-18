@@ -37,6 +37,8 @@ class GuideWarp(
     private val rowScaleL: FloatArray? = null,
     private val rowScaleR: FloatArray? = null,
     private val rowCenter: FloatArray? = null,
+    /** Centro de cada fila en el dibujo (silueta: punto medio del contorno; óvalo: eje fijo). */
+    private val rowArtC: FloatArray? = null,
     /** Giro de la cabeza en la foto (°, horario en pantalla) y centro del giro (x del ancho, y del alto). */
     val rollDeg: Float = 0f,
     val pivot: Offset = Offset(0.5f, 0.5f),
@@ -56,8 +58,9 @@ class GuideWarp(
     fun x(a: Float, ay: Float): Float {
         val l = rowScaleL ?: return x(a)
         val i = ((ay.coerceIn(0f, 1f)) * ROWS).toInt().coerceIn(0, ROWS)
-        val s = if (a < cxArt) l[i] else rowScaleR!![i]
-        return rowCenter!![i] + (a - cxArt) * s
+        val ac = rowArtC?.get(i) ?: cxArt
+        val s = if (a < ac) l[i] else rowScaleR!![i]
+        return rowCenter!![i] + (a - ac) * s
     }
 
     /** Escala y centro de una fila (para dibujar la franja de la ilustración por mitades). */
@@ -65,6 +68,7 @@ class GuideWarp(
     fun rowRightScale(ay: Float) = rowScaleR?.let { it[(ay.coerceIn(0f, 1f) * ROWS).toInt().coerceIn(0, ROWS)] } ?: sx
     fun rowCenter(ay: Float) = rowCenter?.let { it[(ay.coerceIn(0f, 1f) * ROWS).toInt().coerceIn(0, ROWS)] } ?: cxRef
     val artCenter: Float get() = cxArt
+    fun rowArtCenter(ay: Float) = rowArtC?.let { it[(ay.coerceIn(0f, 1f) * ROWS).toInt().coerceIn(0, ROWS)] } ?: cxArt
     val followsOutline: Boolean get() = rowScaleL != null
 
     fun map(o: Offset) = Offset(x(o.x, o.y), y(o.y))
@@ -220,6 +224,12 @@ class GuideWarp(
             for (k in 0 until outline.size / 3) maxHalf = max(maxHalf, min(cxArt - outline[k * 3 + 1], outline[k * 3 + 2] - cxArt))
             // El ápice del óvalo detectado (frente alta) es estrecho y no corresponde al cráneo de la
             // ilustración: solo se usan las filas desde las cejas hacia abajo y con el óvalo ancho.
+            val ac = FloatArray(ROWS + 1) { Float.NaN }
+            val limb = "x:extremidad" in art
+            var detMaxWidth = 0f
+            det.silhouette?.let { sl -> for (i in 0 until sl.rows) if (!sl.left[i].isNaN()) detMaxWidth = max(detMaxWidth, sl.right[i] - sl.left[i]) }
+            var maxWidth = 0f
+            for (k in 0 until outline.size / 3) maxWidth = max(maxWidth, outline[k * 3 + 2] - outline[k * 3 + 1])
             var detMaxHalf = 0f
             for (o in det.oval) detMaxHalf = max(detMaxHalf, abs(o.x - (ref["x:centro"] ?: 0.5f)))
             // con el óvalo facial, el cráneo (sobre las cejas) conserva la forma del dibujo
@@ -228,6 +238,18 @@ class GuideWarp(
                 val ay = i / ROWS.toFloat()
                 if (browArt != null && ay < browArt) continue
                 val a = artSpan(outline, ay) ?: continue
+                if (!useOval) {
+                    // Silueta (cuerpo, perfil, extremidades): cada fila se lleva por su propio centro,
+                    // con la escala del ancho (el sujeto no tiene por qué estar centrado en el eje).
+                    val wa = a.second - a.first
+                    if (wa < 0.3f * maxWidth) continue
+                    val d = det.span(base.y(ay)) ?: continue
+                    // extremidad: solo el cuerpo de la mano/pie (yemas y dedos sueltos no miden el ancho)
+                    if (limb && d.second - d.first < 0.6f * detMaxWidth) continue
+                    val sc = ((d.second - d.first) / wa).coerceIn(0.3f, 3f)
+                    l[i] = sc; r[i] = sc; c[i] = (d.first + d.second) / 2; ac[i] = (a.first + a.second) / 2
+                    continue
+                }
                 val hl = cxArt - a.first; val hr = a.second - cxArt
                 // cerca del mentón el ancho tiende a 0: escala inestable, se usa la vecina
                 if (hl < 0.3f * maxHalf || hr < 0.3f * maxHalf) continue
@@ -255,8 +277,20 @@ class GuideWarp(
                 for (j in max(0, i - k)..min(v.size - 1, i + k)) { s += v[j]; n++ }
                 s / n
             }
+            if (limb) {
+                // extremidades: filas atípicas (pulgar o dedos unidos o no según la foto) → ±20 % de la mediana
+                val med = l.filter { !it.isNaN() }.sorted().let { it[it.size / 2] }
+                for (i in l.indices) if (!l[i].isNaN()) { l[i] = l[i].coerceIn(med * 0.8f, med * 1.25f); r[i] = l[i] }
+                // desplazamiento horizontal de cada fila: ±3 % del ancho alrededor de la mediana
+                val offs = c.indices.filter { !c[it].isNaN() && !ac[it].isNaN() }.map { c[it] - ac[it] }.sorted()
+                if (offs.isNotEmpty()) {
+                    val mo = offs[offs.size / 2]
+                    for (i in c.indices) if (!c[i].isNaN() && !ac[i].isNaN()) c[i] = ac[i] + (c[i] - ac[i]).coerceIn(mo - 0.03f, mo + 0.03f)
+                }
+            }
             fill(l); fill(r); fill(c)
-            return GuideWarp(pairs, base.sx, cxArt, cxRef, smooth(l), smooth(r), smooth(c), det.rollDeg, det.pivot)
+            val artC = if (useOval) null else { fill(ac); smooth(ac) }
+            return GuideWarp(pairs, base.sx, cxArt, cxRef, smooth(l), smooth(r), smooth(c), artC, det.rollDeg, det.pivot)
         }
     }
 }

@@ -238,3 +238,40 @@ data class ContourMetrics(
         }
     }
 }
+
+
+/**
+ * Sujeto sobre fondo liso (manos, pies aislados, donde la segmentación de personas falla):
+ * sustracción de fondo por color. El fondo se modela con los píxeles del borde de la imagen
+ * (mediana en CIELAB y su dispersión, MAD); es sujeto todo píxel a una distancia ΔE mayor que
+ * max(12, 4·MAD) del color del fondo. Después: apertura/cierre, relleno de huecos y componente
+ * mayor. Null si el fondo no es liso (dispersión alta) o el resultado no es plausible.
+ */
+object ForegroundOnPlain {
+    fun mask(rgb: IntArray, w: Int, h: Int): Mask? {
+        val lab = DoubleArray(3)
+        val bw = maxOf(2, (minOf(w, h) * 0.03f).toInt())
+        val border = ArrayList<DoubleArray>()
+        for (y in 0 until h) for (x in 0 until w) {
+            if (x >= bw && x < w - bw && y >= bw && y < h - bw) continue
+            if ((x + y) % 3 != 0) continue
+            Lab.fromRgb(rgb[y * w + x], lab); border += lab.copyOf()
+        }
+        if (border.size < 20) return null
+        fun med(k: Int) = border.map { it[k] }.sorted()[border.size / 2]
+        val c = doubleArrayOf(med(0), med(1), med(2))
+        val d = border.map { kotlin.math.sqrt((it[0] - c[0]).let { v -> v * v } + (it[1] - c[1]).let { v -> v * v } + (it[2] - c[2]).let { v -> v * v }) }.sorted()
+        val mad = d[d.size / 2]
+        if (mad > 10) return null                       // fondo no liso
+        val thr = maxOf(12.0, 4 * mad)
+        val m = Mask(w, h)
+        for (i in 0 until w * h) {
+            Lab.fromRgb(rgb[i], lab)
+            val dl = lab[0] - c[0]; val da = lab[1] - c[1]; val db = lab[2] - c[2]
+            m.data[i] = kotlin.math.sqrt(dl * dl + da * da + db * db) > thr
+        }
+        val out = MaskOps.clean(m, radius = 2)
+        val frac = out.area / (w * h).toFloat()
+        return if (frac in 0.03f..0.92f) out else null
+    }
+}

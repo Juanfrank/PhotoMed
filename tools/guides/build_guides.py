@@ -158,6 +158,40 @@ def profile_anchors(out, front_right):
     i_pog = i_min + int(np.argmax(fx[i_min:neck]))
     return {"punta nasal": ys[i_nose], "pogonion": ys[i_pog]}
 
+# Zonas con modo individual: ¿la mitad izquierda de la imagen es el lado derecho del paciente?
+# (dibujos con los dedos hacia abajo: pulgar / dedo gordo; piernas: paciente de frente)
+SIDED = {"manos_dorso": False, "manos_palma": True, "pies_dorso": True, "pies_planta": False, "muslos": True}
+
+def halves_info(src, frame):
+    """Recuadro y contorno por filas de cada mitad (izquierda/derecha del encuadre)."""
+    g = np.array(Image.open(SRC / f"{src}.png").convert("L")).astype(int)
+    m = g < 250
+    x0, y0, fw, fh = frame
+    cx = x0 + fw / 2
+    boxes, outs = [], []
+    for lo, hi in ((x0, cx), (cx, x0 + fw)):
+        sub = m[max(int(y0), 0):int(y0 + fh), max(int(lo), 0):int(hi)]
+        ys, xs = np.where(sub)
+        xa, xb = xs.min() + max(int(lo), 0), xs.max() + max(int(lo), 0)
+        ya, yb = ys.min() + max(int(y0), 0), ys.max() + max(int(y0), 0)
+        boxes += [(xa - x0) / fw, (ya - y0) / fh, (xb - x0) / fw, (yb - y0) / fh]
+        # eje de la mitad: columna con más relleno en el tercio central de su altura (pierna, mano, pie)
+        mid = sub[sub.shape[0] // 3: 2 * sub.shape[0] // 3]
+        ccx = int(np.argmax(mid.sum(0))) + max(int(lo), 0)
+        o = silhouette(src, frame, ccx)
+        outs.append([v for t in o for v in ((t[0] - y0) / fh, (t[1] - x0) / fw, (t[2] - x0) / fw)])
+        # contorno recortado a su mitad (las piernas se tocan en los muslos)
+        o = [(t[0], max(t[1], lo), min(t[2], hi)) for t in o if min(t[2], hi) - max(t[1], lo) > 8]
+        outs[-1] = [v for t in o for v in ((t[0] - y0) / fh, (t[1] - x0) / fw, (t[2] - x0) / fw)]
+        if src.startswith("body_"):
+            # piernas: recuadro por debajo de las manos (que cuelgan a los lados en el tercio superior)
+            low = sub[int(sub.shape[0] * 0.35):]
+            ys2, xs2 = np.where(low)
+            cols = np.where(low.sum(0) > low.shape[0] * 0.25)[0]
+            xa, xb = cols.min() + max(int(lo), 0), cols.max() + max(int(lo), 0)
+            boxes[-4:] = [(xa - x0) / fw, (ya - y0) / fh, (xb - x0) / fw, (yb - y0) / fh]
+    return boxes, outs
+
 def render(src, crop):
     im = Image.open(SRC / f"{src}.png").convert("L")
     cx, cy, h = crop if crop else auto(src)
@@ -206,7 +240,14 @@ kt = ["// ARCHIVO GENERADO por tools/guides/build_guides.py — no editar a mano
       "    /** Contorno de la cabeza (cráneo → mentón): y, x izquierda, x derecha (normalizadas), por filas. */",
       "    val outline: FloatArray = FloatArray(0),",
       "    /** Puntos de control de la ilustración (x, y normalizadas) en el orden de [FaceControlKeys]. */",
-      "    val controls: FloatArray = FloatArray(0))", "",
+      "    val controls: FloatArray = FloatArray(0),",
+      "    /** Modo individual (una mano, un pie, una pierna): recuadro de cada mitad (x0, y0, x1, y1 normalizados, izquierda y luego derecha de la imagen). */",
+      "    val halves: FloatArray = FloatArray(0),",
+      "    /** true si la mitad izquierda de la imagen es el lado derecho del paciente. */",
+      "    val leftIsRight: Boolean = false,",
+      "    /** Contorno por filas de cada mitad (y, x izq., x der.), para ajustar la guía individual a la silueta. */",
+      "    val outlineL: FloatArray = FloatArray(0),",
+      "    val outlineR: FloatArray = FloatArray(0))", "",
       "/** Claves de los puntos de control del rostro (malla de MediaPipe sobre el dibujo + orejas y vértice). */",
       "val FaceControlKeys: Array<String> = arrayOf(" + ", ".join(f'\"{k}\"' for k in FACE_CONTROLS) + ")", "",
       "val GuideArtByZone: Map<String, GuideArt> = mapOf("]
@@ -280,6 +321,14 @@ for zone, (src, crop, refs) in Z.items():
         kt.append(f"        floatArrayOf({', '.join(f'{v:.4f}f' for v in cc)})),")
     else:
         kt.append(f"        mapOf({', '.join(items)})),")
+    if zone in SIDED:
+        boxes, outs = halves_info(src, frame)
+        last = kt.pop()
+        assert last.endswith(")),"), last
+        kt.append(last[:-2] + ",")
+        kt.append(f"        halves = floatArrayOf({', '.join(f'{v:.4f}f' for v in boxes)}), leftIsRight = {'true' if SIDED[zone] else 'false'},")
+        kt.append(f"        outlineL = floatArrayOf({', '.join(f'{v:.4f}f' for v in outs[0])}),")
+        kt.append(f"        outlineR = floatArrayOf({', '.join(f'{v:.4f}f' for v in outs[1])})),")
     # vista previa
     tinted = img.copy(); a = np.array(tinted); white = a[..., 0] > 128; a[white, 0:3] = (0x7C, 0xF5, 0xE4)
     tinted = Image.fromarray(a, "RGBA")

@@ -20,6 +20,11 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -67,8 +72,67 @@ fun GuideOverlay(
     adaptTo: Map<String, Pt> = emptyMap(),
     /** Silueta segmentada de la referencia (cuerpo y perfil): la guía se ajusta a sus bordes. */
     silhouette: com.photomed.app.align.Silhouette? = null,
+    /** Modo individual de extremidades: una sola mano, pie o pierna (ver [LimbSide]). */
+    side: LimbSide = LimbSide.BOTH,
 ) {
-    val art = GuideArtByZone[zone.id]
+    val base = GuideArtByZone[zone.id]
+    val frame = base?.limbFrame(side)
+    if (base == null || frame == null) {
+        GuideLayer(zone, base, showContour, showGrid, modifier, tone, adaptTo, silhouette, emptyMap())
+        return
+    }
+    // Modo individual: la guía se acerca a la mitad del dibujo de ese lado (encuadre 3:4) y se
+    // ajusta a la silueta de esa extremidad; los datos de la foto pasan a coordenadas del dibujo.
+    val outline = base.limbOutline(side)
+    val n = outline?.size?.div(3) ?: 0
+    val art = remember(base, side) {
+        // extremos de la extremidad en el dibujo: recuadro de su mitad (incluye dedos y yemas)
+        val hb = base.limbBox(side)
+        val anchors = base.anchors + ("x:centro" to (frame.left + frame.right) / 2) + ("x:extremidad" to 1f) +
+            (if (hb != null) mapOf("extremo_sup" to hb.top, "extremo_inf" to hb.bottom) else emptyMap())
+        GuideArt(base.drawable, base.lines, base.marks, anchors, outline ?: FloatArray(0))
+    }
+    val pts = remember(adaptTo, frame) { adaptTo.mapValues { frame.toArt(it.value) } }
+    val sil = remember(silhouette, frame) { silhouette?.let { frame.toArt(it) } }
+    val extra = remember(silhouette, frame) {
+        buildMap {
+            silhouette?.top?.let { put("extremo_sup", frame.top + it * frame.height) }
+            silhouette?.bottom?.let { put("extremo_inf", frame.top + it * frame.height) }
+        }
+    }
+    Box(modifier.clipToBounds()) {
+        if (showGrid) Canvas(Modifier.matchParentSize()) { drawGrid() }
+        val keep = remember(base, side) { base.limbClip(side) }
+        Box(Modifier.matchParentSize().graphicsLayer {
+            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+            scaleX = 1f / frame.width; scaleY = 1f / frame.height
+            translationX = -frame.left / frame.width * size.width
+            translationY = -frame.top / frame.height * size.height
+        }) {
+            // solo la extremidad elegida (la otra mitad del dibujo no se dibuja)
+            Box(Modifier.fillMaxSize().drawWithContent {
+                val k = keep ?: return@drawWithContent drawContent()
+                clipRect(k.left * size.width, k.top * size.height, k.right * size.width, k.bottom * size.height) { this@drawWithContent.drawContent() }
+            }) {
+                GuideLayer(zone, art, showContour, false, Modifier.fillMaxSize(), tone, pts, sil, extra)
+            }
+        }
+    }
+}
+
+@Composable
+private fun GuideLayer(
+    zone: Zone,
+    art: GuideArt?,
+    showContour: Boolean,
+    showGrid: Boolean,
+    modifier: Modifier,
+    tone: GuideTone,
+    adaptTo: Map<String, Pt>,
+    silhouette: com.photomed.app.align.Silhouette?,
+    /** Anclas adicionales medidas en la foto (p. ej. extremos de la silueta de una extremidad). */
+    extraAnchors: Map<String, Float>,
+) {
     // Rostro: deformación rasgo a rasgo (thin-plate spline con ~140 puntos de control).
     val mesh = remember(art, adaptTo) {
         if (art == null || adaptTo.isEmpty() || art.controls.isEmpty()) null
@@ -94,9 +158,11 @@ fun GuideOverlay(
         }
         return
     }
-    val warp = remember(art, adaptTo, silhouette) {
+    val warp = remember(art, adaptTo, silhouette, extraAnchors) {
         if (art == null || (adaptTo.isEmpty() && silhouette == null)) null else {
-            val det = GuideWarp.analyze(adaptTo, silhouette, art.anchors)
+            val d0 = GuideWarp.analyze(adaptTo, silhouette, art.anchors)
+            val det = if (extraAnchors.isEmpty()) d0 else
+                GuideWarp.Detected(d0.anchors + extraAnchors, d0.oval, d0.rollDeg, d0.pivot, d0.pitchDeg, d0.silhouette)
             // Rostro: el borde superior del contorno de la ilustración es su vértice del cráneo.
             val face = zone.category == com.photomed.app.data.ZoneCategory.FACIAL
             val artAnchors = if (face && art.outline.size >= 3) art.anchors + ("vértice" to art.outline[0]) else art.anchors
@@ -115,15 +181,16 @@ fun GuideOverlay(
                     // Deformación por franjas horizontales; cada franja por mitades (izquierda/derecha
                     // de la línea media) para seguir el contorno del cráneo, mejillas y mandíbula.
                     val n = 160
-                    val cSrc = (w.artCenter * bmp.width).toInt().coerceIn(1, bmp.width - 1)
                     for (i in 0 until n) {
                         val a0 = i / n.toFloat(); val a1 = (i + 1) / n.toFloat(); val am = (a0 + a1) / 2
+                        val ac = w.rowArtCenter(am)
+                        val cSrc = (ac * bmp.width).toInt().coerceIn(1, bmp.width - 1)
                         val y0 = w.y(a0) * size.height; val y1 = w.y(a1) * size.height
                         if (y1 - y0 < 0.5f) continue
                         val sy0 = (a0 * bmp.height).toInt(); val sy1 = ((a1 * bmp.height).toInt()).coerceAtMost(bmp.height)
                         val center = w.rowCenter(am) * size.width
-                        val left = center - w.artCenter * w.rowLeftScale(am) * size.width
-                        val right = center + (1f - w.artCenter) * w.rowRightScale(am) * size.width
+                        val left = center - ac * w.rowLeftScale(am) * size.width
+                        val right = center + (1f - ac) * w.rowRightScale(am) * size.width
                         val dy = IntOffset(0, y0.toInt()); val dh = (y1 - y0).toInt() + 1
                         val sh = (sy1 - sy0).coerceAtLeast(1)
                         drawImage(bmp, srcOffset = IntOffset(0, sy0), srcSize = IntSize(cSrc, sh),

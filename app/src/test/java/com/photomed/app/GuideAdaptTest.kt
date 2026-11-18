@@ -298,4 +298,84 @@ class GuideAdaptTest {
             }
         }
     }
+
+    @Test
+    fun limbIndividualModes() {
+        val zones = listOf(Zone.HANDS_DORSAL, Zone.HANDS_PALMAR, Zone.FEET_DORSAL, Zone.FEET_PLANTAR, Zone.LEGS)
+        for (z in zones) assertTrue("${z.id} con modo individual", GuideArtByZone[z.id]!!.halves.size == 8)
+        // derecha e izquierda encuadran mitades distintas, y la derecha del paciente según el dibujo
+        val hands = GuideArtByZone["manos_palma"]!!
+        val fr = hands.let { com.photomed.app.ui.camera.limbFrameOf(it, com.photomed.app.ui.camera.LimbSide.RIGHT) }!!
+        val fl = hands.let { com.photomed.app.ui.camera.limbFrameOf(it, com.photomed.app.ui.camera.LimbSide.LEFT) }!!
+        assertTrue("palma: la derecha del paciente está a la izquierda de la imagen", fr.center.x < fl.center.x)
+        paparazzi.snapshot {
+            Column(Modifier.background(Color(0xFF1B1B1F)).padding(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                zones.forEach { z ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        com.photomed.app.ui.camera.LimbSide.entries.forEach { sd ->
+                            Column(Modifier.width(80.dp)) {
+                                Box(Modifier.aspectRatio(3f / 4f).background(Color(0xFF30303A))) {
+                                    GuideOverlay(z, showContour = true, showGrid = true, modifier = Modifier.fillMaxSize(), side = sd)
+                                }
+                                Text("${z.id} · ${sd.label}", color = Color.White, fontSize = 7.sp)
+                            }
+                        }
+                        // una mano/pie/pierna más ancha (+20 %) en la foto de referencia: la guía se ajusta
+                        val art = GuideArtByZone[z.id]!!
+                        val sd = com.photomed.app.ui.camera.LimbSide.RIGHT
+                        val f = com.photomed.app.ui.camera.limbFrameOf(art, sd)!!
+                        val ol = com.photomed.app.ui.camera.limbOutlineOf(art, sd)!!
+                        // silueta en coordenadas del encuadre individual
+                        val rows = com.photomed.app.align.Silhouette.ROWS
+                        val l = FloatArray(rows) { Float.NaN }; val rr = FloatArray(rows) { Float.NaN }
+                        for (i in 0 until rows) {
+                            val yf = (i + 0.5f) / rows; val ya = f.top + yf * f.height
+                            val k = (0 until ol.size / 3).minBy { kotlin.math.abs(ol[it * 3] - ya) }
+                            if (kotlin.math.abs(ol[k * 3] - ya) > 0.02f) continue
+                            val c = (ol[k * 3 + 1] + ol[k * 3 + 2]) / 2
+                            l[i] = ((c + (ol[k * 3 + 1] - c) * 1.2f) - f.left) / f.width; rr[i] = ((c + (ol[k * 3 + 2] - c) * 1.2f) - f.left) / f.width
+                        }
+                        val sil = com.photomed.app.align.Silhouette(l, rr)
+                        Column(Modifier.width(80.dp)) {
+                            Box(Modifier.aspectRatio(3f / 4f).background(Color(0xFF30303A))) {
+                                androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                                    for (i in 0 until rows) if (!l[i].isNaN()) drawRect(Color(0xFF5A5470), androidx.compose.ui.geometry.Offset(l[i] * size.width, i * size.height / rows),
+                                        androidx.compose.ui.geometry.Size((rr[i] - l[i]) * size.width, size.height / rows + 1))
+                                }
+                                GuideOverlay(z, showContour = true, showGrid = false, modifier = Modifier.fillMaxSize(), silhouette = sil, side = sd)
+                            }
+                            Text("${z.id} · ajustada", color = Color.White, fontSize = 7.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun limbGuideOnPlainBackgroundPhoto() {
+        // "foto" de una sola mano / pie sobre fondo liso, 15 % más ancha que el dibujo
+        val cases = listOf(Triple("limb_hand", Zone.HANDS_DORSAL, com.photomed.app.ui.camera.LimbSide.RIGHT),
+            Triple("limb_foot", Zone.FEET_PLANTAR, com.photomed.app.ui.camera.LimbSide.LEFT))
+        paparazzi.snapshot {
+            Row(Modifier.background(Color(0xFF1B1B1F)).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                cases.forEach { (img, z, sd) ->
+                    val bmp = BitmapFactory.decodeStream(javaClass.getResourceAsStream("/demo/$img.png"))
+                    val rgb = IntArray(bmp.width * bmp.height).also { bmp.getPixels(it, 0, bmp.width, 0, 0, bmp.width, bmp.height) }
+                    val mask = com.photomed.app.align.ForegroundOnPlain.mask(rgb, bmp.width, bmp.height)!!
+                    val sil = com.photomed.app.align.Silhouette.fromMask(mask, 0.5f)!!
+                    listOf(false, true).forEach { adapt ->
+                        Column(Modifier.width(110.dp)) {
+                            Box(Modifier.aspectRatio(3f / 4f)) {
+                                Image(bmp.asImageBitmap(), null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
+                                GuideOverlay(z, showContour = true, showGrid = false, modifier = Modifier.fillMaxSize(),
+                                    silhouette = if (adapt) sil else null, side = sd)
+                            }
+                            Text("${z.id} · ${sd.label}" + if (adapt) " · ajustada" else "", color = Color.White, fontSize = 7.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

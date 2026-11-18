@@ -232,6 +232,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     var liveMatch by remember { mutableStateOf(true) }
     val prefs = remember { context.getSharedPreferences("photomed", android.content.Context.MODE_PRIVATE) }
     var autoCapture by remember { mutableStateOf(prefs.getBoolean("auto_capture", false)) }
+    // Modo individual de extremidades (manos, pies, piernas): lado recordado por zona
+    var limbSide by remember(zone) { mutableStateOf(LimbSide.ofTag(prefs.getString("limb_side_${zone.id}", null))) }
     var threshold by remember { mutableFloatStateOf(prefs.getFloat("match_threshold_v2", LiveMatch.DEFAULT_THRESHOLD)) }
     var showSettings by remember { mutableStateOf(false) }
     var mirrorOn by remember { mutableStateOf(prefs.getBoolean("mirror_front", true)) }
@@ -295,7 +297,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             e to e?.let { repo.photos(it, zone) }.orEmpty()
         }
         exp = e; photos = list
-        if (ghost == null || photos.none { it.key == ghost?.key }) ghost = photos.lastOrNull()
+        if (ghost == null || photos.none { it.key == ghost?.key })
+            ghost = photos.lastOrNull { LimbSide.ofFileName(it.displayName, zone) == limbSide } ?: photos.lastOrNull()
     }
 
     val previewView = remember {
@@ -384,6 +387,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
 
     fun captureConditions(): Map<String, String> = buildMap {
         put("Engine", engine.label)
+        if (zone.hasLimbSides) put("Side", limbSide.label)
         put("Zoom", "%.2f".format(java.util.Locale.US, zoomRatio))
         live?.let { f ->
             f.eval.pointFraction?.let { put("MatchPercent", "%.0f".format(java.util.Locale.US, it * 100)) }
@@ -419,7 +423,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                     // Se guarda en el ámbito de la app: termina aunque se cierre la cámara.
                     AppScope.launch {
                         val result = runCatching {
-                            repo.savePhoto(e, zone, temp, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conditions)
+                            repo.savePhoto(e, zone, temp, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conditions,
+                                variant = limbSide.tag.takeIf { zone.hasLimbSides })
                         }.also { temp.delete() }
                         scope.launch {
                             capturing = false
@@ -553,7 +558,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                     }
                     GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize(),
                         tone = tone, adaptTo = if (adaptGuide && showGhost) refPoints else emptyMap(),
-                        silhouette = if (adaptGuide && showGhost) refSilhouette else null)
+                        silhouette = if (adaptGuide && showGhost) refSilhouette else null,
+                        side = if (zone.hasLimbSides) limbSide else LimbSide.BOTH)
                     if (matchingEnabled) live?.let { LivePoints(it, tone, mirror = false) }
                 }
 
@@ -606,6 +612,28 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             onZoom = { setZoom(it) },
             onResumeAssist = { manualZoom = false; zoomCtl.reset() },
         )
+
+        // Modo individual de extremidades: ambas o una sola (misma zona)
+        if (zone.hasLimbSides) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.s2),
+                horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(when (zone.guide) { com.photomed.app.data.GuideType.HANDS -> "Mano"; com.photomed.app.data.GuideType.FEET -> "Pie"; else -> "Pierna" },
+                    color = Color.White, style = MaterialTheme.typography.labelLarge)
+                LimbSide.entries.forEach { sd ->
+                    androidx.compose.material3.FilterChip(
+                        selected = limbSide == sd,
+                        onClick = {
+                            limbSide = sd; prefs.edit().putString("limb_side_${zone.id}", sd.tag).apply()
+                            photos.lastOrNull { LimbSide.ofFileName(it.displayName, zone) == sd }?.let { ghost = it }
+                        },
+                        label = { Text(if (sd == LimbSide.BOTH) "Ambas" else sd.label) },
+                    )
+                }
+            }
+        }
 
         // Controles de capas (objetivo táctil ≥ 48 dp, etiquetas visibles)
         Row(

@@ -133,13 +133,15 @@ class PhotoRepository(
         exp: Expediente, zone: Zone, capture: File, takenAt: Long = System.currentTimeMillis(),
         cameraPitch: Float? = null, roll: Float? = null, focalNorm: Float? = null,
         conditions: Map<String, String> = emptyMap(),
+        /** Variante (p. ej. lado "der"/"izq" en el modo individual de extremidades): va en el nombre. */
+        variant: String? = null,
     ): Photo {
         PhotoMetadata.write(
             capture,
             PhotoInfo(exp.patientName, exp.recordNumber, exp.id, zone.id, zone.label, takenAt, exp.consent,
                 cameraPitch, roll, focalNorm, conditions),
         )
-        val name = "${zone.id}_${stampFormat.format(Date(takenAt))}.jpg"
+        val name = "${zone.id}_${variant?.let { "${it}_" } ?: ""}${stampFormat.format(Date(takenAt))}.jpg"
         val uri = store.save(exp.id, name, capture, takenAt)
         return Photo(uri, name, zone, takenAt)
     }

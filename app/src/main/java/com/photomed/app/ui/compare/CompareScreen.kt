@@ -722,6 +722,7 @@ fun captureConditionsWarning(b: Map<String, String>, a: Map<String, String>): St
     val issues = mutableListOf<String>()
     val yb = b["HeadYaw"]?.toFloatOrNull(); val ya = a["HeadYaw"]?.toFloatOrNull()
     if (yb != null && ya != null && kotlin.math.abs(yb - ya) > 6f) issues += "giro de la cabeza %.0f° vs %.0f°".format(yb, ya)
+    if (b["Side"] != null && a["Side"] != null && b["Side"] != a["Side"]) issues += "lado distinto (${b["Side"]} / ${a["Side"]})"
     val pb = b["HeadPitch"]?.toFloatOrNull(); val pa = a["HeadPitch"]?.toFloatOrNull()
     if (pb != null && pa != null && kotlin.math.abs(pb - pa) > 6f) issues += "cabeceo (barbilla) %+.0f° vs %+.0f°".format(pb, pa)
     val db = b["DistanceCm"]?.toFloatOrNull(); val da = a["DistanceCm"]?.toFloatOrNull()
