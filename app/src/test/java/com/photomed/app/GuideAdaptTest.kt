@@ -180,4 +180,25 @@ class GuideAdaptTest {
             }
         }
     }
+
+    @Test
+    fun meshWarpPlacesEachFeature() {
+        val art = GuideArtByZone["rostro_frontal"]!!
+        val keys = com.photomed.app.ui.camera.FaceControlKeys
+        for (f in listOf("face_1", "face_2", "face_3")) {
+            val p = pts(f)
+            val w = com.photomed.app.ui.camera.FaceMeshWarp.fit(keys, art.controls, p)!!
+            assertTrue(w.controlCount > 100)
+            fun artPt(k: String) = keys.indexOf(k).let { androidx.compose.ui.geometry.Offset(art.controls[it * 2], art.controls[it * 2 + 1]) }
+            // pupilas, comisuras, base nasal, mentón, cejas y mejillas: cada rasgo en su sitio (±1,5 % del ancho)
+            for (k in listOf("eye_l", "eye_r", "mouth_l", "mouth_r", "nose_bottom_1", "oval_18", "oval_8", "oval_28", "brow_l_top_2", "brow_r_top_2")) {
+                val m = w.map(artPt(k)); val d = p[k]!!
+                assertEquals("$f $k x", d.x, m.x, 0.015f)
+                assertEquals("$f $k y", d.y / (4f / 3f), m.y, 0.015f)
+            }
+            // orejas: entre los bordes del óvalo y por fuera de él, a la altura de los ojos–nariz
+            val ear = w.map(artPt("ear_r_out")); val eye = p["eye_r"]!!
+            assertTrue("$f oreja por fuera del ojo", ear.x < eye.x)
+        }
+    }
 }

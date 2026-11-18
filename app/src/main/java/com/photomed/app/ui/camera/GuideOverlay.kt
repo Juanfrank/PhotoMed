@@ -20,6 +20,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
@@ -60,6 +64,29 @@ fun GuideOverlay(
     adaptTo: Map<String, Pt> = emptyMap(),
 ) {
     val art = GuideArtByZone[zone.id]
+    // Rostro: deformación rasgo a rasgo (thin-plate spline con ~140 puntos de control).
+    val mesh = remember(art, adaptTo) {
+        if (art == null || adaptTo.isEmpty() || art.controls.isEmpty()) null
+        else runCatching { FaceMeshWarp.fit(FaceControlKeys, art.controls, adaptTo) }.getOrNull()
+    }
+    if (art != null && mesh != null) {
+        val bmp = ImageBitmap.imageResource(art.drawable)
+        val paint = remember(tone) {
+            android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                colorFilter = android.graphics.LightingColorFilter(tone.color.toArgb(), 0)
+            }
+        }
+        Canvas(modifier) {
+            if (showGrid) drawGrid()
+            if (showContour) {
+                val cols = 36; val rows = 48
+                val verts = mesh.meshVertices(cols, rows, size.width, size.height)
+                drawIntoCanvas { it.nativeCanvas.drawBitmapMesh(bmp.asAndroidBitmap(), cols, rows, verts, 0, null, 0, paint) }
+                drawGuide(Guide(emptyList(), art.lines.map { (a, b) -> mesh.map(a) to mesh.map(b) }, art.marks.map { mesh.map(it) }), mirror = false)
+            }
+        }
+        return
+    }
     val warp = remember(art, adaptTo) {
         if (art == null || adaptTo.isEmpty()) null else {
             val det = GuideWarp.analyze(adaptTo)

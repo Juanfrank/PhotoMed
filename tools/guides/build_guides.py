@@ -98,6 +98,13 @@ ANCHORS = {
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from face_profile import face_profile
 FACE_PROFILE = face_profile()[1]
+FACE_CONTROLS = json.loads((SRC / "face_front_controls.json").read_text())
+# Labios: en el dibujo la boca está cerrada (contornos interiores juntos). Si la boca de la foto está
+# abierta, esos contornos se separan y estirarían la línea de la boca: se usa su línea media.
+for i in range(9):
+    a, b = FACE_CONTROLS[f"lip_upper_bottom_{i}"], FACE_CONTROLS[f"lip_lower_top_{i}"]
+    FACE_CONTROLS[f"lip_mid_{i}"] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+FACE_CONTROLS = {k: v for k, v in FACE_CONTROLS.items() if not k.startswith(("lip_upper_bottom_", "lip_lower_top_"))}
 
 def render(src, crop):
     im = Image.open(SRC / f"{src}.png").convert("L")
@@ -145,7 +152,11 @@ kt = ["// ARCHIVO GENERADO por tools/guides/build_guides.py — no editar a mano
       "    /** Anclas anatómicas: nombre → y (o x si empieza por \"x:\") en coordenadas normalizadas del encuadre. */",
       "    val anchors: Map<String, Float> = emptyMap(),",
       "    /** Contorno de la cabeza (cráneo → mentón): y, x izquierda, x derecha (normalizadas), por filas. */",
-      "    val outline: FloatArray = FloatArray(0))", "",
+      "    val outline: FloatArray = FloatArray(0),",
+      "    /** Puntos de control de la ilustración (x, y normalizadas) en el orden de [FaceControlKeys]. */",
+      "    val controls: FloatArray = FloatArray(0))", "",
+      "/** Claves de los puntos de control del rostro (malla de MediaPipe sobre el dibujo + orejas y vértice). */",
+      "val FaceControlKeys: Array<String> = arrayOf(" + ", ".join(f'\"{k}\"' for k in FACE_CONTROLS) + ")", "",
       "val GuideArtByZone: Map<String, GuideArt> = mapOf("]
 previews = []
 for zone, (src, crop, refs) in Z.items():
@@ -174,7 +185,11 @@ for zone, (src, crop, refs) in Z.items():
         for y, l, r in FACE_PROFILE:
             ol += [(y - y0) / fh, (l - x0) / fw, (r - x0) / fw]
         kt.append(f"        mapOf({', '.join(items)}),")
-        kt.append(f"        floatArrayOf({', '.join(f'{v:.4f}f' for v in ol)})),")
+        kt.append(f"        floatArrayOf({', '.join(f'{v:.4f}f' for v in ol)}),")
+        cc = []
+        for k, (x, y) in FACE_CONTROLS.items():
+            cc += [(x - x0) / fw, (y - y0) / fh]
+        kt.append(f"        floatArrayOf({', '.join(f'{v:.4f}f' for v in cc)})),")
     else:
         kt.append(f"        mapOf({', '.join(items)})),")
     # vista previa

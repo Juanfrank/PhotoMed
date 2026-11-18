@@ -3,8 +3,8 @@
 package com.photomed.app.align
 
 internal object HeadModel {
-    /** Vértice del cráneo (estimación antropométrica: ~11,5 cm sobre los ojos, sobre las orejas). */
-    val VERTEX = floatArrayOf(0f, 14.0f, -1.5f)
+    /** Vértice del cráneo (posición del dibujo, profundidad supuesta). */
+    val VERTEX = floatArrayOf(-0.045f, 13.599f, -1.500f)
     val POINTS: Map<String, FloatArray> = mapOf(
         "oval_0" to floatArrayOf(0.000f, 8.262f, 4.482f),
         "oval_1" to floatArrayOf(1.891f, 8.236f, 4.275f),
@@ -142,5 +142,12 @@ internal object HeadModel {
         "nose_base" to floatArrayOf(0.000f, -2.089f, 6.058f),
         "mouth_l" to floatArrayOf(2.456f, -4.343f, 4.284f),
         "mouth_r" to floatArrayOf(-2.456f, -4.343f, 4.284f),
+        "ear_r_top" to floatArrayOf(-8.263f, 3.182f, -4.500f),
+        "ear_r_out" to floatArrayOf(-9.102f, 1.735f, -5.500f),
+        "ear_r_low" to floatArrayOf(-6.961f, -2.605f, -3.500f),
+        "ear_l_top" to floatArrayOf(8.173f, 3.182f, -4.500f),
+        "ear_l_out" to floatArrayOf(9.012f, 1.735f, -5.500f),
+        "ear_l_low" to floatArrayOf(6.871f, -2.605f, -3.500f),
+        "vertex" to floatArrayOf(-0.045f, 13.599f, -1.500f),
     )
 }

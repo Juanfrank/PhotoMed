@@ -240,6 +240,15 @@ prueba con una foto real distorsionada (más oscura, más contraste, luz cálida
 
 ## Guía adaptada a la foto de referencia
 
+**Rostro (frontal, tercio superior, periocular, labios): rasgo a rasgo.** Thin-plate spline
+(Bookstein, 1989) con ~140 puntos de control: los de la malla de MediaPipe detectada sobre el propio
+dibujo (`tools/guides/face_controls.py`) se llevan a los mismos puntos de la foto: ojos (posición,
+amplitud y altura), cejas, nariz, boca (línea media de los labios, para que la boca abierta no
+ensanche el trazo), óvalo (frente, sienes, mejillas, mandíbula, mentón). Orejas (borde superior,
+hélice, lóbulo) y vértice del cráneo se proyectan desde el modelo 3D con la pose de la cabeza, así
+siguen giro, inclinación y cabeceo. La ilustración se dibuja como malla deformada (36×48 celdas).
+Sin puntos suficientes se usa el ajuste por franjas descrito abajo.
+
 1. **Inclinación**: ángulo de la línea entre los centros de los contornos de los ojos (o pupilas;
    hombros en el cuerpo). Los puntos se enderezan antes de ajustar y la guía se dibuja girada ese
    ángulo. La misma medida se usa en la estandarización ("Enderece la cabeza: inclinada N° hacia…"),
