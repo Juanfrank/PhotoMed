@@ -35,15 +35,15 @@ object FaceMeshMap {
     val GROUPS: Map<String, IntArray> = linkedMapOf(
         "oval_" to intArrayOf(10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152,
             148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109),
-        "brow_l_top_" to intArrayOf(336, 296, 334, 293, 300), "brow_l_bottom_" to intArrayOf(285, 295, 282, 283, 276),
+        "brow_l_top_" to intArrayOf(300, 293, 334, 296, 336), "brow_l_bottom_" to intArrayOf(276, 283, 282, 295, 285),
         "brow_r_top_" to intArrayOf(70, 63, 105, 66, 107), "brow_r_bottom_" to intArrayOf(46, 53, 52, 65, 55),
-        "eye_l_" to intArrayOf(362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398),
-        "eye_r_" to intArrayOf(33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246),
+        "eye_l_" to intArrayOf(362, 398, 384, 385, 386, 387, 388, 466, 263, 249, 390, 373, 374, 380, 381, 382),
+        "eye_r_" to intArrayOf(33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7),
         "lip_upper_top_" to intArrayOf(61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291),
         "lip_upper_bottom_" to intArrayOf(78, 191, 80, 81, 82, 13, 312, 311, 310),
-        "lip_lower_top_" to intArrayOf(78, 95, 88, 178, 87, 14, 317, 402, 318),
-        "lip_lower_bottom_" to intArrayOf(146, 91, 181, 84, 17, 314, 405, 321, 375),
-        "nose_bridge_" to intArrayOf(168, 6), "nose_bottom_" to intArrayOf(98, 2, 327),
+        "lip_lower_top_" to intArrayOf(318, 402, 317, 14, 87, 178, 88, 95, 78),
+        "lip_lower_bottom_" to intArrayOf(375, 321, 405, 314, 17, 84, 181, 91, 146),
+        "nose_bridge_" to intArrayOf(168, 4), "nose_bottom_" to intArrayOf(98, 2, 327),
     )
     /** Iris (468–477) para pupilas; base nasal y comisuras. */
     val SINGLE: Map<String, Int> = linkedMapOf(Landmarks.EYE_L to 473, Landmarks.EYE_R to 468, Landmarks.NOSE_BASE to 2,

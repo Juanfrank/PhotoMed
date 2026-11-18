@@ -23,6 +23,14 @@ EXTRA = {
     "vertex": (CX, 165),
 }
 EXTRA.update({k.replace("ear_r_", "ear_l_"): (2 * CX - x, y) for k, (x, y) in list(EXTRA.items()) if k.startswith("ear_r_")})
+# Cráneo: bordes laterales del contorno de la cabeza a tres alturas entre el vértice y la frente
+# (sin ellos la parte alta de la guía solo tiene el vértice y se dobla con la cabeza girada).
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+from face_profile import face_profile
+_prof = face_profile()[1]
+for k, yy in (("skull_1", 300), ("skull_2", 450), ("skull_3", 620)):
+    y, l, r = min(_prof, key=lambda t: abs(t[0] - yy))
+    EXTRA[k + "_r"] = (round(l, 1), round(y, 1)); EXTRA[k + "_l"] = (round(r, 1), round(y, 1))
 
 def mesh(task):
     import mediapipe as mp

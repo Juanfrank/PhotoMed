@@ -42,6 +42,31 @@ class FaceMeshWarp private constructor(
         return Offset(fx.toFloat(), (fy / H).toFloat())
     }
 
+    /**
+     * Fracción de celdas plegadas (orientación invertida) dentro del óvalo facial del dibujo: con
+     * detecciones muy ruidosas o cabezas muy giradas la malla puede cruzarse; entonces conviene el
+     * ajuste por franjas, más robusto.
+     */
+    fun foldFraction(keys: Array<String>, art: FloatArray, n: Int = 24): Float {
+        val oval = (0 until 36).mapNotNull { i -> keys.indexOf("oval_$i").takeIf { it >= 0 && !art[it * 2].isNaN() }?.let { Offset(art[it * 2], art[it * 2 + 1]) } }
+        if (oval.size < 8) return 0f
+        fun inside(x: Float, y: Float): Boolean {
+            var ins = false; var j = oval.size - 1
+            for (i in oval.indices) { val a = oval[i]; val b = oval[j]
+                if ((a.y > y) != (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) ins = !ins; j = i }
+            return ins
+        }
+        var bad = 0; var all = 0
+        for (j in 0 until n) for (i in 0 until n) {
+            val x = i / n.toFloat(); val y = j / n.toFloat()
+            if (!inside(x + 0.5f / n, y + 0.5f / n)) continue
+            all++
+            val p00 = map(Offset(x, y)); val p10 = map(Offset(x + 1f / n, y)); val p01 = map(Offset(x, y + 1f / n))
+            if ((p10.x - p00.x) * (p01.y - p00.y) - (p10.y - p00.y) * (p01.x - p00.x) <= 0f) bad++
+        }
+        return if (all == 0) 0f else bad / all.toFloat()
+    }
+
     /** Vértices de una malla [cols]×[rows] sobre la ilustración, en px del destino (para drawBitmapMesh). */
     fun meshVertices(cols: Int, rows: Int, width: Float, height: Float): FloatArray {
         val v = FloatArray((cols + 1) * (rows + 1) * 2)
@@ -56,26 +81,63 @@ class FaceMeshWarp private constructor(
     companion object {
         private const val H = 4f / 3f
         const val MIN_CONTROLS = 24
+        private val SINGLES = setOf("eye_l", "eye_r", "mouth_l", "mouth_r", "nose_base")
 
         /**
          * Correspondencias ilustración → foto. [art]: puntos de control normalizados en el orden de
          * [keys]; [points]: puntos detectados en la foto (unidades del ancho, como los detectores).
          */
-        fun fit(keys: Array<String>, art: FloatArray, points: Map<String, Pt>, lambda: Double = 2e-4): FaceMeshWarp? {
-            val pose = runCatching { HeadPose.fit(points) }.getOrNull()
-            // línea media de los labios (boca abierta o cerrada), como en los controles del dibujo
-            val pts = HashMap(points)
+        fun fit(keys: Array<String>, art: FloatArray, points: Map<String, Pt>, lambda: Double = 1e-2): FaceMeshWarp? {
+            val canon = com.photomed.app.align.FaceKeys.canonical(points)
+            val pose = runCatching { HeadPose.fit(canon) }.getOrNull()
+            // línea media de los labios (boca abierta o cerrada), como en los controles del dibujo;
+            // en orden canónico el labio inferior va de derecha a izquierda
+            val pts = HashMap(canon)
             for (i in 0 until 9) {
-                val a = points["lip_upper_bottom_$i"]; val b = points["lip_lower_top_$i"]
+                val a = canon["lip_upper_bottom_$i"]; val b = canon["lip_lower_top_${8 - i}"]
                 if (a != null && b != null) pts["lip_mid_$i"] = Pt((a.x + b.x) / 2, (a.y + b.y) / 2)
             }
             val s = ArrayList<Pt>(); val d = ArrayList<Pt>()
+            // Orejas y cráneo proyectados con la pose: con la cabeza girada, los del lado lejano caen
+            // sobre la cara (están ocultos) y plegarían la malla: solo se usan los que quedan fuera
+            // del óvalo facial (visibles).
+            val oval = (0 until 36).mapNotNull { canon["oval_$it"] }
+            fun insideOval(p: Pt): Boolean {
+                if (oval.size < 8) return false
+                var inside = false; var j = oval.size - 1
+                for (i in oval.indices) {
+                    val a = oval[i]; val b = oval[j]
+                    if ((a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside
+                    j = i
+                }
+                return inside
+            }
+            val hiddenEar = listOf("ear_r_", "ear_l_").filter { side ->
+                val out = pose?.let { p -> HeadModel.POINTS["${side}out"]?.let(p::project) }
+                out == null || insideOval(out)
+            }.toSet()
+            // Óvalo del lado lejano con la cabeza girada: sus puntos 3D proyectados quedan por dentro
+            // de la cola de la ceja o del ojo (están ocultos tras la mejilla) y cruzarían la malla.
+            val feats = canon.filterKeys { it.startsWith("eye_") || it.startsWith("brow_") || it.startsWith("lip_") || it.startsWith("nose_") }.values
+            val cx = feats.map { it.x }.average().toFloat()
+            fun occludedOval(p: Pt): Boolean {
+                val band = feats.filter { kotlin.math.abs(it.y - p.y) < 0.04f }
+                if (band.isEmpty()) return false
+                return if (p.x < cx) p.x > band.minOf { it.x } - 0.01f else p.x < band.maxOf { it.x } + 0.01f
+            }
             for ((i, k) in keys.withIndex()) {
+                if (hiddenEar.any { k.startsWith(it) }) continue
+                if (k.startsWith("oval_")) { val q = pts[k]; if (q != null && occludedOval(q)) continue }
+                // Puntos sueltos (pupilas, comisuras, base nasal): repiten o están dentro de un
+                // contorno; su ruido (y la diferencia pupila/centro del ojo entre motores) curvaría
+                // la malla. Los contornos ya fijan esos rasgos.
+                if (k in SINGLES) continue
                 val target: Pt = pts[k]
-                    ?: (if (k.startsWith("ear_")) pose?.let { p -> HeadModel.POINTS[k]?.let(p::project) } else null)
+                    ?: (if (k.startsWith("ear_") || k.startsWith("skull_")) pose?.let { p -> HeadModel.POINTS[k]?.let(p::project) } else null)
                     ?: (if (k == "vertex") pose?.let(HeadPose::vertex) else null)
                     ?: continue
                 if (art[i * 2].isNaN()) continue   // punto que no existe en este dibujo (p. ej. oreja oculta)
+                if (k.startsWith("skull_") && insideOval(target)) continue
                 val a = Pt(art[i * 2], art[i * 2 + 1] * H)
                 // puntos repetidos en la ilustración (p. ej. comisuras compartidas): solo el primero
                 if (s.any { kotlin.math.abs(it.x - a.x) < 1e-4f && kotlin.math.abs(it.y - a.y) < 1e-4f }) continue

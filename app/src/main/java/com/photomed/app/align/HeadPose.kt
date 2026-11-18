@@ -82,7 +82,8 @@ object HeadPose {
     }
 
     /** Ajuste crudo (ángulos geométricos sin calibrar, convención del modelo: cabeceo + = mira abajo). */
-    private fun fitRaw(points: Map<String, Pt>): Triple<FloatArray, Solve, FloatArray>? {
+    private fun fitRaw(raw: Map<String, Pt>): Triple<FloatArray, Solve, FloatArray>? {
+        val points = FaceKeys.canonical(raw)
         val keys = points.keys.filter { it in HeadModel.POINTS }
         if (keys.size < MIN_POINTS) return null
         val X = Array(keys.size) { HeadModel.POINTS.getValue(keys[it]) }

@@ -154,7 +154,7 @@ ctrl = {}
 for k, (x, y) in fc.items():
     yi = int(round(min(max(y, TOP_F + 2), FH - 1)))
     dx = x - CX
-    if k.startswith("ear_l_"): continue
+    if k.startswith("ear_l_") or k.startswith("skull_"): continue   # oreja lejana; cráneo: por la silueta
     if k.startswith("ear_r_"):
         # oreja cercana: marcada sobre el dibujo sintetizado (borde superior, hélice, lóbulo)
         ctrl[k] = {"ear_r_top": [272.0, 816.0], "ear_r_out": [228.0, 905.0], "ear_r_low": [392.0, 1236.0]}[k]

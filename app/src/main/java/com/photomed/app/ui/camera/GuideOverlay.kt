@@ -53,6 +53,9 @@ enum class GuideTone(val color: Color) {
     MATCH(Color(0xFF69F0AE)),
 }
 
+/** Máxima fracción de celdas plegadas en el rostro para usar la deformación rasgo a rasgo. */
+const val MAX_FOLDS = 0.04f
+
 @Composable
 fun GuideOverlay(
     zone: Zone,
@@ -70,6 +73,8 @@ fun GuideOverlay(
     val mesh = remember(art, adaptTo) {
         if (art == null || adaptTo.isEmpty() || art.controls.isEmpty()) null
         else runCatching { FaceMeshWarp.fit(FaceControlKeys, art.controls, adaptTo) }.getOrNull()
+            // malla plegada dentro del rostro (detección ruidosa, cabeza muy girada): ajuste por franjas
+            ?.takeIf { it.foldFraction(FaceControlKeys, art.controls) < MAX_FOLDS }
     }
     if (art != null && mesh != null) {
         val bmp = ImageBitmap.imageResource(art.drawable)

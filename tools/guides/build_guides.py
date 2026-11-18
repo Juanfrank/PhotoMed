@@ -99,11 +99,13 @@ ANCHORS = {
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from face_profile import face_profile
 FACE_PROFILE = face_profile()[1]
-FACE_CONTROLS = json.loads((SRC / "face_front_controls.json").read_text())
+sys.path.insert(0, str(ROOT / "tools/eval"))
+from canonical import canonical
+FACE_CONTROLS = canonical(json.loads((SRC / "face_front_controls.json").read_text()))
 # Labios: en el dibujo la boca está cerrada (contornos interiores juntos). Si la boca de la foto está
 # abierta, esos contornos se separan y estirarían la línea de la boca: se usa su línea media.
 for i in range(9):
-    a, b = FACE_CONTROLS[f"lip_upper_bottom_{i}"], FACE_CONTROLS[f"lip_lower_top_{i}"]
+    a, b = FACE_CONTROLS[f"lip_upper_bottom_{i}"], FACE_CONTROLS[f"lip_lower_top_{8 - i}"]
     FACE_CONTROLS[f"lip_mid_{i}"] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
 FACE_CONTROLS = {k: v for k, v in FACE_CONTROLS.items() if not k.startswith(("lip_upper_bottom_", "lip_lower_top_"))}
 
@@ -250,8 +252,9 @@ for zone, (src, crop, refs) in Z.items():
         if zone.endswith("_izq"):
             mk = json.loads((SRC / "face_key_mirror.json").read_text())
             oc = {mk[k]: [OW - x, y] for k, (x, y) in oc.items() if k in mk}
+        oc = canonical(oc)
         for i in range(9):
-            a, b = oc.get(f"lip_upper_bottom_{i}"), oc.get(f"lip_lower_top_{i}")
+            a, b = oc.get(f"lip_upper_bottom_{i}"), oc.get(f"lip_lower_top_{8 - i}")
             if a and b: oc[f"lip_mid_{i}"] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
         ol = [v for o in outline_src for v in ((o[0] - y0) / fh, (o[1] - x0) / fw, (o[2] - x0) / fw)] if outline_src else []
         cc = []

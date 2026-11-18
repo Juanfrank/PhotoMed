@@ -25,7 +25,8 @@ ks = [k for k in ctrl if k in model]
 X = np.array([model[k][:2] for k in ks]); U = np.array([ctrl[k] for k in ks], float)
 Xc = X - X.mean(0); Uc = (U - U.mean(0)) * np.array([1, -1])
 sc = (Uc * Xc).sum() / (Xc ** 2).sum()
-DEPTH = {"ear_r_top": -4.5, "ear_r_out": -5.5, "ear_r_low": -3.5, "ear_l_top": -4.5, "ear_l_out": -5.5, "ear_l_low": -3.5, "vertex": -1.5}
+DEPTH = {"skull_1_r": -1.0, "skull_1_l": -1.0, "skull_2_r": -2.0, "skull_2_l": -2.0, "skull_3_r": -2.5, "skull_3_l": -2.5,
+         "ear_r_top": -4.5, "ear_r_out": -5.5, "ear_r_low": -3.5, "ear_l_top": -4.5, "ear_l_out": -5.5, "ear_l_low": -3.5, "vertex": -1.5}
 for k, z in DEPTH.items():
     u, v = ctrl[k]
     model[k] = np.array([(u - U[:, 0].mean()) / sc + X[:, 0].mean(), -(v - U[:, 1].mean()) / sc + X[:, 1].mean(), z])
@@ -54,6 +55,7 @@ for g, idx in groups.items():
         if j in idx_key: mkeys[f"{g}{k}"] = idx_key[j]
 mkeys.update({"eye_l": "eye_r", "eye_r": "eye_l", "mouth_l": "mouth_r", "mouth_r": "mouth_l", "nose_base": "nose_base", "vertex": "vertex"})
 for s_ in ("top", "out", "low"): mkeys[f"ear_r_{s_}"] = f"ear_l_{s_}"; mkeys[f"ear_l_{s_}"] = f"ear_r_{s_}"
+for s_ in ("1", "2", "3"): mkeys[f"skull_{s_}_r"] = f"skull_{s_}_l"; mkeys[f"skull_{s_}_l"] = f"skull_{s_}_r"
 for i in range(9): mkeys[f"lip_mid_{i}"] = f"lip_mid_{8 - i}"
 (ROOT / "art/source/face_key_mirror.json").write_text(__import__("json").dumps(mkeys))
 print(len(mkeys), "claves simétricas")

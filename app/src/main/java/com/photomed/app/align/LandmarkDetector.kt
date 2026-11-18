@@ -64,7 +64,8 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
 
     fun detectFull(detector: Detector, bmp: Bitmap): Detection = try {
         val d = when (detector) {
-            Detector.FACE -> detectFaceAny(bmp)
+            // orden canónico de los contornos: el mismo para ML Kit y MediaPipe (ver FaceKeys)
+            Detector.FACE -> detectFaceAny(bmp).let { it.copy(points = FaceKeys.canonical(it.points)) }
             Detector.POSE -> Detection(detectPose(bmp))
             Detector.NONE -> Detection.EMPTY
         }
@@ -88,14 +89,14 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
                 null
             }
             if (mp != null && mp.points.isNotEmpty()) {
-                val pose = runCatching { HeadPose.fit(mp.points) }.getOrNull()
+                val pose = runCatching { HeadPose.fit(FaceKeys.canonical(mp.points)) }.getOrNull()
                 return mp.copy(gaze = runCatching { Gaze.fromIris(mp.points) }.getOrNull(), pose = pose)
             }
         }
         val d = detectFace(bmp)
         if (d.points.isEmpty()) return d
         // Mirada y pose geométrica son datos adicionales: un error al estimarlos no anula la detección.
-        val pose = runCatching { HeadPose.fit(d.points) }.getOrNull()
+        val pose = runCatching { HeadPose.fit(FaceKeys.canonical(d.points)) }.getOrNull()
         // ML Kit (modo rápido): el cabeceo de Euler es ruidoso; se promedia con el geométrico.
         val pitch = when {
             pose == null -> d.pitch

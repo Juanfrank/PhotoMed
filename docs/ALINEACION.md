@@ -249,6 +249,25 @@ hélice, lóbulo) y vértice del cráneo se proyectan desde el modelo 3D con la 
 siguen giro, inclinación y cabeceo. La ilustración se dibuja como malla deformada (36×48 celdas).
 Sin puntos suficientes se usa el ajuste por franjas descrito abajo.
 
+**Orden canónico de los contornos (corrección importante).** ML Kit y la malla de MediaPipe no
+numeran igual sus contornos (según el diagrama oficial de ML Kit: ojos empezando por el párpado
+superior, ceja izquierda y labio inferior en sentido contrario, puente nasal hasta la punta). Con
+ML Kit los puntos del dibujo se emparejaban con los equivocados y la guía se deformaba sin sentido.
+Ahora todos los puntos (de ambos motores, del dibujo y del modelo 3D) pasan por `FaceKeys.canonical`
+(misma regla en `tools/eval/canonical.py`): lados por posición en la imagen, ojos desde la comisura
+izquierda por el párpado superior, óvalo desde el punto superior sobre la línea media de la cara,
+curvas abiertas orientadas. Verificado: sin reordenaciones espurias en 297 poses sintéticas
+(guiñada ±40°, cabeceo ±25°, alabeo ±15°).
+
+**Prueba con retratos de stock** (`tools/eval/stock_faces.py`, `StockFacesGuideTest`; 24 fotos de
+Unsplash/Pexels en encuadre clínico, rectas y giradas ±10°, que no se guardan en el repositorio):
+la guía es la misma con los puntos de MediaPipe y con un "otro motor" que numera cada contorno
+distinto, cambia de lado y añade ruido (diferencia < 5 % del ancho). Mejoras derivadas: sin puntos
+sueltos (pupilas, comisuras) en la deformación —su ruido curvaba la malla—, orejas y cráneo
+proyectados solo si quedan fuera del rostro (visibles), óvalo lejano oculto descartado con la cabeza
+girada, puntos laterales del cráneo, y salvaguarda: si la malla se pliega dentro del rostro (> 4 %
+de las celdas) se usa el ajuste por franjas. 68 de 72 rostros usan la deformación rasgo a rasgo.
+
 **Oblicuos 45°:** la misma deformación rasgo a rasgo. Sus puntos de control salen de proyectar los
 del frontal con la misma superficie de cabeza girada que sintetizó el dibujo
 (`tools/guides/synth_oblique.py`); el izquierdo es el reflejo del derecho (claves simétricas de la
