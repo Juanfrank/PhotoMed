@@ -328,10 +328,20 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     }
     val tone = GuideTone.of(live?.eval, matchingEnabled)
     /**
+     * Cuero cabelludo (vértice): la cámara trasera debe mirar al suelo (teléfono horizontal, pantalla
+     * hacia arriba: cabeceo del sensor ≈ 90°); si se desvía más de 8°, se indica cuánto inclinarla.
+     */
+    fun overheadHint(): String? {
+        if (zone.guide != com.photomed.app.data.GuideType.SCALP || lensFacing == CameraSelector.LENS_FACING_FRONT) return null
+        val off = 90f - tilt.value.pitch
+        return if (off > 8f) "Cámara: cenital, inclinar %.0f°".format(off) else null
+    }
+    /**
      * Distancia: con referencia, la de su toma como objetivo ("N cm → M cm" si difiere > 15 %);
      * sin referencia, aviso de efecto selfie (< 80 cm).
      */
     fun distanceHint(): String? {
+        overheadHint()?.let { return it }
         if (zone.category != com.photomed.app.data.ZoneCategory.FACIAL) return null
         val d = live?.let { CameraGuidance.faceDistanceCm(it.currentPointsAll, focalNorm, zoomRatio) } ?: return null
         val target = refCond["DistanceCm"]?.toFloatOrNull()?.takeIf { showGhost && ghost != null }

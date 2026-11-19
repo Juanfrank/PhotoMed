@@ -1,10 +1,12 @@
 package com.photomed.app.data
 
-enum class ZoneCategory(val label: String) { FACIAL("Facial"), CORPORAL("Corporal"), FREE("Libre") }
+enum class ZoneCategory(val label: String) { FACIAL("Facial"), CAPILAR("Capilar"), CORPORAL("Corporal"), FREE("Libre") }
 
 /** Tipo de guía (contorno) que se dibuja sobre la cámara para cada zona. */
 enum class GuideType {
     FACE_FRONT, FACE_OBLIQUE, FACE_PROFILE, FOREHEAD, PERIOCULAR, LIPS, NECK,
+    /** Cuero cabelludo, vista cenital (vértice), para tricología. */
+    SCALP,
     TORSO_FRONT, BREASTS, TORSO_SIDE, BACK, GLUTES, LEGS, ARM, HANDS, FEET,
     /** Modo libre: la guía es el contorno de lo visible (referencia o cuadro actual). */
     FREE
@@ -40,6 +42,8 @@ enum class Zone(
         hint = "Labios relajados en contacto, comisuras sobre la línea horizontal."),
     NECK("cuello", "Cuello y escote", ZoneCategory.FACIAL, GuideType.NECK,
         hint = "Mentón al frente, hombros relajados."),
+    SCALP_VERTEX("cuero_cabelludo_vertice", "Cuero cabelludo (vértice)", ZoneCategory.CAPILAR, GuideType.SCALP,
+        hint = "Vista cenital: cámara paralela al suelo sobre la cabeza, frente hacia arriba del encuadre, raya en la línea media y coronilla en la cruz; cabello seco y peinado igual en cada toma."),
     TORSO_FRONT("abdomen_frontal", "Abdomen frontal", ZoneCategory.CORPORAL, GuideType.TORSO_FRONT,
         hint = "Brazos separados del cuerpo; ombligo sobre la cruz de referencia."),
     TORSO_SIDE("abdomen_lateral", "Abdomen lateral derecho", ZoneCategory.CORPORAL, GuideType.TORSO_SIDE,

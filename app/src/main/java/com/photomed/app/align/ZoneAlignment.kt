@@ -86,6 +86,13 @@ data class ZoneAlignment(
                     listOf("Mentón", "Escotadura yugular"),
                     "mandíbula, hombros y contorno cervical",
                 )
+                GuideType.SCALP -> ZoneAlignment(
+                    Detector.NONE, emptySet(),
+                    listOf(r("coronilla", 0.5f, 0.72f, 0.2f, 0.18f), r("contorno craneal", 0.5f, 0.667f, 0.4f, 0.5f, 0.8f),
+                        r("raya y línea frontal", 0.5f, 0.3f, 0.25f, 0.2f, 0.7f)),
+                    listOf("Vértice (coronilla)", "Línea de implantación frontal (centro)"),
+                    "contorno del cráneo, raya, coronilla y patrón del cabello",
+                )
                 GuideType.TORSO_FRONT -> ZoneAlignment(
                     Detector.POSE, L.TRUNK,
                     listOf(r("cintura", 0.5f, 0.72f, 0.45f, 0.14f), r("caderas", 0.5f, 1.12f, 0.45f, 0.12f),

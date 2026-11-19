@@ -330,6 +330,8 @@ private fun hLine(y: Float, x0: Float = 0.04f, x1: Float = 0.96f) = o(x0, y) to 
 private fun vLine(x: Float, y0: Float = 0.03f, y1: Float = 0.97f) = o(x, y0) to o(x, y1)
 private fun mirrorX(points: List<Offset>) = points.map { o(1f - it.x, it.y) }
 private fun open(p: List<Offset>) = p to false
+private fun ellipse(cx: Float, cy: Float, rx: Float, ry: Float, n: Int) =
+    (0 until n).map { val a = 2 * Math.PI * it / n; o(cx + rx * kotlin.math.cos(a).toFloat(), cy + ry * kotlin.math.sin(a).toFloat()) }
 private fun closed(p: List<Offset>) = p to true
 
 fun guideFor(type: GuideType): Guide = when (type) {
@@ -456,6 +458,23 @@ fun guideFor(type: GuideType): Guide = when (type) {
         ),
         lines = listOf(vLine(0.5f), hLine(0.29f, 0.2f, 0.8f), hLine(0.64f)),
         marks = listOf(o(0.5f, 0.62f)),
+    )
+
+    // Vista cenital del cuero cabelludo: cráneo visto desde arriba (más largo que ancho), frente
+    // arriba; raya en la línea media, línea interauricular y coronilla (vértice) en la cruz.
+    GuideType.SCALP -> Guide(
+        contours = listOf(
+            closed(ellipse(0.5f, 0.50f, 0.36f, 0.39f, 28)),
+            // línea de implantación frontal
+            open(listOf(o(0.27f, 0.22f), o(0.36f, 0.17f), o(0.50f, 0.15f), o(0.64f, 0.17f), o(0.73f, 0.22f))),
+            // pabellones auriculares (asoman a los lados, algo por delante del centro)
+            closed(listOf(o(0.14f, 0.43f), o(0.10f, 0.46f), o(0.10f, 0.53f), o(0.14f, 0.56f))),
+            closed(listOf(o(0.86f, 0.43f), o(0.90f, 0.46f), o(0.90f, 0.53f), o(0.86f, 0.56f))),
+            // coronilla
+            closed(ellipse(0.5f, 0.60f, 0.07f, 0.05f, 16)),
+        ),
+        lines = listOf(vLine(0.5f, 0.10f, 0.90f), hLine(0.495f, 0.10f, 0.90f)),
+        marks = listOf(o(0.5f, 0.60f), o(0.5f, 0.15f)),
     )
 
     GuideType.TORSO_FRONT -> Guide(

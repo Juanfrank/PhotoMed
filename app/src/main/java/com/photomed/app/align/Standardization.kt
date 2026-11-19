@@ -47,6 +47,9 @@ object Standardization {
 
     fun evaluate(zone: Zone, det: Detection, lighting: Lighting?): MatchEval {
         val t = target(zone)
+        // Zonas sin detector (cuero cabelludo, modo libre): sin referencia no hay nada que evaluar
+        // en la imagen; las indicaciones (p. ej. cámara cenital) las añade la cámara.
+        if (ZoneAlignment.of(zone).detector == Detector.NONE) return MatchEval(MatchStatus.SEARCHING, 0f, emptyList(), threshold = 1f)
         if (det.points.size < LiveDecision.MIN_POINTS) {
             val hint = if (t?.minYaw != null) "Perfil: alinee la oreja y el plano de Frankfort con la guía" else "No se detecta el rostro del paciente"
             return MatchEval(MatchStatus.SEARCHING, 0f, listOf(hint), threshold = 1f)

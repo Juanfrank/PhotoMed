@@ -88,6 +88,8 @@ object HintCues {
                 if ("izquierdo" in t) Icons.AutoMirrored.Filled.ArrowBack else Icons.AutoMirrored.Filled.ArrowForward, null, h)
             t.startsWith("poca luz") -> HintCue(Icons.Default.BrightnessLow, Icons.Default.Add, null, h)
             t.startsWith("demasiada luz") -> HintCue(Icons.Default.FlashOff, null, null, h)
+            // cámara cenital (cuero cabelludo): poner el teléfono horizontal sobre la cabeza
+            t.startsWith("cámara: cenital") -> HintCue(Icons.Default.PhotoCamera, Icons.Default.ArrowDownward, degrees(h), h)
             // cámara: perspectiva vertical
             t.startsWith("cámara: inclinar hacia abajo") -> HintCue(Icons.Default.PhotoCamera, Icons.Default.ArrowDownward, null, h)
             t.startsWith("cámara: inclinar hacia arriba") -> HintCue(Icons.Default.PhotoCamera, Icons.Default.ArrowUpward, null, h)
