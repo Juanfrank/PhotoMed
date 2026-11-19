@@ -125,6 +125,33 @@ Optimización: búsqueda exhaustiva gruesa (desplazamiento ±18 %, escala ±16 %
 no hay puntos, o ventana estrecha alrededor de la estimación anatómica; descenso por coordenadas de
 grueso a fino escalando alrededor del centroide de las regiones.
 
+### 4. Salvaguardas (la alineación automática nunca empeora a la de puntos)
+
+Evaluación `AlignmentRealTest` (84 casos: retomas reales de stock con los puntos detectados de
+nuevo y cambios sintéticos conocidos de escala, giro, desplazamiento y cámara inclinada 5°).
+Error medio en % del ancho de la imagen:
+
+| Variante | Antes | Ahora |
+|---|---|---|
+| Sin alinear | 4,30 | 4,30 |
+| Solo puntos | 0,15 | 0,15 |
+| Puntos + perspectiva | 0,12 | 0,12 |
+| Completa (puntos + perspectiva + contornos) | 0,11 (peor caso 0,91) | 0,10 (peor caso 0,35) |
+
+Se encontraron dos causas de empeoramiento:
+
+- **Perspectiva falsa**: un cambio de pose de la cabeza (3D) también reduce algo el residuo de
+  los puntos con un φ inexistente (hasta −7°), y "corregirlo" deformaba la foto. Ahora solo se
+  acepta si el residuo baja al menos un 40 % y |φ| ≥ 1°; la cámara inclinada de verdad (5°) se
+  sigue detectando (+4,6…+5,0°).
+- **Afinado por contornos a la deriva**: pelo, ropa o fondo podían arrastrar la semejanza lejos
+  de los puntos. Si el afinado sube el residuo de los puntos más de un 15 % (+0,2 % del ancho),
+  se descarta y queda la alineación por puntos.
+- En Comparar, la foto se corrige con el φ exacto (antes se redondeaba a 0,5° y no coincidía con
+  la semejanza calculada).
+
+La prueba falla si la alineación completa empeora a la de solo puntos en algún caso.
+
 ### 5. Coincidencia en vivo en la cámara
 
 Con una foto de referencia superpuesta y la capa **Coincidir** activa, `LiveMatcher` analiza ~5

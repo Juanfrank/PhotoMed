@@ -18,6 +18,9 @@ import kotlin.math.sqrt
  */
 object KeystoneFit {
     const val RANGE = 15f
+    /** Residuo máximo con corrección, relativo al residuo sin ella, para aceptar la perspectiva. */
+    const val ACCEPT_RATIO = 0.6f
+    const val MIN_DEG = 1f
 
     data class Result(val keystoneDeg: Float, val similarity: Similarity, val rms: Float, val rmsWithout: Float)
 
@@ -47,8 +50,9 @@ object KeystoneFit {
         }
         val phiBest = (lo + hi) / 2
         val best = fit(phiBest) ?: return null
-        // aceptar solo si reduce el residuo al menos un 10 %
-        return if (best.second < base.second * 0.9f) Result(phiBest, best.first, best.second, base.second)
+        // Aceptar solo si la mejora es clara: un cambio de pose de la cabeza (3D) también reduce algo
+        // el residuo con un φ falso, y corregir una perspectiva inexistente deforma la foto.
+        return if (abs(phiBest) >= MIN_DEG && best.second < base.second * ACCEPT_RATIO) Result(phiBest, best.first, best.second, base.second)
         else Result(0f, base.first, base.second, base.second)
     }
 

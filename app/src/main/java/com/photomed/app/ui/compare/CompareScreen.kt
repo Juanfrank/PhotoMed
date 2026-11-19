@@ -705,7 +705,8 @@ fun alignmentHint(zone: Zone) = ZoneAlignment.of(zone).description
 @Composable
 private fun rememberCorrected(uri: android.net.Uri, pitchDeg: Float, focalNorm: Float, color: ColorAdjust? = null): Any {
     val context = LocalContext.current
-    val key = (pitchDeg * 2).roundToInt() / 2f
+    // φ exacto: la semejanza se calculó sobre la foto corregida con este mismo ángulo
+    val key = pitchDeg
     val state = androidx.compose.runtime.produceState<Any>(uri, uri, key, focalNorm, color) {
         if (key == 0f && color == null) { value = uri; return@produceState }
         value = withContext(Dispatchers.Default) {

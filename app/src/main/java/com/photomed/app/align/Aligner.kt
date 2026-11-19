@@ -77,29 +77,7 @@ class Aligner(private val context: Context) {
                 it.detectFull(spec.detector, b) to it.detectFull(spec.detector, a0)
             } else Detection.EMPTY to Detection.EMPTY
             ensureActive()
-            val bPts = if (options.points) bDet.points else emptyMap()
-            val aPts0 = if (options.points) aDet0.points else emptyMap()
-            val (phi, src) = manualKeystone?.let { it to "manual" } ?: estimateKeystone(spec, b, a0, bPts, aPts0, options)
-            val a = ImageOps.correctPerspective(a0, phi, Perspective.DEFAULT_FOCAL)
-            val aPts = aPts0.mapValues { Perspective.mapPt(it.value, phi) }
-            val lm = if (options.points) landmarkTransform(spec.landmarks, bPts, aPts) else null
-            ensureActive()
-            val gb = bDet.gaze.takeIf { options.gaze }
-            val ga = aDet0.gaze.takeIf { options.gaze }
-            val method = when {
-                lm != null && options.contours -> "Puntos anatómicos + contornos"
-                lm != null -> "Puntos anatómicos"
-                options.contours -> "Contornos anatómicos"
-                else -> "Sin alineación geométrica"
-            }
-            val window = when {
-                !options.contours -> EdgeAligner.Window(0f, 0f, 0f)   // solo puntúa, no mueve
-                lm != null -> EdgeAligner.Window.NARROW
-                else -> EdgeAligner.Window.WIDE
-            }
-            val r = EdgeAligner(spec.contours).align(ImageOps.gray(b, REFINE_W), ImageOps.gray(a, REFINE_W),
-                lm?.first ?: if (options.contours) null else Similarity.IDENTITY, window)
-            AlignmentResult(r.transform, method, lm?.second.orEmpty(), r.score, r.regionScores, phi, src, gb, ga)
+            alignCore(spec, b, a0, bDet, aDet0, manualKeystone, options) { bmp -> autoMask(spec, bmp) }
         }
 
     /** Medición de contornos para una foto (óvalo facial si hay rostro, si no la silueta del sujeto). */
@@ -137,8 +115,61 @@ class Aligner(private val context: Context) {
         return SubjectSegmenter().use { it.segment(bmp) }
     }
 
+    companion object Core {
+        const val DETECT_W = 720
+        const val REFINE_W = 192
+        const val MEASURE_W = 360
+        /** El afinado por contornos puede subir el residuo de los puntos como mucho este factor (+ holgura). */
+        const val REFINE_TOLERANCE = 1.15f
+        const val REFINE_SLACK = 0.002f
+
+    /**
+     * Núcleo de la alineación (sin detectores ni cargador de imágenes, para poder probarlo con
+     * puntos ya detectados): perspectiva → semejanza por puntos → afinado por contornos.
+     * [maskOf]: silueta de una imagen (solo si no hay puntos para la perspectiva).
+     */
+    fun alignCore(spec: ZoneAlignment, b: Bitmap, a0: Bitmap, bDet: Detection, aDet0: Detection, manualKeystone: Float?,
+                  options: AlignOptions, maskOf: (Bitmap) -> Mask? = { null }): AlignmentResult {
+        val bPts = if (options.points) bDet.points else emptyMap()
+        val aPts0 = if (options.points) aDet0.points else emptyMap()
+        val (phi, src) = manualKeystone?.let { it to "manual" } ?: estimateKeystone(spec, b, a0, bPts, aPts0, options, maskOf)
+        val a = ImageOps.correctPerspective(a0, phi, Perspective.DEFAULT_FOCAL)
+        val aPts = aPts0.mapValues { Perspective.mapPt(it.value, phi) }
+        val lm = if (options.points) landmarkTransform(spec.landmarks, bPts, aPts) else null
+        val gb = bDet.gaze.takeIf { options.gaze }
+        val ga = aDet0.gaze.takeIf { options.gaze }
+        val method = when {
+            lm != null && options.contours -> "Puntos anatómicos + contornos"
+            lm != null -> "Puntos anatómicos"
+            options.contours -> "Contornos anatómicos"
+            else -> "Sin alineación geométrica"
+        }
+        val window = when {
+            !options.contours -> EdgeAligner.Window(0f, 0f, 0f)   // solo puntúa, no mueve
+            lm != null -> EdgeAligner.Window.NARROW
+            else -> EdgeAligner.Window.WIDE
+        }
+        val gB = ImageOps.gray(b, REFINE_W); val gA = ImageOps.gray(a, REFINE_W)
+        val edges = EdgeAligner(spec.contours)
+        var r = edges.align(gB, gA, lm?.first ?: if (options.contours) null else Similarity.IDENTITY, window)
+        var m = method
+        // Salvaguarda: los puntos anatómicos mandan. Si el afinado por contornos (pelo, ropa, fondo)
+        // aleja los puntos de su sitio, se descarta y queda la alineación por puntos.
+        if (lm != null && r.transform != lm.first) {
+            val keys = lm.second
+            val pa = keys.map { aPts[it]!! }; val pb = keys.map { bPts[it]!! }
+            val base = Similarity.rms(lm.first, pa, pb)
+            val refined = Similarity.rms(r.transform, pa, pb)
+            if (refined > base * REFINE_TOLERANCE + REFINE_SLACK) {
+                r = edges.align(gB, gA, lm.first, EdgeAligner.Window(0f, 0f, 0f))
+                m = "Puntos anatómicos"
+            }
+        }
+        return AlignmentResult(r.transform, m, lm?.second.orEmpty(), r.score, r.regionScores, phi, src, gb, ga)
+    }
+
     private fun estimateKeystone(spec: ZoneAlignment, b: Bitmap, a: Bitmap, bPts: Map<String, Pt>, aPts: Map<String, Pt>,
-                                 options: AlignOptions): Pair<Float, String> {
+                                 options: AlignOptions, maskOf: (Bitmap) -> Mask?): Pair<Float, String> {
         if (options.contours && options.beforeOutline != null && options.afterOutline != null) {
             KeystoneFit.fromOutlines(options.beforeOutline, options.afterOutline)?.let { return it to "contornos seleccionados" }
         }
@@ -147,18 +178,14 @@ class Aligner(private val context: Context) {
             return it.keystoneDeg to "proporciones de ${keys.size} puntos de contorno"
         }
         if (!options.contours) return 0f to ""
-        val mb = autoMask(spec, Bitmap.createScaledBitmap(b, MEASURE_W, MEASURE_W * 4 / 3, true))?.let(ContourMetrics::of)
-        val ma = autoMask(spec, Bitmap.createScaledBitmap(a, MEASURE_W, MEASURE_W * 4 / 3, true))?.let(ContourMetrics::of)
+        val mb = maskOf(Bitmap.createScaledBitmap(b, MEASURE_W, MEASURE_W * 4 / 3, true))?.let(ContourMetrics::of)
+        val ma = maskOf(Bitmap.createScaledBitmap(a, MEASURE_W, MEASURE_W * 4 / 3, true))?.let(ContourMetrics::of)
         if (mb != null && ma != null) {
             KeystoneFit.fromOutlines(mb.outline, ma.outline)?.let { return it to "proporciones de la silueta" }
         }
         return 0f to ""
     }
 
-    companion object {
-        const val DETECT_W = 720
-        const val REFINE_W = 192
-        const val MEASURE_W = 360
     }
 }
 
