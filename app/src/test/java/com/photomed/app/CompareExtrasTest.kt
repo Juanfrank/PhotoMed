@@ -111,6 +111,28 @@ class CompareExtrasTest {
         assertTrue("todos los píxeles idénticos", px.indices.all { (px[it] and 0xFFFFFF) == (d[it] and 0xFFFFFF) })
     }
 
+    @Test
+    fun previewTimelineMatchesGifFrames() {
+        // la vista previa usa gifStateAt; el archivo, la lista de cuadros: deben coincidir en todo el ciclo
+        for (timing in listOf(com.photomed.app.ui.compare.CompareExport.GifTiming(1200, 700),
+                              com.photomed.app.ui.compare.CompareExport.GifTiming(500, 0),
+                              com.photomed.app.ui.compare.CompareExport.GifTiming(2000, 2500))) {
+            val n = 3
+            val frames = ArrayList<Triple<Int, Float, Int>>()   // foto, avance, duración (como gifFrames)
+            for (i in 0 until n) {
+                frames += Triple(i, 0f, timing.holdMs)
+                for (k in 1..timing.steps) frames += Triple(i, k / (timing.steps + 1f), timing.stepMs)
+            }
+            assertEquals(timing.cycleMs(n), frames.sumOf { it.third })
+            var t = 0L
+            for ((i, f, d) in frames) {
+                val (pi, pf) = com.photomed.app.ui.compare.CompareExport.gifStateAt(t + d / 2, n, timing)
+                assertEquals(i, pi); assertEquals(f, pf, 1e-4f)
+                t += d
+            }
+        }
+    }
+
     /** Descodificador GIF mínimo (paleta global, LZW) para verificar el codificador. */
     private fun decodeGif(b: ByteArray): List<IntArray> {
         var p = 6

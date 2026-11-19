@@ -120,6 +120,8 @@ Compose, Coil, Google ML Kit (rostro, pose, segmentación) y MediaPipe Face Land
 - **Orden de la cuadrícula** (menú ⋮): fecha antigua primero, reciente primero o manual; en la
   cuadrícula se reordena manteniendo pulsada una foto y arrastrándola (o con las acciones de
   accesibilidad "Mover antes/después"). Es solo presentación: la referencia de la alineación no cambia.
-- **Exportar**: fotos ajustadas, cuadrícula, **lado a lado** (una fila) y **GIF animado** en modo
-  desplazamiento (cortinilla como el deslizador) o fundido, con codificador propio (paleta de 256
+- **Exportar** (una opción a la vez): fotos ajustadas, cuadrícula, **lado a lado** (una fila) o
+  **GIF animado** en modo desplazamiento (cortinilla como el deslizador) o fundido, con tiempo por
+  imagen (0,3–5 s) y de transición (0–3 s; 0 = corte) ajustables y **vista previa animada** que usa
+  el mismo dibujo y los mismos tiempos que el archivo. Codificador GIF propio (paleta de 256
   colores por corte de la mediana, LZW).

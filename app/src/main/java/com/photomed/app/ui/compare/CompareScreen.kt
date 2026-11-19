@@ -694,13 +694,24 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         ExportSheet(
             count = seq.size, aligned = shown.isNotEmpty(), colorMatched = colorAdjusts.isNotEmpty(), cropped = crop != null,
             onDismiss = { exportSheet = false },
+            // vista previa del GIF: las fotos ajustadas (alineación, recorte, color) en tamaño reducido
+            loadPreview = {
+                val labels = stampLabels(seq.map { it.takenAt })
+                seq.mapIndexed { i, p ->
+                    val d = labels[i]
+                    CompareExport.render(context, p, shown[p.key], colorAdjusts[p.key], width = 300, crop = crop) to
+                        (if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d")
+                }
+            },
             onExport = { ch, toGallery, progress ->
                 val e = exp
                 val anonymize = ch.anonymize
                 val dir = java.io.File(context.cacheDir, "share/export").apply { deleteRecursively(); mkdirs() }
                 val order = displayOrder(seq.map { it.key }, gridOrder, manualOrder).map { k -> seq.indexOfFirst { it.key == k } }
-                val r = CompareExport.build(context, repo, seq, shown, colorAdjusts, ch.individual, ch.grid, anonymize, dir, progress,
-                    side = ch.side, gif = ch.gif, crop = crop, labels = stampLabels(seq.map { it.takenAt }), order = order)
+                val r = CompareExport.build(context, repo, seq, shown, colorAdjusts,
+                    individual = ch.kind == ExportKind.INDIVIDUAL, grid = ch.kind == ExportKind.GRID, anonymize = anonymize, dir = dir,
+                    onProgress = progress, side = ch.kind == ExportKind.SIDE, gif = ch.gif.takeIf { ch.kind == ExportKind.GIF },
+                    gifTiming = ch.timing, crop = crop, labels = stampLabels(seq.map { it.takenAt }), order = order)
                 when {
                     r.files.isEmpty() -> "No se pudo exportar ninguna imagen"
                     toGallery && e != null -> {

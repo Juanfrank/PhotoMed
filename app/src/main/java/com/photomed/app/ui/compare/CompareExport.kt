@@ -29,6 +29,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.coroutines.coroutineContext
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
@@ -104,55 +105,78 @@ object CompareExport {
     enum class GifMode(val label: String) { SLIDE("Desplazamiento"), FADE("Fundido") }
 
     const val GIF_W = 480
-    const val GIF_HOLD_MS = 1200
-    const val GIF_STEPS = 10
+    /** Duración de cada paso de la transición (≈ 14 cuadros/s). */
     const val GIF_STEP_MS = 70
 
+    /** Tiempos del GIF: [holdMs] cada foto quieta y [transitionMs] el paso a la siguiente (0 = corte). */
+    data class GifTiming(val holdMs: Int = 1200, val transitionMs: Int = 700) {
+        /** Pasos intermedios de la transición. */
+        val steps: Int get() = if (transitionMs <= 0) 0 else (transitionMs / GIF_STEP_MS.toFloat()).roundToInt().coerceIn(2, 30)
+        val stepMs: Int get() = if (steps == 0) 0 else transitionMs / steps
+        /** Duración de un ciclo completo con [n] fotos. */
+        fun cycleMs(n: Int) = n * (holdMs + steps * stepMs)
+    }
+
     /**
-     * Cuadros del GIF: cada foto se mantiene [GIF_HOLD_MS] y pasa a la siguiente (y la última a la
-     * primera) en [GIF_STEPS] pasos, por fundido o con una cortinilla vertical que avanza de derecha
-     * a izquierda (como el deslizador de la app). Etiqueta de fecha en cada cuadro.
+     * Estado de la animación en el instante [timeMs] (en bucle): foto actual y avance de la
+     * transición hacia la siguiente (0 = quieta), cuantizado en los mismos pasos que el GIF para que
+     * la vista previa sea idéntica al archivo.
      */
-    fun gifFrames(images: List<Pair<Bitmap, String>>, mode: GifMode): List<Pair<IntArray, Int>> {
-        val w = GIF_W; val h = w * 4 / 3
-        val scaled = images.map { (b, l) -> Bitmap.createScaledBitmap(b, w, h, true) to l }
-        val out = ArrayList<Pair<IntArray, Int>>()
+    fun gifStateAt(timeMs: Long, n: Int, timing: GifTiming): Pair<Int, Float> {
+        if (n < 1) return 0 to 0f
+        val per = timing.holdMs + timing.steps * timing.stepMs
+        val t = (timeMs % (per.toLong() * n)).toInt()
+        val i = t / per; val r = t % per
+        if (r < timing.holdMs || timing.steps == 0) return i to 0f
+        val k = ((r - timing.holdMs) / timing.stepMs.coerceAtLeast(1)).coerceAtMost(timing.steps - 1) + 1
+        return i to k / (timing.steps + 1f)
+    }
+
+    /** Dibuja un cuadro: foto [a] → [b] con avance [t] (fundido o cortinilla) y sus etiquetas. */
+    fun drawGifFrame(c: Canvas, w: Int, h: Int, a: Bitmap, b: Bitmap, la: String, lb: String, t: Float, mode: GifMode) {
         val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = w * 0.045f; typeface = Typeface.DEFAULT_BOLD }
         val pill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x99000000.toInt() }
-        fun label(c: Canvas, s: String, right: Boolean) {
+        fun label(s: String, right: Boolean) {
             val pad = w * 0.02f; val tw = text.measureText(s)
             val x0 = if (right) w - pad * 3 - tw else pad
             c.drawRoundRect(RectF(x0, pad, x0 + pad * 2 + tw, pad * 3 + text.textSize), pad, pad, pill)
             c.drawText(s, x0 + pad, pad * 1.6f + text.textSize, text)
         }
-        fun frame(draw: (Canvas) -> Unit): IntArray {
-            val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888); draw(Canvas(b))
-            return IntArray(w * h).also { b.getPixels(it, 0, w, 0, 0, w, h) }
-        }
-        val alpha = Paint(Paint.FILTER_BITMAP_FLAG)
-        val line = Paint().apply { color = android.graphics.Color.WHITE; strokeWidth = w * 0.006f }
-        for (i in scaled.indices) {
-            val (a, la) = scaled[i]; val (b, lb) = scaled[(i + 1) % scaled.size]
-            out += frame { c -> c.drawBitmap(a, 0f, 0f, null); label(c, la, false) } to GIF_HOLD_MS
-            for (k in 1 until GIF_STEPS) {
-                val t = k / GIF_STEPS.toFloat()
-                out += frame { c ->
-                    when (mode) {
-                        GifMode.FADE -> {
-                            c.drawBitmap(a, 0f, 0f, null)
-                            alpha.alpha = (t * 255).toInt(); c.drawBitmap(b, 0f, 0f, alpha)
-                            label(c, if (t < 0.5f) la else lb, false)
-                        }
-                        GifMode.SLIDE -> {
-                            val x = w * (1f - t)
-                            c.drawBitmap(a, 0f, 0f, null)
-                            c.save(); c.clipRect(x, 0f, w.toFloat(), h.toFloat()); c.drawBitmap(b, 0f, 0f, null); c.restore()
-                            c.drawLine(x, 0f, x, h.toFloat(), line)
-                            label(c, la, false); label(c, lb, true)
-                        }
-                    }
-                } to GIF_STEP_MS
+        val dst = RectF(0f, 0f, w.toFloat(), h.toFloat())
+        val img = Paint(Paint.FILTER_BITMAP_FLAG)
+        c.drawBitmap(a, null, dst, img)
+        if (t <= 0f) { label(la, false); return }
+        when (mode) {
+            GifMode.FADE -> {
+                c.drawBitmap(b, null, dst, Paint(Paint.FILTER_BITMAP_FLAG).apply { alpha = (t * 255).toInt() })
+                label(if (t < 0.5f) la else lb, false)
             }
+            GifMode.SLIDE -> {
+                val x = w * (1f - t)
+                c.save(); c.clipRect(x, 0f, w.toFloat(), h.toFloat()); c.drawBitmap(b, null, dst, img); c.restore()
+                c.drawLine(x, 0f, x, h.toFloat(), Paint().apply { color = android.graphics.Color.WHITE; strokeWidth = w * 0.006f })
+                label(la, false); label(lb, true)
+            }
+        }
+    }
+
+    /**
+     * Cuadros del GIF: cada foto quieta [GifTiming.holdMs] y paso a la siguiente (la última vuelve a
+     * la primera) en [GifTiming.steps] pasos por fundido o cortinilla (como el deslizador).
+     */
+    fun gifFrames(images: List<Pair<Bitmap, String>>, mode: GifMode, timing: GifTiming = GifTiming()): List<Pair<IntArray, Int>> {
+        val w = GIF_W; val h = w * 4 / 3
+        val scaled = images.map { (b, l) -> Bitmap.createScaledBitmap(b, w, h, true) to l }
+        val out = ArrayList<Pair<IntArray, Int>>()
+        fun frame(a: Int, t: Float): IntArray {
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            val (ba, la) = scaled[a]; val (bb, lb) = scaled[(a + 1) % scaled.size]
+            drawGifFrame(Canvas(bmp), w, h, ba, bb, la, lb, t, mode)
+            return IntArray(w * h).also { bmp.getPixels(it, 0, w, 0, 0, w, h) }
+        }
+        for (i in scaled.indices) {
+            out += frame(i, 0f) to timing.holdMs
+            for (k in 1..timing.steps) out += frame(i, k / (timing.steps + 1f)) to timing.stepMs
         }
         return out
     }
@@ -174,6 +198,7 @@ object CompareExport {
         side: Boolean = false,
         /** Animación GIF (null = no). */
         gif: GifMode? = null,
+        gifTiming: GifTiming = GifTiming(),
         /** Recorte común según la alineación (ver [overlapCrop]). */
         crop: Similarity? = null,
         /** Etiquetas (fecha, y hora si hay fotos del mismo día); por defecto, la fecha. */
@@ -215,7 +240,7 @@ object CompareExport {
             coroutineContext.ensureActive()
             val bytes = withContext(Dispatchers.Default) {
                 val enc = GifEncoder(GIF_W, GIF_W * 4 / 3)
-                gifFrames(rendered, gif).forEach { (px, ms) -> enc.add(px, ms) }
+                gifFrames(rendered, gif, gifTiming).forEach { (px, ms) -> enc.add(px, ms) }
                 enc.toByteArray()
             }
             withContext(Dispatchers.IO) {

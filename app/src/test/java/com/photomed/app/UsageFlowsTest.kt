@@ -19,6 +19,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import com.photomed.app.align.AlignOptions
@@ -168,6 +169,39 @@ class UsageFlowsTest {
             File("build/reports").mkdirs()
             File("build/reports/compare_same_day.png").outputStream().use { img.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, it) }
         }
+    }
+
+    @Test
+    fun exportSheetSingleChoiceAndGifPreview() {
+        var choice: com.photomed.app.ui.compare.ExportChoice? = null
+        val bmps = listOf(android.graphics.Color.RED, android.graphics.Color.BLUE).map { c ->
+            android.graphics.Bitmap.createBitmap(90, 120, android.graphics.Bitmap.Config.ARGB_8888).apply { eraseColor(c) } to "x"
+        }
+        setContent {
+            com.photomed.app.ui.compare.ExportSheet(count = 2, aligned = true, colorMatched = false, onDismiss = {},
+                loadPreview = { bmps },
+                onExport = { ch, _, _ -> choice = ch; null }, onMessage = {})
+        }
+        waitText("Animación GIF")
+        // la vista previa es una animación sin fin: el reloj de la prueba avanza a mano
+        compose.mainClock.autoAdvance = false
+        // elección única: al marcar GIF se desmarca la cuadrícula
+        compose.onNodeWithText("Animación GIF").performClick()
+        compose.mainClock.advanceTimeBy(200)
+        compose.onNode(androidx.compose.ui.test.hasText("Cuadrícula con fechas")).assertExists()
+        waitText("Tiempo por imagen", substring = true)
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithContentDescription("Vista previa del GIF").assertExists()
+        compose.onNodeWithContentDescription("Tiempo de transición")
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(0f) }
+        compose.mainClock.advanceTimeBy(100)
+        waitText("sin transición", substring = true)
+        compose.onNodeWithText("  Guardar", substring = true).performClick()
+        compose.mainClock.advanceTimeBy(200)
+        repeat(50) { if (choice == null) { compose.mainClock.advanceTimeBy(100); Thread.sleep(20) } }
+        assertEquals(com.photomed.app.ui.compare.ExportKind.GIF, choice!!.kind)
+        assertEquals(0, choice!!.timing.transitionMs)
+        assertEquals(1200, choice!!.timing.holdMs)
     }
 
     @Test
