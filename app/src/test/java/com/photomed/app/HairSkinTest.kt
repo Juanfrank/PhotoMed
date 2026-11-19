@@ -68,4 +68,37 @@ class HairSkinTest {
         assertTrue(s, s.contains("retrocede"))
         assertTrue(com.photomed.app.ui.compare.hairlineSummary(listOf(mapOf("HairlineIpd" to "0.8"), emptyMap())) == null)
     }
+
+    @Test
+    fun ovalSnapAndOcclusionOnStock() {
+        val json = javaClass.getResourceAsStream("/stock/stock_faces.json")?.bufferedReader()?.readText()
+        assumeTrue("sin retratos de stock", json != null)
+        val o = JSONObject(json!!)
+        val dir = File("build/reports/oval_snap").apply { mkdirs() }
+        val moves = ArrayList<Float>(); val occl = HashMap<String, Int>()
+        for (k in o.keys().asSequence().filter { it.endsWith("_r0") }.sorted()) {
+            val lab = labels(k) ?: continue
+            val p = o.getJSONObject(k).getJSONObject("pts")
+            val pts = com.photomed.app.align.FaceKeys.canonical(p.keys().asSequence().associateWith { kk -> p.getJSONArray(kk).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1).toFloat()) } })
+            val snapped = HairSkin.snapOval(lab, pts)
+            val faceW = (0 until 36).maxOf { pts["oval_$it"]!!.x } - (0 until 36).minOf { pts["oval_$it"]!!.x }
+            val m = (0 until 36).map { i -> val a = pts["oval_$i"]!!; val b = snapped["oval_$i"]!!; kotlin.math.hypot(a.x - b.x, a.y - b.y) / faceW }
+            moves += m.average().toFloat()
+            occl[k] = HairSkin.occluded(lab, pts).size
+            val img = javaClass.getResourceAsStream("/stock/$k.jpg")?.let { BitmapFactory.decodeStream(it) }?.copy(Bitmap.Config.ARGB_8888, true) ?: continue
+            val c = Canvas(img)
+            val red = Paint().apply { color = Color.RED; strokeWidth = 2f }; val green = Paint().apply { color = Color.GREEN; strokeWidth = 2f }
+            for (i in 0 until 36) {
+                val a = pts["oval_$i"]!!; val b = snapped["oval_$i"]!!
+                c.drawCircle(a.x * img.width, a.y * img.width, 2f, red); c.drawCircle(b.x * img.width, b.y * img.width, 2.5f, green)
+            }
+            File(dir, "$k.png").outputStream().use { img.compress(Bitmap.CompressFormat.PNG, 90, it) }
+        }
+        assumeTrue(moves.isNotEmpty())
+        println("ÓVALO: desplazamiento medio %.1f %% del ancho de la cara (máx. %.1f %%)".format(moves.average() * 100, moves.max() * 100))
+        println("TAPADOS: " + occl.entries.sortedByDescending { it.value }.take(6).joinToString { "${it.key.take(18)}=${it.value}" })
+        // ajustes moderados (la segmentación corrige, no reemplaza) y pocos puntos tapados en rostros despejados
+        assertTrue(moves.average() < 0.05)
+        assertTrue(occl.values.count { it > 20 } <= 3)
+    }
 }

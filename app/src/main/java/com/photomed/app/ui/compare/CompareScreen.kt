@@ -1,6 +1,7 @@
 package com.photomed.app.ui.compare
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.Palette
@@ -97,6 +98,10 @@ import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.verticalScroll
 import com.photomed.app.ui.formatDate
 import com.photomed.app.ui.theme.Md3Spacing
 import kotlinx.coroutines.Dispatchers
@@ -158,6 +163,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     var hairlineInfo by remember { mutableStateOf<String?>(null) }
     var nearCaptured by remember { mutableStateOf(false) }
     var exportSheet by remember { mutableStateOf(false) }
+    var lastTouch by remember { mutableStateOf(0L) }
+    var controlsVisible by remember { mutableStateOf(true) }
     /** Recortar todas las fotos al área común que dejan tras alinearse (sin bordes negros). */
     var cropToAlign by remember { mutableStateOf(prefs.getBoolean("compare_crop", false)) }
     var crop by remember { mutableStateOf<Similarity?>(null) }
@@ -286,6 +293,14 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         }
     }
 
+    // Ocultar los controles inferiores tras unos segundos sin tocar (solo con fotos en comparación)
+    LaunchedEffect(lastTouch, seqKeys, alignJob, settings, exportSheet) {
+        controlsVisible = true
+        if (CompareIdle.enabled && seqKeys.size >= 2 && !settings && !exportSheet) {
+            kotlinx.coroutines.delay(CompareIdle.HIDE_MS); controlsVisible = alignJob?.isActive == true
+        }
+    }
+
     LaunchedEffect(nearCaptured, seqKeys) {
         if (nearCaptured && seqKeys.size >= 2 && alignedFor != seqKeys && alignJob?.isActive != true) runAlign()
     }
@@ -309,75 +324,17 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            Text("Alineación automática", style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = Md3Spacing.s3, vertical = Md3Spacing.s1))
-                            CheckItem("Usar puntos anatómicos", options.points) { setOption(options.copy(points = it)) }
-                            CheckItem("Usar contornos", options.contours) { setOption(options.copy(contours = it)) }
-                            CheckItem("Usar mirada (gaze)", options.gaze) { setOption(options.copy(gaze = it)) }
-                            CheckItem("Recortar según la alineación", cropToAlign) {
-                                cropToAlign = it; prefs.edit().putBoolean("compare_crop", it).apply()
-                                if (it && !validAlign) scope.launch { snackbar.showSnackbar("Se aplicará al alinear automáticamente") }
-                            }
-                            HorizontalDivider()
-                            Text("Orden de la cuadrícula", style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = Md3Spacing.s3, vertical = Md3Spacing.s1))
-                            GridOrder.entries.forEach { o ->
-                                DropdownMenuItem(
-                                    text = { Text(o.label) },
-                                    leadingIcon = { Icon(if (gridOrder == o) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked, null,
-                                        tint = if (gridOrder == o) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
-                                    onClick = {
-                                        if (o == GridOrder.MANUAL && gridOrder != GridOrder.MANUAL)
-                                            manualOrder = displayOrder(seqKeys, gridOrder, manualOrder)
-                                        gridOrder = o; menu = false
-                                        if (o == GridOrder.MANUAL) scope.launch { snackbar.showSnackbar("Mantenga pulsada una foto de la cuadrícula y arrástrela") }
-                                    },
-                                    modifier = Modifier.semantics { this.selected = gridOrder == o },
-                                )
-                            }
-                            HorizontalDivider()
+                            // menú corto: el resto, agrupado en la hoja de ajustes de comparación
                             DropdownMenuItem(
-                                text = { Text(if (colorAdjusts.isEmpty()) "Igualar color de piel" else "Quitar igualación de color") },
-                                leadingIcon = { Icon(Icons.Default.Palette, null) },
-                                enabled = seq != null,
-                                onClick = { menu = false; if (colorAdjusts.isEmpty()) colorDialog = true else colorAdjusts = emptyMap() },
-                            )
-                            if (n > 2 && colorAdjusts.isEmpty()) DropdownMenuItem(
-                                text = { Text("Igualar color de todas (automático)") },
-                                leadingIcon = { Icon(Icons.Default.AutoFixHigh, null) },
-                                onClick = {
-                                    menu = false
-                                    val s = seq ?: return@DropdownMenuItem
-                                    scope.launch {
-                                        val out = s.drop(1).mapNotNull { p ->
-                                            runCatching { autoColorAdjust(context, aligner, s[0], p) }
-                                                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
-                                                .getOrNull()?.let { p.key to it }
-                                        }.toMap()
-                                        colorAdjusts = out
-                                        snackbar.showSnackbar(if (out.isEmpty()) "No se encontró piel para igualar" else "Color igualado en ${out.size} fotos")
-                                    }
-                                },
+                                text = { Text("Ajustes de comparación") },
+                                leadingIcon = { Icon(Icons.Default.Tune, null) },
+                                onClick = { menu = false; settings = true },
                             )
                             DropdownMenuItem(
                                 text = { Text("Exportar imágenes ajustadas") },
                                 leadingIcon = { Icon(Icons.Default.IosShare, null) },
                                 enabled = seq != null,
                                 onClick = { menu = false; exportSheet = true },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Contornos (configuración)") },
-                                leadingIcon = { Icon(Icons.Default.Straighten, null) },
-                                enabled = seq != null,
-                                onClick = { menu = false; measure = true },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Perspectiva y ajustes") },
-                                leadingIcon = { Icon(Icons.Default.Tune, null) },
-                                enabled = seq != null,
-                                onClick = { menu = false; settings = true },
                             )
                             DropdownMenuItem(
                                 text = { Text("Restablecer zoom") },
@@ -389,7 +346,15 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 }
             )
         },
-        snackbarHost = { SnackbarHost(snackbar) },
+        snackbarHost = {
+            androidx.compose.foundation.layout.Column {
+                val (_, _, _, seqC, _, nC) = derive()
+                com.photomed.app.ui.components.CoachMark("comparar_gestos", Icons.Default.TouchApp,
+                    "Los controles se ocultan solos: toque para verlos. En la cuadrícula, mantenga pulsada una foto y arrástrela para reordenar. " +
+                        "Ajustes y recorte en ⋮.", show = seqC != null && nC >= 2)
+                SnackbarHost(snackbar)
+            }
+        },
     ) { padding ->
         val (photos, zonesWithPhotos, visible, seq, seqKeys, n, timeline, reference, target, validAlign) = derive()
         val aligning = alignJob?.isActive == true
@@ -402,7 +367,11 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 "Tome al menos dos fotografías de una zona para compararlas.", Modifier.padding(padding))
             return@Scaffold
         }
-        Column(Modifier.padding(padding).fillMaxSize()) {
+        Column(Modifier.padding(padding).fillMaxSize().pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) { awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial); lastTouch = System.currentTimeMillis() }
+            }
+        }) {
             if (aligning) LinearProgressIndicator(Modifier.fillMaxWidth()) else Spacer(Modifier.height(4.dp))
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact)) {
                 Mode.entries.forEachIndexed { i, m ->
@@ -541,6 +510,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 }
             }
 
+            // Controles bajo las fotos: se ocultan a los 3 s sin tocar (fotos más grandes); un toque los recupera
+            androidx.compose.animation.AnimatedVisibility(controlsVisible || seq == null) {
+            Column {
             // Alineación y datos de la selección
             seq?.let { s ->
                 Row(
@@ -650,14 +622,68 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     }
                 }
             }
+            }
+            }
         }
     }
 
-    if (settings && seq != null) {
+    if (settings) {
+        val seq = derive().seq
         SafeBottomSheet(onDismiss = { settings = false }) {
-            Column(Modifier.padding(horizontal = Md3Spacing.s6).padding(bottom = Md3Spacing.s8),
+            Column(Modifier.padding(horizontal = Md3Spacing.s6).padding(bottom = Md3Spacing.s8).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
-                Text("Perspectiva vertical", style = MaterialTheme.typography.titleLarge)
+                Text("Ajustes de comparación", style = MaterialTheme.typography.titleLarge)
+                // Alineación
+                SectionTitle("Alineación automática")
+                SheetSwitch("Usar puntos anatómicos", options.points) { setOption(options.copy(points = it)) }
+                SheetSwitch("Usar contornos", options.contours) { setOption(options.copy(contours = it)) }
+                SheetSwitch("Usar mirada (gaze)", options.gaze) { setOption(options.copy(gaze = it)) }
+                androidx.compose.material3.TextButton(onClick = { settings = false; measure = true }, enabled = seq != null) {
+                    Icon(Icons.Default.Straighten, null); Text("  Contornos (configuración)")
+                }
+                // Presentación
+                SectionTitle("Presentación")
+                SheetSwitch("Recortar según la alineación", cropToAlign,
+                    "Todas las fotos al área común que dejan tras alinearse, sin bordes negros.") {
+                    cropToAlign = it; prefs.edit().putBoolean("compare_crop", it).apply()
+                    if (it && !validAlign) scope.launch { snackbar.showSnackbar("Se aplicará al alinear automáticamente") }
+                }
+                Text("Orden de la cuadrícula y lado a lado", style = MaterialTheme.typography.bodyLarge)
+                Column(Modifier.selectableGroup()) {
+                    GridOrder.entries.forEach { o ->
+                        Row(Modifier.fillMaxWidth().selectable(gridOrder == o, role = Role.RadioButton) {
+                            if (o == GridOrder.MANUAL && gridOrder != GridOrder.MANUAL) manualOrder = displayOrder(derive().seqKeys, gridOrder, manualOrder)
+                            gridOrder = o
+                        }.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = gridOrder == o, onClick = null)
+                            Text(o.label, modifier = Modifier.padding(start = 8.dp))
+                        }
+                    }
+                }
+                // Color
+                SectionTitle("Color de la piel")
+                Row(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
+                    if (colorAdjusts.isEmpty()) {
+                        androidx.compose.material3.OutlinedButton(onClick = { settings = false; colorDialog = true }, enabled = seq != null) {
+                            Icon(Icons.Default.Palette, null); Text("  Igualar")
+                        }
+                        if ((seq?.size ?: 0) > 2) androidx.compose.material3.OutlinedButton(onClick = {
+                            val s = seq ?: return@OutlinedButton
+                            settings = false
+                            scope.launch {
+                                val out = s.drop(1).mapNotNull { p ->
+                                    runCatching { autoColorAdjust(context, aligner, s[0], p) }
+                                        .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                                        .getOrNull()?.let { p.key to it }
+                                }.toMap()
+                                colorAdjusts = out
+                                snackbar.showSnackbar(if (out.isEmpty()) "No se encontró piel para igualar" else "Color igualado en ${out.size} fotos")
+                            }
+                        }) { Icon(Icons.Default.AutoFixHigh, null); Text("  Todas (automático)") }
+                    } else androidx.compose.material3.OutlinedButton(onClick = { colorAdjusts = emptyMap() }) { Text("Quitar igualación de color") }
+                }
+                // Perspectiva
+                SectionTitle("Perspectiva vertical")
                 Row(
                     Modifier.fillMaxWidth().toggleable(keystoneAuto, role = Role.Switch) { keystoneAuto = it; resetAlignment() },
                     verticalAlignment = Alignment.CenterVertically,
@@ -744,6 +770,30 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 if (m != contourOutlines) { contourOutlines = m; resetAlignment() }
             },
         )
+    }
+}
+
+/** Ocultación automática de los controles de Comparar (las pruebas de uso la desactivan). */
+object CompareIdle {
+    @Volatile var enabled = true
+    const val HIDE_MS = 3000L
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = Md3Spacing.s3))
+}
+
+@Composable
+private fun SheetSwitch(text: String, checked: Boolean, desc: String? = null, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = onChange).padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(text, style = MaterialTheme.typography.bodyLarge)
+            desc?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

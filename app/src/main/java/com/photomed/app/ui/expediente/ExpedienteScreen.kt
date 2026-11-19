@@ -1,5 +1,10 @@
 package com.photomed.app.ui.expediente
 
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +23,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.BookmarkAdd
@@ -184,6 +190,8 @@ fun ExpedienteContent(
     var selection by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(listOf<String>()) }
     val selecting = selection.isNotEmpty()
     var templates by remember { mutableStateOf(com.photomed.app.data.SessionTemplates.load(prefs)) }
+    /** Categorías desplegadas por el usuario (las zonas sin fotos van plegadas). */
+    var openCats by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(setOf<String>()) }
     var naming by remember { mutableStateOf(false) }
     androidx.activity.compose.BackHandler(enabled = selecting) { selection = emptyList() }
     fun toggleZone(z: Zone) { selection = if (z.id in selection) selection - z.id else selection + z.id }
@@ -231,7 +239,13 @@ fun ExpedienteContent(
                 )
             }
         },
-        snackbarHost = { SnackbarHost(snackbar) },
+        snackbarHost = {
+            androidx.compose.foundation.layout.Column {
+                com.photomed.app.ui.components.CoachMark("expediente_seleccion", Icons.Default.TouchApp,
+                    "Mantenga pulsada una zona o una plantilla para elegir varias e iniciar una secuencia de fotos.")
+                SnackbarHost(snackbar)
+            }
+        },
     ) { padding ->
         val byZone = photos.groupBy { it.zone }
         LazyVerticalGrid(
@@ -252,12 +266,27 @@ fun ExpedienteContent(
                         templates = com.photomed.app.data.SessionTemplates.load(prefs)
                     })
             }
-            ZoneCategory.entries.forEach { cat ->
-                val zones = Zone.entries.filter { it.category == cat }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    SectionHeader("${cat.label} · ${zones.count { byZone.containsKey(it) }}/${zones.size} zonas")
+            // Primero las zonas con fotos; el resto, por categoría en secciones plegables
+            // (abiertas si el expediente aún no tiene fotos o si hay zonas suyas seleccionadas)
+            val withPhotos = Zone.entries.filter { byZone.containsKey(it) }
+            if (withPhotos.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader("Con fotos · ${withPhotos.size} zonas") }
+                items(withPhotos, key = { "f_" + it.id }) { zone ->
+                    val order = selection.indexOf(zone.id).takeIf { it >= 0 }?.plus(1)
+                    ZoneCard(zone, byZone[zone].orEmpty(), order, selecting,
+                        onLongClick = { toggleZone(zone) }) { if (selecting) toggleZone(zone) else onZone(zone) }
                 }
-                items(zones, key = { it.id }) { zone ->
+            }
+            ZoneCategory.entries.forEach { cat ->
+                val zones = Zone.entries.filter { it.category == cat && !byZone.containsKey(it) }
+                if (zones.isEmpty()) return@forEach
+                val open = cat.name in openCats || withPhotos.isEmpty() || zones.any { it.id in selection }
+                item(span = { GridItemSpan(maxLineSpan) }, key = "cat_" + cat.name) {
+                    CategoryHeader("${cat.label} · ${zones.size} ${if (withPhotos.isEmpty()) "zonas" else "zonas más"}", open) {
+                        openCats = if (cat.name in openCats) openCats - cat.name else openCats + cat.name
+                    }
+                }
+                if (open) items(zones, key = { it.id }) { zone ->
                     val order = selection.indexOf(zone.id).takeIf { it >= 0 }?.plus(1)
                     ZoneCard(zone, byZone[zone].orEmpty(), order, selecting,
                         onLongClick = { toggleZone(zone) }) { if (selecting) toggleZone(zone) else onZone(zone) }
@@ -269,6 +298,20 @@ fun ExpedienteContent(
         naming = false
         com.photomed.app.data.SessionTemplates.save(prefs, com.photomed.app.data.SessionTemplate(name, selection.mapNotNull { Zone.fromId(it) }))
         templates = com.photomed.app.data.SessionTemplates.load(prefs)
+    }
+}
+
+/** Encabezado plegable de una categoría de zonas. */
+@Composable
+private fun CategoryHeader(text: String, open: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable(onClickLabel = if (open) "Plegar" else "Desplegar", onClick = onToggle)
+            .padding(vertical = Md3Spacing.s2)
+            .semantics { stateDescription = if (open) "Desplegada" else "Plegada"; heading() },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+        Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = MaterialTheme.colorScheme.primary)
     }
 }
 

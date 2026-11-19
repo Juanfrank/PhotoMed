@@ -2,6 +2,11 @@ package com.photomed.app.ui.camera
 
 import android.Manifest
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.AutoMode
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Flip
@@ -276,6 +281,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     /** Condiciones guardadas con la referencia (zoom, distancia…). */
     var refCond by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var adaptGuide by remember { mutableStateOf(true) }
+    /** Primera toma (sin referencia): el rostro coincide con el marco de la guía → la guía se ajusta a la cara. */
+    var framedFace by remember { mutableStateOf(false) }
     var autoArmed by remember { mutableStateOf(true) }
     var live by remember { mutableStateOf<LiveFrame?>(null) }
     var focalNorm by remember { mutableStateOf<Float?>(null) }
@@ -339,6 +346,15 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         if (!feedback || d < 3 || d >= 10) return@LaunchedEffect
         val interval = (1000L - d * 85L).coerceAtLeast(200L)
         while (true) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); kotlinx.coroutines.delay(interval) }
+    }
+    // ¿La cara del cuadro coincide con el marco de la guía? (solo sin foto de referencia superpuesta)
+    LaunchedEffect(live, refPoints, showGhost) {
+        val art = GuideArtByZone[zone.id]
+        val pts = live?.currentPointsAll.orEmpty()
+        val noRef = refPoints.isEmpty() || !showGhost
+        val fit = if (noRef && art != null && art.controls.isNotEmpty() && pts.isNotEmpty())
+            com.photomed.app.align.FaceFraming.of(art.controls, FaceControlKeys, pts) else null
+        framedFace = com.photomed.app.align.FaceFraming.matches(fit, framedFace)
     }
     val tone = GuideTone.of(live?.eval, matchingEnabled)
     /**
@@ -681,7 +697,6 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 Icon(Icons.Default.AutoMode, if (autoCapture) "Disparo automático activado" else "Disparo automático desactivado",
                     tint = if (autoCapture) GuideTone.MATCH.color else Color.White)
             }
-            IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.Tune, "Ajustes de coincidencia", tint = Color.White) }
             IconButton(onClick = {
                 flashMode = when (flashMode) {
                     ImageCapture.FLASH_MODE_OFF -> ImageCapture.FLASH_MODE_ON
@@ -700,6 +715,28 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         else -> "Flash desactivado"
                     }, tint = Color.White
                 )
+            }
+            // Menú "⋯": ajustes, modo experto y ayudas (fuera de la barra para no saturarla)
+            Box {
+                var more by remember { mutableStateOf(false) }
+                IconButton(onClick = { more = true }) { Icon(Icons.Default.MoreVert, "Más opciones de la cámara", tint = Color.White) }
+                androidx.compose.material3.DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text("Ajustes de coincidencia") },
+                        leadingIcon = { Icon(Icons.Default.Tune, null) },
+                        onClick = { more = false; showSettings = true },
+                    )
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text("Modo experto") },
+                        leadingIcon = { Icon(if (expert) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, null) },
+                        onClick = { expert = !expert; prefs.edit().putBoolean("camera_expert", expert).apply(); more = false },
+                    )
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text("Mostrar las ayudas otra vez") },
+                        leadingIcon = { Icon(Icons.Default.TouchApp, null) },
+                        onClick = { more = false; com.photomed.app.ui.components.CoachMarks.resetAll(context) },
+                    )
+                }
             }
         }
 
@@ -731,7 +768,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     val linesVisible = expert || !matchingEnabled || (GuideTone.degree(live?.eval) ?: 0f) >= 0.6f
                     androidx.compose.runtime.CompositionLocalProvider(LocalGuideLines provides linesVisible) {
                     GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize(),
-                        tone = tone, adaptTo = if (adaptGuide && showGhost) refPoints else emptyMap(),
+                        tone = tone, adaptTo = when {
+                            adaptGuide && showGhost && refPoints.isNotEmpty() -> refPoints
+                            // primera toma: con la cara dentro del marco, el contorno se ajusta a ella
+                            adaptGuide && framedFace -> live?.currentPointsAll.orEmpty()
+                            else -> emptyMap()
+                        },
                         silhouette = if (adaptGuide && showGhost) refSilhouette else null,
                         side = if (zone.hasLimbSides) limbSide else LimbSide.BOTH,
                         // modo libre: contorno de la referencia (si se superpone) o de lo que se ve ahora
@@ -931,6 +973,16 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         }
     }
     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 120.dp))
+    // vistas faciales sin el modelo opcional de pelo y piel: avisar una vez de que existe
+    if (com.photomed.app.align.ZoneAlignment.of(zone).detector == com.photomed.app.align.Detector.FACE &&
+        !com.photomed.app.align.ModelStore.available(context))
+        com.photomed.app.ui.components.CoachMark("modelo_pelo_piel", Icons.Default.Download,
+            "Opcional: descargue en Ajustes el modelo de pelo y piel (16 MB) para ver la línea de implantación y ajustar el óvalo al rostro.",
+            Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 56.dp))
+    com.photomed.app.ui.components.CoachMark("camara_gestos", Icons.Default.TouchApp,
+        "Pellizque para el zoom. El anillo del disparador se llena al coincidir con la guía. " +
+            "Más capas y datos: modo experto en los ajustes (⋯).",
+        Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 120.dp))
     ScreenFlashOverlay(screenFlash)
     if (showSettings) {
         MatchSettingsSheet(

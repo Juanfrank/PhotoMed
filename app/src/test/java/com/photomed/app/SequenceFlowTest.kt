@@ -42,7 +42,10 @@ class SequenceFlowTest {
     private val prefs get() = ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("photomed", Context.MODE_PRIVATE)
     private val exp = Expediente("0012_Ana", "Ana Gómez", "0012", "", true, 0L, File("."), 0, null)
 
-    @Before fun clear() { prefs.edit().clear().commit() }
+    @Before fun clear() {
+        prefs.edit().clear().commit()
+        com.photomed.app.ui.components.CoachMarks.enabled = false; com.photomed.app.ui.compare.CompareIdle.enabled = false
+    }
 
     @Test
     fun templatesPersist() {

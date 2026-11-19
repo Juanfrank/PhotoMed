@@ -1,5 +1,9 @@
 package com.photomed.app.ui.settings
 
+import kotlinx.coroutines.launch
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
 import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -88,6 +92,16 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
             }
             HorizontalDivider()
+            SectionHeader("Modelo opcional de pelo y piel", Modifier.padding(horizontal = Md3Spacing.s6))
+            HairSkinModelItem()
+            HorizontalDivider()
+            SectionHeader("Ayudas", Modifier.padding(horizontal = Md3Spacing.s6))
+            ListItem(
+                headlineContent = { Text("Mostrar las ayudas de primera vez otra vez") },
+                supportingContent = { Text("Indicaciones sobre gestos: pulsación larga, arrastrar, pellizcar…") },
+                modifier = Modifier.fillMaxWidth().clickable { com.photomed.app.ui.components.CoachMarks.resetAll(context) },
+            )
+            HorizontalDivider()
             SectionHeader("Cámara", Modifier.padding(horizontal = Md3Spacing.s6))
             ListItem(
                 headlineContent = { Text("Vista en espejo (cámara frontal)") },
@@ -99,4 +113,41 @@ fun SettingsScreen(onBack: () -> Unit) {
             )
         }
     }
+}
+
+/**
+ * Descarga o elimina el modelo opcional de segmentación pelo / piel (16 MB, servidor público de
+ * MediaPipe). Solo se conecta a Internet al pulsar "Descargar"; no envía datos.
+ */
+@Composable
+private fun HairSkinModelItem() {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var have by remember { mutableStateOf(com.photomed.app.align.ModelStore.available(context)) }
+    var progress by remember { mutableStateOf<Float?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    ListItem(
+        headlineContent = { Text(if (have) "Instalado (16 MB)" else "No instalado") },
+        supportingContent = {
+            Column {
+                Text("Línea de implantación del pelo y altura de la frente, ajuste del óvalo al rostro, puntos tapados " +
+                    "(flequillo, gafas) y piel para igualar el color. Se descarga del servidor público de modelos de " +
+                    "MediaPipe (Apache 2.0); no se envía ningún dato.")
+                progress?.let { androidx.compose.material3.LinearProgressIndicator({ it }, Modifier.fillMaxWidth().padding(top = 6.dp)) }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        trailingContent = {
+            if (have) androidx.compose.material3.TextButton(onClick = { com.photomed.app.align.ModelStore.delete(context); have = false }) { Text("Eliminar") }
+            else androidx.compose.material3.Button(enabled = progress == null, onClick = {
+                error = null; progress = 0f
+                scope.launch {
+                    runCatching { com.photomed.app.align.ModelStore.download(context, progress = { p -> progress = p }) }
+                        .onSuccess { have = true }
+                        .onFailure { e -> if (e is kotlinx.coroutines.CancellationException) throw e; error = "No se pudo descargar: ${e.message ?: "sin conexión"}" }
+                    progress = null
+                }
+            }) { Text("Descargar") }
+        },
+    )
 }

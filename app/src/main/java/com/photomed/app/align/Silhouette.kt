@@ -61,6 +61,22 @@ class Silhouette(val left: FloatArray, val right: FloatArray) {
         return out
     }
 
+    /**
+     * Puntos del perfil desde la silueta (y en unidades del ancho, como los detectores): vértice
+     * (fila superior), punta nasal y pogonion en el borde anterior, y occipucio (borde posterior a la
+     * altura de la nariz). Sirve donde los detectores pierden el rostro (perfil cerca de 90°).
+     */
+    fun profilePoints(frontRight: Boolean): Map<String, Pt> {
+        val a = profileAnchors(frontRight)
+        val out = LinkedHashMap<String, Pt>()
+        fun front(y: Float) = span(y)?.let { (l, r) -> if (frontRight) r else l }
+        fun back(y: Float) = span(y)?.let { (l, r) -> if (frontRight) l else r }
+        top?.let { t -> span(t)?.let { (l, r) -> out["vértice"] = Pt((l + r) / 2, t * 4f / 3f) } }
+        a["punta nasal"]?.let { y -> front(y)?.let { out["punta nasal"] = Pt(it, y * 4f / 3f) }; back(y)?.let { out["occipucio"] = Pt(it, y * 4f / 3f) } }
+        a["pogonion"]?.let { y -> front(y)?.let { out["pogonion"] = Pt(it, y * 4f / 3f) } }
+        return out
+    }
+
     companion object {
         const val ROWS = 96
 

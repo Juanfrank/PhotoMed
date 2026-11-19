@@ -35,13 +35,14 @@ class FaceLabels(val width: Int, val height: Int, val data: ByteArray) {
 }
 
 /**
- * Segmentación multiclase en el dispositivo (MediaPipe "selfie multiclass 256×256", Apache 2.0,
- * en assets/selfie_multiclass.tflite): separa pelo, piel del rostro, piel del cuerpo y ropa.
+ * Segmentación multiclase en el dispositivo (MediaPipe "selfie multiclass 256×256", Apache 2.0):
+ * separa pelo, piel del rostro, piel del cuerpo y ropa. El modelo es opcional y se descarga en
+ * Ajustes ([ModelStore]); sin él, las funciones que lo usan simplemente no se aplican.
  */
 class HairSkinSegmenter(context: Context) : Closeable {
     private val seg: ImageSegmenter = ImageSegmenter.createFromOptions(context,
         ImageSegmenter.ImageSegmenterOptions.builder()
-            .setBaseOptions(BaseOptions.builder().setModelAssetPath(MODEL).build())
+            .setBaseOptions(BaseOptions.builder().setModelAssetBuffer(ModelStore.buffer(context) ?: error("modelo no descargado")).build())
             .setRunningMode(RunningMode.IMAGE)
             .setOutputCategoryMask(true).setOutputConfidenceMasks(false)
             .build())
@@ -58,9 +59,9 @@ class HairSkinSegmenter(context: Context) : Closeable {
     override fun close() = seg.close()
 
     companion object {
-        const val MODEL = "selfie_multiclass.tflite"
-        /** null si el modelo no se puede cargar (p. ej. dispositivo sin soporte). */
-        fun createOrNull(context: Context): HairSkinSegmenter? = runCatching { HairSkinSegmenter(context) }.getOrNull()
+        /** null si el modelo no está descargado o no se puede cargar. */
+        fun createOrNull(context: Context): HairSkinSegmenter? =
+            if (!ModelStore.available(context)) null else runCatching { HairSkinSegmenter(context) }.getOrNull()
     }
 }
 
@@ -131,6 +132,74 @@ object HairSkin {
         if (out.size < SAMPLES / 4) return null
         val h = heights.sorted().let { if (it.size >= 3) it[it.size / 2] else null }
         return Hairline(out, h, out.size / SAMPLES.toFloat())
+    }
+
+    /**
+     * Ajuste del óvalo facial al límite real de la cara según la segmentación: cada punto se mueve a
+     * lo largo de la normal del óvalo (como mucho [MAX_SNAP] del ancho de la cara) hasta el borde
+     * más cercano. Sienes y mejillas: piel del rostro → pelo o fondo; mandíbula y mentón: rostro (o
+     * barba) → cuello, ropa o fondo (así la barba o la papada no lo encogen). La frente (puntos
+     * altos, donde manda la línea de implantación) no se toca. Desplazamientos suavizados entre
+     * vecinos. Devuelve los puntos con el óvalo ajustado.
+     */
+    fun snapOval(labels: FaceLabels, points: Map<String, Pt>): Map<String, Pt> {
+        val p = FaceKeys.canonical(points)
+        val oval = (0 until 36).map { p["oval_$it"] ?: return points }
+        val w = labels.width.toFloat()
+        val cx = oval.map { it.x }.average().toFloat(); val cy = oval.map { it.y }.average().toFloat()
+        val faceW = oval.maxOf { it.x } - oval.minOf { it.x }
+        val top = oval.minOf { it.y }; val bottom = oval.maxOf { it.y }
+        val mouthY = p["lip_upper_top_5"]?.y ?: (top + (bottom - top) * 0.7f)
+        fun lab(q: Pt) = labels[(q.x * w).roundToInt(), (q.y * w).roundToInt()]
+        val offs = FloatArray(36) { Float.NaN }
+        for (i in 0 until 36) {
+            val o = oval[i]
+            // frente: la decide la línea de implantación, no el óvalo
+            if (o.y < top + (bottom - top) * 0.22f) { offs[i] = 0f; continue }
+            val n = hypot(o.x - cx, o.y - cy).takeIf { it > 1e-5f } ?: continue
+            val nx = (o.x - cx) / n; val ny = (o.y - cy) / n
+            val lower = o.y > mouthY
+            fun inside(c: Int) = if (lower) c == FaceLabels.FACE_SKIN || c == FaceLabels.HAIR else c == FaceLabels.FACE_SKIN
+            val r = MAX_SNAP * faceW; val step = 1f / w
+            var best: Float? = null
+            var d = -r
+            var prevIn = inside(lab(Pt(o.x + nx * d, o.y + ny * d)))
+            while (d <= r) {
+                val cin = inside(lab(Pt(o.x + nx * d, o.y + ny * d)))
+                if (prevIn && !cin && (best == null || kotlin.math.abs(d) < kotlin.math.abs(best))) best = d
+                prevIn = cin; d += step
+            }
+            offs[i] = best ?: Float.NaN
+        }
+        if (offs.count { !it.isNaN() } < 18) return points
+        // suavizado circular de los desplazamientos (los huecos toman el de sus vecinos)
+        val sm = FloatArray(36) { i ->
+            val v = (-2..2).mapNotNull { k -> offs[(i + k + 36) % 36].takeIf { !it.isNaN() } }
+            if (v.isEmpty()) 0f else v.sorted()[v.size / 2]
+        }
+        val out = p.toMutableMap()
+        for (i in 0 until 36) {
+            val o = oval[i]
+            val n = hypot(o.x - cx, o.y - cy).takeIf { it > 1e-5f } ?: continue
+            out["oval_$i"] = Pt(o.x + (o.x - cx) / n * sm[i], o.y + (o.y - cy) / n * sm[i])
+        }
+        return out
+    }
+
+    const val MAX_SNAP = 0.08f
+
+    /**
+     * Puntos tapados en una foto: rasgos interiores (ojos, nariz, labios, pupilas, comisuras) que
+     * caen sobre pelo (flequillo), accesorios (gafas oscuras, mascarilla), la mano o el fondo.
+     * Óvalo y cejas quedan fuera (están en el límite o la segmentación las marca como pelo).
+     */
+    fun occluded(labels: FaceLabels, points: Map<String, Pt>): Set<String> {
+        val w = labels.width.toFloat()
+        return points.filter { (k, q) ->
+            if (k.startsWith("oval_") || k.startsWith("brow_") || k.startsWith("ear") || k.startsWith("skull") || k == "vertex") return@filter false
+            val c = labels[(q.x * w).roundToInt(), (q.y * w).roundToInt()]
+            c == FaceLabels.HAIR || c == FaceLabels.OTHER || c == FaceLabels.BG || c == FaceLabels.BODY_SKIN
+        }.keys
     }
 
     /** Piel del rostro (clase "piel del rostro") a [w]×[h]. */

@@ -10,8 +10,14 @@ from mediapipe.tasks.python import vision, BaseOptions
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 STOCK = ROOT / "app/src/test/resources/stock"
 OUT = STOCK / "labels"; OUT.mkdir(exist_ok=True)
+# el modelo no va en el repositorio (la app lo descarga a petición): se descarga aquí si falta
+MODEL = pathlib.Path("/tmp/photomed-eval/selfie_multiclass.tflite")
+if not MODEL.exists():
+    import urllib.request
+    MODEL.parent.mkdir(parents=True, exist_ok=True)
+    urllib.request.urlretrieve("https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite", MODEL)
 seg = vision.ImageSegmenter.create_from_options(vision.ImageSegmenterOptions(
-    base_options=BaseOptions(model_asset_path=str(ROOT / "app/src/main/assets/selfie_multiclass.tflite")),
+    base_options=BaseOptions(model_asset_path=str(MODEL)),
     output_category_mask=True, output_confidence_masks=False))
 n = 0
 for f in sorted(STOCK.glob("*_r0.jpg")):

@@ -3,6 +3,8 @@
 
     <uses-feature android:name="android.hardware.camera.any" android:required="true" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Solo para descargar, a petición en Ajustes, el modelo opcional de pelo y piel (sin enviar datos) -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 8–9: guardar en Pictures/PhotoMed requiere permiso de escritura -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"

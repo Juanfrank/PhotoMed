@@ -43,20 +43,21 @@ def feats(p):
     return out
 
 
-rows = []
-for f in sorted(STOCK.glob("*_r0.jpg")):
-    img = cv2.imread(str(f)); rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    r = det.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb))
-    if not r.face_landmarks: continue
-    data = json.loads((STOCK / "stock_faces.json").read_text())[f.stem]
-    p = canonical.canonical(data["pts"])
-    bs = {c.category_name: c.score for c in r.face_blendshapes[0]}
-    g = feats(p)
-    rows.append((f.stem, g, {"smile": (bs["mouthSmileLeft"] + bs["mouthSmileRight"]) / 2, "jaw": bs["jawOpen"],
-                             "blink": max(bs["eyeBlinkLeft"], bs["eyeBlinkRight"]), "browUp": bs["browInnerUp"]}))
-for n, g, b in rows:
-    print(f"{n[:22]:22s} " + " ".join(f"{k}={v:.3f}" for k, v in g.items()) + " | " + " ".join(f"{k}={v:.2f}" for k, v in b.items()))
-def corr(a, b): return float(np.corrcoef(a, b)[0, 1])
-G = lambda k: [g[k] for _, g, _ in rows]; B = lambda k: [b[k] for _, _, b in rows]
-print("r sonrisa (elevación comisuras)", round(corr(G("smile_lift"), B("smile")), 2), "· (ancho)", round(corr(G("mouth_width"), B("smile")), 2))
-print("r boca abierta", round(corr(G("mouth_open"), B("jaw")), 2), "· r ojos", round(corr(G("eyes"), B("blink")), 2), "· r cejas", round(corr(G("brows"), B("browUp")), 2))
+if __name__ == "__main__":
+    rows = []
+    for f in sorted(STOCK.glob("*_r0.jpg")):
+        img = cv2.imread(str(f)); rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        r = det.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb))
+        if not r.face_landmarks: continue
+        data = json.loads((STOCK / "stock_faces.json").read_text())[f.stem]
+        p = canonical.canonical(data["pts"])
+        bs = {c.category_name: c.score for c in r.face_blendshapes[0]}
+        g = feats(p)
+        rows.append((f.stem, g, {"smile": (bs["mouthSmileLeft"] + bs["mouthSmileRight"]) / 2, "jaw": bs["jawOpen"],
+                                 "blink": max(bs["eyeBlinkLeft"], bs["eyeBlinkRight"]), "browUp": bs["browInnerUp"]}))
+    for n, g, b in rows:
+        print(f"{n[:22]:22s} " + " ".join(f"{k}={v:.3f}" for k, v in g.items()) + " | " + " ".join(f"{k}={v:.2f}" for k, v in b.items()))
+    def corr(a, b): return float(np.corrcoef(a, b)[0, 1])
+    G = lambda k: [g[k] for _, g, _ in rows]; B = lambda k: [b[k] for _, _, b in rows]
+    print("r sonrisa (elevación comisuras)", round(corr(G("smile_lift"), B("smile")), 2), "· (ancho)", round(corr(G("mouth_width"), B("smile")), 2))
+    print("r boca abierta", round(corr(G("mouth_open"), B("jaw")), 2), "· r ojos", round(corr(G("eyes"), B("blink")), 2), "· r cejas", round(corr(G("brows"), B("browUp")), 2))

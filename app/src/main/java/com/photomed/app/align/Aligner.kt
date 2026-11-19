@@ -77,11 +77,28 @@ class Aligner(private val context: Context) {
                 it.detectFull(spec.detector, b) to it.detectFull(spec.detector, a0)
             } else Detection.EMPTY to Detection.EMPTY
             ensureActive()
+            // Puntos tapados (flequillo, gafas oscuras, mano…) en cualquiera de las dos fotos: fuera
+            val (bD, aD) = if (spec.detector == Detector.FACE && options.points) withoutOccluded(bDet, aDet0, b, a0) else bDet to aDet0
             SubjectSegmenter().use { seg ->
-                alignCore(spec, b, a0, bDet, aDet0, manualKeystone, options, { bmp -> autoMask(spec, bmp) },
+                alignCore(spec, b, a0, bD, aD, manualKeystone, options, { bmp -> autoMask(spec, bmp) },
                     bodyOf = { bmp -> BodyRegion.of(zone, bmp) { seg.segment(it) } })
             }
         }
+
+    /**
+     * Quita de ambas detecciones los rasgos interiores tapados en alguna de las dos fotos (según la
+     * segmentación pelo / piel). Si quedarían muy pocos puntos (p. ej. gafas de sol en las dos), no
+     * se quita ninguno: la oclusión es la misma y los puntos siguen siendo comparables.
+     */
+    private fun withoutOccluded(b: Detection, a: Detection, bb: Bitmap, ab: Bitmap): Pair<Detection, Detection> {
+        val occ = HairSkinSegmenter.createOrNull(context)?.use { s ->
+            val lb = s.labels(bb); val la = s.labels(ab)
+            if (lb == null || la == null) null else HairSkin.occluded(lb, b.points) + HairSkin.occluded(la, a.points)
+        } ?: return b to a
+        val common = b.points.keys.intersect(a.points.keys)
+        if (occ.isEmpty() || (common - occ).size < common.size * 0.6f) return b to a
+        return b.copy(points = b.points - occ) to a.copy(points = a.points - occ)
+    }
 
     /** Medición de contornos para una foto (óvalo facial si hay rostro, si no la silueta del sujeto). */
     suspend fun autoMask(zone: Zone, uri: Uri, width: Int = MEASURE_W): Pair<Bitmap, Mask?> = withContext(Dispatchers.Default) {

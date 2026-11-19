@@ -125,3 +125,20 @@ Compose, Coil, Google ML Kit (rostro, pose, segmentación) y MediaPipe Face Land
   imagen (0,3–5 s) y de transición (0–3 s; 0 = corte) ajustables y **vista previa animada** que usa
   el mismo dibujo y los mismos tiempos que el archivo. Codificador GIF propio (paleta de 256
   colores por corte de la mediana, LZW).
+
+## Primera toma, ayudas y modelo opcional
+
+- **Primera toma (sin referencia)**: cuando el óvalo de la cara coincide con el del dibujo de la guía
+  (centro ±5 %, tamaño ±12 %, con histéresis), el contorno se ajusta a la cara del paciente (cráneo,
+  mentón, ojos, boca…) usando los puntos suavizados del cuadro.
+- **Ayudas de primera vez**: una tarjeta por pantalla (expediente, cámara, comparar) explica los
+  gestos ocultos; "Entendido" la cierra para siempre (Ajustes o ⋯ de la cámara: mostrarlas otra vez).
+- **Comparar**: menú ⋮ corto (Ajustes de comparación, Exportar, Restablecer zoom); la hoja de
+  ajustes agrupa alineación, presentación (recorte, orden), color y perspectiva. Los controles bajo
+  las fotos se ocultan a los 3 s sin tocar.
+- **Expediente**: primero las zonas con fotos; el resto por categoría, en secciones plegables.
+- **Modelo opcional de pelo y piel** (16 MB): no va en la APK; se descarga solo desde *Ajustes*
+  (servidor público de MediaPipe, verificado con SHA-256, sin enviar datos). Sin él, la línea de
+  implantación, el ajuste del óvalo, los puntos tapados y la piel por segmentación no se aplican.
+- **Calibración con fotos propias**: `python3 tools/eval/calibrate.py carpeta_neutras --smiles carpeta_sonrisas`
+  mide la expresión en sus fotos (en su equipo) y propone los límites de expresión neutra.

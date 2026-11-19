@@ -68,6 +68,7 @@ class UsageFlowsTest {
 
     @Before
     fun setUp() {
+        com.photomed.app.ui.components.CoachMarks.enabled = false; com.photomed.app.ui.compare.CompareIdle.enabled = false
         val gallery = File(tmp.root, "Pictures/PhotoMed")
         repo = PhotoRepository(File(tmp.root, "private"), FilePhotoStore(gallery),
             openStream = { uri -> File(uri.path!!).inputStream() })
@@ -205,6 +206,38 @@ class UsageFlowsTest {
     }
 
     @Test
+    fun expedienteCollapsedCategoriesAndCoachMark() {
+        com.photomed.app.ui.components.CoachMarks.enabled = true
+        setContent { com.photomed.app.ui.expediente.ExpedienteScreen(exp.id, onBack = {}, onZone = {}, onCompare = {}) }
+        waitText("Con fotos", substring = true)
+        // las zonas sin fotos van plegadas por categoría; al tocar el encabezado aparecen
+        assertTrue(compose.onAllNodesWithText("Rostro frontal").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithText("Facial · ", substring = true).performClick()
+        waitText("Rostro frontal")
+        // ayuda de primera vez: se cierra con "Entendido" y no vuelve
+        waitText("Mantenga pulsada una zona", substring = true)
+        compose.onNodeWithText("Entendido").performClick()
+        compose.waitForIdle()
+        assertTrue(compose.onAllNodesWithText("Mantenga pulsada una zona", substring = true).fetchSemanticsNodes().isEmpty())
+        assertTrue(com.photomed.app.ui.components.CoachMarks.seen(ApplicationProvider.getApplicationContext(), "expediente_seleccion"))
+        com.photomed.app.ui.components.CoachMarks.enabled = false
+    }
+
+    @Test
+    fun compareControlsHideWhenIdleAndReturnOnTouch() {
+        com.photomed.app.ui.compare.CompareIdle.enabled = true
+        setContent { CompareScreen(exp.id, Zone.LIPS, onBack = {}, initialSelection = photos.take(2).map { it.displayName }) }
+        waitText("Antes", substring = true)
+        compose.mainClock.advanceTimeBy(com.photomed.app.ui.compare.CompareIdle.HIDE_MS + 1000)
+        compose.waitForIdle()
+        assertTrue("controles ocultos", compose.onAllNodesWithContentDescription("Labios", substring = true).fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithText("Deslizar").performClick()
+        compose.mainClock.advanceTimeBy(500)
+        waitText("Labios", substring = true)
+        com.photomed.app.ui.compare.CompareIdle.enabled = false
+    }
+
+    @Test
     fun compareNPhotosModesAndSelectionStress() {
         setContent { CompareScreen(exp.id, Zone.LIPS, onBack = {}, initialSelection = photos.map { it.displayName }) }
         waitText("Comparar 4 fotos")
@@ -240,6 +273,8 @@ class UsageFlowsTest {
         // Invertir orden repetidamente y menú con casillas persistentes.
         repeat(5) { compose.onNodeWithContentDescription("Invertir el orden").performClick() }
         compose.onNodeWithContentDescription("Más opciones").performClick()
+        compose.onNodeWithText("Ajustes de comparación").performClick()
+        waitText("Usar mirada (gaze)")
         compose.onNodeWithText("Usar mirada (gaze)").performClick()
         compose.onNodeWithText("Usar contornos").performClick()
         val prefs = ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("photomed", Context.MODE_PRIVATE)
@@ -256,7 +291,7 @@ class UsageFlowsTest {
         waitText("Antes", substring = true)
         repeat(2) {
             compose.onNodeWithContentDescription("Más opciones").performClick()
-            compose.onNodeWithText("Perspectiva y ajustes").performClick()
+            compose.onNode(androidx.compose.ui.test.hasText("Ajustes de comparación") and androidx.compose.ui.test.hasClickAction()).performClick()
             waitText("Perspectiva vertical")
             compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             compose.waitForIdle()
@@ -294,6 +329,9 @@ class CompareNCaptureTest {
 
     @get:Rule(order = 1)
     val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Before
+    fun noHelpers() { com.photomed.app.ui.components.CoachMarks.enabled = false; com.photomed.app.ui.compare.CompareIdle.enabled = false }
 
     @Test
     fun captureGridAndProgressive() {

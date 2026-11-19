@@ -54,6 +54,22 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     private var frameBody: Mask? = null
     private var frameBodyAt = 0L
     private var refEdgePts: List<ContourMatch.EdgePt> = emptyList()
+    /** Perfil: puntos de la silueta (vértice, punta nasal, pogonion, occipucio) cuando los detectores no ven el rostro. */
+    private val isProfile = zone.guide == com.photomed.app.data.GuideType.FACE_PROFILE
+    private val frontRight = !zone.mirrored
+    private var refProfile: Map<String, Pt>? = null
+    private var frameSil: Map<String, Pt>? = null
+    private var frameSilAt = 0L
+
+    /** Puntos del perfil del cuadro por silueta (segmentación como mucho cada 0,3 s). */
+    private fun frameProfile(frame: Bitmap): Map<String, Pt>? {
+        val now = System.currentTimeMillis()
+        if (now - frameSilAt > 300) {
+            frameSilAt = now
+            frameSil = runCatching { segmenter?.segment(frame)?.let { Silhouette.fromMask(it) }?.profilePoints(frontRight) }.getOrNull()
+        }
+        return frameSil
+    }
 
     /** Puntos de la referencia (para adaptar la guía a la foto). */
     val referencePoints: Map<String, Pt> get() = ref.points
@@ -80,13 +96,18 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
 
     fun setReference(bmp: Bitmap) {
         ref = detector.detectFull(spec.detector, bmp)
+        // Segmentación pelo / piel de la referencia (vistas faciales): óvalo ajustado al límite real de
+        // la cara (la guía se adapta a él) y línea de implantación
+        val faceView = zone.guide == com.photomed.app.data.GuideType.FACE_FRONT || zone.guide == com.photomed.app.data.GuideType.FACE_OBLIQUE
+        val labels = if (faceView || tracksHairline) runCatching { hairSkin?.labels(bmp) }.getOrNull() else null
+        if (labels != null && faceView && ref.points.isNotEmpty()) ref = ref.copy(points = HairSkin.snapOval(labels, ref.points))
         // Bordes solo del cuerpo (sin los del fondo): región del paciente en la referencia
         refBody = runCatching { BodyRegion.of(zone, bmp) { b -> segmenter?.segment(b) } }.getOrNull()
         referenceEdges = runCatching { FreeContour.edgesOf(bmp, refBody) }.getOrNull()
         referenceFree = if (zone.guide == com.photomed.app.data.GuideType.FREE)
             runCatching { FreeContour.from(bmp) { b -> segmenter?.segment(b) } }.getOrNull() else null
-        referenceHairline = if (!tracksHairline) null else runCatching {
-            hairSkin?.labels(bmp)?.let { HairSkin.hairline(it, ref.points)?.points }
+        referenceHairline = if (!tracksHairline || labels == null) null else runCatching {
+            HairSkin.hairline(labels, ref.points)?.points
         }.getOrNull()
         referenceSilhouette = runCatching {
             val plain = zone.guide == com.photomed.app.data.GuideType.HANDS || zone.guide == com.photomed.app.data.GuideType.FEET
@@ -94,6 +115,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
                 else SubjectSegmenter().use { s -> s.segment(bmp) }
             mask?.let { Silhouette.fromMask(it, Silhouette.axisOf(ref.points)) }
         }.getOrNull()
+        refProfile = if (!isProfile) null else referenceSilhouette?.profilePoints(frontRight)?.takeIf { it.size >= 3 }
+        frameSil = null; frameSilAt = 0L
         refGrayAll = ImageOps.gray(bmp, EDGE_W)
         val g = ImageOps.gray(bmp, EDGE_W, refBody)
         refGray = g
@@ -107,7 +130,14 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val cur = detected(frame, smooth)
         val light = if (spec.detector == Detector.FACE && cur.points.isNotEmpty())
             Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) else null
-        val eval = withDiagnostic(Standardization.evaluate(zone, cur, light), cur)
+        var eval = withDiagnostic(Standardization.evaluate(zone, cur, light), cur)
+        // Perfil sin rostro detectado: si la silueta muestra un perfil hacia el lado de la vista
+        // (nariz y mentón en el borde anterior), se acepta como perfil
+        if (isProfile && cur.points.size < LiveDecision.MIN_POINTS) {
+            val fp = frameProfile(frame)
+            if (fp != null && "punta nasal" in fp && "pogonion" in fp)
+                eval = MatchEval(MatchStatus.CLOSE, 0.85f, emptyList(), threshold = 1f)
+        }
         // Modo libre: el contorno se diseña con lo visible en el cuadro (como mucho cada 0,6 s)
         val free = if (zone.guide != com.photomed.app.data.GuideType.FREE) null else {
             val now = System.currentTimeMillis()
@@ -138,12 +168,22 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         var drawKeys: List<String> = emptyList()
         val total: Int
         var cur = Detection.EMPTY
-        if (spec.detector != Detector.NONE && ref.points.size >= LiveDecision.MIN_POINTS) {
+        val rp = refProfile
+        if (spec.detector != Detector.NONE && ref.points.size >= LiveDecision.MIN_POINTS &&
+            !(isProfile && rp != null && detected(frame, smooth).also { cur = it }.points.size < LiveDecision.MIN_POINTS)) {
             // Zona con detector y referencia con puntos: solo coincide si el cuadro también los tiene.
-            cur = detected(frame, smooth)
+            if (cur.points.isEmpty()) cur = detected(frame, smooth)
             eval = LiveDecision.evaluate(spec, ref, cur, threshold, matched, useGaze)
             drawKeys = spec.landmarks.filter { it in ref.points && it in cur.points }
             method = "puntos anatómicos"; total = drawKeys.size
+            last = null
+        } else if (isProfile && rp != null) {
+            // Perfil cerca de 90° (los detectores pierden el rostro): puntos de la silueta
+            val fp = frameProfile(frame)
+            val keys = rp.keys.filter { fp?.containsKey(it) == true }
+            val t = if (keys.size >= 3) Similarity.estimate(keys.map { fp!![it]!! }, keys.map { rp[it]!! }) else null
+            eval = LiveMatch.evaluate(t, spec.pivot, matched, null, threshold, gate = true)
+            method = "silueta del perfil"; total = keys.size
             last = null
         } else {
             // cuerpo en el cuadro actual (segmentación como mucho cada 0,5 s; el encuadre cambia poco)

@@ -181,6 +181,20 @@ bordes se quedaba pegado al fondo (15 px de error); solo con los del cuerpo, 0,5
   evolución ("la línea retrocede / avanza / estable"). La piel para igualar el color se limita a la
   clase "piel del rostro". `HairSkinTest`: línea en 23 de 24 retratos (el que falta es calvo).
 
+### Ajuste del óvalo, puntos tapados y perfil por silueta
+
+- **Óvalo ajustado a la cara** (`HairSkin.snapOval`): con la segmentación pelo / piel, cada punto del
+  óvalo de la referencia se mueve por su normal (≤ 8 % del ancho de la cara) al límite real: sienes y
+  mejillas contra pelo o fondo; mandíbula y mentón contra cuello, ropa o fondo (la barba cuenta como
+  rostro). Retratos de stock: desplazamiento medio 1,1 % del ancho de la cara (máx. 2,7 %).
+- **Puntos tapados** (`HairSkin.occluded`): rasgos interiores sobre pelo, accesorios, mano o fondo en
+  alguna de las dos fotos se excluyen de la alineación (gafas de sol: 34 puntos; rostros despejados: 0–3).
+- **Perfil cerca de 90°** (`Silhouette.profilePoints`): vértice, punta nasal, pogonion y occipucio
+  desde la silueta; si el detector pierde el rostro, la coincidencia en vivo usa estos puntos y, sin
+  referencia, un perfil reconocible en la silueta se acepta como vista de perfil.
+- **Primera toma**: `FaceFraming` compara el óvalo detectado con el del dibujo; si coincide con el
+  marco, la guía se adapta a la cara.
+
 ### 5. Coincidencia en vivo en la cámara
 
 Con una foto de referencia superpuesta y la capa **Coincidir** activa, `LiveMatcher` analiza ~5
