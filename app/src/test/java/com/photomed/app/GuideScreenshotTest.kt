@@ -55,13 +55,15 @@ class GuideToneScreenshotTest {
         paparazzi.snapshot {
             Row(Modifier.background(Color(0xFF1B1B1F)).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(
-                    com.photomed.app.ui.camera.GuideTone.NORMAL to "Buscando",
-                    com.photomed.app.ui.camera.GuideTone.CLOSE to "Casi",
+                    com.photomed.app.ui.camera.GuideTone.NORMAL to "Sin detección",
+                    com.photomed.app.ui.camera.GuideTone(com.photomed.app.ui.camera.GuideTone.gradient(0.1f)) to "Lejos",
+                    com.photomed.app.ui.camera.GuideTone(com.photomed.app.ui.camera.GuideTone.gradient(0.5f)) to "Cerca",
+                    com.photomed.app.ui.camera.GuideTone(com.photomed.app.ui.camera.GuideTone.gradient(0.8f)) to "Casi",
                     com.photomed.app.ui.camera.GuideTone.MATCH to "Coincide",
                 ).forEach { (tone, label) ->
-                    Column(Modifier.width(120.dp)) {
+                    Column(Modifier.width(68.dp)) {
                         Box(Modifier.aspectRatio(3f / 4f).background(Color(0xFF455A64))) {
-                            GuideOverlay(Zone.FACE_OBLIQUE_R, showContour = true, showGrid = false,
+                            GuideOverlay(Zone.FACE_FRONTAL, showContour = true, showGrid = false,
                                 modifier = Modifier.matchParentSize(), tone = tone)
                         }
                         Text(label, color = Color.White, fontSize = 11.sp)

@@ -207,11 +207,8 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
                        /** false: los iconos se dibujan sobre la imagen ([CueOverlay]); aquí solo estado y textos. */
                        showCues: Boolean = true) {
     val eval = frame?.eval
-    val color = when (eval?.status) {
-        MatchStatus.MATCH -> GuideTone.MATCH.color
-        MatchStatus.CLOSE -> GuideTone.CLOSE.color
-        else -> Color.White
-    }
+    // mismo color que el contorno (gris → rojo → naranja → verde); sin detección, blanco
+    val color = GuideTone.of(eval).let { if (it == GuideTone.NORMAL) Color.White else it.color }
     val moving = g != null && (g.moveX != 0 || g.moveY != 0 || g.zoom != 0 || g.rotateDeg != 0f)
     val title = when (eval?.status) {
         MatchStatus.MATCH -> if (frame.standard) (if (autoCapture) "Encuadre estándar · capturando" else "Encuadre estándar correcto")

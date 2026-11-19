@@ -52,11 +52,33 @@ private val LineColor = Color(0xFFFFD54F)
 private val GridColor = Color(0x99FFFFFF)
 private val Shadow = Color(0x66000000)
 
-/** Color de la guía según la coincidencia en vivo con la foto de referencia. */
-enum class GuideTone(val color: Color) {
-    NORMAL(ContourColor),
-    CLOSE(Color(0xFFFFD54F)),
-    MATCH(Color(0xFF69F0AE)),
+/**
+ * Color de la guía según el grado de coincidencia: gris (sin detección o sin asistencia) →
+ * rojo (lejos) → naranja (cerca) → verde (coincide). Entre rojo, naranja y verde el color es
+ * continuo según el grado.
+ */
+data class GuideTone(val color: Color) {
+    companion object {
+        val NORMAL = GuideTone(Color(0xFFB0B0B0))   // gris
+        val FAR = GuideTone(Color(0xFFF44336))      // rojo
+        val CLOSE = GuideTone(Color(0xFFFF9800))    // naranja
+        val MATCH = GuideTone(Color(0xFF4CAF50))    // verde
+
+        /**
+         * Grado 0..1 (fracción de puntos respecto del umbral o calidad geométrica) → color.
+         * Sin coincidencia confirmada no llega al verde pleno (como mucho, verde amarillento).
+         */
+        fun of(eval: com.photomed.app.align.MatchEval?, enabled: Boolean = true): GuideTone {
+            if (!enabled || eval == null || eval.status == com.photomed.app.align.MatchStatus.SEARCHING) return NORMAL
+            if (eval.status == com.photomed.app.align.MatchStatus.MATCH) return MATCH
+            val d = (eval.pointFraction?.let { it / eval.threshold.coerceAtLeast(0.05f) } ?: eval.quality).coerceIn(0f, 0.85f)
+            return GuideTone(gradient(d))
+        }
+
+        /** Rojo (0) → naranja (0,5) → verde (1). */
+        fun gradient(d: Float): Color = if (d < 0.5f) androidx.compose.ui.graphics.lerp(FAR.color, CLOSE.color, d / 0.5f)
+            else androidx.compose.ui.graphics.lerp(CLOSE.color, MATCH.color, (d - 0.5f) / 0.5f)
+    }
 }
 
 /** Máxima fracción de celdas plegadas en el rostro para usar la deformación rasgo a rasgo. */
@@ -233,7 +255,7 @@ private fun GuideLayer(
     val guide = guideFor(zone.guide)
     Canvas(modifier) {
         if (showGrid) drawGrid()
-        if (showContour) drawGuide(guide, zone.mirrored)
+        if (showContour) drawGuide(guide, zone.mirrored, tone.color)
     }
 }
 
@@ -252,7 +274,7 @@ private fun DrawScope.drawGrid() {
     drawLine(Color.White, c - Offset(0f, s), c + Offset(0f, s), 1.5f.dp.toPx())
 }
 
-private fun DrawScope.drawGuide(guide: Guide, mirror: Boolean) {
+private fun DrawScope.drawGuide(guide: Guide, mirror: Boolean, contour: Color = ContourColor) {
     fun map(p: Offset) = Offset((if (mirror) 1f - p.x else p.x) * size.width, p.y * size.height)
     // Grosores proporcionales al tamaño (referencia: guía de 360 dp de ancho en la cámara),
     // para que miniaturas y cámara mantengan la misma jerarquía visual.
@@ -267,7 +289,7 @@ private fun DrawScope.drawGuide(guide: Guide, mirror: Boolean) {
     guide.contours.forEach { (points, closed) ->
         val path = smoothPath(points.map(::map), closed)
         drawPath(path, Shadow, style = Stroke(d(4f), cap = StrokeCap.Round))
-        drawPath(path, ContourColor, style = Stroke(d(1.6f), cap = StrokeCap.Round))
+        drawPath(path, contour, style = Stroke(d(1.6f), cap = StrokeCap.Round))
     }
     guide.marks.forEach { m ->
         drawCircle(Shadow, d(6f), map(m), style = Stroke(d(2.5f)))

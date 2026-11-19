@@ -287,12 +287,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     LaunchedEffect(status) {
         if (status == MatchStatus.MATCH) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
-    val tone = when {
-        !matchingEnabled -> GuideTone.NORMAL
-        status == MatchStatus.MATCH -> GuideTone.MATCH
-        status == MatchStatus.CLOSE -> GuideTone.CLOSE
-        else -> GuideTone.NORMAL
-    }
+    val tone = GuideTone.of(live?.eval, matchingEnabled)
 
     LaunchedEffect(reload) {
         val (e, list) = withContext(Dispatchers.IO) {
