@@ -110,3 +110,16 @@ Compose, Coil, Google ML Kit (rostro, pose, segmentación) y MediaPipe Face Land
   el control de opacidad, unos segundos al usarlos. Cuadrícula apagada por defecto.
 - **Experto** (Ajustes de coincidencia): además líneas siempre, puntos detectados, porcentajes,
   franja de indicaciones, barra de zoom y todas las capas.
+
+## Comparar: recorte, orden y exportación
+
+- **Recortar según la alineación** (menú ⋮, junto a las condiciones de la alineación): tras alinear,
+  todas las fotos se recortan al mayor encuadre 3:4 que cubren todas a la vez (incluida la
+  perspectiva), sin bordes negros. Se aplica en pantalla y al exportar.
+- **Fechas**: la hora y minuto se añaden solo a las fotos que comparten día con otra de la selección.
+- **Orden de la cuadrícula** (menú ⋮): fecha antigua primero, reciente primero o manual; en la
+  cuadrícula se reordena manteniendo pulsada una foto y arrastrándola (o con las acciones de
+  accesibilidad "Mover antes/después"). Es solo presentación: la referencia de la alineación no cambia.
+- **Exportar**: fotos ajustadas, cuadrícula, **lado a lado** (una fila) y **GIF animado** en modo
+  desplazamiento (cortinilla como el deslizador) o fundido, con codificador propio (paleta de 256
+  colores por corte de la mediana, LZW).

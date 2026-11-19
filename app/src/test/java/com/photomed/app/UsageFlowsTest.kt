@@ -15,6 +15,8 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
@@ -146,6 +148,26 @@ class UsageFlowsTest {
         compose.onNodeWithText("Eliminar").performClick()
         waitText("Sin fotografías de esta zona")
         assertEquals(0, repo.photos(exp, Zone.LIPS).size)
+    }
+
+    @Test
+    fun compareShowsTimeOnlyForSameDayPhotos() {
+        val jpeg = File(tmp.root, "d.jpg").apply { writeBytes(this@UsageFlowsTest.javaClass.getResourceAsStream("/blank.jpg")!!.readBytes()) }
+        val cal = java.util.Calendar.getInstance()
+        fun at(d: Int, h: Int, m: Int) = cal.apply { set(2026, 10, d, h, m, 0) }.timeInMillis
+        val same = listOf(at(12, 9, 5), at(12, 17, 40)).map { repo.savePhoto(exp, Zone.FOREHEAD, jpeg, takenAt = it) }
+        val other = repo.savePhoto(exp, Zone.FOREHEAD, jpeg, takenAt = at(19, 11, 0))
+        setContent { CompareScreen(exp.id, Zone.FOREHEAD, onBack = {}, initialSelection = (same + other).map { it.displayName }) }
+        compose.onNodeWithText("Cuadrícula").performClick()
+        waitText("09:05", substring = true)
+        waitText("17:40", substring = true)
+        // la del otro día, solo con la fecha
+        assertTrue(compose.onAllNodesWithText("11:00", substring = true).fetchSemanticsNodes().isEmpty())
+        runCatching {
+            val img = compose.onRoot().captureToImage().asAndroidBitmap()
+            File("build/reports").mkdirs()
+            File("build/reports/compare_same_day.png").outputStream().use { img.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, it) }
+        }
     }
 
     @Test
@@ -328,5 +350,20 @@ class CompareExportTest {
         assertEquals(4, saved)
         assertTrue(File(tmp.root, "Pictures/PhotoMed/${exp.id}/Exportadas").listFiles()!!.size == 4)
         assertEquals(3, repo.photos(exp).size)
+        // lado a lado (una fila) y GIF (desplazamiento), con recorte común según la alineación
+        val crop = com.photomed.app.ui.compare.overlapCrop(listOf(com.photomed.app.ui.compare.footprint(shift.transform, 0f)))
+        val r2 = com.photomed.app.ui.compare.CompareExport.build(ctx, repo, photos, mapOf(photos[1].key to shift), emptyMap(),
+            individual = false, grid = false, anonymize = true, dir = File(tmp.root, "out2"), side = true,
+            gif = com.photomed.app.ui.compare.CompareExport.GifMode.SLIDE, crop = crop, order = listOf(2, 0, 1))
+        assertEquals(2, r2.files.size)
+        val side = android.graphics.BitmapFactory.decodeFile(r2.files[0].absolutePath)
+        assertTrue("lado a lado: 3 en una fila", side.width > side.height * 2)
+        val gif = r2.files[1]
+        assertTrue(gif.name.endsWith(".gif"))
+        val head = gif.readBytes().copyOfRange(0, 6).toString(Charsets.US_ASCII)
+        assertEquals("GIF89a", head)
+        println("GIF exportado: %.1f MB".format(gif.length() / 1e6))
+        File("build/reports").mkdirs(); gif.copyTo(File("build/reports/export_demo.gif"), overwrite = true)
+        r2.files[0].copyTo(File("build/reports/export_side.jpg"), overwrite = true)
     }
 }

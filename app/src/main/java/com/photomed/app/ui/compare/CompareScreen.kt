@@ -91,6 +91,12 @@ import com.photomed.app.data.Photo
 import com.photomed.app.data.Zone
 import com.photomed.app.ui.LocalRepository
 import com.photomed.app.ui.components.EmptyState
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.material.icons.filled.RadioButtonChecked
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import com.photomed.app.ui.formatDate
 import com.photomed.app.ui.theme.Md3Spacing
 import kotlinx.coroutines.Dispatchers
@@ -152,6 +158,14 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     var hairlineInfo by remember { mutableStateOf<String?>(null) }
     var nearCaptured by remember { mutableStateOf(false) }
     var exportSheet by remember { mutableStateOf(false) }
+    /** Recortar todas las fotos al área común que dejan tras alinearse (sin bordes negros). */
+    var cropToAlign by remember { mutableStateOf(prefs.getBoolean("compare_crop", false)) }
+    var crop by remember { mutableStateOf<Similarity?>(null) }
+    /** Orden de la cuadrícula y lado a lado (solo presentación; la referencia no cambia). */
+    var gridOrder by remember { mutableStateOf(GridOrder.OLDEST_FIRST) }
+    var dragKey by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    var manualOrder by remember { mutableStateOf<List<String>>(emptyList()) }
     var options by remember { mutableStateOf(AlignOptions.fromPrefs(prefs)) }
     /** Cambia con cada reinicio de la alineación: un cálculo en curso solo se aplica si sigue vigente. */
     var alignToken by remember { mutableStateOf(0) }
@@ -192,8 +206,17 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         )
     }
     fun resultOf(p: Photo): AlignmentResult? = if (useAligned && alignedFor.contains(p.key) && alignedFor == derive().seqKeys) alignments[p.key] else null
-    fun transformOf(p: Photo): Similarity? = resultOf(p)?.transform
+    fun transformOf(p: Photo): Similarity? = CompareExport.withCrop(resultOf(p)?.transform, crop)
     val (photos, _, _, seq, seqKeys, n, timeline, reference, target, validAlign) = derive()
+
+    // Recorte común según la alineación: el mayor 3:4 que cubren todas las fotos alineadas.
+    LaunchedEffect(cropToAlign, alignments, alignedFor, useAligned, seqKeys) {
+        val s = derive().seq
+        crop = if (!cropToAlign || s == null || !useAligned || alignedFor != s.map { it.key }) null
+        else withContext(Dispatchers.Default) {
+            overlapCrop(s.drop(1).mapNotNull { p -> alignments[p.key]?.let { footprint(it.transform, it.keystoneDeg) } })
+        }
+    }
 
     // Condiciones de captura (XMP): avisar si alguna foto no es comparable con la referencia.
     LaunchedEffect(seqKeys) {
@@ -292,6 +315,28 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                             CheckItem("Usar puntos anatómicos", options.points) { setOption(options.copy(points = it)) }
                             CheckItem("Usar contornos", options.contours) { setOption(options.copy(contours = it)) }
                             CheckItem("Usar mirada (gaze)", options.gaze) { setOption(options.copy(gaze = it)) }
+                            CheckItem("Recortar según la alineación", cropToAlign) {
+                                cropToAlign = it; prefs.edit().putBoolean("compare_crop", it).apply()
+                                if (it && !validAlign) scope.launch { snackbar.showSnackbar("Se aplicará al alinear automáticamente") }
+                            }
+                            HorizontalDivider()
+                            Text("Orden de la cuadrícula", style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Md3Spacing.s3, vertical = Md3Spacing.s1))
+                            GridOrder.entries.forEach { o ->
+                                DropdownMenuItem(
+                                    text = { Text(o.label) },
+                                    leadingIcon = { Icon(if (gridOrder == o) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked, null,
+                                        tint = if (gridOrder == o) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
+                                    onClick = {
+                                        if (o == GridOrder.MANUAL && gridOrder != GridOrder.MANUAL)
+                                            manualOrder = displayOrder(seqKeys, gridOrder, manualOrder)
+                                        gridOrder = o; menu = false
+                                        if (o == GridOrder.MANUAL) scope.launch { snackbar.showSnackbar("Mantenga pulsada una foto de la cuadrícula y arrástrela") }
+                                    },
+                                    modifier = Modifier.semantics { this.selected = gridOrder == o },
+                                )
+                            }
                             HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text(if (colorAdjusts.isEmpty()) "Igualar color de piel" else "Quitar igualación de color") },
@@ -379,8 +424,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     Text("Seleccione dos o más fotografías abajo para compararlas.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
                 } else {
+                    // fecha; con hora y minuto solo en las fotos que comparten día con otra
+                    val stamps = stampLabels(seq.map { it.takenAt })
+                    // orden de presentación de la cuadrícula y lado a lado (índices de seq)
+                    val shownOrder = displayOrder(seqKeys, gridOrder, manualOrder).mapNotNull { k -> seq.indexOfFirst { it.key == k }.takeIf { it >= 0 } }
                     fun label(i: Int): String {
-                        val d = formatDate(seq[i].takenAt)
+                        val d = stamps[i]
                         return if (n == 2) (if (i == 0) "Antes · $d" else "Después · $d") else "${i + 1} · $d"
                     }
                     val from = seq[timeline.from]; val to = seq[timeline.to]
@@ -400,7 +449,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                             val cellW: Dp = if (n <= 3) minOf((maxWidth - gap * (n - 1)) / n, maxHeight * 3f / 4f)
                             else minOf((maxWidth - gap * 2) / 2.4f, maxHeight * 3f / 4f)
                             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                                seq.forEachIndexed { i, p -> PhotoCell(models.getValue(p.key), label(i), transformOf(p), zoom, Modifier.width(cellW)) }
+                                shownOrder.forEach { i -> val p = seq[i]; PhotoCell(models.getValue(p.key), label(i), transformOf(p), zoom, Modifier.width(cellW)) }
                             }
                         }
 
@@ -409,11 +458,46 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                             val cols = gridColumns(n, maxWidth.value, maxHeight.value)
                             val rows = (n + cols - 1) / cols
                             val cellW: Dp = minOf((maxWidth - gap * (cols - 1)) / cols, ((maxHeight - gap * (rows - 1)) / rows) * 3f / 4f)
+                            // Mantener pulsada una foto y arrastrarla: se reordena (orden manual)
+                            val density = androidx.compose.ui.platform.LocalDensity.current
+                            val stepX = with(density) { (cellW + gap).toPx() }; val stepY = stepX * 4f / 3f
+                            val orderKeys = shownOrder.map { seq[it].key }
                             Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-                                seq.chunked(cols).forEachIndexed { r, rowPhotos ->
+                                shownOrder.chunked(cols).forEachIndexed { r, rowIdx ->
                                     Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                                        rowPhotos.forEachIndexed { c, p ->
-                                            PhotoCell(models.getValue(p.key), label(r * cols + c), transformOf(p), zoom, Modifier.width(cellW))
+                                        rowIdx.forEachIndexed { c, si ->
+                                            val p = seq[si]; val pos = r * cols + c
+                                            val dragging = dragKey == p.key
+                                            PhotoCell(models.getValue(p.key), label(si), transformOf(p), zoom, Modifier.width(cellW)
+                                                .zIndex(if (dragging) 1f else 0f)
+                                                .graphicsLayer {
+                                                    if (dragging) {
+                                                        translationX = dragOffset.x; translationY = dragOffset.y
+                                                        scaleX = 1.05f; scaleY = 1.05f; shadowElevation = 16f
+                                                    }
+                                                }
+                                                .pointerInput(p.key, orderKeys, cols) {
+                                                    detectDragGesturesAfterLongPress(
+                                                        onDragStart = { dragKey = p.key; dragOffset = androidx.compose.ui.geometry.Offset.Zero },
+                                                        onDrag = { ch, d -> ch.consume(); dragOffset += d },
+                                                        onDragEnd = {
+                                                            val nc = (c + (dragOffset.x / stepX).roundToInt()).coerceIn(0, cols - 1)
+                                                            val nr = (r + (dragOffset.y / stepY).roundToInt()).coerceIn(0, (orderKeys.size - 1) / cols)
+                                                            val to = (nr * cols + nc).coerceIn(0, orderKeys.size - 1)
+                                                            if (to != pos) { manualOrder = orderKeys.moved(pos, to); gridOrder = GridOrder.MANUAL }
+                                                            dragKey = null; dragOffset = androidx.compose.ui.geometry.Offset.Zero
+                                                        },
+                                                        onDragCancel = { dragKey = null; dragOffset = androidx.compose.ui.geometry.Offset.Zero },
+                                                    )
+                                                }
+                                                .semantics {
+                                                    customActions = listOfNotNull(
+                                                        if (pos > 0) androidx.compose.ui.semantics.CustomAccessibilityAction("Mover antes") {
+                                                            manualOrder = orderKeys.moved(pos, pos - 1); gridOrder = GridOrder.MANUAL; true } else null,
+                                                        if (pos < orderKeys.size - 1) androidx.compose.ui.semantics.CustomAccessibilityAction("Mover después") {
+                                                            manualOrder = orderKeys.moved(pos, pos + 1); gridOrder = GridOrder.MANUAL; true } else null,
+                                                    )
+                                                })
                                         }
                                     }
                                 }
@@ -524,10 +608,11 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
 
             // Selección múltiple (toggle) de imágenes; el número indica el orden en la comparación.
             LazyRow(
-                Modifier.fillMaxWidth().height(124.dp),
+                Modifier.fillMaxWidth().height(136.dp),
                 contentPadding = PaddingValues(horizontal = Md3Spacing.marginCompact, vertical = Md3Spacing.s2),
                 horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2),
             ) {
+                val stripStamps = stampLabels(visible.map { it.takenAt }).let { l -> visible.indices.associate { visible[it].key to l[it] } }
                 items(visible, key = { it.key }) { p ->
                     val isSel = p.key in selected
                     val order = seqKeys.indexOf(p.key).takeIf { it >= 0 }?.let { it + 1 }
@@ -560,7 +645,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                                 )
                             }
                         }
-                        Text(formatDate(p.takenAt), style = MaterialTheme.typography.labelSmall)
+                        Text((stripStamps[p.key] ?: formatDate(p.takenAt)).replace(", ", "\n"), style = MaterialTheme.typography.labelSmall,
+                            maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
                 }
             }
@@ -606,12 +692,15 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     if (exportSheet && seq != null) {
         val shown = seq.mapNotNull { p -> resultOf(p)?.let { p.key to it } }.toMap()
         ExportSheet(
-            count = seq.size, aligned = shown.isNotEmpty(), colorMatched = colorAdjusts.isNotEmpty(),
+            count = seq.size, aligned = shown.isNotEmpty(), colorMatched = colorAdjusts.isNotEmpty(), cropped = crop != null,
             onDismiss = { exportSheet = false },
-            onExport = { individual, grid, anonymize, toGallery, progress ->
+            onExport = { ch, toGallery, progress ->
                 val e = exp
+                val anonymize = ch.anonymize
                 val dir = java.io.File(context.cacheDir, "share/export").apply { deleteRecursively(); mkdirs() }
-                val r = CompareExport.build(context, repo, seq, shown, colorAdjusts, individual, grid, anonymize, dir, progress)
+                val order = displayOrder(seq.map { it.key }, gridOrder, manualOrder).map { k -> seq.indexOfFirst { it.key == k } }
+                val r = CompareExport.build(context, repo, seq, shown, colorAdjusts, ch.individual, ch.grid, anonymize, dir, progress,
+                    side = ch.side, gif = ch.gif, crop = crop, labels = stampLabels(seq.map { it.takenAt }), order = order)
                 when {
                     r.files.isEmpty() -> "No se pudo exportar ninguna imagen"
                     toGallery && e != null -> {

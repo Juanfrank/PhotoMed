@@ -82,7 +82,7 @@ class MediaStorePhotoStore(private val resolver: ContentResolver) : PhotoStore {
     override fun save(folder: String, displayName: String, source: File, dateTaken: Long): Uri {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
-            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+            put(MediaStore.MediaColumns.MIME_TYPE, if (displayName.endsWith(".gif", true)) "image/gif" else "image/jpeg")
             put(MediaStore.MediaColumns.RELATIVE_PATH, "$base$folder/")
             put(MediaStore.MediaColumns.DATE_TAKEN, dateTaken)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
