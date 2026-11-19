@@ -27,6 +27,28 @@ object Standardization {
         else -> null
     }
 
+    /**
+     * Ángulo de la cámara (grados hacia abajo respecto de la horizontal; 90 = cenital) que pide
+     * cada vista del cuero cabelludo, con su tolerancia; null si la zona no lo exige.
+     */
+    fun cameraDownTarget(zone: Zone): Pair<Float, Float>? = when (zone.guide) {
+        GuideType.SCALP -> 90f to 8f
+        GuideType.SCALP_CROWN -> 75f to 12f
+        GuideType.SCALP_PARIETAL -> 45f to 12f
+        else -> null
+    }
+
+    /** Indicación para la inclinación del teléfono ([downDeg]: 90 = cámara trasera mirando al suelo). */
+    fun cameraAngleHint(zone: Zone, downDeg: Float): String? {
+        val (t, tol) = cameraDownTarget(zone) ?: return null
+        val d = t - downDeg
+        return when {
+            d > tol -> "Cámara: apuntar más abajo %.0f°".format(d)
+            d < -tol -> "Cámara: apuntar más arriba %.0f°".format(-d)
+            else -> null
+        }
+    }
+
     const val PITCH_TOL = 7f
     const val ROLL_TOL = 4f
     const val LIGHT_ASYM = 0.15f

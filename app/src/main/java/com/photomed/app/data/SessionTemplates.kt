@@ -15,7 +15,8 @@ object SessionTemplates {
         SessionTemplate("Rostro 5 vistas", listOf(Zone.FACE_FRONTAL, Zone.FACE_OBLIQUE_R, Zone.FACE_OBLIQUE_L, Zone.FACE_PROFILE_R, Zone.FACE_PROFILE_L), true),
         SessionTemplate("Rostro 3 vistas", listOf(Zone.FACE_FRONTAL, Zone.FACE_OBLIQUE_R, Zone.FACE_OBLIQUE_L), true),
         SessionTemplate("Tercios faciales", listOf(Zone.FOREHEAD, Zone.PERIOCULAR, Zone.LIPS), true),
-        SessionTemplate("Tricología", listOf(Zone.SCALP_VERTEX, Zone.FOREHEAD, Zone.FACE_PROFILE_R, Zone.FACE_PROFILE_L), true),
+        SessionTemplate("Tricología", listOf(Zone.SCALP_VERTEX, Zone.SCALP_CROWN, Zone.SCALP_PARIETAL_R, Zone.SCALP_PARIETAL_L, Zone.FOREHEAD), true),
+        SessionTemplate("Ojos", listOf(Zone.EYE_R, Zone.EYE_L, Zone.PERIOCULAR), true),
         SessionTemplate("Tronco", listOf(Zone.TORSO_FRONT, Zone.TORSO_SIDE, Zone.TORSO_SIDE_L, Zone.BACK), true),
         SessionTemplate("Manos y pies", listOf(Zone.HANDS_DORSAL, Zone.HANDS_PALMAR, Zone.FEET_DORSAL, Zone.FEET_PLANTAR), true),
     )

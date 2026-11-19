@@ -36,9 +36,25 @@ class ScalpZoneTest {
     }
 
     @Test
-    fun overheadCameraCueIsAnIcon() {
-        val c = HintCues.of("Cámara: cenital, inclinar 20°")
+    fun cameraAngleHintsPerScalpView() {
+        // vértice cenital (90°): con el teléfono a 70° hay que apuntar más abajo
+        assertEquals("Cámara: apuntar más abajo 20°", Standardization.cameraAngleHint(Zone.SCALP_VERTEX, 70f))
+        assertEquals(null, Standardization.cameraAngleHint(Zone.SCALP_VERTEX, 86f))
+        // parietal ≈ 45°: a 80° sobra inclinación
+        assertEquals("Cámara: apuntar más arriba 35°", Standardization.cameraAngleHint(Zone.SCALP_PARIETAL_L, 80f))
+        assertEquals(null, Standardization.cameraAngleHint(Zone.SCALP_CROWN, 70f))
+        assertEquals(null, Standardization.cameraAngleHint(Zone.EYE_R, 0f))
+        val c = HintCues.of("Cámara: apuntar más abajo 20°")
         assertNotNull(c)
         assertEquals("20°", c!!.value)
+    }
+
+    @Test
+    fun newZonesHaveIdsAndSides() {
+        listOf(Zone.SCALP_CROWN, Zone.SCALP_PARIETAL_R, Zone.SCALP_PARIETAL_L).forEach { assertEquals(ZoneCategory.CAPILAR, it.category) }
+        assertTrue(Zone.SCALP_PARIETAL_L.mirrored && !Zone.SCALP_PARIETAL_R.mirrored)
+        assertTrue(Zone.EYE_L.mirrored && !Zone.EYE_R.mirrored)
+        assertEquals(Zone.EYE_L, Zone.fromId("ojo_izq"))
+        assertTrue(Zone.entries.map { it.id }.toSet().size == Zone.entries.size)
     }
 }

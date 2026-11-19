@@ -88,10 +88,31 @@ data class ZoneAlignment(
                 )
                 GuideType.SCALP -> ZoneAlignment(
                     Detector.NONE, emptySet(),
-                    listOf(r("coronilla", 0.5f, 0.72f, 0.2f, 0.18f), r("contorno craneal", 0.5f, 0.667f, 0.4f, 0.5f, 0.8f),
+                    listOf(r("vértice", 0.5f, 0.667f, 0.2f, 0.18f), r("contorno craneal", 0.5f, 0.667f, 0.4f, 0.5f, 0.8f),
                         r("raya y línea frontal", 0.5f, 0.3f, 0.25f, 0.2f, 0.7f)),
-                    listOf("Vértice (coronilla)", "Línea de implantación frontal (centro)"),
-                    "contorno del cráneo, raya, coronilla y patrón del cabello",
+                    listOf("Vértice", "Línea de implantación frontal (centro)"),
+                    "contorno del cráneo, raya, vértice y patrón del cabello",
+                )
+                GuideType.SCALP_CROWN -> ZoneAlignment(
+                    Detector.NONE, emptySet(),
+                    listOf(r("remolino de la coronilla", 0.5f, 0.6f, 0.2f, 0.18f), r("contorno craneal", 0.5f, 0.62f, 0.42f, 0.5f, 0.8f),
+                        r("nuca y orejas", 0.5f, 1.15f, 0.45f, 0.12f, 0.6f)),
+                    listOf("Remolino (coronilla)", "Protuberancia occipital"),
+                    "contorno del cráneo, remolino, nuca y patrón del cabello",
+                )
+                GuideType.SCALP_PARIETAL -> ZoneAlignment(
+                    Detector.NONE, emptySet(),
+                    listOf(r("región parietal", 0.5f, 0.6f, 0.3f, 0.25f), r("contorno craneal", 0.5f, 0.45f, 0.45f, 0.3f, 0.8f),
+                        r("oreja y sien", 0.6f, 1.0f, 0.25f, 0.14f, 0.7f)).mirrored(zone.mirrored),
+                    listOf("Hélix (oreja)", "Raya (línea media)"),
+                    "contorno del cráneo, raya, oreja y patrón del cabello",
+                )
+                GuideType.EYE -> ZoneAlignment(
+                    Detector.NONE, emptySet(),
+                    listOf(r("párpados", 0.5f, 0.73f, 0.3f, 0.08f), r("ceja", 0.5f, 0.45f, 0.35f, 0.08f, 0.8f),
+                        r("patas de gallo", 0.15f, 0.75f, 0.12f, 0.15f, 0.6f)).mirrored(zone.mirrored),
+                    listOf("Pupila", "Canto lateral"),
+                    "párpados, ceja y pliegues laterales",
                 )
                 GuideType.TORSO_FRONT -> ZoneAlignment(
                     Detector.POSE, L.TRUNK,

@@ -7,6 +7,12 @@ enum class GuideType {
     FACE_FRONT, FACE_OBLIQUE, FACE_PROFILE, FOREHEAD, PERIOCULAR, LIPS, NECK,
     /** Cuero cabelludo, vista cenital (vértice), para tricología. */
     SCALP,
+    /** Cuero cabelludo: corona (coronilla), cabeza flexionada, vista posterosuperior. */
+    SCALP_CROWN,
+    /** Cuero cabelludo: región parietal de un lado, vista lateral superior. */
+    SCALP_PARIETAL,
+    /** Primer plano de un ojo (párpados, cola de la ceja y patas de gallo). */
+    EYE,
     TORSO_FRONT, BREASTS, TORSO_SIDE, BACK, GLUTES, LEGS, ARM, HANDS, FEET,
     /** Modo libre: la guía es el contorno de lo visible (referencia o cuadro actual). */
     FREE
@@ -38,12 +44,22 @@ enum class Zone(
         hint = "Encuadrar de la línea de implantación a las cejas; tomar en reposo y en contracción."),
     PERIOCULAR("periocular", "Periocular", ZoneCategory.FACIAL, GuideType.PERIOCULAR,
         hint = "Pupilas sobre la línea horizontal; tomar en reposo y sonriendo."),
+    EYE_R("ojo_der", "Ojo derecho", ZoneCategory.FACIAL, GuideType.EYE,
+        hint = "Primer plano del ojo derecho, mirada al frente; pupila en la cruz, cola de la ceja y patas de gallo dentro del encuadre (a la izquierda); en reposo y sonriendo."),
+    EYE_L("ojo_izq", "Ojo izquierdo", ZoneCategory.FACIAL, GuideType.EYE, mirrored = true,
+        hint = "Primer plano del ojo izquierdo, mirada al frente; pupila en la cruz, cola de la ceja y patas de gallo dentro del encuadre (a la derecha); en reposo y sonriendo."),
     LIPS("labios", "Labios / peribucal", ZoneCategory.FACIAL, GuideType.LIPS,
         hint = "Labios relajados en contacto, comisuras sobre la línea horizontal."),
     NECK("cuello", "Cuello y escote", ZoneCategory.FACIAL, GuideType.NECK,
         hint = "Mentón al frente, hombros relajados."),
-    SCALP_VERTEX("cuero_cabelludo_vertice", "Cuero cabelludo (vértice)", ZoneCategory.CAPILAR, GuideType.SCALP,
-        hint = "Vista cenital: cámara paralela al suelo sobre la cabeza, frente hacia arriba del encuadre, raya en la línea media y coronilla en la cruz; cabello seco y peinado igual en cada toma."),
+    SCALP_VERTEX("cuero_cabelludo_vertice", "Vértice", ZoneCategory.CAPILAR, GuideType.SCALP,
+        hint = "Vista cenital: cámara paralela al suelo sobre la cabeza, frente hacia arriba del encuadre, raya en la línea media y el punto más alto del cráneo en la cruz; cabello seco y peinado igual en cada toma."),
+    SCALP_CROWN("cuero_cabelludo_corona", "Corona (coronilla)", ZoneCategory.CAPILAR, GuideType.SCALP_CROWN,
+        hint = "Paciente sentado con la cabeza flexionada; cámara por detrás y encima (≈ 75° hacia abajo); remolino de la coronilla en la cruz, nuca abajo."),
+    SCALP_PARIETAL_R("cuero_cabelludo_parietal_der", "Parietal derecho", ZoneCategory.CAPILAR, GuideType.SCALP_PARIETAL,
+        hint = "Cámara por encima del lado derecho (≈ 45° hacia abajo); oreja derecha abajo en la marca, raya arriba siguiendo la curva, frente hacia la derecha del encuadre."),
+    SCALP_PARIETAL_L("cuero_cabelludo_parietal_izq", "Parietal izquierdo", ZoneCategory.CAPILAR, GuideType.SCALP_PARIETAL, mirrored = true,
+        hint = "Cámara por encima del lado izquierdo (≈ 45° hacia abajo); oreja izquierda abajo en la marca, raya arriba siguiendo la curva, frente hacia la izquierda del encuadre."),
     TORSO_FRONT("abdomen_frontal", "Abdomen frontal", ZoneCategory.CORPORAL, GuideType.TORSO_FRONT,
         hint = "Brazos separados del cuerpo; ombligo sobre la cruz de referencia."),
     TORSO_SIDE("abdomen_lateral", "Abdomen lateral derecho", ZoneCategory.CORPORAL, GuideType.TORSO_SIDE,
