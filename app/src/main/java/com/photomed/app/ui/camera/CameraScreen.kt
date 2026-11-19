@@ -393,7 +393,16 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             .setTargetRotation(Surface.ROTATION_0)
             .build()
     }
-    LaunchedEffect(imageCapture, flashMode) { imageCapture.flashMode = flashMode }
+    // Flash: la cámara frontal usa el flash de pantalla (blanco a brillo máximo), como las selfies.
+    val screenFlash = rememberScreenFlash()
+    val ambientLux by rememberAmbientLux(lensFacing == CameraSelector.LENS_FACING_FRONT && flashMode == ImageCapture.FLASH_MODE_AUTO)
+    val effectiveFlash = effectiveFlashMode(lensFacing == CameraSelector.LENS_FACING_FRONT, flashMode, ambientLux)
+    LaunchedEffect(imageCapture, effectiveFlash) {
+        runCatching {
+            if (effectiveFlash == ImageCapture.FLASH_MODE_SCREEN) imageCapture.screenFlash = screenFlash
+            imageCapture.flashMode = effectiveFlash
+        }.onFailure { imageCapture.flashMode = ImageCapture.FLASH_MODE_OFF }
+    }
     val analysisRef = remember { java.util.concurrent.atomic.AtomicReference<ImageAnalysis?>() }
     val analysis = remember(lensFacing) {
         ImageAnalysis.Builder()
@@ -512,7 +521,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         val stamp = System.currentTimeMillis()
         scope.launch {
             // Ráfaga: 3 tomas seguidas; se guarda la de mayor coincidencia (evita repetir por un parpadeo)
-            val shots = if (burst) 3 else 1
+            // con flash de pantalla, una sola toma (un destello, como en las selfies)
+            val shots = if (burst && effectiveFlash != ImageCapture.FLASH_MODE_SCREEN) 3 else 1
             val files = ArrayList<File>()
             try {
                 for (k in 0 until shots) {
@@ -652,7 +662,11 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         ImageCapture.FLASH_MODE_ON -> Icons.Default.FlashOn
                         ImageCapture.FLASH_MODE_AUTO -> Icons.Default.FlashAuto
                         else -> Icons.Default.FlashOff
-                    }, "Flash", tint = Color.White
+                    }, when (flashMode) {
+                        ImageCapture.FLASH_MODE_ON -> if (lensFacing == CameraSelector.LENS_FACING_FRONT) "Flash de pantalla activado" else "Flash activado"
+                        ImageCapture.FLASH_MODE_AUTO -> "Flash automático"
+                        else -> "Flash desactivado"
+                    }, tint = Color.White
                 )
             }
         }
@@ -854,6 +868,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         }
     }
     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 120.dp))
+    ScreenFlashOverlay(screenFlash)
     if (showSettings) {
         MatchSettingsSheet(
             autoCapture = autoCapture,
