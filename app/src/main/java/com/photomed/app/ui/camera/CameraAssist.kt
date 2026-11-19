@@ -26,6 +26,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -172,11 +176,29 @@ fun correctionItems(frame: LiveFrame?, zoomInfo: String?, distanceHint: String?)
 fun CueOverlay(items: List<String>, accent: Color, modifier: Modifier = Modifier) {
     val cues = items.mapNotNull { HintCues.of(it) }
     if (cues.isEmpty()) return
+    // Una sola fila; si no caben, "…" (al tocarlo se ven todas; al tocar de nuevo, se recogen)
+    var expanded by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.foundation.layout.FlowRow(
         modifier.padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
         verticalArrangement = Arrangement.spacedBy(4.dp),
+        maxLines = if (expanded) Int.MAX_VALUE else 1,
+        overflow = androidx.compose.foundation.layout.FlowRowOverflow.expandOrCollapseIndicator(
+            // (el número de fichas visibles solo se conoce al dibujar: descripción genérica)
+            expandIndicator = { MoreChip(Icons.Default.MoreHoriz, "Más indicaciones: toque para verlas todas") { expanded = true } },
+            collapseIndicator = { MoreChip(Icons.Default.ExpandMore, "Mostrar menos indicaciones") { expanded = false } },
+        ),
     ) { cues.forEach { CueChip(it, accent, compact = true) } }
+}
+
+@Composable
+private fun MoreChip(icon: ImageVector, description: String, onClick: () -> Unit) {
+    Box(
+        Modifier.background(Color(0x66000000), RoundedCornerShape(8.dp)).clickable(onClickLabel = description, onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 2.dp).size(22.dp)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(18.dp)) }
 }
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
