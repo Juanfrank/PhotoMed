@@ -47,6 +47,9 @@ fun SettingsScreen(onBack: () -> Unit) {
     var zoom by remember { mutableStateOf(prefs.getBoolean("zoom_assist", true)) }
     var mirror by remember { mutableStateOf(prefs.getBoolean("mirror_front", true)) }
     var engine by remember { mutableStateOf(FaceEngine.get(context)) }
+    var feedback by remember { mutableStateOf(prefs.getBoolean("guide_feedback", true)) }
+    var nearCapture by remember { mutableStateOf(prefs.getBoolean("auto_capture_near", true)) }
+    var burst by remember { mutableStateOf(prefs.getBoolean("burst", true)) }
     var alignPoints by remember { mutableStateOf(prefs.getBoolean(AlignOptions.PREF_POINTS, true)) }
     var alignContours by remember { mutableStateOf(prefs.getBoolean(AlignOptions.PREF_CONTOURS, true)) }
     var alignGaze by remember { mutableStateOf(prefs.getBoolean(AlignOptions.PREF_GAZE, true)) }
@@ -62,6 +65,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                 zoomAssist = zoom, onZoomAssist = { zoom = it; prefs.edit().putBoolean("zoom_assist", it).apply() },
                 engine = engine, onEngine = { engine = it; FaceEngine.set(context, it) },
                 useGaze = alignGaze, onUseGaze = { alignGaze = it; prefs.edit().putBoolean(AlignOptions.PREF_GAZE, it).apply() },
+                feedback = feedback, onFeedback = { feedback = it; prefs.edit().putBoolean("guide_feedback", it).apply() },
+                nearCapture = nearCapture, onNearCapture = { nearCapture = it; prefs.edit().putBoolean("auto_capture_near", it).apply() },
+                burst = burst, onBurst = { burst = it; prefs.edit().putBoolean("burst", it).apply() },
             )
             HorizontalDivider()
             SectionHeader("Alineación automática (comparar)", Modifier.padding(horizontal = Md3Spacing.s6))

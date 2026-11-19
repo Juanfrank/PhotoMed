@@ -149,6 +149,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     var colorAdjusts by remember { mutableStateOf<Map<String, ColorAdjust>>(emptyMap()) }
     var contourOutlines by remember { mutableStateOf<Map<String, List<Pt>>>(emptyMap()) }
     var conditionsWarning by remember { mutableStateOf<String?>(null) }
+    var nearCaptured by remember { mutableStateOf(false) }
     var exportSheet by remember { mutableStateOf(false) }
     var options by remember { mutableStateOf(AlignOptions.fromPrefs(prefs)) }
     /** Cambia con cada reinicio de la alineación: un cálculo en curso solo se aplica si sigue vigente. */
@@ -197,6 +198,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     LaunchedEffect(seqKeys) {
         val s = seq ?: run { conditionsWarning = null; return@LaunchedEffect }
         val infos = withContext(Dispatchers.IO) { s.map { repo.readInfo(it)?.conditions.orEmpty() } }
+        // tomadas "casi alineadas" (disparo permisivo): alinear automáticamente al abrir
+        nearCaptured = infos.any { it["Status"] == "CLOSE" }
         conditionsWarning = infos.drop(1).mapIndexedNotNull { i, c ->
             captureConditionsWarning(infos[0], c)?.let { w -> if (s.size > 2) "Foto ${i + 2}: $w" else w }
         }.joinToString("\n").ifEmpty { null }
@@ -255,6 +258,10 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             }
             snackbar.showSnackbar(msg)
         }
+    }
+
+    LaunchedEffect(nearCaptured, seqKeys) {
+        if (nearCaptured && seqKeys.size >= 2 && alignedFor != seqKeys && alignJob?.isActive != true) runAlign()
     }
 
     Scaffold(

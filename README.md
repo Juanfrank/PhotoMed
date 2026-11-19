@@ -28,6 +28,13 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
 - **Medición de contornos**: selección automática (óvalo facial / silueta, como los stickers) o con
   **varita mágica**; alto, anchos por nivel, área y proporciones antes/después.
 
+- **Toma más sencilla**: indicaciones de una en una por prioridad (“+N” muestra el resto),
+  vibración que se acelera al acercarse y tono al coincidir, disparo automático también “casi”
+  alineado (se alinea después en Comparar), ráfaga de 3 fotos guardando la de mayor coincidencia,
+  fantasma de bordes de la referencia, y zoom/distancia de la referencia aplicados al elegirla.
+- **Plantillas y secuencias**: en el expediente, mantener presionada una zona elige varias (o se
+  toca una plantilla, predefinida o propia); “Iniciar secuencia de fotos” recorre las zonas en orden
+  y pasa sola a la siguiente tras cada foto.
 - **Modo libre**: zona sin dibujo cuya guía es el contorno de lo visible (silueta o bordes).
 - **Extremidades en modo individual**: una sola mano, pie o pierna dentro de la misma zona.
 - **Zoom manual** con deslizador o pellizco (pausa el zoom asistido; “Auto” lo reanuda).

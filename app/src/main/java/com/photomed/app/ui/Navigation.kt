@@ -69,6 +69,9 @@ fun AppNavigation() {
                 onBack = { nav.popBackStack() },
                 onZone = { zone -> nav.navigate("zone/$exp/${zone.id}") },
                 onCompare = { nav.navigate("compare/$exp") },
+                onSequence = { zones ->
+                    if (zones.isNotEmpty()) nav.navigate("camera/$exp/${zones.first().id}?seq=" + zones.joinToString(",") { it.id })
+                },
             )
         }
         composable("zone/{exp}/{zone}") { entry ->
@@ -86,10 +89,20 @@ fun AppNavigation() {
                 onPhoto = { photo -> nav.navigate("photo/$exp/${zone.id}/${photo.displayName}") },
             )
         }
-        composable("camera/{exp}/{zone}") { entry ->
+        composable(
+            "camera/{exp}/{zone}?seq={seq}",
+            arguments = listOf(navArgument("seq") { type = NavType.StringType; nullable = true; defaultValue = null }),
+        ) { entry ->
             val exp = entry.arguments?.getString("exp").orEmpty()
             val zone = Zone.fromId(entry.arguments?.getString("zone")) ?: return@composable
-            CameraScreen(expId = exp, zone = zone, onBack = { nav.popBackStack() })
+            val seqArg = entry.arguments?.getString("seq")
+            val seq = seqArg?.split(',')?.mapNotNull { Zone.fromId(it) }.orEmpty()
+            CameraScreen(expId = exp, zone = zone, onBack = { nav.popBackStack() }, sequence = seq,
+                onNext = { next ->
+                    // secuencia: la cámara de la zona siguiente sustituye a la actual; al final, vuelve
+                    nav.popBackStack()
+                    if (next != null) nav.navigate("camera/$exp/${next.id}?seq=$seqArg")
+                })
         }
         composable(
             "compare/{exp}?zone={zone}&sel={sel}",

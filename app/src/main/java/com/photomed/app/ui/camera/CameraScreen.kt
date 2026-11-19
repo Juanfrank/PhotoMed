@@ -172,7 +172,12 @@ import kotlin.math.sqrt
 
 
 @Composable
-fun CameraScreen(expId: String, zone: Zone, onBack: () -> Unit) = ImmersiveTheme {
+fun CameraScreen(
+    expId: String, zone: Zone, onBack: () -> Unit,
+    /** Secuencia de zonas (plantilla): tras guardar se pasa a la siguiente; null = fin. */
+    sequence: List<Zone> = emptyList(),
+    onNext: (Zone?) -> Unit = {},
+) = ImmersiveTheme {
     val context = LocalContext.current
     val needed = remember {
         buildList {
@@ -187,7 +192,7 @@ fun CameraScreen(expId: String, zone: Zone, onBack: () -> Unit) = ImmersiveTheme
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (hasPermission) {
-            CameraContent(expId, zone, onBack)
+            CameraContent(expId, zone, onBack, sequence, onNext)
         } else {
             EmptyState(
                 icon = Icons.Default.NoPhotography,
@@ -205,7 +210,7 @@ fun CameraScreen(expId: String, zone: Zone, onBack: () -> Unit) = ImmersiveTheme
 }
 
 @Composable
-private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
+private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequence: List<Zone>, onNext: (Zone?) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val repo = LocalRepository.current
@@ -232,6 +237,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     var liveMatch by remember { mutableStateOf(true) }
     val prefs = remember { context.getSharedPreferences("photomed", android.content.Context.MODE_PRIVATE) }
     var autoCapture by remember { mutableStateOf(prefs.getBoolean("auto_capture", false)) }
+    /** Vibración (y sonido al coincidir) según el grado de coincidencia. */
+    var feedback by remember { mutableStateOf(prefs.getBoolean("guide_feedback", true)) }
+    /** Disparo automático también "casi" alineado (≥ 80 %): la alineación fina se hace en Comparar. */
+    var nearCapture by remember { mutableStateOf(prefs.getBoolean("auto_capture_near", true)) }
+    /** Ráfaga de 3 fotos: se guarda la de mayor coincidencia. */
+    var burst by remember { mutableStateOf(prefs.getBoolean("burst", true)) }
+    /** Fantasma de la referencia como bordes (más legible que la foto translúcida). */
+    var ghostEdges by remember { mutableStateOf(prefs.getBoolean("ghost_edges", false)) }
     // Modo individual de extremidades (manos, pies, piernas): lado recordado por zona
     var limbSide by remember(zone) { mutableStateOf(LimbSide.ofTag(prefs.getString("limb_side_${zone.id}", null))) }
     var threshold by remember { mutableFloatStateOf(prefs.getFloat("match_threshold_v2", LiveMatch.DEFAULT_THRESHOLD)) }
@@ -246,6 +259,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
     var refPoints by remember { mutableStateOf<Map<String, Pt>>(emptyMap()) }
     var refSilhouette by remember { mutableStateOf<com.photomed.app.align.Silhouette?>(null) }
     var refFree by remember { mutableStateOf<com.photomed.app.align.FreeContour?>(null) }
+    var refEdges by remember { mutableStateOf<com.photomed.app.align.FreeContour?>(null) }
+    /** Condiciones guardadas con la referencia (zoom, distancia…). */
+    var refCond by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var adaptGuide by remember { mutableStateOf(true) }
     var autoArmed by remember { mutableStateOf(true) }
     var live by remember { mutableStateOf<LiveFrame?>(null) }
@@ -274,6 +290,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
         live = null
         refSilhouette = null
         refFree = null
+        refEdges = null
         val bmp = runCatching { ImageOps.load34(context, g.uri, 360) }.getOrNull() ?: return@LaunchedEffect
         val m = matcher
         pipeline.post {
@@ -281,13 +298,55 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             refPoints = m.referencePoints
             refSilhouette = m.referenceSilhouette
             refFree = m.referenceFree
+            refEdges = m.referenceEdges
         }
     }
     val status = live?.eval?.status
+    val toneGen = remember { runCatching { android.media.ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, 70) }.getOrNull() }
+    DisposableEffect(Unit) { onDispose { toneGen?.release() } }
     LaunchedEffect(status) {
-        if (status == MatchStatus.MATCH) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        if (status == MatchStatus.MATCH) {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            if (feedback) runCatching { toneGen?.startTone(android.media.ToneGenerator.TONE_PROP_ACK, 160) }
+        }
+    }
+    // Pulsos que se aceleran al acercarse a la coincidencia (sin mirar la pantalla)
+    val degree = if (matchingEnabled) GuideTone.degree(live?.eval) else null
+    val degreeStep = degree?.let { (it * 10).toInt() }
+    LaunchedEffect(degreeStep, feedback) {
+        val d = degreeStep ?: return@LaunchedEffect
+        if (!feedback || d < 3 || d >= 10) return@LaunchedEffect
+        val interval = (1000L - d * 85L).coerceAtLeast(200L)
+        while (true) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); kotlinx.coroutines.delay(interval) }
     }
     val tone = GuideTone.of(live?.eval, matchingEnabled)
+    /**
+     * Distancia: con referencia, la de su toma como objetivo ("N cm → M cm" si difiere > 15 %);
+     * sin referencia, aviso de efecto selfie (< 80 cm).
+     */
+    fun distanceHint(): String? {
+        if (zone.category != com.photomed.app.data.ZoneCategory.FACIAL) return null
+        val d = live?.let { CameraGuidance.faceDistanceCm(it.currentPointsAll, focalNorm, zoomRatio) } ?: return null
+        val target = refCond["DistanceCm"]?.toFloatOrNull()?.takeIf { showGhost && ghost != null }
+        return when {
+            target != null && kotlin.math.abs(d - target) / target > 0.15f -> "Distancia: %.0f cm → %.0f cm".format(d, target)
+            target != null -> null
+            d < 80f -> "≈ %.0f cm: aléjese ≥ 1 m y use zoom".format(d)
+            else -> "≈ %.0f cm".format(d)
+        }
+    }
+
+    // Referencia: condiciones guardadas; su zoom se aplica al elegirla (salvo zoom manual)
+    LaunchedEffect(ghost?.key, camera) {
+        val g = ghost ?: run { refCond = emptyMap(); return@LaunchedEffect }
+        refCond = withContext(Dispatchers.IO) { runCatching { repo.readInfo(g)?.conditions }.getOrNull() }.orEmpty()
+        val z = refCond["Zoom"]?.toFloatOrNull() ?: return@LaunchedEffect
+        val cam = camera ?: return@LaunchedEffect
+        if (zoomAssist && !manualZoom && z > 1.01f) {
+            val zz = z.coerceIn(zoomRange.start, zoomRange.endInclusive)
+            cam.cameraControl.setZoomRatio(zz); zoomRatio = zz
+        }
+    }
 
     LaunchedEffect(reload) {
         val (e, list) = withContext(Dispatchers.IO) {
@@ -400,49 +459,78 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
         }
     }
 
+    /** Una toma a [file]; true si se guardó. */
+    suspend fun shoot(file: File): Boolean = kotlinx.coroutines.suspendCancellableCoroutine { c ->
+        imageCapture.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(), ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) { if (c.isActive) c.resume(true) }
+                override fun onError(exception: ImageCaptureException) { file.delete(); if (c.isActive) c.resume(false) }
+            })
+    }
+
+    /** Puntuación de una foto frente a la referencia, en el hilo de análisis (sin tocar el estado en vivo). */
+    suspend fun scoreOf(file: File): Float {
+        val bmp = runCatching { ImageOps.load34(context, android.net.Uri.fromFile(file), 360) }.getOrNull() ?: return 0f
+        return kotlinx.coroutines.suspendCancellableCoroutine { c ->
+            pipeline.post { val sc = runCatching { pipeline.withEngine { it.scoreOf(bmp) } }.getOrNull() ?: 0f; if (c.isActive) c.resume(sc) }
+        }
+    }
+
     fun capture() {
         val e = exp ?: return
         if (capturing) return
         capturing = true
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-        val temp = File(context.cacheDir, "capture_${System.currentTimeMillis()}.jpg")
-        val options = ImageCapture.OutputFileOptions.Builder(temp).build()
         scope.launch {
             shutterFlash.snapTo(0.8f)
             shutterFlash.animateTo(0f, tween(Md3Motion.durationMedium2, easing = Md3Motion.easingStandard))
         }
-        imageCapture.takePicture(options, ContextCompat.getMainExecutor(context),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    val conditions = captureConditions()
-                    val pitch = Perspective.cameraPitchFromDevice(tilt.value.pitch, lensFacing == CameraSelector.LENS_FACING_FRONT)
-                    val roll = tilt.value.roll
-                    val focal = focalNorm
-                    // Se guarda en el ámbito de la app: termina aunque se cierre la cámara.
-                    AppScope.launch {
-                        val result = runCatching {
-                            repo.savePhoto(e, zone, temp, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conditions,
-                                variant = limbSide.tag.takeIf { zone.hasLimbSides })
-                        }.also { temp.delete() }
-                        scope.launch {
-                            capturing = false
-                            result.onSuccess {
-                                lastSaved = it
-                                reload++
-                                snackbar.showSnackbar("Guardada en el álbum ${e.id}")
-                            }.onFailure {
-                                snackbar.showSnackbar("No se pudo guardar: ${it.message}")
-                            }
+        val conditions = captureConditions()
+        val pitch = Perspective.cameraPitchFromDevice(tilt.value.pitch, lensFacing == CameraSelector.LENS_FACING_FRONT)
+        val roll = tilt.value.roll
+        val focal = focalNorm
+        val stamp = System.currentTimeMillis()
+        scope.launch {
+            // Ráfaga: 3 tomas seguidas; se guarda la de mayor coincidencia (evita repetir por un parpadeo)
+            val shots = if (burst) 3 else 1
+            val files = ArrayList<File>()
+            for (k in 0 until shots) {
+                val f = File(context.cacheDir, "capture_${stamp}_$k.jpg")
+                if (shoot(f)) files += f
+            }
+            if (files.isEmpty()) {
+                capturing = false
+                snackbar.showSnackbar("Error al capturar")
+                return@launch
+            }
+            val best = if (files.size == 1) files[0] else files.maxBy { scoreOf(it) }
+            files.filter { it !== best }.forEach { it.delete() }
+            // Se guarda en el ámbito de la app: termina aunque se cierre la cámara.
+            AppScope.launch {
+                val result = runCatching {
+                    repo.savePhoto(e, zone, best, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conditions,
+                        variant = limbSide.tag.takeIf { zone.hasLimbSides })
+                }.also { best.delete() }
+                scope.launch {
+                    capturing = false
+                    result.onSuccess {
+                        lastSaved = it
+                        reload++
+                        val near = conditions["Status"] == MatchStatus.CLOSE.name
+                        val idx = sequence.indexOf(zone)
+                        if (idx >= 0) {
+                            // secuencia: pasa sola a la siguiente zona (o termina)
+                            snackbar.showSnackbar(if (idx + 1 < sequence.size) "Guardada · siguiente: ${sequence[idx + 1].label}" else "Secuencia completada")
+                            onNext(sequence.getOrNull(idx + 1))
+                        } else {
+                            snackbar.showSnackbar("Guardada en el álbum ${e.id}" + if (near) " · casi alineada: se alinea en Comparar" else "")
                         }
+                    }.onFailure {
+                        snackbar.showSnackbar("No se pudo guardar: ${it.message}")
                     }
                 }
-
-                override fun onError(exception: ImageCaptureException) {
-                    capturing = false
-                    temp.delete()
-                    scope.launch { snackbar.showSnackbar("Error al capturar: ${exception.message}") }
-                }
-            })
+            }
+        }
     }
 
 
@@ -482,15 +570,19 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
 
     // Disparo automático: coincidencia sostenida ~0,4 s, sin zoom/enfoque en curso; enfoca en el
     // pivote anatómico, espera el resultado y dispara solo si sigue coincidiendo. Una vez por coincidencia.
-    LaunchedEffect(status, autoCapture, matchingEnabled) {
-        if (status != MatchStatus.MATCH || !matchingEnabled) { autoArmed = true; return@LaunchedEffect }
+    // Listo para disparar: coincide, o "casi" (≥ 80 %) si se permite; la alineación fina se hace después.
+    fun readyNow(e: com.photomed.app.align.MatchEval?) =
+        e != null && (e.status == MatchStatus.MATCH || (nearCapture && (GuideTone.degree(e) ?: 0f) >= 0.8f))
+    val ready = matchingEnabled && readyNow(live?.eval)
+    LaunchedEffect(ready, autoCapture) {
+        if (!ready) { autoArmed = true; return@LaunchedEffect }
         if (autoCapture && autoArmed && !capturing) {
             kotlinx.coroutines.delay(400)
             while (zoomCtl.isSettling(System.currentTimeMillis())) kotlinx.coroutines.delay(100)
             val focused = kotlinx.coroutines.withTimeoutOrNull(2500) {
                 kotlinx.coroutines.suspendCancellableCoroutine<Boolean> { c -> focusOnPivot { ok -> if (c.isActive) c.resume(ok) } }
             }
-            if (live?.eval?.status == MatchStatus.MATCH && !capturing) {
+            if (readyNow(live?.eval) && !capturing) {
                 autoArmed = false
                 if (focused == false) snackbar.showSnackbar("Enfoque no confirmado: se tomó la foto igualmente")
                 capture()
@@ -505,7 +597,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás", tint = Color.White) }
             Column(Modifier.weight(1f)) {
                 Text(zone.label, color = Color.White, style = MaterialTheme.typography.titleMedium)
-                Text(exp?.patientName.orEmpty(), color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                val idx = sequence.indexOf(zone)
+                Text(if (idx >= 0) "Secuencia ${idx + 1}/${sequence.size} · ${exp?.patientName.orEmpty()}" else exp?.patientName.orEmpty(),
+                    color = if (idx >= 0) GuideTone.MATCH.color else Color.LightGray, style = MaterialTheme.typography.bodySmall)
+            }
+            if (zone in sequence) {
+                androidx.compose.material3.TextButton(onClick = { onNext(sequence.getOrNull(sequence.indexOf(zone) + 1)) }) {
+                    Text(if (sequence.indexOf(zone) + 1 < sequence.size) "Saltar" else "Terminar", color = Color.White)
+                }
             }
             IconToggleButton(
                 checked = autoCapture,
@@ -546,7 +645,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                 // Capas en coordenadas de la foto: se espejan igual que la vista previa.
                 Box(Modifier.fillMaxSize().graphicsLayer { scaleX = if (displayMirrored) -1f else 1f }) {
                     val g = ghost
-                    if (showGhost && g != null) {
+                    val edges = refEdges
+                    if (showGhost && g != null && ghostEdges && edges != null) {
+                        EdgeGhost(edges, (ghostAlpha + 0.25f).coerceAtMost(1f), Modifier.fillMaxSize())
+                    } else if (showGhost && g != null) {
                         AsyncImage(
                             model = g.uri,
                             contentDescription = "Foto anterior superpuesta",
@@ -585,12 +687,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                 // Correcciones como iconos translúcidos sobre la imagen, abajo (sobre la etiqueta de la
                 // referencia y, si la hay, la flecha hacia abajo)
                 if (matchingEnabled) {
-                    val distCue = if (zone.category == com.photomed.app.data.ZoneCategory.FACIAL)
-                        live?.let { CameraGuidance.faceDistanceCm(it.currentPointsAll, focalNorm, zoomRatio) } else null
                     CueOverlay(
                         correctionItems(live,
                             if (zoomAssist && !manualZoom && zoomRatio > 1.01f) "zoom asistido %.1f×".format(zoomRatio) else null,
-                            distCue?.let { d -> if (d < 80f) "≈ %.0f cm: aléjese ≥ 1 m y use zoom".format(d) else "≈ %.0f cm".format(d) }),
+                            distanceHint()),
                         tone.color.takeIf { tone != GuideTone.NORMAL } ?: GuideTone.CLOSE.color,
                         Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                             .padding(bottom = if ((guidance?.moveY ?: 0) > 0) 54.dp else 28.dp),
@@ -610,14 +710,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             }
         }
         if (matchingEnabled) {
-            val dist = if (zone.category == com.photomed.app.data.ZoneCategory.FACIAL)
-                live?.let { CameraGuidance.faceDistanceCm(it.currentPointsAll, focalNorm, zoomRatio) } else null
             RecommendationStrip(
                 live, guidance, autoCapture,
                 zoomInfo = if (zoomAssist && !manualZoom && zoomRatio > 1.01f) "zoom asistido %.1f×".format(zoomRatio) else null,
-                distanceHint = dist?.let { d ->
-                    if (d < 80f) "≈ %.0f cm: aléjese ≥ 1 m y use zoom".format(d) else "≈ %.0f cm".format(d)
-                },
+                distanceHint = distanceHint(),
                 showCues = false,
             )
         }
@@ -668,6 +764,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
 
         if (showGhost && photos.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.FilterChip(
+                    selected = ghostEdges,
+                    onClick = { ghostEdges = !ghostEdges; prefs.edit().putBoolean("ghost_edges", ghostEdges).apply() },
+                    label = { Text("Bordes", style = MaterialTheme.typography.labelMedium) },
+                    modifier = Modifier.padding(end = 8.dp).height(32.dp),
+                )
                 Text("Opacidad", color = Color.White, style = MaterialTheme.typography.labelMedium)
                 Slider(
                     value = ghostAlpha,
@@ -742,6 +844,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
             onThreshold = { threshold = it; prefs.edit().putFloat("match_threshold_v2", it).apply() },
             useGaze = useGaze,
             onUseGaze = { useGaze = it; prefs.edit().putBoolean(com.photomed.app.align.AlignOptions.PREF_GAZE, it).apply() },
+            feedback = feedback, onFeedback = { feedback = it; prefs.edit().putBoolean("guide_feedback", it).apply() },
+            nearCapture = nearCapture, onNearCapture = { nearCapture = it; prefs.edit().putBoolean("auto_capture_near", it).apply() },
+            burst = burst, onBurst = { burst = it; prefs.edit().putBoolean("burst", it).apply() },
             onDismiss = { showSettings = false },
         )
     }
@@ -773,10 +878,17 @@ fun MatchSettingsSheet(
     onThreshold: (Float) -> Unit,
     useGaze: Boolean = true,
     onUseGaze: (Boolean) -> Unit = {},
+    feedback: Boolean = true,
+    onFeedback: (Boolean) -> Unit = {},
+    nearCapture: Boolean = true,
+    onNearCapture: (Boolean) -> Unit = {},
+    burst: Boolean = true,
+    onBurst: (Boolean) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     SafeBottomSheet(onDismiss = onDismiss) {
-        MatchSettingsContent(autoCapture, threshold, onAutoCapture, onThreshold, zoomAssist, onZoomAssist, engine, onEngine, useGaze, onUseGaze)
+        MatchSettingsContent(autoCapture, threshold, onAutoCapture, onThreshold, zoomAssist, onZoomAssist, engine, onEngine, useGaze, onUseGaze,
+            feedback, onFeedback, nearCapture, onNearCapture, burst, onBurst)
     }
 }
 
@@ -788,6 +900,12 @@ fun MatchSettingsContent(
     onEngine: (com.photomed.app.align.FaceEngine) -> Unit = {},
     useGaze: Boolean = true,
     onUseGaze: (Boolean) -> Unit = {},
+    feedback: Boolean = true,
+    onFeedback: (Boolean) -> Unit = {},
+    nearCapture: Boolean = true,
+    onNearCapture: (Boolean) -> Unit = {},
+    burst: Boolean = true,
+    onBurst: (Boolean) -> Unit = {},
 ) {
     Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Coincidencia con la referencia", style = MaterialTheme.typography.titleLarge)
@@ -813,6 +931,12 @@ fun MatchSettingsContent(
             }
             Switch(checked = zoomAssist, onCheckedChange = null)
         }
+        SettingSwitch("Disparar también casi alineado", "Dispara al llegar al 80 % de coincidencia (verde amarillento); " +
+            "la alineación fina se hace en Comparar.", nearCapture, onNearCapture)
+        SettingSwitch("Ráfaga de 3 fotos", "Al disparar toma tres y guarda la de mayor coincidencia (evita repetir por un parpadeo).",
+            burst, onBurst)
+        SettingSwitch("Vibración y sonido de guía", "Pulsos que se aceleran al acercarse a la coincidencia y un tono al coincidir, " +
+            "para no tener que mirar la pantalla.", feedback, onFeedback)
         Row(
             Modifier.fillMaxWidth().toggleable(useGaze, role = Role.Switch, onValueChange = onUseGaze),
             verticalAlignment = Alignment.CenterVertically,
@@ -900,4 +1024,16 @@ private fun rememberTilt(enabled: Boolean): State<Tilt> {
 private suspend fun Context.cameraProvider(): ProcessCameraProvider = suspendCancellableCoroutine { cont ->
     val future = ProcessCameraProvider.getInstance(this)
     future.addListener({ cont.resume(future.get()) }, ContextCompat.getMainExecutor(this))
+}
+
+
+@Composable
+private fun SettingSwitch(title: String, desc: String, value: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().toggleable(value, role = Role.Switch, onValueChange = onChange), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = value, onCheckedChange = null)
+    }
 }

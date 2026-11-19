@@ -59,6 +59,12 @@ class ScreensScreenshotTest {
     }
 
     @Test
+    fun expedienteSequence() = shot("expediente_secuencia") {
+        // la selección de zonas se muestra al mantener presionada una zona; aquí, vista inicial con plantillas
+        ExpedienteContent(sample[0], emptyList(), SnackbarHostState(), {}, {}, {}, {}, {})
+    }
+
+    @Test
     fun form() = shot("form") {
         ExpedienteForm(title = "Nuevo expediente", onDismiss = {}, onConfirm = { _, _, _, _ -> })
     }
@@ -82,4 +88,5 @@ class SettingsScreenshotTest {
     fun settings() = paparazzi.snapshot {
         com.photomed.app.ui.theme.PhotoMedTheme { com.photomed.app.ui.settings.SettingsScreen(onBack = {}) }
     }
+
 }

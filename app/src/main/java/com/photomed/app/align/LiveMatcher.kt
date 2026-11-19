@@ -53,6 +53,9 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     /** Silueta del sujeto en la referencia (segmentación), para adaptar la guía corporal y de perfil. */
     @Volatile var referenceSilhouette: Silhouette? = null
         private set
+    /** Bordes de la referencia (fantasma de bordes: más legible que la foto translúcida). */
+    @Volatile var referenceEdges: FreeContour? = null
+        private set
     /** Modo libre: contorno de lo visible en la referencia. */
     @Volatile var referenceFree: FreeContour? = null
         private set
@@ -64,6 +67,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
 
     fun setReference(bmp: Bitmap) {
         ref = detector.detectFull(spec.detector, bmp)
+        referenceEdges = runCatching { FreeContour.edgesOf(bmp) }.getOrNull()
         referenceFree = if (zone.guide == com.photomed.app.data.GuideType.FREE)
             runCatching { FreeContour.from(bmp) { b -> segmenter?.segment(b) } }.getOrNull() else null
         referenceSilhouette = runCatching {
@@ -126,6 +130,23 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         eval = withDiagnostic(eval, cur)
         val shown = if (drawKeys.size > MAX_DRAWN) drawKeys.filterIndexed { i, _ -> i % (drawKeys.size / MAX_DRAWN + 1) == 0 } else drawKeys
         return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points, headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze)
+    }
+
+    /**
+     * Puntuación de una foto ya tomada frente a la referencia (para quedarse con la mejor de una
+     * ráfaga), sin alterar el estado del análisis en vivo (histéresis y última transformación).
+     * Mayor = mejor; > 1 si coincide.
+     */
+    fun scoreOf(photo: Bitmap): Float {
+        val m = matched; val l = last
+        return try {
+            val e = analyze(photo).eval
+            when (e.status) {
+                MatchStatus.MATCH -> 1f + (e.pointFraction ?: e.quality)
+                MatchStatus.SEARCHING -> 0f
+                else -> e.pointFraction?.let { it / e.threshold.coerceAtLeast(0.05f) }?.coerceAtMost(0.99f) ?: e.quality
+            }
+        } finally { matched = m; last = l }
     }
 
     /** Sin puntos y con un error del detector: mostrarlo para poder diagnosticar en el dispositivo. */

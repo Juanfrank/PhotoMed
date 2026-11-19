@@ -18,6 +18,13 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.BookmarkAdd
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.Delete
@@ -85,6 +92,8 @@ fun ExpedienteScreen(
     onBack: () -> Unit,
     onZone: (Zone) -> Unit,
     onCompare: () -> Unit,
+    /** Secuencia guiada por las zonas elegidas (plantilla), en orden. */
+    onSequence: (List<Zone>) -> Unit = {},
 ) {
     val repo = LocalRepository.current
     val scope = rememberCoroutineScope()
@@ -113,6 +122,7 @@ fun ExpedienteScreen(
         exp = exp, photos = photos, snackbar = snackbar,
         onBack = onBack, onZone = onZone, onCompare = onCompare,
         onEdit = { editing = true }, onDelete = { confirmDelete = true },
+        onSequence = onSequence,
     )
 
     val current = exp
@@ -164,13 +174,30 @@ fun ExpedienteContent(
     onCompare: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onSequence: (List<Zone>) -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var menu by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { context.getSharedPreferences("photomed", android.content.Context.MODE_PRIVATE) }
+    /** Zonas elegidas para la secuencia, en el orden en que se eligieron (mantener presionado para empezar). */
+    var selection by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(listOf<String>()) }
+    val selecting = selection.isNotEmpty()
+    var templates by remember { mutableStateOf(com.photomed.app.data.SessionTemplates.load(prefs)) }
+    var naming by remember { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler(enabled = selecting) { selection = emptyList() }
+    fun toggleZone(z: Zone) { selection = if (z.id in selection) selection - z.id else selection + z.id }
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            MediumTopAppBar(
+            if (selecting) androidx.compose.material3.TopAppBar(
+                title = { Text("${selection.size} zona" + if (selection.size == 1) "" else "s") },
+                navigationIcon = { IconButton(onClick = { selection = emptyList() }) { Icon(Icons.Default.Close, "Cancelar selección") } },
+                actions = {
+                    IconButton(onClick = { naming = true }) { Icon(Icons.Default.BookmarkAdd, "Guardar como plantilla") }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+            ) else MediumTopAppBar(
                 title = { Text(exp?.patientName.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
                 actions = {
@@ -190,7 +217,13 @@ fun ExpedienteContent(
             )
         },
         floatingActionButton = {
-            if (photos.size >= 2) {
+            if (selecting) {
+                ExtendedFloatingActionButton(
+                    onClick = { onSequence(selection.mapNotNull { Zone.fromId(it) }); selection = emptyList() },
+                    icon = { Icon(Icons.Default.PlayArrow, null) },
+                    text = { Text("Iniciar secuencia de fotos (${selection.size})") },
+                )
+            } else if (photos.size >= 2) {
                 ExtendedFloatingActionButton(
                     onClick = onCompare,
                     icon = { Icon(Icons.Default.Compare, null) },
@@ -211,13 +244,75 @@ fun ExpedienteContent(
             if (exp != null) {
                 item(span = { GridItemSpan(maxLineSpan) }) { SummaryCard(exp, photos.size) }
             }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                TemplatesRow(templates, selection,
+                    onPick = { t -> selection = t.zones.map { it.id } },
+                    onDelete = { t ->
+                        com.photomed.app.data.SessionTemplates.delete(prefs, t.name)
+                        templates = com.photomed.app.data.SessionTemplates.load(prefs)
+                    })
+            }
             ZoneCategory.entries.forEach { cat ->
                 val zones = Zone.entries.filter { it.category == cat }
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     SectionHeader("${cat.label} · ${zones.count { byZone.containsKey(it) }}/${zones.size} zonas")
                 }
                 items(zones, key = { it.id }) { zone ->
-                    ZoneCard(zone, byZone[zone].orEmpty()) { onZone(zone) }
+                    val order = selection.indexOf(zone.id).takeIf { it >= 0 }?.plus(1)
+                    ZoneCard(zone, byZone[zone].orEmpty(), order, selecting,
+                        onLongClick = { toggleZone(zone) }) { if (selecting) toggleZone(zone) else onZone(zone) }
+                }
+            }
+        }
+    }
+    if (naming) TemplateNameDialog(onDismiss = { naming = false }) { name ->
+        naming = false
+        com.photomed.app.data.SessionTemplates.save(prefs, com.photomed.app.data.SessionTemplate(name, selection.mapNotNull { Zone.fromId(it) }))
+        templates = com.photomed.app.data.SessionTemplates.load(prefs)
+    }
+}
+
+@Composable
+private fun TemplateNameDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Guardar plantilla") },
+        text = {
+            androidx.compose.material3.OutlinedTextField(name, { name = it }, label = { Text("Nombre") }, singleLine = true)
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { onSave(name.trim()) }, enabled = name.isNotBlank()) { Text("Guardar") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
+}
+
+/**
+ * Plantillas de sesión: tocar una elige sus zonas (se puede ajustar dejando presionado y tocando
+ * zonas); mantener presionada una plantilla propia la elimina.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun TemplatesRow(templates: List<com.photomed.app.data.SessionTemplate>, selection: List<String>,
+                         onPick: (com.photomed.app.data.SessionTemplate) -> Unit, onDelete: (com.photomed.app.data.SessionTemplate) -> Unit) {
+    Column {
+        SectionHeader("Plantillas de sesión · mantenga presionada una zona para elegir varias")
+        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
+            items(templates.size) { i ->
+                val t = templates[i]
+                val active = selection == t.zones.map { it.id }
+                // ficha propia: toque elige la plantilla; mantener presionada una propia la elimina
+                androidx.compose.material3.Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = if (active) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (active) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.height(32.dp).clip(MaterialTheme.shapes.small)
+                        .combinedClickable(onClick = { onPick(t) }, onLongClick = if (t.builtIn) null else ({ onDelete(t) }),
+                            onClickLabel = "Elegir plantilla", onLongClickLabel = if (t.builtIn) null else "Eliminar plantilla"),
+                ) {
+                    Row(Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(if (t.builtIn) Icons.Default.PhotoLibrary else Icons.Default.Bookmark, null, Modifier.size(18.dp))
+                        Text("  ${t.name} · ${t.zones.size}", style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
         }
@@ -263,15 +358,23 @@ private fun SummaryCard(exp: Expediente, count: Int) {
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun ZoneCard(zone: Zone, photos: List<Photo>, onClick: () -> Unit) {
+private fun ZoneCard(zone: Zone, photos: List<Photo>, order: Int? = null, selecting: Boolean = false,
+                     onLongClick: () -> Unit = {}, onClick: () -> Unit) {
     val last = photos.lastOrNull()
     Card(
-        onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
-        modifier = Modifier.fillMaxWidth().semantics {
-            contentDescription = "${zone.label}, ${photos.size} fotografías"
-        },
+        colors = CardDefaults.cardColors(containerColor = if (order != null) MaterialTheme.colorScheme.secondaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerHighest),
+        border = if (order != null) androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else null,
+        modifier = Modifier.fillMaxWidth()
+            .clip(CardDefaults.shape)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick,
+                onClickLabel = if (selecting) (if (order != null) "Quitar de la secuencia" else "Añadir a la secuencia") else "Abrir",
+                onLongClickLabel = "Elegir varias zonas")
+            .semantics {
+                contentDescription = "${zone.label}, ${photos.size} fotografías" + (order?.let { ", número $it de la secuencia" } ?: "")
+            },
     ) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(3f / 4f)
@@ -283,6 +386,13 @@ private fun ZoneCard(zone: Zone, photos: List<Photo>, onClick: () -> Unit) {
                     modifier = Modifier.fillMaxSize())
             } else {
                 GuideOverlay(zone = zone, showContour = true, showGrid = false, modifier = Modifier.fillMaxSize().padding(8.dp))
+            }
+            if (order != null) {
+                Badge(
+                    containerColor = MaterialTheme.colorScheme.tertiary,
+                    contentColor = MaterialTheme.colorScheme.onTertiary,
+                    modifier = Modifier.align(Alignment.TopStart).padding(Md3Spacing.s2).size(24.dp),
+                ) { Text("$order", style = MaterialTheme.typography.labelLarge) }
             }
             if (photos.isNotEmpty()) {
                 Badge(

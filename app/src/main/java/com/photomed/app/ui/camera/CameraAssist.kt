@@ -174,31 +174,38 @@ fun correctionItems(frame: LiveFrame?, zoomInfo: String?, distanceHint: String?)
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun CueOverlay(items: List<String>, accent: Color, modifier: Modifier = Modifier) {
-    val cues = items.mapNotNull { HintCues.of(it) }
+    // De una en una: la corrección más importante (ver HintCues.priority) y "+N" con las demás;
+    // al tocar "+N" se ven todas, y al tocar de nuevo se recogen.
+    val cues = items.sortedBy(HintCues::priority).mapNotNull { HintCues.of(it) }
     if (cues.isEmpty()) return
-    // Una sola fila; si no caben, "…" (al tocarlo se ven todas; al tocar de nuevo, se recogen)
     var expanded by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.foundation.layout.FlowRow(
         modifier.padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
         verticalArrangement = Arrangement.spacedBy(4.dp),
-        maxLines = if (expanded) Int.MAX_VALUE else 1,
-        overflow = androidx.compose.foundation.layout.FlowRowOverflow.expandOrCollapseIndicator(
-            // (el número de fichas visibles solo se conoce al dibujar: descripción genérica)
-            expandIndicator = { MoreChip(Icons.Default.MoreHoriz, "Más indicaciones: toque para verlas todas") { expanded = true } },
-            collapseIndicator = { MoreChip(Icons.Default.ExpandMore, "Mostrar menos indicaciones") { expanded = false } },
-        ),
-    ) { cues.forEach { CueChip(it, accent, compact = true) } }
+    ) {
+        if (expanded) {
+            cues.forEach { CueChip(it, accent, compact = true) }
+            if (cues.size > 1) MoreChip(Icons.Default.ExpandMore, null, "Mostrar solo la indicación principal") { expanded = false }
+        } else {
+            CueChip(cues.first(), accent, compact = true)
+            if (cues.size > 1) MoreChip(Icons.Default.MoreHoriz, "+${cues.size - 1}",
+                "${cues.size - 1} indicaciones más: " + cues.drop(1).joinToString("; ") { it.description }) { expanded = true }
+        }
+    }
 }
 
 @Composable
-private fun MoreChip(icon: ImageVector, description: String, onClick: () -> Unit) {
-    Box(
+private fun MoreChip(icon: ImageVector, count: String?, description: String, onClick: () -> Unit) {
+    Row(
         Modifier.background(Color(0x66000000), RoundedCornerShape(8.dp)).clickable(onClickLabel = description, onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 2.dp).size(22.dp)
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(18.dp)) }
+            .padding(horizontal = 6.dp, vertical = 2.dp).height(22.dp)
+            .semantics(mergeDescendants = true) { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (count != null) Text(count, color = Color.White, style = MaterialTheme.typography.labelMedium)
+        else Icon(icon, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(18.dp))
+    }
 }
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)

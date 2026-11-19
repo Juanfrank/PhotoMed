@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
@@ -35,6 +36,25 @@ data class HintCue(val icon: ImageVector, val badge: ImageVector?, val value: St
 object HintCues {
     private val deg = Regex("(\\d+)°")
     private fun degrees(h: String) = deg.find(h)?.groupValues?.get(1)?.let { "$it°" }
+
+    /**
+     * Prioridad (menor = antes): primero lo que cambia todo el encuadre (detección, distancia,
+     * zoom, inclinación de la cámara), luego la pose de la cabeza, después mirada y luz.
+     */
+    fun priority(h: String): Int {
+        val t = h.lowercase()
+        return when {
+            t.startsWith("no se detecta") || t.startsWith("detector") -> 0
+            t.startsWith("≈") || t.startsWith("distancia") -> 1
+            t.startsWith("zoom") -> 2
+            t.startsWith("cámara") -> 3
+            t.startsWith("cara:") || t.startsWith("cabeza: girar") || t.startsWith("cabeza: corregir") -> 4
+            t.startsWith("barbilla") -> 5
+            t.startsWith("cabeza: enderezar") -> 6
+            t.startsWith("mirada") -> 7
+            else -> 8
+        }
+    }
 
     /** Icono para una indicación de texto; null si no tiene equivalente (se muestra el texto). */
     fun of(h: String): HintCue? {
@@ -72,6 +92,9 @@ object HintCues {
             t.startsWith("cámara: inclinar hacia abajo") -> HintCue(Icons.Default.PhotoCamera, Icons.Default.ArrowDownward, null, h)
             t.startsWith("cámara: inclinar hacia arriba") -> HintCue(Icons.Default.PhotoCamera, Icons.Default.ArrowUpward, null, h)
             // distancia y zoom
+            t.startsWith("distancia:") -> HintCue(Icons.Default.SocialDistance,
+                if (Regex("(\\d+) cm → (\\d+)").find(h)?.groupValues?.let { it[1].toInt() > it[2].toInt() } == true) Icons.Default.ZoomIn else Icons.Default.ZoomOut,
+                Regex("(\\d+) cm → (\\d+) cm").find(h)?.let { "${it.groupValues[1]}→${it.groupValues[2]} cm" }, h)
             t.startsWith("≈") && "aléjese" in t -> HintCue(Icons.Default.SocialDistance, Icons.Default.ZoomIn,
                 Regex("≈ ?(\\d+) ?cm").find(h)?.groupValues?.get(1)?.let { "$it cm → 1 m" }, h)
             t.startsWith("≈") -> HintCue(Icons.Default.Straighten, null, Regex("(\\d+) ?cm").find(h)?.groupValues?.get(1)?.let { "$it cm" }, h)
