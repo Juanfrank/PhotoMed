@@ -85,6 +85,29 @@ class UsageFlowsTest {
     private fun photoNodes() = compose.onAllNodesWithContentDescription("Fotografía del", substring = true)
 
     @Test
+    fun doubleBackNeverLeavesTheApp() {
+        // Doble toque en "Atrás" (o toque durante la animación de salida): antes se sacaban dos
+        // pantallas de la pila, se vaciaba y la app se cerraba. Ahora solo regresa una.
+        ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("photomed", Context.MODE_PRIVATE)
+            .edit().putBoolean("terms_accepted_v1", true).commit()
+        setContent { com.photomed.app.ui.AppNavigation() }
+        waitText("Paciente Prueba")
+        compose.onNodeWithText("Paciente Prueba").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Atrás").fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.autoAdvance = false
+        compose.onAllNodesWithContentDescription("Atrás")[0].performClick()
+        compose.mainClock.advanceTimeBy(50)
+        // la pantalla que sale sigue visible un instante: un segundo toque no debe sacar otra
+        val again = compose.onAllNodesWithContentDescription("Atrás").fetchSemanticsNodes().isNotEmpty()
+        if (again) compose.onAllNodesWithContentDescription("Atrás")[0].performClick()
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        waitText("Paciente Prueba")
+        assertFalse(compose.activity.isFinishing)
+        println("REGRESO doble: segundo toque probado = $again")
+    }
+
+    @Test
     fun galleryMultiSelectCompareShareDelete() {
         var compared: List<String>? = null
         setContent { ZoneGalleryScreen(exp.id, Zone.LIPS, {}, {}, { compared = it }, {}) }

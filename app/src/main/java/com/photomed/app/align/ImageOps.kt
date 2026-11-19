@@ -50,7 +50,13 @@ object ImageOps {
         return out
     }
 
-    fun gray(bmp: Bitmap, width: Int): GrayImage {
+    /** Gris estandarizado con el fondo aplanado fuera de [body] (ver [BodyRegion]); sin máscara, normal. */
+    fun gray(bmp: Bitmap, width: Int, body: Mask?): GrayImage =
+        if (body == null) gray(bmp, width) else BodyRegion.flattenBackground(grayRaw(bmp, width), body)
+
+    fun gray(bmp: Bitmap, width: Int): GrayImage = grayRaw(bmp, width).standardized()
+
+    private fun grayRaw(bmp: Bitmap, width: Int): GrayImage {
         val small = Bitmap.createScaledBitmap(bmp, width, width * 4 / 3, true)
         val px = IntArray(small.width * small.height)
         small.getPixels(px, 0, small.width, 0, 0, small.width, small.height)
@@ -59,6 +65,6 @@ object ImageOps {
             val c = px[i]
             g.data[i] = (0.299f * ((c shr 16) and 0xFF) + 0.587f * ((c shr 8) and 0xFF) + 0.114f * (c and 0xFF)) / 255f
         }
-        return g.standardized()
+        return g
     }
 }

@@ -152,6 +152,17 @@ Se encontraron dos causas de empeoramiento:
 
 La prueba falla si la alineación completa empeora a la de solo puntos en algún caso.
 
+### Bordes solo del cuerpo
+
+El fantasma de bordes, la coincidencia en vivo por contornos y el afinado de la alineación usan
+solo los bordes del paciente (`BodyRegion`): segmentación de personas (incluye pelo, orejas y
+cuello) o sujeto sobre fondo liso en manos, pies y modo libre. Fuera del cuerpo el gris se aplana
+al tono medio del fondo, así desaparecen los bordes de paredes, azulejos o muebles y se conserva
+el contraste del contorno. Si no se aísla el cuerpo en las dos imágenes, se usan todos los bordes.
+
+`BodyEdgesTest`: con el paciente desplazado y la pared de azulejos fija, el afinado con todos los
+bordes se quedaba pegado al fondo (15 px de error); solo con los del cuerpo, 0,5 px.
+
 ### 5. Coincidencia en vivo en la cámara
 
 Con una foto de referencia superpuesta y la capa **Coincidir** activa, `LiveMatcher` analiza ~5

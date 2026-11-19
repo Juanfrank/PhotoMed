@@ -55,10 +55,15 @@ class FreeContour(
             return smooth.filterIndexed { i, _ -> i % step == 0 }
         }
 
-        /** Dibujo lineal de los bordes dominantes (gradiente de Sobel sobre la imagen reducida). */
-        fun edgesOf(bmp: Bitmap): FreeContour? {
-            val g = ImageOps.gray(bmp, EDGE_W)
+        /**
+         * Dibujo lineal de los bordes dominantes (gradiente de Sobel sobre la imagen reducida).
+         * Con [body] (ver [BodyRegion]) solo cuentan los bordes del cuerpo y su contorno exterior;
+         * los del fondo se descartan y el umbral se calcula solo dentro del cuerpo.
+         */
+        fun edgesOf(bmp: Bitmap, body: Mask? = null): FreeContour? {
+            val g = ImageOps.gray(bmp, EDGE_W, body)
             val w = g.width; val h = g.height
+            val gate = body?.let { BodyRegion.edgeGate(it, w, h) }
             val mag = FloatArray(w * h)
             for (y in 1 until h - 1) for (x in 1 until w - 1) {
                 fun p(dx: Int, dy: Int) = g[x + dx, y + dy]
@@ -66,8 +71,12 @@ class FreeContour(
                 val gy = (p(-1, 1) + 2 * p(0, 1) + p(1, 1)) - (p(-1, -1) + 2 * p(0, -1) + p(1, -1))
                 mag[y * w + x] = hypot(gx, gy)
             }
-            val sorted = mag.sortedArray()
-            val thr = sorted[(sorted.size * 0.93f).toInt()]
+            if (gate != null) for (i in mag.indices) if (!gate[i]) mag[i] = 0f
+            val inside = if (gate == null) mag else mag.filterIndexed { i, _ -> gate[i] }.toFloatArray()
+            if (inside.size < 20) return null
+            val sorted = inside.sortedArray()
+            // dentro del cuerpo hay menos píxeles: se conserva una fracción algo mayor (12 %)
+            val thr = sorted[(sorted.size * (if (gate == null) 0.93f else 0.88f)).toInt()]
             if (thr <= 1e-3f) return null
             val e = BooleanArray(w * h) { mag[it] >= thr }
             // sin puntos aislados (ruido): al menos 2 vecinos de borde
@@ -81,7 +90,7 @@ class FreeContour(
                     n >= 2
                 }
             }
-            return FreeContour(emptyList(), clean, w, h, "bordes de la imagen")
+            return FreeContour(emptyList(), clean, w, h, if (gate == null) "bordes de la imagen" else "bordes del cuerpo")
         }
     }
 }

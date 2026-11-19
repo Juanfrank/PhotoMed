@@ -77,7 +77,10 @@ class Aligner(private val context: Context) {
                 it.detectFull(spec.detector, b) to it.detectFull(spec.detector, a0)
             } else Detection.EMPTY to Detection.EMPTY
             ensureActive()
-            alignCore(spec, b, a0, bDet, aDet0, manualKeystone, options) { bmp -> autoMask(spec, bmp) }
+            SubjectSegmenter().use { seg ->
+                alignCore(spec, b, a0, bDet, aDet0, manualKeystone, options, { bmp -> autoMask(spec, bmp) },
+                    bodyOf = { bmp -> BodyRegion.of(zone, bmp) { seg.segment(it) } })
+            }
         }
 
     /** Medición de contornos para una foto (óvalo facial si hay rostro, si no la silueta del sujeto). */
@@ -129,7 +132,9 @@ class Aligner(private val context: Context) {
      * [maskOf]: silueta de una imagen (solo si no hay puntos para la perspectiva).
      */
     fun alignCore(spec: ZoneAlignment, b: Bitmap, a0: Bitmap, bDet: Detection, aDet0: Detection, manualKeystone: Float?,
-                  options: AlignOptions, maskOf: (Bitmap) -> Mask? = { null }): AlignmentResult {
+                  options: AlignOptions, maskOf: (Bitmap) -> Mask? = { null },
+                  /** Región del cuerpo (ver [BodyRegion]): el afinado por contornos ignora los bordes del fondo. */
+                  bodyOf: (Bitmap) -> Mask? = { null }): AlignmentResult {
         val bPts = if (options.points) bDet.points else emptyMap()
         val aPts0 = if (options.points) aDet0.points else emptyMap()
         val (phi, src) = manualKeystone?.let { it to "manual" } ?: estimateKeystone(spec, b, a0, bPts, aPts0, options, maskOf)
@@ -149,7 +154,11 @@ class Aligner(private val context: Context) {
             lm != null -> EdgeAligner.Window.NARROW
             else -> EdgeAligner.Window.WIDE
         }
-        val gB = ImageOps.gray(b, REFINE_W); val gA = ImageOps.gray(a, REFINE_W)
+        // Solo bordes del cuerpo, en las dos fotos a la vez (si una no se aísla, ninguna)
+        val bodyB = if (options.contours) bodyOf(b) else null
+        val bodyA = if (bodyB != null) bodyOf(a) else null
+        val both = bodyB != null && bodyA != null
+        val gB = ImageOps.gray(b, REFINE_W, bodyB.takeIf { both }); val gA = ImageOps.gray(a, REFINE_W, bodyA.takeIf { both })
         val edges = EdgeAligner(spec.contours)
         var r = edges.align(gB, gA, lm?.first ?: if (options.contours) null else Similarity.IDENTITY, window)
         var m = method

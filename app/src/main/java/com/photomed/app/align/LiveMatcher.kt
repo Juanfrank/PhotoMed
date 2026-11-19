@@ -40,6 +40,11 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     private val edges = EdgeAligner(spec.contours)
     private var ref: Detection = Detection.EMPTY
     private var refGray: GrayImage? = null
+    /** Gris de la referencia con todo el fondo (si el cuadro actual no permite aislar el cuerpo). */
+    private var refGrayAll: GrayImage? = null
+    private var refBody: Mask? = null
+    private var frameBody: Mask? = null
+    private var frameBodyAt = 0L
     private var refEdgePts: List<ContourMatch.EdgePt> = emptyList()
 
     /** Puntos de la referencia (para adaptar la guía a la foto). */
@@ -67,7 +72,9 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
 
     fun setReference(bmp: Bitmap) {
         ref = detector.detectFull(spec.detector, bmp)
-        referenceEdges = runCatching { FreeContour.edgesOf(bmp) }.getOrNull()
+        // Bordes solo del cuerpo (sin los del fondo): región del paciente en la referencia
+        refBody = runCatching { BodyRegion.of(zone, bmp) { b -> segmenter?.segment(b) } }.getOrNull()
+        referenceEdges = runCatching { FreeContour.edgesOf(bmp, refBody) }.getOrNull()
         referenceFree = if (zone.guide == com.photomed.app.data.GuideType.FREE)
             runCatching { FreeContour.from(bmp) { b -> segmenter?.segment(b) } }.getOrNull() else null
         referenceSilhouette = runCatching {
@@ -76,9 +83,11 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
                 else SubjectSegmenter().use { s -> s.segment(bmp) }
             mask?.let { Silhouette.fromMask(it, Silhouette.axisOf(ref.points)) }
         }.getOrNull()
-        val g = ImageOps.gray(bmp, EDGE_W)
+        refGrayAll = ImageOps.gray(bmp, EDGE_W)
+        val g = ImageOps.gray(bmp, EDGE_W, refBody)
         refGray = g
         refEdgePts = ContourMatch.referencePoints(g, spec.contours)
+        frameBody = null; frameBodyAt = 0L
         last = null; matched = false
     }
 
@@ -119,8 +128,18 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             method = "puntos anatómicos"; total = drawKeys.size
             last = null
         } else {
-            val g = ImageOps.gray(frame, EDGE_W)
-            val r = edges.align(refG, g, last, if (last != null) EdgeAligner.Window.NARROW else EdgeAligner.Window.LIVE, levels = 2)
+            // cuerpo en el cuadro actual (segmentación como mucho cada 0,5 s; el encuadre cambia poco)
+            if (refBody != null) {
+                val now = System.currentTimeMillis()
+                if (now - frameBodyAt > 500) {
+                    frameBodyAt = now
+                    frameBody = runCatching { BodyRegion.of(zone, frame) { b -> segmenter?.segment(b) } }.getOrNull()
+                }
+            }
+            val body = frameBody?.takeIf { refBody != null }
+            val g = ImageOps.gray(frame, EDGE_W, body)
+            val refUse = if (body != null) refG else refGrayAll ?: refG
+            val r = edges.align(refUse, g, last, if (last != null) EdgeAligner.Window.NARROW else EdgeAligner.Window.LIVE, levels = 2)
             val t = if (EdgeAligner.isConfident(r.score)) r.transform else null
             last = t ?: last
             eval = LiveMatch.evaluate(t, spec.pivot, matched, ContourMatch.fraction(refEdgePts, g), threshold, gate = true)
