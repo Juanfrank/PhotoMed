@@ -302,6 +302,13 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         }
     }
     val status = live?.eval?.status
+    // tomas de ráfagas interrumpidas (cámara cerrada a mitad): se borran al abrir
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            val old = System.currentTimeMillis() - 10 * 60_000
+            context.cacheDir.listFiles { f -> f.name.startsWith("capture_") && f.lastModified() < old }?.forEach { it.delete() }
+        }
+    }
     val toneGen = remember { runCatching { android.media.ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, 70) }.getOrNull() }
     DisposableEffect(Unit) { onDispose { toneGen?.release() } }
     LaunchedEffect(status) {
@@ -471,9 +478,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     /** Puntuación de una foto frente a la referencia, en el hilo de análisis (sin tocar el estado en vivo). */
     suspend fun scoreOf(file: File): Float {
         val bmp = runCatching { ImageOps.load34(context, android.net.Uri.fromFile(file), 360) }.getOrNull() ?: return 0f
-        return kotlinx.coroutines.suspendCancellableCoroutine { c ->
-            pipeline.post { val sc = runCatching { pipeline.withEngine { it.scoreOf(bmp) } }.getOrNull() ?: 0f; if (c.isActive) c.resume(sc) }
-        }
+        // con tiempo límite: si el análisis se detiene (cámara cerrada) no queda esperando
+        return kotlinx.coroutines.withTimeoutOrNull(4000) {
+            kotlinx.coroutines.suspendCancellableCoroutine<Float> { c ->
+                pipeline.post { val sc = runCatching { pipeline.withEngine { it.scoreOf(bmp) } }.getOrNull() ?: 0f; if (c.isActive) c.resume(sc) }
+            }
+        } ?: 0f
     }
 
     fun capture() {
@@ -494,9 +504,13 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             // Ráfaga: 3 tomas seguidas; se guarda la de mayor coincidencia (evita repetir por un parpadeo)
             val shots = if (burst) 3 else 1
             val files = ArrayList<File>()
-            for (k in 0 until shots) {
-                val f = File(context.cacheDir, "capture_${stamp}_$k.jpg")
-                if (shoot(f)) files += f
+            try {
+                for (k in 0 until shots) {
+                    val f = File(context.cacheDir, "capture_${stamp}_$k.jpg")
+                    if (shoot(f)) files += f
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                files.forEach { it.delete() }; throw e
             }
             if (files.isEmpty()) {
                 capturing = false
@@ -519,8 +533,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         val near = conditions["Status"] == MatchStatus.CLOSE.name
                         val idx = sequence.indexOf(zone)
                         if (idx >= 0) {
-                            // secuencia: pasa sola a la siguiente zona (o termina)
-                            snackbar.showSnackbar(if (idx + 1 < sequence.size) "Guardada · siguiente: ${sequence[idx + 1].label}" else "Secuencia completada")
+                            // secuencia: pasa sola a la siguiente zona (o termina) sin esperar al aviso;
+                            // la cabecera de la siguiente muestra "Secuencia i/N"
+                            if (idx + 1 >= sequence.size) android.widget.Toast.makeText(context, "Secuencia completada", android.widget.Toast.LENGTH_SHORT).show()
                             onNext(sequence.getOrNull(idx + 1))
                         } else {
                             snackbar.showSnackbar("Guardada en el álbum ${e.id}" + if (near) " · casi alineada: se alinea en Comparar" else "")
