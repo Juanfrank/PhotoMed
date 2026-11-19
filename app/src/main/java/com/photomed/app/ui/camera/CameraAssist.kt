@@ -156,9 +156,34 @@ fun isCameraMove(h: String): Boolean = h.startsWith("←") || h.startsWith("↑"
  * una línea por cada corrección pendiente (pose, mirada, luz, distancia…). Los movimientos de la
  * cámara no se escriben: los indican las flechas del borde y el nivel.
  */
+/** Correcciones pendientes (sin los movimientos de la cámara, que van con flechas). */
+fun correctionItems(frame: LiveFrame?, zoomInfo: String?, distanceHint: String?): List<String> = buildList {
+    addAll(frame?.eval?.hints.orEmpty().filterNot(::isCameraMove))
+    distanceHint?.let { add(it) }
+    zoomInfo?.let { add(it) }
+}.distinct()
+
+/**
+ * Iconos de corrección sobre la imagen (abajo, translúcidos y pequeños): no ocupan espacio fuera
+ * de la vista previa. Las indicaciones sin icono siguen en la franja de abajo.
+ */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, zoomInfo: String?, distanceHint: String?) {
+fun CueOverlay(items: List<String>, accent: Color, modifier: Modifier = Modifier) {
+    val cues = items.mapNotNull { HintCues.of(it) }
+    if (cues.isEmpty()) return
+    androidx.compose.foundation.layout.FlowRow(
+        modifier.padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) { cues.forEach { CueChip(it, accent, compact = true) } }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, zoomInfo: String?, distanceHint: String?,
+                       /** false: los iconos se dibujan sobre la imagen ([CueOverlay]); aquí solo estado y textos. */
+                       showCues: Boolean = true) {
     val eval = frame?.eval
     val color = when (eval?.status) {
         MatchStatus.MATCH -> GuideTone.MATCH.color
@@ -173,12 +198,7 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
         null -> "Preparando la referencia…"
         else -> (if (frame.standard) "Ajuste la pose" else "Alinee con la referencia") + if (moving) " · siga las flechas" else ""
     }
-    val items = buildList {
-        val hints = eval?.hints.orEmpty()
-        addAll(hints.filterNot(::isCameraMove))
-        distanceHint?.let { add(it) }
-        zoomInfo?.let { add(it) }
-    }.distinct()
+    val items = correctionItems(frame, zoomInfo, distanceHint)
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
             .background(Color(0xFF1E1E22), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 6.dp)
@@ -201,7 +221,7 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
         }
         // Correcciones como iconos (qué + hacia dónde + valor corto); las que no tienen icono, en texto,
         // una por línea. El texto completo queda para TalkBack.
-        val cues = items.mapNotNull { HintCues.of(it) }
+        val cues = if (showCues) items.mapNotNull { HintCues.of(it) } else emptyList()
         val texts = items.filter { HintCues.of(it) == null }
         if (cues.isNotEmpty()) {
             androidx.compose.foundation.layout.FlowRow(
@@ -219,24 +239,30 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
     }
 }
 
-/** Ficha de una indicación: icono con insignia de dirección y valor corto. */
+/** Ficha de una indicación: icono con insignia de dirección y valor corto ([compact]: sobre la imagen). */
 @Composable
-fun CueChip(cue: HintCue, accent: Color) {
+fun CueChip(cue: HintCue, accent: Color, compact: Boolean = false) {
+    val box = if (compact) 22.dp else 30.dp; val ic = if (compact) 18.dp else 24.dp
+    val bd = if (compact) 12.dp else 17.dp; val bi = if (compact) 9.dp else 13.dp
     Row(
-        Modifier.background(Color(0x22FFFFFF), RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 4.dp)
+        Modifier.background(if (compact) Color(0x66000000) else Color(0x22FFFFFF), RoundedCornerShape(8.dp))
+            .padding(horizontal = if (compact) 5.dp else 8.dp, vertical = if (compact) 2.dp else 4.dp)
             .semantics(mergeDescendants = true) { contentDescription = cue.description },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(30.dp)) {
-            Icon(cue.icon, null, tint = Color.White, modifier = Modifier.size(24.dp).align(Alignment.TopStart))
+        Box(Modifier.size(box)) {
+            Icon(cue.icon, null, tint = Color.White.copy(alpha = if (compact) 0.9f else 1f),
+                modifier = Modifier.size(ic).align(Alignment.TopStart))
             cue.badge?.let { b ->
-                Box(Modifier.align(Alignment.BottomEnd).size(17.dp).background(accent, CircleShape), contentAlignment = Alignment.Center) {
-                    Icon(b, null, tint = Color(0xFF1E1E22), modifier = Modifier.size(13.dp))
+                Box(Modifier.align(Alignment.BottomEnd).size(bd).background(accent.copy(alpha = if (compact) 0.9f else 1f), CircleShape),
+                    contentAlignment = Alignment.Center) {
+                    Icon(b, null, tint = Color(0xFF1E1E22), modifier = Modifier.size(bi))
                 }
             }
         }
         cue.value?.let {
-            Text(it, color = Color.White, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp))
+            Text(it, color = Color.White, style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(start = if (compact) 2.dp else 4.dp))
         }
     }
 }

@@ -587,6 +587,20 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                     LevelIndicator(tilt.value, guidance?.rotateDeg ?: 0f, Modifier.align(Alignment.TopStart).padding(6.dp))
                 }
                 EdgeArrows(guidance, tone.color.takeIf { tone != GuideTone.NORMAL } ?: Color.White)
+                // Correcciones como iconos translúcidos sobre la imagen, abajo (sobre la etiqueta de la
+                // referencia y, si la hay, la flecha hacia abajo)
+                if (matchingEnabled) {
+                    val distCue = if (zone.category == com.photomed.app.data.ZoneCategory.FACIAL)
+                        live?.let { CameraGuidance.faceDistanceCm(it.currentPointsAll, focalNorm, zoomRatio) } else null
+                    CueOverlay(
+                        correctionItems(live,
+                            if (zoomAssist && !manualZoom && zoomRatio > 1.01f) "zoom asistido %.1f×".format(zoomRatio) else null,
+                            distCue?.let { d -> if (d < 80f) "≈ %.0f cm: aléjese ≥ 1 m y use zoom".format(d) else "≈ %.0f cm".format(d) }),
+                        tone.color.takeIf { tone != GuideTone.NORMAL } ?: GuideTone.CLOSE.color,
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                            .padding(bottom = if ((guidance?.moveY ?: 0) > 0) 54.dp else 28.dp),
+                    )
+                }
                 val g = ghost
                 if (showGhost && g != null) {
                     Text(
@@ -609,6 +623,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit) {
                 distanceHint = dist?.let { d ->
                     if (d < 80f) "≈ %.0f cm: aléjese ≥ 1 m y use zoom".format(d) else "≈ %.0f cm".format(d)
                 },
+                showCues = false,
             )
         }
 

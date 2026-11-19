@@ -88,9 +88,12 @@ class CameraAssistScreenshotTest {
                                 tone = GuideTone.CLOSE, adaptTo = pts("face_2"))
                             LevelIndicator(Tilt(0.8f, 1f), g!!.rotateDeg, Modifier.align(Alignment.TopStart).padding(6.dp))
                             EdgeArrows(g, GuideTone.CLOSE.color)
+                            com.photomed.app.ui.camera.CueOverlay(listOf("Cabeza: girar a la izquierda 9°", "Barbilla: bajar 8° (Frankfort)",
+                                "Mirada: al frente", "Luz desigual: lado izquierdo más oscuro", "≈ 45 cm: aléjese ≥ 1 m y use zoom"),
+                                GuideTone.CLOSE.color, Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp))
                         }
                         RecommendationStrip(LiveFrame(eval, method = "puntos anatómicos", totalPoints = 140), g, autoCapture = true,
-                            zoomInfo = "zoom asistido 1.3×", distanceHint = "≈ 45 cm: aléjese ≥ 1 m y use zoom")
+                            zoomInfo = "zoom asistido 1.3×", distanceHint = "≈ 45 cm: aléjese ≥ 1 m y use zoom", showCues = false)
                         // sin referencia (estandarización): varias correcciones, una por línea
                         val std = eval.copy(status = com.photomed.app.align.MatchStatus.CLOSE, pointFraction = null, hints = listOf(
                             "Cabeza: girar a la izquierda 9°", "Barbilla: bajar 8° (Frankfort)", "Cabeza: enderezar 5° (inclinada a la derecha)",
