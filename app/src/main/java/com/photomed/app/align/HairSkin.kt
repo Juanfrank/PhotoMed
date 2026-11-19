@@ -35,14 +35,13 @@ class FaceLabels(val width: Int, val height: Int, val data: ByteArray) {
 }
 
 /**
- * Segmentación multiclase en el dispositivo (MediaPipe "selfie multiclass 256×256", Apache 2.0):
- * separa pelo, piel del rostro, piel del cuerpo y ropa. El modelo es opcional y se descarga en
- * Ajustes ([ModelStore]); sin él, las funciones que lo usan simplemente no se aplican.
+ * Segmentación multiclase en el dispositivo (MediaPipe "selfie multiclass 256×256", Apache 2.0,
+ * incluido en assets/selfie_multiclass.tflite): separa pelo, piel del rostro, piel del cuerpo y ropa.
  */
 class HairSkinSegmenter(context: Context) : Closeable {
     private val seg: ImageSegmenter = ImageSegmenter.createFromOptions(context,
         ImageSegmenter.ImageSegmenterOptions.builder()
-            .setBaseOptions(BaseOptions.builder().setModelAssetBuffer(ModelStore.buffer(context) ?: error("modelo no descargado")).build())
+            .setBaseOptions(BaseOptions.builder().setModelAssetPath(MODEL).build())
             .setRunningMode(RunningMode.IMAGE)
             .setOutputCategoryMask(true).setOutputConfidenceMasks(false)
             .build())
@@ -59,9 +58,9 @@ class HairSkinSegmenter(context: Context) : Closeable {
     override fun close() = seg.close()
 
     companion object {
-        /** null si el modelo no está descargado o no se puede cargar. */
-        fun createOrNull(context: Context): HairSkinSegmenter? =
-            if (!ModelStore.available(context)) null else runCatching { HairSkinSegmenter(context) }.getOrNull()
+        const val MODEL = "selfie_multiclass.tflite"
+        /** null si el modelo no se puede cargar (p. ej. dispositivo sin soporte). */
+        fun createOrNull(context: Context): HairSkinSegmenter? = runCatching { HairSkinSegmenter(context) }.getOrNull()
     }
 }
 

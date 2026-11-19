@@ -43,10 +43,8 @@ no incluye publicidad ni herramientas de analítica.
 - **Cámara:** tomar las fotografías. Solo se usa con la pantalla de cámara abierta.
 - **Guardar en la galería** (Android 8 y 9): escribir en `Pictures/PhotoMed`. En Android 10 o superior no se necesita permiso.
 - **Leer imágenes** (opcional): solo si usa “Recuperar desde la galería”, para leer fotos de PhotoMed creadas por una instalación anterior.
-- **Internet:** lo declaran las bibliotecas de Google ML Kit (ver la sección 6). PhotoMed solo se
-  conecta por sí misma cuando usted pulsa **“Descargar”** en *Ajustes → Modelo opcional de pelo y
-  piel*, para obtener ese modelo del servidor público de modelos de MediaPipe; esa descarga **no
-  envía ningún dato** suyo ni de sus pacientes, y el archivo se verifica con su huella SHA-256.
+- **Internet:** lo declaran las bibliotecas de Google ML Kit (ver la sección 6). PhotoMed no
+  envía fotos ni datos: todos los modelos van incluidos en la aplicación.
 
 ## 5. Visibilidad en la galería y en copias de seguridad
 
@@ -60,8 +58,8 @@ Revise esa configuración y excluya el álbum PhotoMed si su normativa lo exige.
 Para detectar puntos anatómicos (ojos, oreja, hombros, caderas, etc.) y separar la silueta del
 paciente del fondo (medición de contornos) PhotoMed usa **Google ML Kit** (detección de rostro, de
 pose y segmentación de personas) y, si se elige en Ajustes, **MediaPipe Face Landmarker** (Apache 2.0),
-ambos con modelos incluidos en la aplicación, y opcionalmente el modelo **MediaPipe Selfie
-Multiclass** (Apache 2.0; pelo, piel del rostro y del cuerpo), que se descarga solo si usted lo pide:
+y **MediaPipe Selfie Multiclass** (Apache 2.0; pelo, piel del rostro y del cuerpo), todos con
+modelos incluidos en la aplicación:
 las imágenes se procesan en el dispositivo y **no se envían a Google**. Según la documentación de Google, ML Kit puede enviar información técnica
 anónima de uso y rendimiento de la API (no imágenes ni resultados). Más información en
 <https://developers.google.com/ml-kit/terms>.

@@ -137,8 +137,6 @@ Compose, Coil, Google ML Kit (rostro, pose, segmentación) y MediaPipe Face Land
   ajustes agrupa alineación, presentación (recorte, orden), color y perspectiva. Los controles bajo
   las fotos se ocultan a los 3 s sin tocar.
 - **Expediente**: primero las zonas con fotos; el resto por categoría, en secciones plegables.
-- **Modelo opcional de pelo y piel** (16 MB): no va en la APK; se descarga solo desde *Ajustes*
-  (servidor público de MediaPipe, verificado con SHA-256, sin enviar datos). Sin él, la línea de
-  implantación, el ajuste del óvalo, los puntos tapados y la piel por segmentación no se aplican.
+- **Modelo de pelo y piel** (MediaPipe Selfie Multiclass, 16 MB): incluido en la app.
 - **Calibración con fotos propias**: `python3 tools/eval/calibrate.py carpeta_neutras --smiles carpeta_sonrisas`
   mide la expresión en sus fotos (en su equipo) y propone los límites de expresión neutra.

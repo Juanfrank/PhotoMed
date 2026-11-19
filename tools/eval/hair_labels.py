@@ -11,7 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 STOCK = ROOT / "app/src/test/resources/stock"
 OUT = STOCK / "labels"; OUT.mkdir(exist_ok=True)
 # el modelo no va en el repositorio (la app lo descarga a petición): se descarga aquí si falta
-MODEL = pathlib.Path("/tmp/photomed-eval/selfie_multiclass.tflite")
+MODEL = ROOT / "app/src/main/assets/selfie_multiclass.tflite"
 if not MODEL.exists():
     import urllib.request
     MODEL.parent.mkdir(parents=True, exist_ok=True)

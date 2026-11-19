@@ -2,7 +2,6 @@ package com.photomed.app.ui.camera
 
 import android.Manifest
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.MoreVert
@@ -973,12 +972,6 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         }
     }
     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 120.dp))
-    // vistas faciales sin el modelo opcional de pelo y piel: avisar una vez de que existe
-    if (com.photomed.app.align.ZoneAlignment.of(zone).detector == com.photomed.app.align.Detector.FACE &&
-        !com.photomed.app.align.ModelStore.available(context))
-        com.photomed.app.ui.components.CoachMark("modelo_pelo_piel", Icons.Default.Download,
-            "Opcional: descargue en Ajustes el modelo de pelo y piel (16 MB) para ver la línea de implantación y ajustar el óvalo al rostro.",
-            Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 56.dp))
     com.photomed.app.ui.components.CoachMark("camara_gestos", Icons.Default.TouchApp,
         "Pellizque para el zoom. El anillo del disparador se llena al coincidir con la guía. " +
             "Más capas y datos: modo experto en los ajustes (⋯).",
