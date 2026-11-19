@@ -42,7 +42,7 @@ class ScalpZoneTest {
         assertEquals(null, Standardization.cameraAngleHint(Zone.SCALP_VERTEX, 86f))
         // parietal ≈ 45°: a 80° sobra inclinación
         assertEquals("Cámara: apuntar más arriba 35°", Standardization.cameraAngleHint(Zone.SCALP_PARIETAL_L, 80f))
-        assertEquals(null, Standardization.cameraAngleHint(Zone.SCALP_CROWN, 70f))
+        assertEquals(null, Standardization.cameraAngleHint(Zone.SCALP_CROWN, 38f))
         assertEquals(null, Standardization.cameraAngleHint(Zone.EYE_R, 0f))
         val c = HintCues.of("Cámara: apuntar más abajo 20°")
         assertNotNull(c)

@@ -33,7 +33,7 @@ object Standardization {
      */
     fun cameraDownTarget(zone: Zone): Pair<Float, Float>? = when (zone.guide) {
         GuideType.SCALP -> 90f to 8f
-        GuideType.SCALP_CROWN -> 75f to 12f
+        GuideType.SCALP_CROWN -> 35f to 12f
         GuideType.SCALP_PARIETAL -> 45f to 12f
         else -> null
     }

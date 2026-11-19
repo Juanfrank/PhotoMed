@@ -55,7 +55,7 @@ enum class Zone(
     SCALP_VERTEX("cuero_cabelludo_vertice", "Vértice", ZoneCategory.CAPILAR, GuideType.SCALP,
         hint = "Vista cenital: cámara paralela al suelo sobre la cabeza, frente hacia arriba del encuadre, raya en la línea media y el punto más alto del cráneo en la cruz; cabello seco y peinado igual en cada toma."),
     SCALP_CROWN("cuero_cabelludo_corona", "Corona (coronilla)", ZoneCategory.CAPILAR, GuideType.SCALP_CROWN,
-        hint = "Paciente sentado con la cabeza flexionada; cámara por detrás y encima (≈ 75° hacia abajo); remolino de la coronilla en la cruz, nuca abajo."),
+        hint = "Vista posterior: paciente sentado de espaldas; cámara detrás y algo por encima (≈ 35° hacia abajo); remolino de la coronilla en la marca, nuca y hombros abajo."),
     SCALP_PARIETAL_R("cuero_cabelludo_parietal_der", "Parietal derecho", ZoneCategory.CAPILAR, GuideType.SCALP_PARIETAL,
         hint = "Cámara por encima del lado derecho (≈ 45° hacia abajo); oreja derecha abajo en la marca, raya arriba siguiendo la curva, frente hacia la derecha del encuadre."),
     SCALP_PARIETAL_L("cuero_cabelludo_parietal_izq", "Parietal izquierdo", ZoneCategory.CAPILAR, GuideType.SCALP_PARIETAL, mirrored = true,

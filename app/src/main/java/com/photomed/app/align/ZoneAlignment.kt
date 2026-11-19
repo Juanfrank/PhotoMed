@@ -95,8 +95,8 @@ data class ZoneAlignment(
                 )
                 GuideType.SCALP_CROWN -> ZoneAlignment(
                     Detector.NONE, emptySet(),
-                    listOf(r("remolino de la coronilla", 0.5f, 0.56f, 0.2f, 0.18f), r("contorno craneal", 0.5f, 0.6f, 0.42f, 0.5f, 0.8f),
-                        r("orejas y nuca", 0.5f, 0.95f, 0.47f, 0.2f, 0.6f)),
+                    listOf(r("remolino de la coronilla", 0.5f, 0.40f, 0.18f, 0.16f), r("contorno craneal y orejas", 0.5f, 0.55f, 0.45f, 0.4f, 0.8f),
+                        r("nuca y hombros", 0.5f, 1.05f, 0.47f, 0.2f, 0.7f)),
                     listOf("Remolino (coronilla)", "Protuberancia occipital"),
                     "contorno del cráneo, remolino, nuca y patrón del cabello",
                 )

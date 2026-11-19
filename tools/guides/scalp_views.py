@@ -118,6 +118,39 @@ MIDLINE = midline()
 # Implantación nucal: alrededor de la nuca, detrás de las orejas
 NAPE = surface_curve([-112, -125, -140, -160, -180, -200, -220, -235, -248],
                      [-22, -30, -36, -40, -41, -40, -36, -30, -22])
+# Implantación nucal sobre el cuello: en "V" suave, más baja en la línea media
+def nape_on_neck(n=120, half=1.05):
+    a = np.linspace(np.pi - half, np.pi + half, n)
+    r = np.abs(a - np.pi) / half
+    # punta central leve y laterales que suben detrás de las orejas
+    y = -6.6 + 0.3 * r + 1.3 * r ** 3
+    p = np.stack([NECK_RX * np.sin(a), y, NECK_C[2] + NECK_RZ * np.cos(a)], -1)
+    nn = np.stack([np.sin(a), 0 * a, np.cos(a)], -1)
+    return p, nn
+
+
+NAPE_NECK = nape_on_neck()
+
+
+# Surco de la nuca (línea media posterior del cuello, hacia C7)
+def neck_furrow(n=40):
+    y = np.linspace(-7.2, -13.5, n)
+    p = np.stack([0 * y, y, NECK_C[2] - NECK_RZ * np.ones(n) - 0.1 * (y + 7.2) * 0], -1)
+    return p, np.tile([0, 0, -1.0], (n, 1))
+
+
+FURROW = neck_furrow()
+
+
+# Línea de los trapecios: del cuello al hombro, por detrás
+def trapezius(side, n=60):
+    t = np.linspace(0, 1, n)
+    x = side * (NECK_RX - 0.2 + 13.0 * t ** 1.2)
+    y = -8.5 - 6.0 * t ** 1.6
+    z = NECK_C[2] - 2.0 - 1.5 * t
+    return np.stack([x, y, z], -1), np.tile([0, 0.6, -0.8], (n, 1))
+
+
 # Remolino de la coronilla: en la línea media, por detrás del vértice
 WHORL_AZ, WHORL_EL = 180.0, 62.0
 
@@ -183,25 +216,30 @@ def grid_quads(P):
     return np.stack([a, b, c, d], -2).reshape(-1, 4, 3)
 
 
-def surfaces(jaw_on=True):
+def surfaces(jaw_on=True, torso=False):
     u, v = np.meshgrid(np.radians(np.linspace(-180, 180, 181)), np.radians(np.linspace(-30, 90, 61)))
     quads = [grid_quads(skull_point(u, v))]
     a, t = np.meshgrid(np.linspace(0, 2 * np.pi, 121), np.linspace(-np.pi / 2, np.pi / 2, 61))
     jaw = JAW_C + np.stack([JAW_R[0] * np.cos(t) * np.sin(a), JAW_R[1] * np.sin(t), JAW_R[2] * np.cos(t) * np.cos(a)], -1)
     if jaw_on: quads.append(grid_quads(jaw))
-    a, y = np.meshgrid(np.linspace(0, 2 * np.pi, 121), np.linspace(-11, -1, 21))
-    neck = np.stack([NECK_C[0] + NECK_RX * np.sin(a), y, NECK_C[2] + NECK_RZ * np.cos(a)], -1)
+    # cuello que se abre hacia los hombros (trapecios) y el tronco
+    a, y = np.meshgrid(np.linspace(0, 2 * np.pi, 121), np.linspace(-32, -1, 63))
+    k = np.clip((-8.5 - y) / 7.0, 0, 1); k = k * k * (3 - 2 * k)
+    if not torso: k = 0 * k; y = np.clip(y, -11, -1)
+    rx = NECK_RX + (19.0 - NECK_RX) * k
+    rz = NECK_RZ + (10.0 - NECK_RZ) * k
+    neck = np.stack([NECK_C[0] + rx * np.sin(a), y, NECK_C[2] - 1.0 * k + rz * np.cos(a)], -1)
     quads.append(grid_quads(neck))
     return np.concatenate(quads)
 
 
-QUADS = {True: surfaces(True), False: surfaces(False)}
+QUADS = {(j, t): surfaces(j, t) for j in (True, False) for t in (True, False)}
 
 
-def silhouette(cam, res=900, jaw=False):
+def silhouette(cam, res=900, jaw=False, torso=False):
     W, H = res, res * 4 // 3
     img = Image.new("L", (W, H), 0); dr = ImageDraw.Draw(img)
-    q = cam.proj(QUADS[jaw].reshape(-1, 3)).reshape(-1, 4, 2) * np.array([W, H])
+    q = cam.proj(QUADS[(jaw, torso)].reshape(-1, 3)).reshape(-1, 4, 2) * np.array([W, H])
     for quad in q:
         dr.polygon([tuple(p) for p in quad], fill=255)
     for s in (1, -1):  # orejas
@@ -250,9 +288,9 @@ def simplify(run, n):
     return [run[i] for i in idx]
 
 
-def view(name, cam, extra_marks, whorl=False, face=False, jaw=False):
+def view(name, cam, extra_marks, whorl=False, face=False, jaw=False, back=False):
     contours = []
-    sil = silhouette(cam, jaw=jaw)
+    sil = silhouette(cam, jaw=jaw, torso=back)
     # silueta como contorno cerrado si cabe entera; si no, tramos dentro del encuadre
     inside = all(0 <= x <= 1 and 0 <= y <= 1 for x, y in sil)
     if inside:
@@ -273,7 +311,7 @@ def view(name, cam, extra_marks, whorl=False, face=False, jaw=False):
                 c = np.mean(q, 0)
                 inner = [tuple(c + 0.6 * (np.array(pt) - c)) for pt in q[6:30]]
                 contours.append((simplify(inner, 14), False))
-    for curve in (HAIRLINE, MIDLINE, NAPE):
+    for curve in (HAIRLINE, MIDLINE) + ((NAPE_NECK, FURROW, trapezius(1), trapezius(-1)) if back else (NAPE,)):
         for r in visible_runs(cam, curve):
             contours.append((simplify(r, 40), False))
     for curve in (FACE_CURVES if face else []):
@@ -292,10 +330,12 @@ def build():
     top, ntop = skull_dir(0, 90)
     cam = Cam(top, np.array([0, 1.0, 0]), np.array([0, 0, 1.0]), 21.0, (0.5, 0.5))
     views.append(view("VERTEX", cam, [top, HAIRLINE[0][100]]) + (cam,))
-    # Corona: perpendicular al remolino; vértice/frente arriba, nuca abajo
+    # Corona: desde detrás y encima (≈ 35° sobre la horizontal), mirando el remolino; se ven la
+    # nuca, la implantación nucal, el cuello y el arranque de los hombros
     w, nw = skull_dir(WHORL_AZ, WHORL_EL)
-    cam = Cam(w, nw, np.array([0, 0.2, 1.0]), 18.5, (0.5, 0.42))
-    views.append(view("CROWN", cam, [w], whorl=True) + (cam,))
+    el = np.radians(35)
+    cam = Cam(w, np.array([0, np.sin(el), -np.cos(el)]), np.array([0, 1.0, 0]), 27.0, (0.5, 0.30))
+    views.append(view("CROWN", cam, [w], whorl=True, back=True) + (cam,))
     # Parietal derecho: cámara encima y al lado (≈ 45°), mirando la eminencia parietal derecha
     p, npar = skull_dir(-95, 45)
     cam = Cam(p, npar, np.array([0, 1.0, 0]), 20.0, (0.48, 0.47))

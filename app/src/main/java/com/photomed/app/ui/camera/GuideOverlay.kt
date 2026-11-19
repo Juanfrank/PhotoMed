@@ -468,7 +468,8 @@ fun guideFor(type: GuideType): Guide = when (type) {
         marks = ScalpGuideArt.VERTEX_MARKS,
     )
 
-    // Corona: perpendicular al remolino (detrás y encima, cabeza flexionada); remolino en la cruz.
+    // Corona: vista posterior desde detrás y algo por encima (≈ 35°): remolino, orejas por detrás,
+    // implantación nucal, surco de la nuca y trapecios para que se reconozca la nuca.
     GuideType.SCALP_CROWN -> Guide(
         contours = ScalpGuideArt.CROWN_CONTOURS,
         lines = listOf(hLine(ScalpGuideArt.CROWN_MARKS[0].y, 0.10f, 0.90f)),
