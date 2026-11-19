@@ -48,4 +48,26 @@ class ScreenFlashTest {
         assertFalse(c.active)
         assertEquals(before, activity.window.attributes.screenBrightness)
     }
+
+    @Test
+    fun screenStaysWhiteDuringBurst() {
+        val activity = Robolectric.buildActivity(androidx.activity.ComponentActivity::class.java).setup().get()
+        val before = activity.window.attributes.screenBrightness
+        val c = ScreenFlashController(activity)
+        val looper = shadowOf(Looper.getMainLooper())
+        c.hold(); looper.idle()
+        var done = 0
+        repeat(3) { k ->
+            c.apply(System.currentTimeMillis() + 3000, object : ImageCapture.ScreenFlashListener { override fun onCompleted() { done++ } })
+            looper.idleFor(java.time.Duration.ofMillis(ScreenFlashController.RAMP_MS + 50))
+            c.clear(); looper.idle()
+            // entre tomas la pantalla sigue blanca y al máximo
+            assertTrue("toma ${k + 1}", c.active)
+            assertEquals(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL, activity.window.attributes.screenBrightness)
+        }
+        assertEquals(3, done)
+        c.release(); looper.idle()
+        assertFalse(c.active)
+        assertEquals(before, activity.window.attributes.screenBrightness)
+    }
 }

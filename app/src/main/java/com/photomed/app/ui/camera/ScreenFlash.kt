@@ -36,28 +36,44 @@ class ScreenFlashController(private val activity: Activity?) : ImageCapture.Scre
         private set
     private var saved: Float? = null
     private val main = Handler(Looper.getMainLooper())
+    /** Ráfaga en curso: la pantalla sigue en blanco entre tomas (ver [hold]/[release]). */
+    private var held = false
+    private var litAt = 0L
+
+    private fun light() {
+        if (!active) litAt = System.currentTimeMillis()
+        active = true
+        activity?.window?.let { w ->
+            val lp = w.attributes
+            if (saved == null) saved = lp.screenBrightness
+            lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL
+            w.attributes = lp
+        }
+    }
+
+    /** Mantener la pantalla blanca durante varias tomas (ráfaga); termina con [release]. */
+    fun hold() { main.post { held = true; light() } }
+
+    fun release() { main.post { held = false; restore() } }
 
     override fun apply(expirationTimeMillis: Long, listener: ImageCapture.ScreenFlashListener) {
         main.post {
-            active = true
-            activity?.window?.let { w ->
-                val lp = w.attributes
-                if (saved == null) saved = lp.screenBrightness
-                lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL
-                w.attributes = lp
-            }
-            // tiempo para que se dibuje el blanco y suba el brillo antes de medir la exposición,
-            // sin pasar del límite que da CameraX
-            val wait = (expirationTimeMillis - System.currentTimeMillis() - 100).coerceIn(0, RAMP_MS)
+            light()
+            // tiempo para que se dibuje el blanco y suba el brillo antes de medir la exposición
+            // (si ya estaba encendida en la ráfaga, solo lo que falte), sin pasar del límite de CameraX
+            val pending = RAMP_MS - (System.currentTimeMillis() - litAt)
+            val wait = minOf(pending, expirationTimeMillis - System.currentTimeMillis() - 100).coerceIn(0, RAMP_MS)
             main.postDelayed({ listener.onCompleted() }, wait)
         }
     }
 
     override fun clear() {
-        main.post { restore() }
+        // durante la ráfaga la pantalla sigue blanca hasta la última toma
+        main.post { if (!held) restore() }
     }
 
     fun restore() {
+        held = false
         active = false
         val s = saved ?: return
         activity?.window?.let { w -> val lp = w.attributes; lp.screenBrightness = s; w.attributes = lp }

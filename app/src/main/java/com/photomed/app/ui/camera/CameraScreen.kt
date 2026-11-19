@@ -521,8 +521,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         val stamp = System.currentTimeMillis()
         scope.launch {
             // Ráfaga: 3 tomas seguidas; se guarda la de mayor coincidencia (evita repetir por un parpadeo)
-            // con flash de pantalla, una sola toma (un destello, como en las selfies)
-            val shots = if (burst && effectiveFlash != ImageCapture.FLASH_MODE_SCREEN) 3 else 1
+            val shots = if (burst) 3 else 1
+            // flash de pantalla en ráfaga: la pantalla sigue en blanco de la primera a la última toma
+            val holdScreen = shots > 1 && effectiveFlash == ImageCapture.FLASH_MODE_SCREEN
+            if (holdScreen) screenFlash.hold()
             val files = ArrayList<File>()
             try {
                 for (k in 0 until shots) {
@@ -531,6 +533,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 files.forEach { it.delete() }; throw e
+            } finally {
+                if (holdScreen) screenFlash.release()
             }
             if (files.isEmpty()) {
                 capturing = false
