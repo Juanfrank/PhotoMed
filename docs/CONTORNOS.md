@@ -38,8 +38,8 @@ con las líneas y marcas de referencia, definidas sobre la anatomía de la ilust
 | Perfiles derecho e izquierdo | perfiles | plano de Frankfort, vertical por glabela, tragion y orbitale |
 | Cuello y escote | cuerpo de frente | línea media, mentón, escotadura yugular |
 | Vértice · tricología | vista cenital del cráneo (frente arriba), orejas, línea frontal | raya en la línea media, línea interauricular, vértice en la cruz; cámara 90°; aviso para poner la cámara cenital (sensor de gravedad); alineación por contornos (sin detector facial) |
-| Corona (coronilla) · tricología | cabeza flexionada desde detrás y arriba: cráneo, nuca, orejas, remolino | remolino en la cruz, línea media; cámara ≈ 75° hacia abajo |
-| Parietal derecho / izquierdo · tricología | vista lateral superior: cráneo, raya, entrada temporal, oreja | oreja en la marca, raya arriba; cámara ≈ 45° hacia abajo |
+| Corona (coronilla) · tricología | proyección de un modelo 3D de la cabeza (`tools/guides/scalp_views.py`) perpendicular al remolino: cráneo, orejas, raya, remolino | remolino en la cruz, línea media; cámara ≈ 75° hacia abajo |
+| Parietal derecho / izquierdo · tricología | proyección del modelo 3D perpendicular a la eminencia parietal: cráneo, raya, línea temporal, oreja | oreja en la marca, raya arriba; cámara ≈ 45° hacia abajo |
 | Ojo derecho / izquierdo | primer plano: párpados, iris, surco palpebral, ceja, ojera, patas de gallo | pupila en la cruz, línea intercantal; canto lateral hacia afuera |
 | Tórax / mamas · Abdomen frontal · Muslos | cuerpo de frente | línea media, pezones, pliegue inframamario, ombligo, ingle, rótulas |
 | Espalda · Glúteos · Brazos | cuerpo de espalda | línea media, C7, escápulas, crestas ilíacas, pliegue interglúteo y glúteo, codo |

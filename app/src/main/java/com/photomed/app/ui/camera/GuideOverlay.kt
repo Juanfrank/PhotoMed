@@ -330,8 +330,6 @@ private fun hLine(y: Float, x0: Float = 0.04f, x1: Float = 0.96f) = o(x0, y) to 
 private fun vLine(x: Float, y0: Float = 0.03f, y1: Float = 0.97f) = o(x, y0) to o(x, y1)
 private fun mirrorX(points: List<Offset>) = points.map { o(1f - it.x, it.y) }
 private fun open(p: List<Offset>) = p to false
-private fun spiral(cx: Float, cy: Float, r: Float, turns: Float) =
-    (0..40).map { val t = it / 40f; val a = 2 * Math.PI * turns * t; o(cx + r * t * kotlin.math.cos(a).toFloat(), cy + r * t * kotlin.math.sin(a).toFloat()) }
 private fun ellipse(cx: Float, cy: Float, rx: Float, ry: Float, n: Int) =
     (0 until n).map { val a = 2 * Math.PI * it / n; o(cx + rx * kotlin.math.cos(a).toFloat(), cy + ry * kotlin.math.sin(a).toFloat()) }
 private fun closed(p: List<Offset>) = p to true
@@ -462,56 +460,27 @@ fun guideFor(type: GuideType): Guide = when (type) {
         marks = listOf(o(0.5f, 0.62f)),
     )
 
-    // Vértice: cráneo visto desde arriba (más largo que ancho), frente arriba; raya en la línea
-    // media, línea interauricular y el punto más alto del cráneo en la cruz.
+    // Vistas del cuero cabelludo: proyecciones de un modelo 3D de la cabeza desde la posición de
+    // cámara de cada vista (tools/guides/scalp_views.py). Vértice: cenital, frente arriba.
     GuideType.SCALP -> Guide(
-        contours = listOf(
-            closed(ellipse(0.5f, 0.50f, 0.36f, 0.39f, 28)),
-            // línea de implantación frontal
-            open(listOf(o(0.27f, 0.22f), o(0.36f, 0.17f), o(0.50f, 0.15f), o(0.64f, 0.17f), o(0.73f, 0.22f))),
-            // pabellones auriculares (asoman a los lados, algo por delante del centro)
-            closed(listOf(o(0.14f, 0.43f), o(0.10f, 0.46f), o(0.10f, 0.53f), o(0.14f, 0.56f))),
-            closed(listOf(o(0.86f, 0.43f), o(0.90f, 0.46f), o(0.90f, 0.53f), o(0.86f, 0.56f))),
-        ),
-        lines = listOf(vLine(0.5f, 0.10f, 0.90f), hLine(0.50f, 0.10f, 0.90f)),
-        marks = listOf(o(0.5f, 0.50f), o(0.5f, 0.15f)),
+        contours = ScalpGuideArt.VERTEX_CONTOURS,
+        lines = listOf(hLine(0.50f, 0.10f, 0.90f)),
+        marks = ScalpGuideArt.VERTEX_MARKS,
     )
 
-    // Corona: cabeza flexionada vista desde detrás y arriba; remolino de la coronilla en la cruz,
-    // nuca y orejas abajo, la raya sube hacia el borde superior.
+    // Corona: perpendicular al remolino (detrás y encima, cabeza flexionada); remolino en la cruz.
     GuideType.SCALP_CROWN -> Guide(
-        contours = listOf(
-            open(listOf(o(0.16f, 0.80f), o(0.12f, 0.62f), o(0.13f, 0.42f), o(0.22f, 0.24f), o(0.36f, 0.12f), o(0.50f, 0.09f),
-                o(0.64f, 0.12f), o(0.78f, 0.24f), o(0.87f, 0.42f), o(0.88f, 0.62f), o(0.84f, 0.80f))),
-            // nuca y línea de implantación posterior
-            open(listOf(o(0.16f, 0.80f), o(0.30f, 0.86f), o(0.50f, 0.88f), o(0.70f, 0.86f), o(0.84f, 0.80f))),
-            open(listOf(o(0.34f, 0.88f), o(0.34f, 0.98f))), open(listOf(o(0.66f, 0.88f), o(0.66f, 0.98f))),
-            // orejas
-            closed(listOf(o(0.11f, 0.66f), o(0.06f, 0.69f), o(0.07f, 0.78f), o(0.13f, 0.79f))),
-            closed(listOf(o(0.89f, 0.66f), o(0.94f, 0.69f), o(0.93f, 0.78f), o(0.87f, 0.79f))),
-            // remolino
-            open(spiral(0.5f, 0.45f, 0.075f, 1.6f)),
-        ),
-        lines = listOf(vLine(0.5f, 0.06f, 0.90f), hLine(0.45f, 0.10f, 0.90f)),
-        marks = listOf(o(0.5f, 0.45f)),
+        contours = ScalpGuideArt.CROWN_CONTOURS,
+        lines = listOf(hLine(ScalpGuideArt.CROWN_MARKS[0].y, 0.10f, 0.90f)),
+        marks = ScalpGuideArt.CROWN_MARKS,
     )
 
-    // Parietal (derecho; el izquierdo en espejo): cabeza vista desde arriba y de lado, frente a la
-    // derecha del encuadre; la raya (línea media) arriba, oreja abajo y entrada temporal.
+    // Parietal (derecho; el izquierdo en espejo): encima y al lado (≈ 45°), frente a la derecha del
+    // encuadre; raya arriba, línea temporal y oreja abajo.
     GuideType.SCALP_PARIETAL -> Guide(
-        contours = listOf(
-            // contorno craneal (de la nuca a la frente)
-            open(listOf(o(0.06f, 0.90f), o(0.05f, 0.62f), o(0.12f, 0.38f), o(0.28f, 0.20f), o(0.50f, 0.13f),
-                o(0.72f, 0.18f), o(0.88f, 0.32f), o(0.95f, 0.50f))),
-            // raya / línea media (vista oblicua desde arriba)
-            open(listOf(o(0.10f, 0.50f), o(0.25f, 0.33f), o(0.50f, 0.25f), o(0.75f, 0.29f), o(0.92f, 0.40f))),
-            // línea de implantación frontotemporal y entrada temporal
-            open(listOf(o(0.95f, 0.50f), o(0.86f, 0.56f), o(0.80f, 0.66f), o(0.82f, 0.78f), o(0.76f, 0.90f))),
-            // oreja
-            closed(listOf(o(0.46f, 0.80f), o(0.52f, 0.77f), o(0.58f, 0.80f), o(0.59f, 0.92f), o(0.53f, 0.98f), o(0.47f, 0.92f))),
-        ),
-        lines = listOf(hLine(0.55f, 0.08f, 0.92f), vLine(0.5f, 0.10f, 0.95f)),
-        marks = listOf(o(0.5f, 0.55f), o(0.52f, 0.77f)),
+        contours = ScalpGuideArt.PARIETAL_CONTOURS,
+        lines = ScalpGuideArt.PARIETAL_MARKS[0].let { listOf(hLine(it.y, 0.06f, 0.94f), vLine(it.x, 0.08f, 0.92f)) },
+        marks = ScalpGuideArt.PARIETAL_MARKS,
     )
 
     // Ojo (derecho del paciente: el canto lateral a la izquierda del encuadre; el izquierdo en

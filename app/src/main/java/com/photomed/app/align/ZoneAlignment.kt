@@ -95,15 +95,15 @@ data class ZoneAlignment(
                 )
                 GuideType.SCALP_CROWN -> ZoneAlignment(
                     Detector.NONE, emptySet(),
-                    listOf(r("remolino de la coronilla", 0.5f, 0.6f, 0.2f, 0.18f), r("contorno craneal", 0.5f, 0.62f, 0.42f, 0.5f, 0.8f),
-                        r("nuca y orejas", 0.5f, 1.15f, 0.45f, 0.12f, 0.6f)),
+                    listOf(r("remolino de la coronilla", 0.5f, 0.56f, 0.2f, 0.18f), r("contorno craneal", 0.5f, 0.6f, 0.42f, 0.5f, 0.8f),
+                        r("orejas y nuca", 0.5f, 0.95f, 0.47f, 0.2f, 0.6f)),
                     listOf("Remolino (coronilla)", "Protuberancia occipital"),
                     "contorno del cráneo, remolino, nuca y patrón del cabello",
                 )
                 GuideType.SCALP_PARIETAL -> ZoneAlignment(
                     Detector.NONE, emptySet(),
-                    listOf(r("región parietal", 0.5f, 0.6f, 0.3f, 0.25f), r("contorno craneal", 0.5f, 0.45f, 0.45f, 0.3f, 0.8f),
-                        r("oreja y sien", 0.6f, 1.0f, 0.25f, 0.14f, 0.7f)).mirrored(zone.mirrored),
+                    listOf(r("región parietal", 0.48f, 0.63f, 0.3f, 0.25f), r("contorno craneal", 0.5f, 0.4f, 0.47f, 0.3f, 0.8f),
+                        r("oreja y sien", 0.6f, 1.05f, 0.28f, 0.16f, 0.7f)).mirrored(zone.mirrored),
                     listOf("Hélix (oreja)", "Raya (línea media)"),
                     "contorno del cráneo, raya, oreja y patrón del cabello",
                 )
