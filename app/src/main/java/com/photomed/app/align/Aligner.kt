@@ -94,7 +94,12 @@ class Aligner(private val context: Context) {
         val spec = ZoneAlignment.of(zone)
         if (spec.detector == Detector.FACE) {
             val pts = LandmarkDetector(stream = false, context, FaceEngine.get(context)).use { it.detect(Detector.FACE, bmp) }
-            faceSkin(pts, bmp.width, bmp.height)?.let { return@withContext it }
+            faceSkin(pts, bmp.width, bmp.height)?.let { poly ->
+                // solo piel del rostro según la segmentación (sin mechones, cejas pobladas ni gafas)
+                val skin = HairSkinSegmenter.createOrNull(context)?.use { s -> s.labels(bmp) }?.let { HairSkin.faceSkin(it, bmp.width, bmp.height) }
+                val both = if (skin == null) null else BooleanArray(poly.size) { poly[it] && skin[it] }
+                return@withContext both?.takeIf { b -> b.count { it } > 200 } ?: poly
+            }
         }
         val m = when (zone.guide) {
             com.photomed.app.data.GuideType.HANDS, com.photomed.app.data.GuideType.FEET -> ForegroundOnPlain.mask(bmp.rgb(), bmp.width, bmp.height)

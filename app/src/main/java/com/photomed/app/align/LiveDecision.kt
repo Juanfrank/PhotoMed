@@ -18,7 +18,7 @@ object LiveDecision {
     const val MIN_POINTS = 4
 
     fun evaluate(spec: ZoneAlignment, ref: Detection, cur: Detection, threshold: Float, wasMatched: Boolean,
-                 useGaze: Boolean = true): MatchEval {
+                 useGaze: Boolean = true, useExpression: Boolean = true): MatchEval {
         val keys = spec.landmarks.filter { it in ref.points && it in cur.points }
         if (keys.size < MIN_POINTS) {
             val what = if (spec.detector == Detector.FACE) "No se detecta el rostro" else "No se detecta el cuerpo"
@@ -35,8 +35,15 @@ object LiveDecision {
             ref.pitch != null && cur.pitch != null -> cur.pitch - ref.pitch
             else -> 0f
         }
-        val e = LiveMatch.evaluate(t, spec.pivot, wasMatched, LiveMatch.pointFraction(rp, cp), threshold, ks,
+        val e0 = LiveMatch.evaluate(t, spec.pivot, wasMatched, LiveMatch.pointFraction(rp, cp), threshold, ks,
             dYaw, dPitch, gate = true)
+        // Expresión: la misma que en la referencia (sonrisa, labios, ojos, cejas)
+        val exprHints = if (useExpression && spec.detector == Detector.FACE && Expression.usable(cur.yaw) && Expression.usable(ref.yaw)) {
+            val re = Expression.measure(ref.points); val ce = Expression.measure(cur.points)
+            if (re != null && ce != null) Expression.compare(re, ce) else emptyList()
+        } else emptyList()
+        val e = if (exprHints.isEmpty()) e0 else e0.copy(
+            status = if (e0.status == MatchStatus.MATCH) MatchStatus.CLOSE else e0.status, hints = e0.hints + exprHints)
         // Mirada: debe coincidir con la de la referencia (si ambas se midieron)
         val rg = ref.gaze; val cg = cur.gaze
         if (!useGaze || rg == null || cg == null) return e

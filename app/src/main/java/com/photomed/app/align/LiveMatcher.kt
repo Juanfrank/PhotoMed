@@ -35,6 +35,14 @@ data class LiveFrame(
  */
 class LiveMatcher(private val zone: Zone, context: android.content.Context? = null, engine: FaceEngine = FaceEngine.ML_KIT) : Closeable {
     private val spec = ZoneAlignment.of(zone)
+    private val appContext = context?.applicationContext
+    /** Segmentación pelo / piel (MediaPipe multiclase); null si no hay contexto o modelo. */
+    private val hairSkinLazy = lazy { appContext?.let { HairSkinSegmenter.createOrNull(it) } }
+    private val hairSkin: HairSkinSegmenter? get() = hairSkinLazy.value
+    private val tracksHairline = HairSkin.appliesTo(zone)
+    /** Línea de implantación frontal de la referencia (rostro frontal y frente). */
+    @Volatile var referenceHairline: List<Pt>? = null
+        private set
     private val detector = LandmarkDetector(stream = true, context, engine)
     val engine: FaceEngine = detector.engine
     private val edges = EdgeAligner(spec.contours)
@@ -77,6 +85,9 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         referenceEdges = runCatching { FreeContour.edgesOf(bmp, refBody) }.getOrNull()
         referenceFree = if (zone.guide == com.photomed.app.data.GuideType.FREE)
             runCatching { FreeContour.from(bmp) { b -> segmenter?.segment(b) } }.getOrNull() else null
+        referenceHairline = if (!tracksHairline) null else runCatching {
+            hairSkin?.labels(bmp)?.let { HairSkin.hairline(it, ref.points)?.points }
+        }.getOrNull()
         referenceSilhouette = runCatching {
             val plain = zone.guide == com.photomed.app.data.GuideType.HANDS || zone.guide == com.photomed.app.data.GuideType.FEET
             val mask = if (plain) ForegroundOnPlain.mask(bmp.rgb(), bmp.width, bmp.height)
@@ -92,8 +103,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     }
 
     /** Sin referencia: estandarización de la toma (vista, Frankfort, iluminación). */
-    fun standardize(frame: Bitmap): LiveFrame {
-        val cur = detector.detectFull(spec.detector, frame)
+    fun standardize(frame: Bitmap, smooth: Boolean = true): LiveFrame {
+        val cur = detected(frame, smooth)
         val light = if (spec.detector == Detector.FACE && cur.points.isNotEmpty())
             Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) else null
         val eval = withDiagnostic(Standardization.evaluate(zone, cur, light), cur)
@@ -113,8 +124,15 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     /** false: ignorar la referencia (superposición apagada) y estandarizar. */
     @Volatile var useReference: Boolean = true
 
-    fun analyze(frame: Bitmap): LiveFrame {
-        val refG = refGray?.takeIf { useReference } ?: return standardize(frame)
+    /** Detección del cuadro; en vivo, suavizada en el tiempo (One-Euro) para que la guía y las indicaciones no tiemblen. */
+    private fun detected(frame: Bitmap, smooth: Boolean): Detection {
+        val d = detector.detectFull(spec.detector, frame)
+        return if (smooth) smoother.smooth(d, System.currentTimeMillis()) else d
+    }
+    private val smoother = LandmarkSmoother()
+
+    fun analyze(frame: Bitmap, smooth: Boolean = true): LiveFrame {
+        val refG = refGray?.takeIf { useReference } ?: return standardize(frame, smooth)
         var eval: MatchEval
         val method: String
         var drawKeys: List<String> = emptyList()
@@ -122,7 +140,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         var cur = Detection.EMPTY
         if (spec.detector != Detector.NONE && ref.points.size >= LiveDecision.MIN_POINTS) {
             // Zona con detector y referencia con puntos: solo coincide si el cuadro también los tiene.
-            cur = detector.detectFull(spec.detector, frame)
+            cur = detected(frame, smooth)
             eval = LiveDecision.evaluate(spec, ref, cur, threshold, matched, useGaze)
             drawKeys = spec.landmarks.filter { it in ref.points && it in cur.points }
             method = "puntos anatómicos"; total = drawKeys.size
@@ -159,7 +177,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     fun scoreOf(photo: Bitmap): Float {
         val m = matched; val l = last
         return try {
-            val e = analyze(photo).eval
+            val e = analyze(photo, smooth = false).eval
             when (e.status) {
                 MatchStatus.MATCH -> 1f + (e.pointFraction ?: e.quality)
                 MatchStatus.SEARCHING -> 0f
@@ -175,7 +193,13 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         return e.copy(hints = e.hints + "Detector ($engine): $d")
     }
 
-    override fun close() { detector.close(); runCatching { segmenterOrNull?.close() } }
+    /** Altura de la frente (cejas → línea de implantación) / interpupilar en una foto; null si no se mide. */
+    fun hairlineIpd(photo: Bitmap): Float? = if (!tracksHairline) null else runCatching {
+        val d = detector.detectFull(spec.detector, photo)
+        hairSkin?.labels(photo)?.let { HairSkin.hairline(it, d.points)?.heightIpd }
+    }.getOrNull()
+
+    override fun close() { detector.close(); runCatching { segmenterOrNull?.close() }; runCatching { if (hairSkinLazy.isInitialized()) hairSkinLazy.value?.close() } }
 
     companion object {
         const val EDGE_W = 96

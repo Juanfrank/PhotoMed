@@ -163,6 +163,24 @@ el contraste del contorno. Si no se aísla el cuerpo en las dos imágenes, se us
 `BodyEdgesTest`: con el paciente desplazado y la pared de azulejos fija, el afinado con todos los
 bordes se quedaba pegado al fondo (15 px de error); solo con los del cuerpo, 0,5 px.
 
+### Suavizado temporal, expresión y segmentación de pelo y piel
+
+- **One-Euro** (`OneEuro.kt`): los puntos y ángulos detectados en vivo se filtran con un paso bajo
+  cuyo corte sube con la velocidad; la pose geométrica se recalcula con los puntos suavizados.
+  `OneEuroTest`: temblor de 0,35 % → 0,18 % del ancho; retraso al moverse 0,8 %.
+- **Expresión** (`Expression.kt`): apertura de los ojos, separación de los labios, ancho de la boca,
+  elevación de las comisuras y altura de las cejas, invariantes a escala y giro, con los dos motores.
+  Calibrado con las expresiones de MediaPipe en retratos de stock (`tools/eval/expression.py`):
+  r = 0,89 sonrisa, 0,83 boca abierta, −0,93 ojos cerrados, 0,75 cejas. Con referencia, la
+  coincidencia exige la misma expresión; sin ella, las vistas faciales completas piden expresión
+  neutra y nunca ojos cerrados. `ExpressionTest`: 1 aviso falso en 48 retomas giradas ±10°.
+- **Pelo y piel** (`HairSkin.kt`, MediaPipe "selfie multiclass", Apache 2.0): línea de implantación
+  frontal (paso de piel del rostro a pelo por encima de las cejas, a lo largo del eje vertical del
+  rostro) y altura de la frente en distancias interpupilares. Se dibuja la línea de la referencia en
+  la cámara (rostro frontal y frente), se guarda `HairlineIpd` con cada foto y Comparar muestra su
+  evolución ("la línea retrocede / avanza / estable"). La piel para igualar el color se limita a la
+  clase "piel del rostro". `HairSkinTest`: línea en 23 de 24 retratos (el que falta es calvo).
+
 ### 5. Coincidencia en vivo en la cámara
 
 Con una foto de referencia superpuesta y la capa **Coincidir** activa, `LiveMatcher` analiza ~5

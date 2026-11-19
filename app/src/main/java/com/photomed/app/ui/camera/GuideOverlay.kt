@@ -88,6 +88,12 @@ data class GuideTone(val color: Color) {
     }
 }
 
+/**
+ * Líneas de referencia de la guía (pupilar, base nasal, línea media…) y marcas. En el modo simple
+ * de la cámara solo se muestran al acercarse a la coincidencia, para no competir con el contorno.
+ */
+val LocalGuideLines = androidx.compose.runtime.staticCompositionLocalOf { true }
+
 /** Máxima fracción de celdas plegadas en el rostro para usar la deformación rasgo a rasgo. */
 const val MAX_FOLDS = 0.04f
 
@@ -169,6 +175,7 @@ private fun GuideLayer(
     /** Anclas adicionales medidas en la foto (p. ej. extremos de la silueta de una extremidad). */
     extraAnchors: Map<String, Float>,
 ) {
+    val showLines = LocalGuideLines.current
     // Rostro: deformación rasgo a rasgo (thin-plate spline con ~140 puntos de control).
     val mesh = remember(art, adaptTo) {
         if (art == null || adaptTo.isEmpty() || art.controls.isEmpty()) null
@@ -189,7 +196,7 @@ private fun GuideLayer(
                 val cols = 36; val rows = 48
                 val verts = mesh.meshVertices(cols, rows, size.width, size.height)
                 drawIntoCanvas { it.nativeCanvas.drawBitmapMesh(bmp.asAndroidBitmap(), cols, rows, verts, 0, null, 0, paint) }
-                drawGuide(Guide(emptyList(), art.lines.map { (a, b) -> mesh.map(a) to mesh.map(b) }, art.marks.map { mesh.map(it) }), mirror = false)
+                drawGuide(Guide(emptyList(), art.lines.map { (a, b) -> mesh.map(a) to mesh.map(b) }, art.marks.map { mesh.map(it) }), mirror = false, lines = showLines)
             }
         }
         return
@@ -236,7 +243,7 @@ private fun GuideLayer(
                             dstOffset = dy.copy(x = center.toInt()), dstSize = IntSize((right - center).toInt().coerceAtLeast(1), dh),
                             colorFilter = filter)
                     }
-                    drawGuide(Guide(emptyList(), art.lines.map { (a, b) -> w.line(a, b, art.anchors, det) }, art.marks.map { w.map(it) }), mirror = false)
+                    drawGuide(Guide(emptyList(), art.lines.map { (a, b) -> w.line(a, b, art.anchors, det) }, art.marks.map { w.map(it) }), mirror = false, lines = showLines)
                 }
             }
         }
@@ -253,7 +260,7 @@ private fun GuideLayer(
             }
             Canvas(Modifier.matchParentSize()) {
                 if (showGrid) drawGrid()
-                if (showContour) drawGuide(Guide(emptyList(), art.lines, art.marks), mirror = false)
+                if (showContour) drawGuide(Guide(emptyList(), art.lines, art.marks), mirror = false, lines = showLines)
             }
         }
         return
@@ -262,7 +269,7 @@ private fun GuideLayer(
     val guide = guideFor(zone.guide)
     Canvas(modifier) {
         if (showGrid) drawGrid()
-        if (showContour) drawGuide(guide, zone.mirrored, tone.color)
+        if (showContour) drawGuide(guide, zone.mirrored, tone.color, lines = showLines)
     }
 }
 
@@ -281,7 +288,7 @@ private fun DrawScope.drawGrid() {
     drawLine(Color.White, c - Offset(0f, s), c + Offset(0f, s), 1.5f.dp.toPx())
 }
 
-private fun DrawScope.drawGuide(guide: Guide, mirror: Boolean, contour: Color = ContourColor) {
+private fun DrawScope.drawGuide(guide: Guide, mirror: Boolean, contour: Color = ContourColor, lines: Boolean = true) {
     fun map(p: Offset) = Offset((if (mirror) 1f - p.x else p.x) * size.width, p.y * size.height)
     // Grosores proporcionales al tamaño (referencia: guía de 360 dp de ancho en la cámara),
     // para que miniaturas y cámara mantengan la misma jerarquía visual.
@@ -289,7 +296,7 @@ private fun DrawScope.drawGuide(guide: Guide, mirror: Boolean, contour: Color = 
     fun d(v: Float) = v.dp.toPx() * k
 
     val dash = PathEffect.dashPathEffect(floatArrayOf(d(9f), d(7f)))
-    guide.lines.forEach { (a, b) ->
+    if (lines) guide.lines.forEach { (a, b) ->
         drawLine(Shadow, map(a), map(b), d(2.5f), pathEffect = dash)
         drawLine(LineColor, map(a), map(b), d(1.2f), pathEffect = dash)
     }
@@ -298,7 +305,7 @@ private fun DrawScope.drawGuide(guide: Guide, mirror: Boolean, contour: Color = 
         drawPath(path, Shadow, style = Stroke(d(4f), cap = StrokeCap.Round))
         drawPath(path, contour, style = Stroke(d(1.6f), cap = StrokeCap.Round))
     }
-    guide.marks.forEach { m ->
+    if (lines) guide.marks.forEach { m ->
         drawCircle(Shadow, d(6f), map(m), style = Stroke(d(2.5f)))
         drawCircle(LineColor, d(6f), map(m), style = Stroke(d(1.2f)))
     }
@@ -634,5 +641,22 @@ fun EdgeGhost(edges: com.photomed.app.align.FreeContour, alpha: Float, modifier:
     Canvas(modifier) {
         drawImage(bmp, dstSize = IntSize(size.width.toInt(), size.height.toInt()), alpha = alpha,
             filterQuality = androidx.compose.ui.graphics.FilterQuality.Low)
+    }
+}
+
+/**
+ * Línea de implantación frontal de la referencia (pelo / piel del rostro): trazo discontinuo fino
+ * para repetir el encuadre de la frente y seguir su evolución (tricología).
+ */
+@Composable
+fun HairlineGuide(points: List<com.photomed.app.align.Pt>, color: Color, modifier: Modifier = Modifier) {
+    if (points.size < 2) return
+    Canvas(modifier) {
+        val pts = points.map { Offset(it.x * size.width, it.y * size.width) }
+        val k = (size.width / 360.dp.toPx()).coerceIn(0.35f, 1.4f)
+        val path = smoothPath(pts, closed = false)
+        val dash = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx() * k, 4.dp.toPx() * k))
+        drawPath(path, Shadow, style = Stroke(3.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
+        drawPath(path, color, style = Stroke(1.6f.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
     }
 }

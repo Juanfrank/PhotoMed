@@ -142,7 +142,7 @@ fun AboutScreen(onBack: () -> Unit, onDoc: (LegalDoc) -> Unit) {
             )
             ListItem(
                 overlineContent = { Text("Componentes de terceros") },
-                headlineContent = { Text("AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + modelo Face Landmarker (Apache 2.0), Google ML Kit (Términos de ML Kit)") },
+                headlineContent = { Text("AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + modelos Face Landmarker y Selfie Multiclass (Apache 2.0), Google ML Kit (Términos de ML Kit)") },
             )
         }
     }

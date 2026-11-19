@@ -8,7 +8,11 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.BrightnessLow
 import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Contrast
+import androidx.compose.material.icons.filled.Expand
+import androidx.compose.material.icons.filled.SentimentNeutral
+import androidx.compose.material.icons.filled.SentimentSatisfied
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.FaceRetouchingOff
@@ -52,6 +56,7 @@ object HintCues {
             t.startsWith("barbilla") -> 5
             t.startsWith("cabeza: enderezar") -> 6
             t.startsWith("mirada") -> 7
+            t.startsWith("expresión") -> 7
             else -> 8
         }
     }
@@ -75,6 +80,15 @@ object HintCues {
             // barbilla (cabeceo, plano de Frankfort)
             t.startsWith("barbilla: bajar") -> HintCue(Icons.Default.Face, Icons.Default.ArrowDownward, degrees(h), h)
             t.startsWith("barbilla: subir") -> HintCue(Icons.Default.Face, Icons.Default.ArrowUpward, degrees(h), h)
+            // expresión
+            t.startsWith("expresión: abrir los ojos") -> HintCue(Icons.Default.Visibility, Icons.Default.Add, null, h)
+            t.startsWith("expresión: entrecerrar") -> HintCue(Icons.Default.Visibility, Icons.Default.Remove, null, h)
+            t.startsWith("expresión: relajar la sonrisa") -> HintCue(Icons.Default.SentimentNeutral, null, null, h)
+            t.startsWith("expresión: sonreír") -> HintCue(Icons.Default.SentimentSatisfied, null, null, h)
+            t.startsWith("expresión: juntar los labios") -> HintCue(Icons.Default.Face, Icons.Default.Compress, null, h)
+            t.startsWith("expresión: separar los labios") -> HintCue(Icons.Default.Face, Icons.Default.Expand, null, h)
+            t.startsWith("expresión: relajar las cejas") -> HintCue(Icons.Default.Face, Icons.Default.ArrowDownward, null, h)
+            t.startsWith("expresión: subir las cejas") -> HintCue(Icons.Default.Face, Icons.Default.ArrowUpward, null, h)
             // mirada
             t.startsWith("mirada") -> HintCue(Icons.Default.Visibility, when {
                 "izquierda" in t -> Icons.AutoMirrored.Filled.ArrowBack

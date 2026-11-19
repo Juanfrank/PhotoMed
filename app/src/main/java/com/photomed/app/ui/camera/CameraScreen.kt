@@ -117,6 +117,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.FlashAuto
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
@@ -222,7 +223,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
 
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var flashMode by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
-    var showGrid by remember { mutableStateOf(true) }
+    // cuadrícula apagada por defecto (menos líneas sobre la imagen)
+    var showGrid by remember { mutableStateOf(false) }
     var showContour by remember { mutableStateOf(true) }
     var showGhost by remember { mutableStateOf(true) }
     var showLevel by remember { mutableStateOf(true) }
@@ -243,6 +245,16 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var nearCapture by remember { mutableStateOf(prefs.getBoolean("auto_capture_near", true)) }
     /** Ráfaga de 3 fotos: se guarda la de mayor coincidencia. */
     var burst by remember { mutableStateOf(prefs.getBoolean("burst", true)) }
+    /**
+     * Modo experto: líneas de referencia siempre, puntos detectados, porcentajes, franja de texto,
+     * barra de zoom y todas las capas. El modo simple (por defecto) muestra solo el contorno (su color
+     * dice qué tan lejos se está), un icono con la corrección principal y el anillo del disparador.
+     */
+    var expert by remember { mutableStateOf(prefs.getBoolean("camera_expert", false)) }
+    /** Última interacción con el zoom (pellizco o barra): la barra se muestra unos segundos. */
+    var zoomTouchedAt by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+    var opacityOpen by remember { mutableStateOf(false) }
+    var opacityTouchedAt by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
     /** Fantasma de la referencia como bordes (más legible que la foto translúcida). */
     var ghostEdges by remember { mutableStateOf(prefs.getBoolean("ghost_edges", false)) }
     // Modo individual de extremidades (manos, pies, piernas): lado recordado por zona
@@ -260,6 +272,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var refSilhouette by remember { mutableStateOf<com.photomed.app.align.Silhouette?>(null) }
     var refFree by remember { mutableStateOf<com.photomed.app.align.FreeContour?>(null) }
     var refEdges by remember { mutableStateOf<com.photomed.app.align.FreeContour?>(null) }
+    var refHairline by remember { mutableStateOf<List<com.photomed.app.align.Pt>?>(null) }
     /** Condiciones guardadas con la referencia (zoom, distancia…). */
     var refCond by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var adaptGuide by remember { mutableStateOf(true) }
@@ -299,6 +312,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             refSilhouette = m.referenceSilhouette
             refFree = m.referenceFree
             refEdges = m.referenceEdges
+            refHairline = m.referenceHairline
         }
     }
     val status = live?.eval?.status
@@ -505,6 +519,17 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         } ?: 0f
     }
 
+    /** Altura de la frente (cejas → línea de implantación) / interpupilar de la foto tomada, para el seguimiento tricológico. */
+    suspend fun hairlineOf(file: File): Float? {
+        if (!com.photomed.app.align.HairSkin.appliesTo(zone)) return null
+        val bmp = runCatching { ImageOps.load34(context, android.net.Uri.fromFile(file), 360) }.getOrNull() ?: return null
+        return kotlinx.coroutines.withTimeoutOrNull(4000) {
+            kotlinx.coroutines.suspendCancellableCoroutine<Float?> { c ->
+                pipeline.post { val v = runCatching { pipeline.withEngine { it.hairlineIpd(bmp) } }.getOrNull(); if (c.isActive) c.resume(v) }
+            }
+        }
+    }
+
     fun capture() {
         val e = exp ?: return
         if (capturing) return
@@ -543,10 +568,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             }
             val best = if (files.size == 1) files[0] else files.maxBy { scoreOf(it) }
             files.filter { it !== best }.forEach { it.delete() }
+            val hairline = hairlineOf(best)
+            val conds = if (hairline == null) conditions else conditions + ("HairlineIpd" to "%.3f".format(java.util.Locale.US, hairline))
             // Se guarda en el ámbito de la app: termina aunque se cierre la cámara.
             AppScope.launch {
                 val result = runCatching {
-                    repo.savePhoto(e, zone, best, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conditions,
+                    repo.savePhoto(e, zone, best, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conds,
                         variant = limbSide.tag.takeIf { zone.hasLimbSides })
                 }.also { best.delete() }
                 scope.launch {
@@ -587,6 +614,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         f.addListener({ onDone(runCatching { f.get().isFocusSuccessful }.getOrDefault(false)) }, ContextCompat.getMainExecutor(context))
     }
     fun setZoom(r: Float) {
+        zoomTouchedAt = System.currentTimeMillis()
         val cam = camera ?: return
         val z = r.coerceIn(zoomRange.start, zoomRange.endInclusive)
         manualZoom = true
@@ -699,13 +727,20 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                             modifier = Modifier.fillMaxSize().graphicsLayer { alpha = ghostAlpha },
                         )
                     }
+                    // líneas de referencia: en el modo simple, solo al acercarse a la coincidencia
+                    val linesVisible = expert || !matchingEnabled || (GuideTone.degree(live?.eval) ?: 0f) >= 0.6f
+                    androidx.compose.runtime.CompositionLocalProvider(LocalGuideLines provides linesVisible) {
                     GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize(),
                         tone = tone, adaptTo = if (adaptGuide && showGhost) refPoints else emptyMap(),
                         silhouette = if (adaptGuide && showGhost) refSilhouette else null,
                         side = if (zone.hasLimbSides) limbSide else LimbSide.BOTH,
                         // modo libre: contorno de la referencia (si se superpone) o de lo que se ve ahora
                         free = if (showGhost && refFree != null) refFree else live?.freeContour)
-                    if (matchingEnabled) live?.let { LivePoints(it, tone, mirror = false) }
+                    }
+                    // línea de implantación frontal de la referencia (segmentación pelo / piel)
+                    val hl = refHairline
+                    if (showContour && showGhost && hl != null) HairlineGuide(hl, tone.color, Modifier.fillMaxSize())
+                    if (matchingEnabled && expert) live?.let { LivePoints(it, tone, mirror = false) }
                 }
 
                 // Toque para enfocar
@@ -723,7 +758,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     }
                 })
 
-                if (showLevel || (guidance?.rotateDeg ?: 0f) != 0f) {
+                // nivel: en el modo simple solo cuando el teléfono está torcido (o hay que girarlo)
+                val tilted = kotlin.math.abs(tilt.value.roll) >= 1.5f && kotlin.math.abs(tilt.value.pitch) < 60f
+                if ((expert && showLevel) || tilted || (guidance?.rotateDeg ?: 0f) != 0f) {
                     LevelIndicator(tilt.value, guidance?.rotateDeg ?: 0f, Modifier.align(Alignment.TopStart).padding(6.dp))
                 }
                 EdgeArrows(guidance, tone.color.takeIf { tone != GuideTone.NORMAL } ?: Color.White)
@@ -752,7 +789,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 Box(Modifier.fillMaxSize().graphicsLayer { alpha = shutterFlash.value }.background(Color.White))
             }
         }
-        if (matchingEnabled) {
+        if (matchingEnabled && expert) {
             RecommendationStrip(
                 live, guidance, autoCapture,
                 zoomInfo = if (zoomAssist && !manualZoom && zoomRatio > 1.01f) "zoom asistido %.1f×".format(zoomRatio) else null,
@@ -761,11 +798,19 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             )
         }
 
-        ZoomBar(
-            ratio = zoomRatio, range = zoomRange, manual = manualZoom, assist = zoomAssist,
-            onZoom = { setZoom(it) },
-            onResumeAssist = { manualZoom = false; zoomCtl.reset() },
-        )
+        // barra de zoom: siempre en el modo experto; en el simple, unos segundos tras pellizcar
+        var zoomBarNow by remember { mutableStateOf(false) }
+        LaunchedEffect(zoomTouchedAt) {
+            zoomBarNow = zoomTouchedAt > 0L
+            if (zoomBarNow) { kotlinx.coroutines.delay(CONTROLS_HIDE_MS); zoomBarNow = false }
+        }
+        androidx.compose.animation.AnimatedVisibility(expert || zoomBarNow) {
+            ZoomBar(
+                ratio = zoomRatio, range = zoomRange, manual = manualZoom, assist = zoomAssist,
+                onZoom = { setZoom(it) },
+                onResumeAssist = { manualZoom = false; zoomCtl.reset(); zoomTouchedAt = System.currentTimeMillis() },
+            )
+        }
 
         // Modo individual de extremidades: ambas o una sola (misma zona)
         if (zone.hasLimbSides) {
@@ -794,15 +839,17 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Md3Spacing.s2, vertical = Md3Spacing.s1),
             horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s3),
         ) {
-            LayerToggle("Cuadrícula", Icons.Default.GridOn, showGrid) { showGrid = it }
+            // modo simple: solo las capas de uso diario; el resto, en el modo experto
+            if (expert) LayerToggle("Cuadrícula", Icons.Default.GridOn, showGrid) { showGrid = it }
             LayerToggle("Contorno", Icons.Default.Face, showContour) { showContour = it }
             LayerToggle("Superponer", Icons.Default.Layers, showGhost, enabled = photos.isNotEmpty()) { showGhost = it }
-            LayerToggle("Nivel", Icons.Default.Straighten, showLevel) { showLevel = it }
+            if (expert) LayerToggle("Nivel", Icons.Default.Straighten, showLevel) { showLevel = it }
             LayerToggle("Asistir", Icons.Default.CenterFocusStrong, liveMatch) { liveMatch = it }
-            LayerToggle("Espejo", Icons.Default.Flip, mirrorOn, enabled = lensFacing == CameraSelector.LENS_FACING_FRONT) {
-                mirrorOn = it; prefs.edit().putBoolean("mirror_front", it).apply()
-            }
-            LayerToggle("Adaptar", Icons.Default.AutoFixHigh, adaptGuide, enabled = refPoints.isNotEmpty() || refSilhouette != null) { adaptGuide = it }
+            if (expert || lensFacing == CameraSelector.LENS_FACING_FRONT)
+                LayerToggle("Espejo", Icons.Default.Flip, mirrorOn, enabled = lensFacing == CameraSelector.LENS_FACING_FRONT) {
+                    mirrorOn = it; prefs.edit().putBoolean("mirror_front", it).apply()
+                }
+            if (expert) LayerToggle("Adaptar", Icons.Default.AutoFixHigh, adaptGuide, enabled = refPoints.isNotEmpty() || refSilhouette != null) { adaptGuide = it }
         }
 
         if (showGhost && photos.isNotEmpty()) {
@@ -813,16 +860,28 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     label = { Text("Bordes", style = MaterialTheme.typography.labelMedium) },
                     modifier = Modifier.padding(end = 8.dp).height(32.dp),
                 )
-                Text("Opacidad", color = Color.White, style = MaterialTheme.typography.labelMedium)
-                Slider(
-                    value = ghostAlpha,
-                    onValueChange = { ghostAlpha = it },
-                    valueRange = 0.05f..0.9f,
-                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp).height(32.dp),
-                    
-                )
-                Text("${(ghostAlpha * 100).toInt()}%", color = Color.White, style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.width(36.dp))
+                // opacidad: un chip; al tocarlo aparece el control y se oculta solo a los pocos segundos
+                LaunchedEffect(opacityOpen, opacityTouchedAt) {
+                    if (opacityOpen && !expert) { kotlinx.coroutines.delay(CONTROLS_HIDE_MS); opacityOpen = false }
+                }
+                if (expert || opacityOpen) {
+                    Text("Opacidad", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                    Slider(
+                        value = ghostAlpha,
+                        onValueChange = { ghostAlpha = it; opacityTouchedAt = System.currentTimeMillis() },
+                        valueRange = 0.05f..0.9f,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp).height(32.dp),
+                    )
+                    Text("${(ghostAlpha * 100).toInt()}%", color = Color.White, style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.width(36.dp))
+                } else {
+                    androidx.compose.material3.AssistChip(
+                        onClick = { opacityOpen = true; opacityTouchedAt = System.currentTimeMillis() },
+                        label = { Text("Opacidad ${(ghostAlpha * 100).toInt()} %", style = MaterialTheme.typography.labelMedium) },
+                        leadingIcon = { Icon(Icons.Default.Contrast, null, Modifier.size(16.dp)) },
+                        modifier = Modifier.height(32.dp),
+                    )
+                }
             }
             LazyRow(
                 Modifier.fillMaxWidth().height(58.dp),
@@ -855,13 +914,13 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.small))
                 }
             }
-            Box(
-                Modifier.size(76.dp).border(4.dp, Color.White, CircleShape).padding(8.dp).clip(CircleShape)
-                    .background(if (capturing) MaterialTheme.colorScheme.outline else Color.White)
-                    .clickable(enabled = !capturing && exp != null, onClickLabel = "Tomar fotografía") { capture() }
-                    .semantics { contentDescription = "Disparador" },
-                contentAlignment = Alignment.Center,
-            ) { if (capturing) CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp) }
+            // anillo de progreso: se llena con la coincidencia (rojo → naranja → verde) y queda verde al coincidir
+            ShutterButton(
+                degree = if (matchingEnabled) GuideTone.degree(live?.eval) else null,
+                capturing = capturing,
+                enabled = !capturing && exp != null,
+                onClick = { capture() },
+            )
             IconButton(
                 onClick = {
                     lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT
@@ -891,6 +950,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             feedback = feedback, onFeedback = { feedback = it; prefs.edit().putBoolean("guide_feedback", it).apply() },
             nearCapture = nearCapture, onNearCapture = { nearCapture = it; prefs.edit().putBoolean("auto_capture_near", it).apply() },
             burst = burst, onBurst = { burst = it; prefs.edit().putBoolean("burst", it).apply() },
+            expert = expert, onExpert = { expert = it; prefs.edit().putBoolean("camera_expert", it).apply() },
             onDismiss = { showSettings = false },
         )
     }
@@ -928,11 +988,13 @@ fun MatchSettingsSheet(
     onNearCapture: (Boolean) -> Unit = {},
     burst: Boolean = true,
     onBurst: (Boolean) -> Unit = {},
+    expert: Boolean = false,
+    onExpert: (Boolean) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     SafeBottomSheet(onDismiss = onDismiss) {
         MatchSettingsContent(autoCapture, threshold, onAutoCapture, onThreshold, zoomAssist, onZoomAssist, engine, onEngine, useGaze, onUseGaze,
-            feedback, onFeedback, nearCapture, onNearCapture, burst, onBurst)
+            feedback, onFeedback, nearCapture, onNearCapture, burst, onBurst, expert, onExpert)
     }
 }
 
@@ -950,9 +1012,14 @@ fun MatchSettingsContent(
     onNearCapture: (Boolean) -> Unit = {},
     burst: Boolean = true,
     onBurst: (Boolean) -> Unit = {},
+    expert: Boolean = false,
+    onExpert: (Boolean) -> Unit = {},
 ) {
     Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Coincidencia con la referencia", style = MaterialTheme.typography.titleLarge)
+        SettingSwitch("Modo experto", "Muestra siempre las líneas de referencia, los puntos detectados, los porcentajes, " +
+            "la franja de indicaciones, la barra de zoom y todas las capas. En el modo simple solo se ven el contorno, " +
+            "un icono con la corrección principal y el anillo del disparador.", expert, onExpert)
         Row(
             Modifier.fillMaxWidth().toggleable(autoCapture, role = Role.Switch, onValueChange = onAutoCapture),
             verticalAlignment = Alignment.CenterVertically,
@@ -1079,5 +1146,44 @@ private fun SettingSwitch(title: String, desc: String, value: Boolean, onChange:
             Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = value, onCheckedChange = null)
+    }
+}
+
+/** Tiempo tras el que se ocultan solos los controles secundarios (zoom, opacidad) en el modo simple. */
+const val CONTROLS_HIDE_MS = 3000L
+
+/**
+ * Disparador con anillo de progreso: el arco crece con el grado de coincidencia ([degree] 0..1,
+ * null = sin detección: anillo blanco) y toma el color de la guía (rojo → naranja → verde).
+ */
+@Composable
+fun ShutterButton(degree: Float?, capturing: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val anim by androidx.compose.animation.core.animateFloatAsState(degree ?: 0f, label = "anillo")
+    val ringColor = when {
+        degree == null -> Color.White
+        degree >= 1f -> GuideTone.MATCH.color
+        else -> GuideTone.gradient(anim)
+    }
+    Box(Modifier.size(76.dp)
+        .semantics {
+            contentDescription = "Disparador"
+            if (degree != null) stateDescription = "Coincidencia ${(degree * 100).toInt()} %"
+        }, contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+            val sw = 4.dp.toPx()
+            val inset = sw / 2
+            val arcSize = androidx.compose.ui.geometry.Size(size.width - sw, size.height - sw)
+            drawCircle(Color.White.copy(alpha = if (degree == null) 1f else 0.35f), radius = size.minDimension / 2 - inset,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(sw))
+            if (degree != null) drawArc(ringColor, -90f, 360f * anim.coerceIn(0f, 1f), false,
+                topLeft = Offset(inset, inset), size = arcSize,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+        }
+        Box(
+            Modifier.size(60.dp).clip(CircleShape)
+                .background(if (capturing) MaterialTheme.colorScheme.outline else Color.White)
+                .clickable(enabled = enabled, onClickLabel = "Tomar fotografía", onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) { if (capturing) CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp) }
     }
 }

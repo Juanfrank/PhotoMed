@@ -106,6 +106,10 @@ object Standardization {
                 }
             }
         }
+        // Expresión neutra en las vistas faciales completas; ojos abiertos siempre
+        if (ZoneAlignment.of(zone).detector == Detector.FACE && Expression.usable(det.yaw)) {
+            Expression.measure(det.points)?.let { ex -> Expression.neutral(zone, ex).forEach { hints += it; off += 0.8f } }
+        }
         det.gaze?.let { g ->
             if (kotlin.math.abs(g.x) > Gaze.TOL_X * 1.2f || kotlin.math.abs(g.y) > Gaze.TOL_Y * 1.2f) {
                 hints += "Mirada: al frente"

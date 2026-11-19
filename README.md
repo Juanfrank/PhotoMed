@@ -101,3 +101,12 @@ Logo: esfigmomanómetro cuyo manómetro es el lente de una cámara (`art/logo/lo
 
 Stack: Kotlin, Jetpack Compose (Material 3), CameraX, MediaStore, ExifInterface, Navigation
 Compose, Coil, Google ML Kit (rostro, pose, segmentación) y MediaPipe Face Landmarker, modelos incluidos. minSdk 26.
+
+## Cámara: modo simple y modo experto
+
+- **Simple** (por defecto): contorno (su color indica la distancia a la coincidencia), un icono con
+  la corrección principal y un anillo de progreso en el disparador. Las líneas de referencia
+  aparecen al acercarse a la coincidencia; el nivel, solo con el teléfono torcido; la barra de zoom y
+  el control de opacidad, unos segundos al usarlos. Cuadrícula apagada por defecto.
+- **Experto** (Ajustes de coincidencia): además líneas siempre, puntos detectados, porcentajes,
+  franja de indicaciones, barra de zoom y todas las capas.

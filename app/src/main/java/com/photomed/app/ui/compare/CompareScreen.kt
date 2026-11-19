@@ -149,6 +149,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     var colorAdjusts by remember { mutableStateOf<Map<String, ColorAdjust>>(emptyMap()) }
     var contourOutlines by remember { mutableStateOf<Map<String, List<Pt>>>(emptyMap()) }
     var conditionsWarning by remember { mutableStateOf<String?>(null) }
+    var hairlineInfo by remember { mutableStateOf<String?>(null) }
     var nearCaptured by remember { mutableStateOf(false) }
     var exportSheet by remember { mutableStateOf(false) }
     var options by remember { mutableStateOf(AlignOptions.fromPrefs(prefs)) }
@@ -200,6 +201,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         val infos = withContext(Dispatchers.IO) { s.map { repo.readInfo(it)?.conditions.orEmpty() } }
         // tomadas "casi alineadas" (disparo permisivo): alinear automáticamente al abrir
         nearCaptured = infos.any { it["Status"] == "CLOSE" }
+        // tricología: altura de la frente (cejas → línea de implantación) en cada foto
+        hairlineInfo = hairlineSummary(infos)
         conditionsWarning = infos.drop(1).mapIndexedNotNull { i, c ->
             captureConditionsWarning(infos[0], c)?.let { w -> if (s.size > 2) "Foto ${i + 2}: $w" else w }
         }.joinToString("\n").ifEmpty { null }
@@ -489,6 +492,10 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 val gazeIssues = if (validAlign && options.gaze) s.drop(1).mapIndexedNotNull { i, p ->
                     alignments[p.key]?.gazeHint?.let { h -> if (n > 2) "Foto ${i + 2}: $h" else h }
                 } else emptyList()
+                hairlineInfo?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = Md3Spacing.marginCompact))
+                }
                 (listOfNotNull(conditionsWarning) + gazeIssues).forEach {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.padding(horizontal = Md3Spacing.marginCompact))
@@ -723,6 +730,23 @@ private fun rememberCorrected(uri: android.net.Uri, pitchDeg: Float, focalNorm: 
         } ?: uri
     }
     return state.value
+}
+
+/**
+ * Altura de la frente (cejas → línea de implantación, en distancias interpupilares) de cada foto y
+ * su cambio respecto de la primera; null si menos de dos fotos la tienen. Una línea que retrocede
+ * (frente más alta) indica pérdida de pelo frontal; normalizada por la interpupilar, no depende de
+ * la distancia ni del zoom.
+ */
+fun hairlineSummary(infos: List<Map<String, String>>): String? {
+    val v = infos.map { it["HairlineIpd"]?.toFloatOrNull() }
+    val first = v.firstOrNull() ?: return null
+    if (v.count { it != null } < 2) return null
+    val parts = v.map { x -> x?.let { "%.2f".format(it) } ?: "—" }
+    val last = v.last() ?: return "Frente (cejas → implantación): " + parts.joinToString(" → ") + " ×IPD"
+    val pct = (last - first) / first * 100
+    return "Frente (cejas → implantación): " + parts.joinToString(" → ") + " ×IPD (%+.0f %%%s)".format(pct,
+        if (kotlin.math.abs(pct) < 4) ", estable" else if (pct > 0) ", la línea retrocede" else ", la línea avanza")
 }
 
 /** Diferencias relevantes entre las condiciones de captura de dos fotos (o null si son comparables). */

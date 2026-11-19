@@ -141,4 +141,18 @@ class CameraAssistScreenshotTest {
             }
         }
     }
+
+    @Test
+    fun shutterRing() {
+        paparazzi.snapshot {
+            androidx.compose.foundation.layout.Row(
+                androidx.compose.ui.Modifier.background(androidx.compose.ui.graphics.Color.Black).padding(12.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+            ) {
+                listOf(null, 0.3f, 0.8f, 1f).forEach { d ->
+                    com.photomed.app.ui.camera.ShutterButton(d, capturing = false, enabled = true) {}
+                }
+            }
+        }
+    }
 }
