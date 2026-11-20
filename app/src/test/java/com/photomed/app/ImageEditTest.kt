@@ -46,9 +46,9 @@ class ImageEditTest {
     }
 
     @Test
-    fun editsPersistAndApplyOnLoad() = kotlinx.coroutines.runBlocking {
+    fun editsPersistAndApplyOnLoad() {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val f = java.io.File(ctx.cacheDir, "p.jpg")
+        val f = java.io.File(ctx.cacheDir, "p.png")
         Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE)
             for (y in 0 until 60) for (x in 0 until 60) setPixel(x, y, Color.RED) }
             .let { b -> f.outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) } }
@@ -56,7 +56,13 @@ class ImageEditTest {
         PhotoEdits.set(ctx, uri.toString(), ImageEdit(mirror = true))
         PhotoEdits.clearCache()
         assertEquals(ImageEdit(mirror = true), PhotoEdits.of(ctx, uri.toString()))
-        val full = com.photomed.app.align.ImageOps.loadFull(ctx, uri, 400)
+        // Coil necesita el hilo principal: la carga va en otro hilo y aquí se procesa el looper
+        val fut = java.util.concurrent.Executors.newSingleThreadExecutor().submit<Bitmap> {
+            kotlinx.coroutines.runBlocking { com.photomed.app.align.ImageOps.loadFull(ctx, uri, 400) }
+        }
+        val end = System.currentTimeMillis() + 30_000
+        while (!fut.isDone && System.currentTimeMillis() < end) { org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle(); Thread.sleep(10) }
+        val full = fut.get(1, java.util.concurrent.TimeUnit.SECONDS)
         assertTrue("espejo aplicado al cargar", Color.red(full.getPixel(full.width - 5, 5)) > 200 && Color.green(full.getPixel(full.width - 5, 5)) < 60)
         PhotoEdits.set(ctx, uri.toString(), ImageEdit.NONE)
         assertTrue(PhotoEdits.of(ctx, uri.toString()).isIdentity)
