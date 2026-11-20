@@ -2,6 +2,18 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.20 — 20 de noviembre de 2026
+
+- **Eliminar falsos positivos**: botón al final de cada fila de arrugas, surcos y ojeras en la tabla
+  de medidas (en Comparar, en una foto o en todas); *Restaurar líneas eliminadas* los recupera.
+- **Trazar surco en una zona**: chip *Trazar surco* en el visor; se arrastra un rectángulo sobre el
+  surco que falta y se busca con un umbral más concesivo (12 orientaciones, valle más marcado que su
+  entorno aunque sea tenue). Se guarda como *Surco añadido n*, con sus medidas.
+- **Referencia de fotos anteriores**: cada foto recuerda sus arrugas y surcos en coordenadas de la
+  cara; al analizar una foto posterior del paciente (misma zona), los que no aparecen se vuelven a
+  buscar donde estaban, con umbrales menores, y conservan su nombre (la comparación los empareja).
+  En 4 retratos con menos contraste: se perdían 21 líneas; con la referencia se recuperan 19.
+
 ## 2.19.2 — 20 de noviembre de 2026
 
 - **Quijada real**: el contorno lateral e inferior sigue ahora el borde de la cara segmentada (piel

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -100,10 +101,14 @@ fun rememberAnnotLayers(): MutableState<Set<AnnotLayer>> {
 @Composable
 fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, modifier: Modifier = Modifier,
                /** Si se da, primer chip «Medidas» (tabla de longitud, ancho, profundidad y grado). */
-               onMetrics: (() -> Unit)? = null) {
+               onMetrics: (() -> Unit)? = null,
+               /** Si se da, chip «Trazar surco» (elegir una zona de la foto para buscar un surco que falta). */
+               onTrace: (() -> Unit)? = null, tracing: Boolean = false) {
     Row(modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (onMetrics != null) androidx.compose.material3.AssistChip(onClick = onMetrics, label = { Text("Medidas") },
             leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.TableChart, null, Modifier.size(18.dp)) })
+        if (onTrace != null) FilterChip(selected = tracing, onClick = onTrace, label = { Text(if (tracing) "Elegir zona…" else "Trazar surco") },
+            leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.Gesture, null, Modifier.size(18.dp)) })
         // contornos internos (ojos y cejas, nariz, labios) de una vez: se ven solo el contorno y las arrugas
         val inner = setOf(AnnotLayer.EYES, AnnotLayer.NOSE, AnnotLayer.LIPS)
         val innerOn = inner.all { it in layers }
@@ -126,21 +131,32 @@ fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, mod
  * en perspectiva [phiDeg] (como se muestra en Comparar). null mientras se calculan.
  */
 /** Motivo (si lo hay) por el que la foto no tiene medidas, tras analizarla. */
-fun photoAnnotationNote(context: Context, uri: Uri): String? {
-    val edit = PhotoEdits.of(context, uri.toString())
-    return PhotoAnnotator.note("34|$uri|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, uri.toString())}")
+fun photoAnnotationNote(context: Context, uri: Uri, previous: List<String> = emptyList()): String? {
+    val edit = PhotoEdits.of(context, uri.toString()); val u = uri.toString()
+    return PhotoAnnotator.note("34|$uri|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, u)}|" +
+        "${com.photomed.app.align.AnnotUserEdits.tag(context, u)}|${com.photomed.app.align.LineMemory.tag(context, previous)}")
 }
 
 @Composable
-fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boolean): State<List<AnnotLine>?> {
+fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boolean,
+                              /** Fotos anteriores del paciente en la zona (la más reciente primero): referencia de arrugas. */
+                              previous: List<String> = emptyList(),
+                              /** Cambia al eliminar líneas (vuelve a analizar). */
+                              userVersion: Int = 0): State<List<AnnotLine>?> {
     val context = LocalContext.current
     val edit = PhotoEdits.of(context, uri.toString())
-    return produceState<List<AnnotLine>?>(null, uri, edit, phiDeg, enabled) {
+    return produceState<List<AnnotLine>?>(null, uri, edit, phiDeg, enabled, userVersion, previous) {
         if (!enabled) { value = null; return@produceState }
-        val key = "34|$uri|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, uri.toString())}"
-        val base = PhotoAnnotator.cached(key) ?: runCatching {
+        val u = uri.toString()
+        val user = com.photomed.app.align.AnnotUserEdits.of(context, u).let { e ->
+            // los trazos añadidos están en la foto completa: se llevan al encuadre 3:4 de Comparar
+            if (e.editHash != edit.hashCode()) e.copy(added = emptyList()) else e.copy(added = e.addedIn34()) }
+        val key = "34|$uri|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, u)}|" +
+            "${com.photomed.app.align.AnnotUserEdits.tag(context, u)}|${com.photomed.app.align.LineMemory.tag(context, previous)}"
+        val base = PhotoAnnotator.cached(key) ?: if (!PhotoAnnotator.enabled) emptyList() else runCatching {
             PhotoAnnotator(context.applicationContext).analyze(ImageOps.load34(context, uri, 1080), zone,
-                PhotoAnnotator.extrasFor(context, uri, 1080, crop34 = true))
+                PhotoAnnotator.extrasFor(context, uri, 1080, crop34 = true),
+                user = user, priors = com.photomed.app.align.LineMemory.priors(context, previous), memoryUri = u)
         }.getOrNull()?.let { (lines, note) -> PhotoAnnotator.put(key, lines); PhotoAnnotator.putNote(key, note); lines }
             ?: emptyList<AnnotLine>().also { PhotoAnnotator.putNote(key, "No se pudo analizar la foto.") }
         value = base?.map { l -> if (phiDeg == 0f) l else l.copy(points = l.points.map { Perspective.mapPt(it, phiDeg) }) }

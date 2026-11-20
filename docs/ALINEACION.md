@@ -552,3 +552,18 @@ otro número, con una guía fina hasta la línea.
 pelo), con voto 3 × 3, la transición dentro → fuera más cercana a la malla en −8 % … +5 %; bajo el mentón
 solo si no baja más de 2,5 % (si no, sombra). Después, de respaldo, el borde de color (dentro parecido
 a la cara junto al punto, fuera no). La oclusión (mano, ropa) se comprueba 6 % hacia dentro.
+
+## Correcciones del usuario y referencia de fotos anteriores (2.20; `LineMemory.kt`)
+
+- `AnnotUserEdits` (preferencias por foto): nombres eliminados (falsos positivos) y trazos añadidos
+  (coordenadas de la foto completa con su edición; si la edición cambia se descartan; en Comparar se
+  llevan al encuadre 3:4 con la proporción guardada). El análisis filtra los eliminados y mide los
+  añadidos («Surco añadido n»).
+- `RegionTrace`: recorte de la zona a ~320 px, `RidgeTracker` en 12 orientaciones (cada 15°) con
+  pasillo del ancho de la zona y resolución lateral ~2,5 px; fuerza ≥ 0,003 y contraste ≥ 1,6; se
+  recorta a la zona y se quitan extremos doblados > 35°. Prueba sintética (valle del 3,5 % con ruido):
+  desviación mediana 0,4 px, máxima 1 px.
+- `LineMemory` + `FaceFrame`: arrugas y surcos de cada foto en coordenadas de la cara (origen entre las
+  pupilas, eje por ellas, unidad la interpupilar). Para una foto posterior (misma zona), cada línea
+  anterior que no se ha encontrado (a menos de 2,5 % del ancho de la cara) se busca en un pasillo de
+  ± 2,5 % alrededor de su posición, con fuerza ≥ 0,012 y contraste ≥ 1,4, y conserva su nombre.

@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -24,6 +25,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -161,11 +164,12 @@ private fun fmt(i: Int, v: Float?, area: Boolean) = when {
  */
 @Composable
 fun MetricsSheet(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>, onDismiss: () -> Unit,
-                 loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null) {
+                 loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null,
+                 onDelete: ((String, Int?) -> Unit)? = null, dismissedCount: Int = 0, onRestore: (() -> Unit)? = null) {
     SafeBottomSheet(onDismiss = onDismiss) {
         Column(Modifier.padding(horizontal = 16.dp).heightIn(max = 640.dp).verticalScroll(rememberScrollState())) {
             Text("Medidas de líneas y surcos", style = MaterialTheme.typography.titleLarge)
-            MetricsContent(columns, layers, loading, note, onShowLayers)
+            MetricsContent(columns, layers, loading, note, onShowLayers, onDelete, dismissedCount, onRestore)
         }
     }
 }
@@ -173,7 +177,9 @@ fun MetricsSheet(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
 /** Panel fijo de medidas (debajo de la foto, sin taparla), con su título y botón de cierre. */
 @Composable
 fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>, onClose: () -> Unit, modifier: Modifier = Modifier,
-                 loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null) {
+                 loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null,
+                 /** Eliminar una línea (falso positivo): nombre y foto (índice de columna; null = en todas). */
+                 onDelete: ((String, Int?) -> Unit)? = null, dismissedCount: Int = 0, onRestore: (() -> Unit)? = null) {
     androidx.compose.material3.Surface(modifier, color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 2.dp) {
         Column(Modifier.fillMaxWidth()) {
@@ -183,7 +189,7 @@ fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
             }
             HorizontalDivider()
             Column(Modifier.padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
-                MetricsContent(columns, layers, loading, note, onShowLayers)
+                MetricsContent(columns, layers, loading, note, onShowLayers, onDelete, dismissedCount, onRestore)
             }
         }
     }
@@ -192,7 +198,8 @@ fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
 /** Contenido de la tabla de medidas (ver [MetricsSheet]). */
 @Composable
 fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>,
-                   loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null) {
+                   loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null,
+                   onDelete: ((String, Int?) -> Unit)? = null, dismissedCount: Int = 0, onRestore: (() -> Unit)? = null) {
     // todas las líneas medidas, estén o no visibles sus capas en la foto
     val byName = LinkedHashMap<String, Pair<AnnotLine, MutableList<LineMetrics?>>>()
     columns.forEachIndexed { ci, (_, lines) ->
@@ -248,7 +255,8 @@ fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Ann
                 TableRow(listOf(if (area) "Zona" else "Línea") + cols, header = true)
                 rows.forEach { (name, v) ->
                     val m = v.second[0]
-                    TableRow(listOf(label(name, v)) + (if (area) areaVals(m) else lineVals(m)).take(cols.size).mapIndexed { i, x -> fmt(i, x, area) }, line = v.first)
+                    TableRow(listOf(label(name, v)) + (if (area) areaVals(m) else lineVals(m)).take(cols.size).mapIndexed { i, x -> fmt(i, x, area) }, line = v.first,
+                        action = onDelete?.let { del -> { DeleteLineButton(name, emptyList()) { c -> del(name, c ?: 0) } } })
                 }
             } else {
                 val head = columns.map { it.first.replace(", ", "\n") }
@@ -259,13 +267,18 @@ fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Ann
                         val first = vals.firstOrNull { it != null }; val last = vals.lastOrNull { it != null }
                         val delta = if (first != null && last != null && vals.count { it != null } >= 2) last - first else null
                         TableRow(listOf(if (i == 0) "${label(name, v)}\n${c.replace("\n", " ")}" else "   ${c.replace("\n", " ")}") +
-                            vals.map { fmt(i, it, area) } + signed(delta, if (!area && i == 2) 2 else 1), line = if (i == 0) v.first else null)
+                            vals.map { fmt(i, it, area) } + signed(delta, if (!area && i == 2) 2 else 1), line = if (i == 0) v.first else null,
+                            action = if (i == 0) onDelete?.let { del -> { DeleteLineButton(name,
+                                columns.mapIndexedNotNull { ci, col -> if (v.second[ci] != null) ci to col.first else null }) { c -> del(name, c) } } } else null)
                     }
                     HorizontalDivider()
                 }
             }
             }
         }
+    }
+    if (dismissedCount > 0 && onRestore != null) TextButton(onClick = onRestore) {
+        Text("Restaurar líneas eliminadas ($dismissedCount)")
     }
     if (ordered.any { it.value.second.any { m -> m?.type != null } }) {
         Text("Tipo probable de ojera: " + ordered.mapNotNull { e -> e.value.second.lastOrNull { it?.type != null }?.let { "${e.key}: ${it.type}" } }.joinToString("; "),
@@ -287,7 +300,9 @@ fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Ann
 
 /** Fila de la tabla: texto con contraste alto (cifras en negrita y color de primer plano). */
 @Composable
-private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLine? = null, wide: Boolean = false) {
+private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLine? = null, wide: Boolean = false,
+                     /** Acción al final de la fila (eliminar la línea). */
+                     action: (@Composable () -> Unit)? = null) {
     Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
         cells.forEachIndexed { i, c ->
             val w: Dp = if (i == 0) (if (wide) 210.dp else 170.dp) else 72.dp
@@ -299,6 +314,26 @@ private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLi
                     textAlign = if (i == 0) TextAlign.Start else TextAlign.End,
                     modifier = Modifier.padding(start = if (i == 0 && line != null) 6.dp else 0.dp))
             }
+        }
+        action?.invoke()
+    }
+}
+
+/**
+ * Eliminar una línea (falso positivo): con una sola foto, directamente; con varias ([photos]: índice y
+ * fecha de las fotos donde está), un menú para elegir en cuál o en todas.
+ */
+@Composable
+private fun DeleteLineButton(name: String, photos: List<Pair<Int, String>>, onDelete: (Int?) -> Unit) {
+    var menu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.foundation.layout.Box {
+        IconButton(onClick = { if (photos.isEmpty()) onDelete(null) else menu = true }, modifier = Modifier.size(36.dp)) {
+            Icon(Icons.Default.Delete, "Eliminar $name (falso positivo)", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+        }
+        androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            photos.forEach { (i, d) -> androidx.compose.material3.DropdownMenuItem(text = { Text("En la foto ${i + 1} · ${d.replace("\n", " ")}") },
+                onClick = { menu = false; onDelete(i) }) }
+            if (photos.size > 1) androidx.compose.material3.DropdownMenuItem(text = { Text("En todas") }, onClick = { menu = false; onDelete(null) })
         }
     }
 }

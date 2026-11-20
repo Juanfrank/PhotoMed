@@ -194,7 +194,11 @@ object ReliefStore {
     }.getOrNull()
 
     /** Borra el relieve y la escala de una foto (al eliminarla). */
-    fun delete(context: Context, uri: String) { reliefFile(context, uri).delete(); metaFile(context, uri).delete() }
+    fun delete(context: Context, uri: String) {
+        reliefFile(context, uri).delete(); metaFile(context, uri).delete()
+        // y las líneas recordadas y las correcciones del usuario de esa foto
+        LineMemory.delete(context, uri); AnnotUserEdits.delete(context, uri)
+    }
 
     /** Uri del relieve (para cargarlo con la misma edición y recorte que la foto) o null. */
     fun reliefUri(context: Context, uri: String): Uri? = reliefFile(context, uri).takeIf { it.exists() }?.let { Uri.fromFile(it) }

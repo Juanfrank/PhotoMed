@@ -98,6 +98,15 @@ class UsageFlowsTest {
         compose.waitUntil(5_000) { compose.onAllNodesWithText(text, substring).fetchSemanticsNodes().isNotEmpty() }
     } catch (e: Throwable) { println("ESPERANDO '$text'\n" + compose.onAllNodes(androidx.compose.ui.test.isRoot()).fetchSemanticsNodes().size + "\n" + compose.onAllNodes(androidx.compose.ui.test.isRoot()).let { r -> (0 until r.fetchSemanticsNodes().size).joinToString("\n") { r[it].printToString() } }); throw e }
 
+    /** Clave de caché de las anotaciones de una foto en el visor (como en PhotoPage). */
+    private fun viewerKey(p: Photo): String {
+        val ctx = ApplicationProvider.getApplicationContext<Context>(); val u = p.uri.toString()
+        val edit = com.photomed.app.align.PhotoEdits.of(ctx, u)
+        val previous = photos.filter { it.takenAt < p.takenAt }.sortedByDescending { it.takenAt }.map { it.uri.toString() }
+        return "full|$u|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(ctx, u)}|" +
+            "${com.photomed.app.align.AnnotUserEdits.tag(ctx, u)}|${com.photomed.app.align.LineMemory.tag(ctx, previous)}"
+    }
+
     private fun photoNodes() = compose.onAllNodesWithContentDescription("Fotografía del", substring = true)
 
     @Test
@@ -285,8 +294,7 @@ class UsageFlowsTest {
         val forehead = com.photomed.app.align.AnnotLine(com.photomed.app.align.AnnotLayer.FOREHEAD,
             (0..10).map { com.photomed.app.align.Pt(0.1f + it * 0.08f, 0.5f) }, false,
             metrics = com.photomed.app.align.LineMetrics("Frente, línea 1", lengthMm = 42f, widthMm = 1.2f, contrastL = 8f, depthMm = 0.31f, grade = 2))
-        val key = "full|${p.uri}|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(ctx, p.uri.toString())}"
-        com.photomed.app.align.PhotoAnnotator.put(key, listOf(forehead))
+        com.photomed.app.align.PhotoAnnotator.put(viewerKey(p), listOf(forehead))
         setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
         waitText("Medidas")
         // toque sobre la línea: centro de la foto ajustada a la página (y = 0,5 × ancho de la foto)
@@ -325,6 +333,15 @@ class UsageFlowsTest {
         val off = ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!
         assertTrue(off, listOf("EYES", "NOSE", "LIPS").none { it in off } && "FOREHEAD" in off)
         assertTrue(compose.onAllNodesWithText("Frente, línea 1", substring = true).fetchSemanticsNodes().size >= 2) // ficha y tabla
+        // eliminar la línea (falso positivo) desde la tabla y restaurarla
+        compose.onNodeWithText("Trazar surco").assertExists()
+        compose.onNodeWithContentDescription("Eliminar Frente, línea 1 (falso positivo)").performClick()
+        compose.waitForIdle()
+        assertTrue(com.photomed.app.align.AnnotUserEdits.of(ctx, p.uri.toString()).dismissed.contains("Frente, línea 1"))
+        waitText("Restaurar líneas eliminadas (1)")
+        compose.onNodeWithText("Restaurar líneas eliminadas (1)").performScrollTo().performClick()
+        compose.waitForIdle()
+        assertTrue(com.photomed.app.align.AnnotUserEdits.of(ctx, p.uri.toString()).dismissed.isEmpty())
     }
 
     /**
@@ -341,8 +358,7 @@ class UsageFlowsTest {
         val fold = com.photomed.app.align.AnnotLine(com.photomed.app.align.AnnotLayer.FOLDS,
             (0..10).map { com.photomed.app.align.Pt(0.3f, 0.3f + it * 0.03f) }, false,
             metrics = com.photomed.app.align.LineMetrics("Nasogeniano derecho", lengthMm = 31f, widthMm = 3f, contrastL = 18f, depthMm = 1.2f, grade = 4))
-        val key = "full|${p.uri}|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(ctx, p.uri.toString())}"
-        com.photomed.app.align.PhotoAnnotator.put(key, listOf(fold))
+        com.photomed.app.align.PhotoAnnotator.put(viewerKey(p), listOf(fold))
         setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
         compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Capas", substring = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Capas", substring = true).performClick()

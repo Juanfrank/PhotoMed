@@ -180,6 +180,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     val layersState = rememberAnnotLayers()
     var showLayers by remember { mutableStateOf(layersState.value.isNotEmpty()) }
     var metricsSheet by remember { mutableStateOf(false) }
+    // eliminar líneas (falsos positivos): vuelve a analizar
+    var userVersion by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     // opacidad de los trazos y números (se recuerda; empieza en 50 %)
     val annotAlpha = rememberAnnotAlpha()
     var viewRot by remember { mutableStateOf(0) }
@@ -382,6 +384,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         },
     ) { padding ->
         val (photos, zonesWithPhotos, visible, seq, seqKeys, n, timeline, reference, target, validAlign) = derive()
+        // referencia de arrugas: fotos anteriores del paciente en la misma zona (la más reciente primero)
+        fun previousOf(p: com.photomed.app.data.Photo) = photos.filter { it.zone == p.zone && it.takenAt < p.takenAt }
+            .sortedByDescending { it.takenAt }.map { it.uri.toString() }
         val aligning = alignJob?.isActive == true
         // Modelos (con perspectiva y color corregidos) de cada foto de la secuencia.
         val models: Map<String, Any> = seq?.associate { p ->
@@ -391,7 +396,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         val layers = if (showLayers) layersState.value else emptySet()
         val annots: Map<String, List<com.photomed.app.align.AnnotLine>> = seq?.mapNotNull { p ->
             // con el panel de capas abierto se analizan las fotos aunque no haya capas encendidas (la tabla de medidas lo necesita)
-            key("a" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, showLayers).value }?.let { p.key to it }
+            key("a" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, showLayers,
+                previous = previousOf(p), userVersion = userVersion).value }?.let { p.key to it }
         }?.toMap().orEmpty()
         val view = CompareView(viewRot, viewMirror, layers, models.mapNotNull { (k, m) -> annots[k]?.let { m to it } }.toMap(), annotAlpha.value)
         if (all != null && photos.size < 2) {
@@ -538,8 +544,16 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 val stamps = stampLabels(seq.map { it.takenAt })
                 MetricsPanel(seq.mapIndexed { i, p -> stamps[i] to annots[p.key].orEmpty() }, layersState.value,
                     onClose = { metricsSheet = false }, loading = seq.any { annots[it.key] == null },
-                    note = seq.firstNotNullOfOrNull { photoAnnotationNote(context, it.uri) },
+                    note = seq.firstNotNullOfOrNull { photoAnnotationNote(context, it.uri, previousOf(it)) },
                     onShowLayers = { layersState.value = it },
+                    onDelete = { name, col ->
+                        (if (col == null) seq else listOfNotNull(seq.getOrNull(col))).forEach { p ->
+                            com.photomed.app.align.AnnotUserEdits.dismiss(context, p.uri.toString(), name)
+                        }
+                        userVersion++
+                    },
+                    dismissedCount = remember(seqKeys, userVersion) { seq.sumOf { com.photomed.app.align.AnnotUserEdits.of(context, it.uri.toString()).dismissed.size } },
+                    onRestore = { seq.forEach { com.photomed.app.align.AnnotUserEdits.restore(context, it.uri.toString()) }; userVersion++ },
                     modifier = Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.42f).dp))
             }
 

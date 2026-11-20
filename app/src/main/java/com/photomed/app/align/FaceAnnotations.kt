@@ -153,7 +153,11 @@ object FaceAnnotations {
      */
     fun fromMesh(mesh: List<Pt>, labels: FaceLabels?, lum: GrayImage?, lab: LabImage? = null, extras: MeasureExtras? = null,
                  /** Datos del análisis para el aviso al usuario (p. ej. "vello": fracción con barba o bigote). */
-                 info: MutableMap<String, Float>? = null): List<AnnotLine> {
+                 info: MutableMap<String, Float>? = null,
+                 /** Arrugas y surcos de fotos anteriores del paciente (coordenadas de la cara), como referencia. */
+                 priors: List<PriorLine> = emptyList(),
+                 /** Trazos añadidos a mano (mismas coordenadas que [mesh]). */
+                 added: List<List<Pt>> = emptyList()): List<AnnotLine> {
         if (mesh.size < 468) return face(keysFromMesh(mesh), labels, lum)
         val keys = FaceKeys.canonical(keysFromMesh(mesh))
         val out = ArrayList<AnnotLine>()
@@ -184,7 +188,10 @@ object FaceAnnotations {
         // labios: bermellón superior e inferior, cada uno con sus medidas
         out += AnnotLine(AnnotLayer.LIPS, FeatureMetrics.upperLipPoly(mesh), true, metrics = fm { mm, s -> FeatureMetrics.upperLip(mesh, mm, s) })
         out += AnnotLine(AnnotLayer.LIPS, FeatureMetrics.lowerLipPoly(mesh), true, metrics = fm { mm, s -> FeatureMetrics.lowerLip(mesh, mm, s) })
-        if (lum != null) out += folds(mesh, lum, labels, lab, extras, info)
+        if (lum != null) {
+            out += folds(mesh, lum, labels, lab, extras, info)
+            out += withReference(mesh, lum, labels, lab, extras, out, priors, added)
+        }
         return out
     }
 
@@ -226,6 +233,45 @@ object FaceAnnotations {
         }
         return folds + wrinkles(mesh, lum, labels, faceW, lab, extras)
     }
+
+    /**
+     * Referencia de fotos anteriores: cada arruga o surco que había antes y que ahora no se ha encontrado
+     * se busca de nuevo en un pasillo estrecho alrededor de donde estaba (llevado a esta foto con las
+     * coordenadas de la cara), con umbrales más bajos; si aparece, se añade con su mismo nombre (así la
+     * comparación lo empareja). Además, los trazos añadidos a mano, con sus medidas.
+     */
+    private fun withReference(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels?, lab: LabImage?, extras: MeasureExtras?,
+                              found: List<AnnotLine>, priors: List<PriorLine>, added: List<List<Pt>>): List<AnnotLine> {
+        val out = ArrayList<AnnotLine>()
+        val faceW = dist(mesh[234], mesh[454]).coerceAtLeast(1e-3f)
+        val sc = scaleOf(mesh, extras) ?: return out
+        val hair = lab?.let { runCatching { FacialHair.fromMesh(it, mesh) }.getOrNull() }
+        val skinLab = labels?.let { l -> { q: Pt -> l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()] == FaceLabels.FACE_SKIN } }
+        val skin: ((Pt) -> Boolean)? = if (hair == null || hair.fraction < 0.02f) skinLab else { q: Pt -> (skinLab?.invoke(q) ?: true) && !hair[q] }
+        val names = found.mapNotNull { it.metrics?.name }.toMutableSet()
+        fun meanDist(a: List<Pt>, b: List<Pt>) = a.map { p -> b.minOf { dist(p, it) } }.average().toFloat()
+        for (p in priors) {
+            val mapped = FaceFrame.fromFace(mesh, p.points) ?: continue
+            if (mapped.size < 3) continue
+            // ya encontrada (misma capa, cerca)
+            if (found.any { it.layer == p.layer && it.points.size >= 2 && meanDist(mapped, it.points) < 0.025f * faceW }) continue
+            val r = RidgeTracker.track(lum, mapped, 0.025f * faceW, stations = 20, offsets = 6,
+                minStrength = PRIOR_MIN_STRENGTH, minContrast = PRIOR_MIN_CONTRAST, skin = skin) ?: continue
+            val name = if (p.name in names) "${p.name} (ref.)" else p.name
+            names += name
+            val half = if (p.layer == AnnotLayer.FOLDS) 4f else 2f
+            out += AnnotLine(p.layer, r.points, false, metrics = LineMeasure.line(name, r.points, lum, sc, halfMm = half, relief = extras?.relief)
+                .copy(note = "Hallada con la foto anterior como referencia"))
+        }
+        added.forEachIndexed { i, pts ->
+            if (pts.size < 2) return@forEachIndexed
+            out += AnnotLine(AnnotLayer.FOLDS, pts, false, metrics = LineMeasure.line("Surco añadido ${i + 1}", pts, lum, sc, halfMm = 4f, relief = extras?.relief)
+                .copy(note = "Trazado a mano en una zona elegida"))
+        }
+        return out
+    }
+    const val PRIOR_MIN_STRENGTH = 0.012f
+    const val PRIOR_MIN_CONTRAST = 1.4f
 
     private class Cand(val res: RidgeTracker.Result, val u0: Float, val u1: Float, val v: Float)
 
@@ -604,14 +650,17 @@ object FaceCrop {
      * [labelsOf]: segmentación pelo / piel del recorte.
      */
     fun annotate(mesh: List<Pt>, src: Bitmap, labelsOf: (Bitmap, Crop) -> FaceLabels?, extras: MeasureExtras? = null,
-                 info: MutableMap<String, Float>? = null): List<AnnotLine> {
+                 info: MutableMap<String, Float>? = null, priors: List<PriorLine> = emptyList(),
+                 /** Trazos añadidos a mano, en coordenadas de [src] (unidades de su ancho). */
+                 added: List<List<Pt>> = emptyList()): List<AnnotLine> {
         val c = crop(mesh, src.width, src.height)
         val b = bitmap(src, c)
         val m = mesh.map { c.toCrop(it) }
         val labels = runCatching { labelsOf(b, c) }.getOrNull()
         val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
         val ex = extras?.let { e -> MeasureExtras(e.relief?.let { relief(it, c, b.width, b.height) }, e.meta) }
-        val lines = FaceAnnotations.fromMesh(m, labels, lum(b), LabImage.fromArgb(px, b.width, b.height), ex, info)
+        val lines = FaceAnnotations.fromMesh(m, labels, lum(b), LabImage.fromArgb(px, b.width, b.height), ex, info, priors,
+            added.map { l -> l.map { c.toCrop(it) } })
         if (b !== src) b.recycle()
         return lines.map { l -> l.copy(points = l.points.map { c.toPhoto(it) }) }
     }
@@ -625,7 +674,13 @@ class PhotoAnnotator(private val context: Context) {
      * Líneas y, si no hay arrugas medibles, el motivo para el usuario (rostro no detectado entero,
      * zona corporal…).
      */
-    suspend fun analyze(bmp: Bitmap, zone: Zone, extras: MeasureExtras? = null): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+    suspend fun analyze(bmp: Bitmap, zone: Zone, extras: MeasureExtras? = null,
+                        /** Correcciones del usuario: líneas eliminadas y trazos añadidos (en coordenadas de [bmp]). */
+                        user: AnnotUserEdit? = null,
+                        /** Arrugas y surcos de fotos anteriores del paciente, como referencia. */
+                        priors: List<PriorLine> = emptyList(),
+                        /** Foto cuya memoria de líneas se guarda (para las fotos posteriores); null = no guardar. */
+                        memoryUri: String? = null): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         if (!enabled) return@withContext emptyList<AnnotLine>() to "Análisis no disponible"
         val spec = ZoneAlignment.of(zone)
         if (spec.detector == Detector.FACE) {
@@ -635,9 +690,12 @@ class PhotoAnnotator(private val context: Context) {
                 // análisis en el recorte de la cara a resolución fija (ver FaceCrop)
                 val seg = HairSkinSegmenter.createOrNull(context)
                 val info = HashMap<String, Float>()
-                val lines = try {
-                    FaceCrop.annotate(mesh, bmp, { b, _ -> seg?.labels(b) }, extras, info)
+                val all = try {
+                    FaceCrop.annotate(mesh, bmp, { b, _ -> seg?.labels(b) }, extras, info, priors, user?.added.orEmpty())
                 } finally { seg?.close() }
+                // falsos positivos eliminados por el usuario
+                val lines = all.filter { l -> l.metrics?.name?.let { it in user?.dismissed.orEmpty() } != true }
+                if (memoryUri != null) LineMemory.save(context, memoryUri, mesh, lines)
                 val note = if (lines.none { it.metrics != null }) "No se encontraron arrugas ni surcos medibles en esta foto (piel lisa, " +
                     "poca resolución de la cara o luz muy plana)." else beardNote(info)
                 return@withContext lines to note
@@ -650,6 +708,7 @@ class PhotoAnnotator(private val context: Context) {
                 val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(bmp) }
                 val info = HashMap<String, Float>()
                 val lines = FaceAnnotations.face(pts, labels, lumOf(bmp), labOf(bmp), info)
+                    .filter { l -> l.metrics?.name?.let { it in user?.dismissed.orEmpty() } != true }
                 return@withContext lines to ("No se pudo obtener la malla facial completa$err: solo se miden los surcos " +
                     "(nasogeniano, marioneta, valle lagrimal); frente, ceño, patas de gallo y ojeras necesitan la malla." +
                     (beardNote(info)?.let { " $it" } ?: ""))
