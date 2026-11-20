@@ -33,8 +33,10 @@ data class LineMetrics(
     val ita: Float? = null,
     val itaRef: Float? = null,
     val type: String? = null,
-    /** Referencia de la escala en mm: "iris" o "interpupilar". */
+    /** Referencia de la escala en mm: "iris", "interpupilar" o "sensor de profundidad". */
     val scale: String = "iris",
+    /** Origen de la profundidad: "sombreado" (una foto) o "relieve" (estéreo fotométrico). */
+    val depthSource: String = "sombreado",
 )
 
 /** Imagen en CIE L*a*b* (D65), para medir el color de la piel. */
@@ -175,12 +177,45 @@ object LineMeasure {
         return abs(s) / 2
     }
 
-    /** Medidas de una línea detectada. */
-    fun line(name: String, pts: List<Pt>, lum: GrayImage, scale: Pair<Float, String>, halfMm: Float = 3f): LineMetrics {
+    /** Medidas de una línea detectada; con [relief] (mm), la profundidad sale del relieve medido. */
+    fun line(name: String, pts: List<Pt>, lum: GrayImage, scale: Pair<Float, String>, halfMm: Float = 3f, relief: GrayImage? = null): LineMetrics {
         val mm = scale.first
         val p = profile(lum, pts, mm, halfMm)
+        val rd = relief?.let { reliefDepth(it, pts, mm, halfMm) }
+        val depth = rd ?: p?.depthMm
         return LineMetrics(name, lengthMm = length(pts) * mm, widthMm = p?.widthMm?.takeIf { it > 0f },
-            contrastL = p?.contrastL, depthMm = p?.depthMm, grade = p?.let { grade(it.depthMm) }, scale = scale.second)
+            contrastL = p?.contrastL, depthMm = depth, grade = depth?.let { grade(it) }, scale = scale.second,
+            depthSource = if (rd != null) "relieve" else "sombreado")
+    }
+
+    /**
+     * Profundidad en el relieve medido (mm, hacia la cámara): en cada punto, perfil perpendicular
+     * ±[halfMm]; profundidad = media de los dos hombros − mínimo cerca del trazado. Mediana; null si
+     * menos de la mitad de los puntos tienen relieve.
+     */
+    fun reliefDepth(relief: GrayImage, pts: List<Pt>, mmPerUnit: Float, halfMm: Float): Float? {
+        if (pts.size < 3) return null
+        val w = relief.width.toFloat()
+        val pxPerMm = w / mmPerUnit
+        val half = max(4f, halfMm * pxPerMm)
+        val n = (half * 2).roundToInt().coerceIn(8, 80)
+        val out = ArrayList<Float>()
+        for (i in 1 until pts.size - 1) {
+            val a = pts[i - 1]; val b = pts[i + 1]
+            val tx = b.x - a.x; val ty = b.y - a.y; val tn = hypot(tx, ty).takeIf { it > 1e-7f } ?: continue
+            val nx = -ty / tn; val ny = tx / tn
+            val cx = pts[i].x * w; val cy = pts[i].y * w
+            val prof = FloatArray(n + 1) { k -> val o = -half + 2 * half * k / n; relief.sample(cx + nx * o, cy + ny * o) }
+            if (prof.count { it.isNaN() } > n / 4) continue
+            val c = n / 2; val r = n / 6
+            val mid = (c - r..c + r).map { prof[it] }.filter { !it.isNaN() }.minOrNull() ?: continue
+            val q = max(2, n / 6)
+            val l = (0 until q).map { prof[it] }.filter { !it.isNaN() }; val rr = (n - q + 1..n).map { prof[it] }.filter { !it.isNaN() }
+            if (l.isEmpty() || rr.isEmpty()) continue
+            out += ((l.average() + rr.average()) / 2 - mid).toFloat().coerceAtLeast(0f)
+        }
+        if (out.size < (pts.size - 2) / 2 || out.isEmpty()) return null
+        return median(out)
     }
 
     /** Color medio L*a*b* dentro de un polígono o null si hay pocos píxeles. */

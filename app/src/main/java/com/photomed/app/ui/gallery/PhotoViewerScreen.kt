@@ -194,7 +194,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     LaunchedEffect(pager.currentPage) { selected = null }
     if (metricsSheet) {
         val e = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
-        val lines = com.photomed.app.align.PhotoAnnotator.cached("full|${current.uri}|${e.hashCode()}").orEmpty()
+        val lines = com.photomed.app.align.PhotoAnnotator.cached("full|${current.uri}|${e.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, current.uri.toString())}").orEmpty()
         com.photomed.app.ui.compare.MetricsSheet(listOf(formatDateTime(current.takenAt) to lines), layersState.value) { metricsSheet = false }
     }
 
@@ -207,7 +207,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
             onDismiss = { confirmDelete = false },
             onConfirm = {
                 confirmDelete = false
-                scope.launch { galleryDelete(withContext(Dispatchers.IO) { repo.deletePhotos(listOf(current)) }) }
+                scope.launch { galleryDelete(withContext(Dispatchers.IO) { current.uri.toString().let { com.photomed.app.align.ReliefStore.delete(context, it) }; repo.deletePhotos(listOf(current)) }) }
             },
         )
     }
@@ -265,10 +265,11 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
     }
     val annots by androidx.compose.runtime.produceState<List<com.photomed.app.align.AnnotLine>?>(null, photo.uri, edit, layers.isNotEmpty()) {
         if (layers.isEmpty()) return@produceState
-        val key = "full|${photo.uri}|${edit.hashCode()}"
+        val key = "full|${photo.uri}|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, photo.uri.toString())}"
         value = com.photomed.app.align.PhotoAnnotator.cached(key) ?: runCatching {
             com.photomed.app.align.PhotoAnnotator(context.applicationContext)
-                .annotate(com.photomed.app.align.ImageOps.loadFull(context, photo.uri, 1080, edit), zone)
+                .annotate(com.photomed.app.align.ImageOps.loadFull(context, photo.uri, 1080, edit), zone,
+                    com.photomed.app.align.PhotoAnnotator.extrasFor(context, photo.uri, 1080, crop34 = false))
         }.getOrNull()?.also { com.photomed.app.align.PhotoAnnotator.put(key, it) }
     }
     val imgState = androidx.compose.runtime.rememberUpdatedState(img)

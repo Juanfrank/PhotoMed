@@ -55,10 +55,17 @@ fun metricRows(m: LineMetrics): List<Pair<String, String>> =
     ) else listOf(
         "Longitud" to "${f1(m.lengthMm)} mm",
         "Ancho (a media profundidad)" to "${f1(m.widthMm)} mm",
-        "Profundidad estimada" to "${f2(m.depthMm)} mm",
+        (if (m.depthSource == "relieve") "Profundidad (relieve medido)" else "Profundidad estimada (sombreado)") to "${f2(m.depthMm)} mm",
         "Contraste ΔL*" to f1(m.contrastL),
         "Grado orientativo (0–5)" to (m.grade?.let { "$it · ${gradeLabel(it)}" } ?: "—"),
+        "Escala" to scaleLabel(m.scale),
     )
+
+fun scaleLabel(s: String) = when (s) {
+    "sensor de profundidad" -> "sensor de profundidad"
+    "interpupilar" -> "interpupilar (63 mm)"
+    else -> "iris (11,7 mm)"
+}
 
 fun gradeLabel(g: Int) = listOf("sin arruga", "apenas perceptible", "superficial", "moderada", "profunda", "muy profunda")[g.coerceIn(0, 5)]
 
@@ -189,8 +196,12 @@ fun MetricsSheet(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
                 Text("Tipo probable de ojera: " + ordered.mapNotNull { e -> e.value.second.lastOrNull { it?.type != null }?.let { "${e.key}: ${it.type}" } }.joinToString("; "),
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
             }
-            val scale = ordered.flatMap { it.value.second }.firstNotNullOfOrNull { it?.scale }
+            val all = ordered.flatMap { it.value.second }.filterNotNull()
+            val scale = all.firstOrNull()?.scale
+            val relief = all.any { it.depthSource == "relieve" }
             Text(METRICS_NOTE + (if (scale == "interpupilar") " (Escala: distancia interpupilar de 63 mm; iris no fiable.)" else "") +
+                (if (scale == "sensor de profundidad") " Escala medida con el sensor de profundidad del teléfono." else "") +
+                (if (relief) " Profundidad medida en el relieve (estéreo fotométrico con la pantalla)." else "") +
                 " Grado: profundidad < ${LineMeasure.GRADE_MM.joinToString(" / ") { f2(it) }} mm → 0 a 4; mayor → 5.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 12.dp))

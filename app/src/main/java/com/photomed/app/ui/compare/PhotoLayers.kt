@@ -94,9 +94,10 @@ fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boole
     val edit = PhotoEdits.of(context, uri.toString())
     return produceState<List<AnnotLine>?>(null, uri, edit, phiDeg, enabled) {
         if (!enabled) { value = null; return@produceState }
-        val key = "34|$uri|${edit.hashCode()}"
+        val key = "34|$uri|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, uri.toString())}"
         val base = PhotoAnnotator.cached(key) ?: runCatching {
-            PhotoAnnotator(context.applicationContext).annotate(ImageOps.load34(context, uri, 720), zone)
+            PhotoAnnotator(context.applicationContext).annotate(ImageOps.load34(context, uri, 720), zone,
+                PhotoAnnotator.extrasFor(context, uri, 720, crop34 = true))
         }.getOrNull()?.also { PhotoAnnotator.put(key, it) }
         value = base?.map { l -> if (phiDeg == 0f) l else l.copy(points = l.points.map { Perspective.mapPt(it, phiDeg) }) }
     }

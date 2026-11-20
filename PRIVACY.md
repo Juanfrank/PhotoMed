@@ -33,6 +33,7 @@ de sus pacientes. PhotoMed es solo una herramienta que se ejecuta en su disposit
 | Nombre del paciente, número de expediente, notas, consentimiento | Organizar las fotografías por expediente | Almacenamiento privado de la app (`expediente.json`) |
 | Fotografías clínicas | Documentación y comparación antes/después | Galería del teléfono, álbum `Pictures/PhotoMed/<expediente>` |
 | Metadatos de cada foto (paciente, expediente, zona, fecha, consentimiento) | Identificar la foto aunque se vea fuera de la app y recuperar expedientes tras reinstalar | Dentro del archivo de imagen (EXIF y XMP) |
+| Mapa de relieve de la piel y distancia del sensor de profundidad (solo con la medición de relieve o un teléfono con sensor de profundidad) | Medir la profundidad y longitud de arrugas y surcos | Almacenamiento privado de la app (`relieve/`); se borra al eliminar la foto desde la app |
 | Lecturas del acelerómetro | Mostrar el nivel en la cámara | Solo en memoria; no se guardan |
 
 PhotoMed no recopila ubicación, contactos, identificadores publicitarios ni datos de uso propios, y

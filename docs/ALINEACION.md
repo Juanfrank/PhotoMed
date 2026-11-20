@@ -468,3 +468,39 @@ una columna por foto y la diferencia entre la última y la primera). Todas son o
 
 Rangos en los 18 retratos (mediana): nasogeniano 1,2 mm (grado 4), valle lagrimal 0,9 mm,
 marioneta 0,8 mm, ceño 0,5 mm, frente 0,4 mm, patas de gallo 0,4 mm; rostro joven: sin arrugas.
+
+## Relieve con la pantalla (estéreo fotométrico) y sensor de profundidad
+
+`PhotometricStereo.kt`, `Relief.kt`, `DepthSensor.kt`, `ui/camera/ReliefCapture.kt`.
+
+- **Captura** (cámara frontal, zonas del rostro, menú ⋯ → *Medición de relieve*): análisis a
+  1280 × 960; pantalla blanca 0,7 s para la exposición automática, bloqueo de AE y AWB
+  (Camera2 interop), y fotogramas con la pantalla oscura, 2 × (mitad izquierda, derecha, superior,
+  inferior), oscura y blanca, cada uno ≥ 160 ms después de cambiar la pantalla (≈ 2,5 s). Después,
+  la foto normal con la pantalla blanca.
+- **Luces**: irradiancia vectorial de cada mitad como emisor plano lambertiano, Σ r·D·dA/|r|⁴,
+  con las medidas físicas de la pantalla (DisplayMetrics) y la cámara en el borde superior; la
+  mitad *izquierda* del usuario queda a +x en la imagen sin espejar. Comprobación de signos con la
+  convexidad de la cara.
+- **Solución**: recorte de la cara a 512 px; luminancia lineal; alineación de cada toma con la
+  blanca (correlación de bordes normalizados, búsqueda gruesa y fina); se resta la oscura y se
+  promedian los ciclos; g = ρn = (LᵀL)⁻¹LᵀI (Woodham 1980); pendientes integradas con Frankot y
+  Chellappa (1988; FFT con derivada de diferencia central); relieve = altura − su gaussiana de 4 mm
+  (solo dentro del óvalo). Se guarda en la foto (semejanza entre las mallas del fotograma y de la
+  foto, con detección de espejo) como PNG de 8 bits, ±1,5 mm (≈ 12 µm por nivel), en
+  `files/relieve/` junto con la escala; se carga con la misma edición que la foto.
+- **Medida**: perfil perpendicular del relieve (±2–5 mm), media de los hombros − mínimo, mediana a
+  lo largo del trazado; grado 0–5 con los mismos umbrales. Se descarta si la luz de la pantalla es
+  < 0,25 × la ambiente o hay < 50 % de píxeles válidos (movimiento, sombras).
+- **Sensor de profundidad**: cámara con DEPTH_OUTPUT y formato DEPTH16 (13 bits de mm, 3 de
+  confianza), abierta aparte de CameraX; mediana del 30 % central con confianza ≥ 50 %. Fija la
+  distancia (luces y mm por px = D / focal) y, en fotos normales de rostro, un factor sobre la escala
+  del iris (ancho de la foto a D según la focal). Si el teléfono no permite abrirlo a la vez que la
+  cámara de fotos, se usa el iris.
+- **Pruebas**: `PhotometricStereoTest` (esfera con surco de 0,40 mm → 0,37 mm; piel lisa 0,007 mm);
+  `ReliefPipelineTest` (retrato real como albedo, elipsoide con arruga de 0,30 mm, movimientos de
+  ±1 px entre tomas → 0,27 mm en la foto y 0,28 mm en la foto espejada; DEPTH16).
+- **Límites**: la pantalla da poca luz (penumbra, 25–35 cm) y ángulos pequeños (≈ ±8°), así que el
+  ruido limita las arrugas muy finas; la piel no es perfectamente lambertiana (dispersión
+  subsuperficial, brillos), lo que tiende a suavizar el relieve. No hay validación en personas frente
+  a perfilometría.

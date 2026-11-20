@@ -243,7 +243,7 @@ fun ZoneGalleryScreen(
     if (confirmDelete) DeleteSelectionDialog(selection.size, onDismiss = { confirmDelete = false }) {
         confirmDelete = false
         val list = selectedPhotos()
-        scope.launch { galleryDelete(withContext(Dispatchers.IO) { repo.deletePhotos(list) }) }
+        scope.launch { galleryDelete(withContext(Dispatchers.IO) { list.forEach { com.photomed.app.align.ReliefStore.delete(context, it.uri.toString()) }; repo.deletePhotos(list) }) }
     }
 }
 

@@ -252,6 +252,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var nearCapture by remember { mutableStateOf(prefs.getBoolean("auto_capture_near", true)) }
     /** Ráfaga de 3 fotos: se guarda la de mayor coincidencia. */
     var burst by remember { mutableStateOf(prefs.getBoolean("burst", true)) }
+    // Medición de relieve (estéreo fotométrico con la pantalla, cámara frontal)
+    var reliefMode by remember { mutableStateOf(prefs.getBoolean("relief_mode", false)) }
+    var psPattern by remember { mutableStateOf<com.photomed.app.align.PhotometricStereo.Pattern?>(null) }
+    val frameGrab = remember { FrameGrab() }
     /**
      * Modo experto: líneas de referencia siempre, puntos detectados, porcentajes, franja de texto,
      * barra de zoom y todas las capas. El modo simple (por defecto) muestra solo el contorno (su color
@@ -307,7 +311,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     val referenceMode = showGhost && ghost != null
     matcher.useReference = referenceMode
     val matchingFlag = remember { AtomicBoolean(false) }
-    matchingFlag.set(matchingEnabled)
+    matchingFlag.set(matchingEnabled && psPattern == null)
 
     // Referencia para la coincidencia en vivo: la foto superpuesta (encuadre 3:4), con el motor elegido.
     LaunchedEffect(ghost?.key, matcher, refOrient) {
@@ -449,12 +453,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         }.onFailure { imageCapture.flashMode = ImageCapture.FLASH_MODE_OFF }
     }
     val analysisRef = remember { java.util.concurrent.atomic.AtomicReference<ImageAnalysis?>() }
-    val analysis = remember(lensFacing) {
+    val reliefHi = reliefMode && lensFacing == CameraSelector.LENS_FACING_FRONT && zone.isFaceZone()
+    val analysis = remember(lensFacing, reliefHi) {
         ImageAnalysis.Builder()
             .setResolutionSelector(
                 ResolutionSelector.Builder()
                     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
-                    .setResolutionStrategy(ResolutionStrategy(Size(640, 480), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
+                    // la medición de relieve necesita más detalle (1280 × 960)
+                    .setResolutionStrategy(ResolutionStrategy(if (reliefHi) Size(1280, 960) else Size(640, 480), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
                     .build()
             )
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -464,6 +470,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 a.setAnalyzer({ r -> pipeline.post(r::run) }) { proxy ->
                     try {
                         val now = System.currentTimeMillis()
+                        // secuencia de relieve: el fotograma pedido tiene prioridad
+                        if (frameGrab.offer(now) { proxy.toUprightCrop(720) }) return@setAnalyzer
                         if (matchingFlag.get() && now - lastAnalysis.get() >= 180) {
                             lastAnalysis.set(now)
                             val frame = proxy.toUprightCrop(360)
@@ -480,7 +488,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     // analysisRef, que ya apuntaba al nuevo: al cambiar de cámara el análisis en vivo se detenía.)
     DisposableEffect(analysis) { onDispose { runCatching { analysis.clearAnalyzer() } } }
 
-    LaunchedEffect(lensFacing) {
+    LaunchedEffect(lensFacing, reliefHi) {
         val provider = context.cameraProvider()
         val preview = Preview.Builder().setResolutionSelector(resolutionSelector).build()
         preview.surfaceProvider = previewView.surfaceProvider
@@ -561,9 +569,55 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         }
     }
 
+    /**
+     * Medición de relieve: secuencia de la pantalla (oscura, mitades, blanca), foto normal con la
+     * pantalla blanca y, en segundo plano, cálculo del relieve sobre la foto guardada.
+     */
+    fun reliefCapture() {
+        val e = exp ?: return
+        if (capturing) return
+        capturing = true
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        val conditions = captureConditions() + ("Relief" to "pantalla")
+        val pitch = Perspective.cameraPitchFromDevice(tilt.value.pitch, true)
+        val roll = tilt.value.roll
+        val focal = focalNorm; val zoom = zoomRatio
+        scope.launch {
+            val depthMm = runCatching { ReliefCapture.depth(context, front = true) }.getOrNull()
+            screenFlash.hold()
+            val file = File(context.cacheDir, "capture_relief_${System.currentTimeMillis()}.jpg")
+            val frames = try {
+                val f = ReliefCapture.sequence(camera, { psPattern = it }, frameGrab)
+                psPattern = com.photomed.app.align.PhotometricStereo.Pattern.FULL
+                ReliefCapture.lockExposure(camera, false)
+                if (!shoot(file)) null else f
+            } finally {
+                ReliefCapture.lockExposure(camera, false)
+                psPattern = null
+                screenFlash.release()
+            }
+            if (frames == null) { capturing = false; snackbar.showSnackbar("Error al capturar"); return@launch }
+            val conds = if (depthMm != null) conditions + ("DepthSensorCm" to "%.1f".format(java.util.Locale.US, depthMm / 10)) else conditions
+            AppScope.launch {
+                val saved = runCatching { repo.savePhoto(e, zone, file, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conds) }
+                    .also { file.delete() }
+                scope.launch {
+                    capturing = false
+                    saved.onSuccess { lastSaved = it; reload++ }.onFailure { snackbar.showSnackbar("No se pudo guardar: ${it.message}") }
+                }
+                val photo = saved.getOrNull() ?: return@launch
+                val msg = runCatching { ReliefCapture.process(context, frames, photo.uri, focal, zoom, depthMm) }
+                    .getOrElse { "Relieve: ${it.message}" }
+                frames.forEach { it.bmp.recycle() }
+                scope.launch { snackbar.showSnackbar(msg) }
+            }
+        }
+    }
+
     fun capture() {
         val e = exp ?: return
         if (capturing) return
+        if (reliefHi) { reliefCapture(); return }
         capturing = true
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         scope.launch {
@@ -575,7 +629,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         val roll = tilt.value.roll
         val focal = focalNorm
         val stamp = System.currentTimeMillis()
+        val zoomNow = zoomRatio
         scope.launch {
+            // sensor de profundidad (si el teléfono lo tiene): distancia real para la escala en mm
+            val depthMm = if (zone.isFaceZone() && com.photomed.app.align.DepthSensor.available(context,
+                    if (lensFacing == CameraSelector.LENS_FACING_FRONT) CameraCharacteristics.LENS_FACING_FRONT else CameraCharacteristics.LENS_FACING_BACK))
+                runCatching { ReliefCapture.depth(context, lensFacing == CameraSelector.LENS_FACING_FRONT) }.getOrNull() else null
             // Ráfaga: 3 tomas seguidas; se guarda la de mayor coincidencia (evita repetir por un parpadeo)
             val shots = if (burst) 3 else 1
             // flash de pantalla en ráfaga: la pantalla sigue en blanco de la primera a la última toma
@@ -600,13 +659,15 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             val best = if (files.size == 1) files[0] else files.maxBy { scoreOf(it) }
             files.filter { it !== best }.forEach { it.delete() }
             val hairline = hairlineOf(best)
-            val conds = if (hairline == null) conditions else conditions + ("HairlineIpd" to "%.3f".format(java.util.Locale.US, hairline))
+            val conds0 = if (hairline == null) conditions else conditions + ("HairlineIpd" to "%.3f".format(java.util.Locale.US, hairline))
+            val conds = if (depthMm == null) conds0 else conds0 + ("DepthSensorCm" to "%.1f".format(java.util.Locale.US, depthMm / 10))
             // Se guarda en el ámbito de la app: termina aunque se cierre la cámara.
             AppScope.launch {
                 val result = runCatching {
                     repo.savePhoto(e, zone, best, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conds,
                         variant = limbSide.tag.takeIf { zone.hasLimbSides })
                 }.also { best.delete() }
+                if (depthMm != null && focal != null) result.getOrNull()?.let { ReliefCapture.saveDepthScale(context, it.uri, depthMm, focal, zoomNow) }
                 scope.launch {
                     capturing = false
                     result.onSuccess {
@@ -740,6 +801,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         text = { Text("Ajustes de coincidencia") },
                         leadingIcon = { Icon(Icons.Default.Tune, null) },
                         onClick = { more = false; showSettings = true },
+                    )
+                    if (lensFacing == CameraSelector.LENS_FACING_FRONT && zone.isFaceZone()) androidx.compose.material3.DropdownMenuItem(
+                        text = { Text("Medición de relieve (pantalla)") },
+                        leadingIcon = { Icon(if (reliefMode) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, null) },
+                        onClick = {
+                            reliefMode = !reliefMode; prefs.edit().putBoolean("relief_mode", reliefMode).apply(); more = false
+                            if (reliefMode) scope.launch { snackbar.showSnackbar("Relieve: penumbra, teléfono a 25–35 cm y sin moverse unos 2 s al disparar") }
+                        },
                     )
                     androidx.compose.material3.DropdownMenuItem(
                         text = { Text("Modo experto") },
@@ -1026,6 +1095,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             "Más capas y datos: modo experto en los ajustes (⋯).",
         Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 120.dp))
     ScreenFlashOverlay(screenFlash)
+    ReliefPatternOverlay(psPattern)
     if (showSettings) {
         MatchSettingsSheet(
             autoCapture = autoCapture,
@@ -1180,6 +1250,9 @@ fun MatchSettingsContent(
 }
 
 /** Cuadro de análisis enderezado (rotación del sensor) y recortado al encuadre 3:4 del viewport. */
+/** Zona del rostro (puntos faciales): admite relieve y escala por el iris. */
+private fun com.photomed.app.data.Zone.isFaceZone() = com.photomed.app.align.ZoneAlignment.of(this).detector == com.photomed.app.align.Detector.FACE
+
 private fun ImageProxy.toUprightCrop(width: Int): Bitmap {
     val full = toBitmap()
     val r = cropRect

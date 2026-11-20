@@ -2,6 +2,16 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.14 — 20 de noviembre de 2026
+
+- **Medición de relieve con la pantalla** (cámara frontal, menú ⋯ → *Medición de relieve*): al
+  disparar, la pantalla ilumina la cara por mitades (izquierda, derecha, arriba, abajo) con la
+  exposición bloqueada; con estéreo fotométrico se obtiene el relieve de la piel y la profundidad de
+  cada arruga y surco se mide en él (en lugar de estimarla por el sombreado de una sola foto).
+- **Sensor de profundidad del teléfono** (si lo tiene): distancia real a la cara para la escala en
+  mm en lugar del tamaño medio del iris.
+- La ficha y la tabla de medidas indican el origen de la profundidad y de la escala.
+
 ## 2.13 — 20 de noviembre de 2026
 
 - **Medidas de cada línea**: toque una línea (surco, frente, ceño, patas de gallo) u ojera en el

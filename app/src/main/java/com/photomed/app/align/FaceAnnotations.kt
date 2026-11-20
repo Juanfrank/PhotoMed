@@ -130,7 +130,7 @@ object FaceAnnotations {
      * contorno de las alas) y labios con su topología real; surcos detectados en la imagen
      * ([RidgeTracker]) dentro de pasillos definidos por la malla, solo si se encuentran.
      */
-    fun fromMesh(mesh: List<Pt>, labels: FaceLabels?, lum: GrayImage?, lab: LabImage? = null): List<AnnotLine> {
+    fun fromMesh(mesh: List<Pt>, labels: FaceLabels?, lum: GrayImage?, lab: LabImage? = null, extras: MeasureExtras? = null): List<AnnotLine> {
         if (mesh.size < 468) return face(keysFromMesh(mesh), labels, lum)
         val keys = FaceKeys.canonical(keysFromMesh(mesh))
         val out = ArrayList<AnnotLine>()
@@ -146,24 +146,24 @@ object FaceAnnotations {
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_ALA_L).toTypedArray(), perSeg = 4), false)
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_TIP).toTypedArray(), perSeg = 6), false)
         out += AnnotLine(AnnotLayer.LIPS, chain(LIPS_OUTER), true); out += AnnotLine(AnnotLayer.LIPS, chain(LIPS_INNER), true)
-        if (lum != null) out += folds(mesh, lum, labels, lab)
+        if (lum != null) out += folds(mesh, lum, labels, lab, extras)
         return out
     }
 
     /** Surcos detectados en la imagen (solo los encontrados), con el ancho del pasillo según la cara y sus medidas. */
-    fun folds(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels? = null, lab: LabImage? = null): List<AnnotLine> {
+    fun folds(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels? = null, lab: LabImage? = null, extras: MeasureExtras? = null): List<AnnotLine> {
         val faceW = dist(mesh[234], mesh[454]).coerceAtLeast(1e-3f)
         val skin = labels?.let { l -> { q: Pt -> l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()] == FaceLabels.FACE_SKIN } }
-        val sc = LineMeasure.scale(mesh)
+        val sc = scaleOf(mesh, extras)
         val folds = FOLD_CORRIDORS.mapIndexedNotNull { i, (name, idx) ->
             RidgeTracker.track(lum, idx.map { mesh[it] }, corridorHalf(name) * faceW, skin = skin,
                 anchorStart = name == "nasogeniano")?.let { r ->
                 val label = "${name.replaceFirstChar { it.uppercase() }} ${if (i % 2 == 0) "derecho" else "izquierdo"}"
                 AnnotLine(AnnotLayer.FOLDS, r.points, false,
-                    metrics = sc?.let { LineMeasure.line(label, r.points, lum, it, halfMm = if (name == "nasogeniano") 5f else 4f) })
+                    metrics = sc?.let { LineMeasure.line(label, r.points, lum, it, halfMm = if (name == "nasogeniano") 5f else 4f, relief = extras?.relief) })
             }
         }
-        return folds + wrinkles(mesh, lum, labels, faceW, lab)
+        return folds + wrinkles(mesh, lum, labels, faceW, lab, extras)
     }
 
     private class Cand(val res: RidgeTracker.Result, val u0: Float, val u1: Float, val v: Float)
@@ -191,11 +191,11 @@ object FaceAnnotations {
      * raíz nasal), patas de gallo (abanico de rayos desde el canto externo) y ojeras (zona
      * infraorbitaria más oscura que la mejilla). Candidatos múltiples con supresión de no máximos.
      */
-    fun wrinkles(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels?, faceW: Float, lab: LabImage? = null): List<AnnotLine> {
+    fun wrinkles(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels?, faceW: Float, lab: LabImage? = null, extras: MeasureExtras? = null): List<AnnotLine> {
         val out = ArrayList<AnnotLine>()
-        val sc = LineMeasure.scale(mesh)
+        val sc = scaleOf(mesh, extras)
         fun withMetrics(layer: AnnotLayer, name: String, r: RidgeTracker.Result) =
-            AnnotLine(layer, r.points, false, metrics = sc?.let { LineMeasure.line(name, r.points, lum, it, halfMm = 2f) })
+            AnnotLine(layer, r.points, false, metrics = sc?.let { LineMeasure.line(name, r.points, lum, it, halfMm = 2f, relief = extras?.relief) })
         val skin = labels?.let { l -> { q: Pt -> l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()] == FaceLabels.FACE_SKIN } }
         val eR = mesh[468].takeIf { mesh.size > 473 } ?: mesh[159]; val eL = mesh[473].takeIf { mesh.size > 473 } ?: mesh[386]
         val ipd = dist(eR, eL).coerceAtLeast(1e-4f)
@@ -339,6 +339,13 @@ object FaceAnnotations {
 
     private fun mid(a: Pt, b: Pt) = Pt((a.x + b.x) / 2, (a.y + b.y) / 2)
 
+    /** Escala en mm: la del iris, corregida con el sensor de profundidad si se midió al tomar la foto. */
+    private fun scaleOf(mesh: List<Pt>, extras: MeasureExtras?): Pair<Float, String>? {
+        val s = LineMeasure.scale(mesh) ?: return null
+        val k = extras?.meta?.irisFactor?.takeIf { it in 0.6f..1.6f } ?: return s
+        return s.first * k to "sensor de profundidad"
+    }
+
     private fun inside(q: Pt, poly: List<Pt>): Boolean {
         var c = false; var j = poly.size - 1
         for (i in poly.indices) {
@@ -459,14 +466,14 @@ object FaceAnnotations {
 
 /** Analiza una foto (ya editada y en su encuadre) y devuelve sus líneas; con caché por clave. */
 class PhotoAnnotator(private val context: Context) {
-    suspend fun annotate(bmp: Bitmap, zone: Zone): List<AnnotLine> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+    suspend fun annotate(bmp: Bitmap, zone: Zone, extras: MeasureExtras? = null): List<AnnotLine> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val spec = ZoneAlignment.of(zone)
         if (spec.detector == Detector.FACE) {
             // malla completa de MediaPipe (nariz, labios, ojos y pasillos de los surcos con su topología real)
             val mesh = runCatching { MediaPipeFace(context).use { it.mesh(bmp) } }.getOrNull()
             if (mesh != null && mesh.size >= 468) {
                 val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(bmp) }
-                return@withContext FaceAnnotations.fromMesh(mesh, labels, lumOf(bmp), labOf(bmp))
+                return@withContext FaceAnnotations.fromMesh(mesh, labels, lumOf(bmp), labOf(bmp), extras)
             }
             val pts = LandmarkDetector(stream = false, context, FaceEngine.get(context)).use { it.detect(Detector.FACE, bmp) }
             if (pts.size >= LiveDecision.MIN_POINTS) {
@@ -495,6 +502,19 @@ class PhotoAnnotator(private val context: Context) {
     }
 
     companion object {
+        /**
+         * Relieve y escala guardados de la foto [uri], cargados como la foto (misma edición; [width]
+         * con recorte 3:4 si [crop34], o lado mayor [width] si no).
+         */
+        suspend fun extrasFor(context: Context, uri: android.net.Uri, width: Int, crop34: Boolean): MeasureExtras? {
+            val meta = ReliefStore.meta(context, uri.toString()) ?: return null
+            val edit = PhotoEdits.of(context, uri.toString())
+            val relief = if (!meta.hasRelief) null else ReliefStore.reliefUri(context, uri.toString())?.let { r ->
+                runCatching { if (crop34) ImageOps.load34(context, r, width, edit) else ImageOps.loadFull(context, r, width, edit) }.getOrNull()
+            }?.let { Relief.decode(it) }
+            return MeasureExtras(relief, meta)
+        }
+
         private val cache = object : LinkedHashMap<String, List<AnnotLine>>(16, 0.75f, true) {
             override fun removeEldestEntry(e: MutableMap.MutableEntry<String, List<AnnotLine>>) = size > 40
         }
