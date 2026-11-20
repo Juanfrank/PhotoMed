@@ -2,6 +2,22 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.22 — 20 de noviembre de 2026
+
+- **Revisar la foto al capturar**: tras el disparo se abre la foto en el visor (con capas, medidas y
+  zoom), con **Guardar** y **Repetir**. Repetir la borra y vuelve a la cámara con los mismos ajustes;
+  Guardar (o Atrás) la conserva y, en una secuencia, pasa a la zona siguiente. Mientras se revisa, el
+  análisis en vivo y el disparo automático quedan en pausa.
+- **Comparar desde el visor**: botón en la barra del visor (y en la revisión) que abre Comparar con la
+  foto y la anterior de la misma expresión.
+- **Cejas**: se ajustan a la franja de pelo de la ceja en la imagen cuando la malla las deja arriba o
+  abajo (solo con evidencia clara y coherente; sin tocar gafas ni flequillo). Mejora la altura de la
+  frente (cejas → línea del pelo) y la de la ceja sobre la pupila.
+- **Barba y bigote poco poblados**: se detecta también el vello ralo (barba de pocos días, canas
+  dispersas) y la piel de referencia se toma de puntos centrales que no caen en el fondo con la cara
+  girada. En los retratos de prueba: 6 rostros con vello detectados (antes 5, y con más cobertura),
+  ningún falso positivo en rostros sin vello.
+
 ## 2.21 — 20 de noviembre de 2026
 
 - **Fotos por expresión facial (arrugas dinámicas)**: en la cámara, una fila *Expresión* elige el

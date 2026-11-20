@@ -186,6 +186,8 @@ fun CameraScreen(
     /** Secuencia de zonas (plantilla): tras guardar se pasa a la siguiente; null = fin. */
     sequence: List<Zone> = emptyList(),
     onNext: (Zone?) -> Unit = {},
+    /** Abrir Comparar con estas fotos (desde la revisión tras la captura). */
+    onCompare: (List<String>) -> Unit = {},
 ) = ImmersiveTheme {
     val context = LocalContext.current
     val needed = remember {
@@ -201,7 +203,7 @@ fun CameraScreen(
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (hasPermission) {
-            CameraContent(expId, zone, onBack, sequence, onNext)
+            CameraContent(expId, zone, onBack, sequence, onNext, onCompare)
         } else {
             EmptyState(
                 icon = Icons.Default.NoPhotography,
@@ -219,7 +221,8 @@ fun CameraScreen(
 }
 
 @Composable
-private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequence: List<Zone>, onNext: (Zone?) -> Unit) {
+private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequence: List<Zone>, onNext: (Zone?) -> Unit,
+                          onCompare: (List<String>) -> Unit = {}) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val repo = LocalRepository.current
@@ -244,6 +247,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     val haptics = LocalHapticFeedback.current
     val snackbar = remember { SnackbarHostState() }
     var lastSaved by remember { mutableStateOf<Photo?>(null) }
+    // foto recién tomada en revisión (Guardar / Repetir); se conserva al volver de Comparar
+    var reviewName by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    var lastNear by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var liveMatch by remember { mutableStateOf(true) }
     val prefs = remember { context.getSharedPreferences("photomed", android.content.Context.MODE_PRIVATE) }
     var autoCapture by remember { mutableStateOf(prefs.getBoolean("auto_capture", false)) }
@@ -318,7 +324,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     matcher.useReference = referenceMode
     matcher.expression = expression
     val matchingFlag = remember { AtomicBoolean(false) }
-    matchingFlag.set(matchingEnabled && psPattern == null)
+    matchingFlag.set(matchingEnabled && psPattern == null && reviewName == null)
 
     // Referencia para la coincidencia en vivo: la foto superpuesta (encuadre 3:4), con el motor elegido.
     LaunchedEffect(ghost?.key, matcher, refOrient) {
@@ -589,7 +595,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
      */
     fun reliefCapture() {
         val e = exp ?: return
-        if (capturing) return
+        if (capturing || reviewName != null) return
         capturing = true
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         val conditions = captureConditions() + ("Relief" to "pantalla")
@@ -618,7 +624,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     .also { file.delete() }
                 scope.launch {
                     capturing = false
-                    saved.onSuccess { lastSaved = it; reload++ }.onFailure { snackbar.showSnackbar("No se pudo guardar: ${it.message}") }
+                    saved.onSuccess { lastSaved = it; reload++; lastNear = false; reviewName = it.displayName }.onFailure { snackbar.showSnackbar("No se pudo guardar: ${it.message}") }
                 }
                 val photo = saved.getOrNull() ?: return@launch
                 val msg = runCatching { ReliefCapture.process(context, frames, photo.uri, focal, zoom, depthMm) }
@@ -631,7 +637,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
 
     fun capture() {
         val e = exp ?: return
-        if (capturing) return
+        if (capturing || reviewName != null) return
         if (reliefHi) { reliefCapture(); return }
         capturing = true
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -689,16 +695,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     result.onSuccess {
                         lastSaved = it
                         reload++
-                        val near = conditions["Status"] == MatchStatus.CLOSE.name
-                        val idx = sequence.indexOf(zone)
-                        if (idx >= 0) {
-                            // secuencia: pasa sola a la siguiente zona (o termina) sin esperar al aviso;
-                            // la cabecera de la siguiente muestra "Secuencia i/N"
-                            if (idx + 1 >= sequence.size) android.widget.Toast.makeText(context, "Secuencia completada", android.widget.Toast.LENGTH_SHORT).show()
-                            onNext(sequence.getOrNull(idx + 1))
-                        } else {
-                            snackbar.showSnackbar("Guardada en el álbum ${e.id}" + if (near) " · casi alineada: se alinea en Comparar" else "")
-                        }
+                        lastNear = conditions["Status"] == MatchStatus.CLOSE.name
+                        // se muestra la foto para guardarla o repetirla
+                        reviewName = it.displayName
                     }.onFailure {
                         snackbar.showSnackbar("No se pudo guardar: ${it.message}")
                     }
@@ -1149,6 +1148,27 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 120.dp))
     ScreenFlashOverlay(screenFlash)
     ReliefPatternOverlay(psPattern)
+    reviewName?.let { name ->
+        fun keep() {
+            reviewName = null
+            val idx = sequence.indexOf(zone)
+            if (idx >= 0) {
+                // secuencia: pasa a la siguiente zona (o termina); la cabecera muestra "Secuencia i/N"
+                if (idx + 1 >= sequence.size) android.widget.Toast.makeText(context, "Secuencia completada", android.widget.Toast.LENGTH_SHORT).show()
+                onNext(sequence.getOrNull(idx + 1))
+            } else scope.launch {
+                snackbar.showSnackbar("Guardada en el álbum ${exp?.id.orEmpty()}" + if (lastNear) " · casi alineada: se alinea en Comparar" else "")
+            }
+        }
+        // la revisión tapa la cámara (el análisis en vivo y el disparo automático quedan en pausa)
+        Box(Modifier.fillMaxSize().background(Color.Black).pointerInput(Unit) {}) {
+            com.photomed.app.ui.gallery.PhotoViewerScreen(expId, zone, name, onBack = { reviewName = null; lastSaved = null; reload++ },
+                onCompare = onCompare,
+                review = com.photomed.app.ui.gallery.ReviewActions(onKeep = ::keep, onRetry = {
+                    reviewName = null; lastSaved = null; reload++
+                }))
+        }
+    }
     if (showSettings) {
         MatchSettingsSheet(
             autoCapture = autoCapture,

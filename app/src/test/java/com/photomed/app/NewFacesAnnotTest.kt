@@ -244,7 +244,8 @@ class NewFacesAnnotTest {
             img.recycle(); small.recycle()
         }
         println(report); println("BARBA: $bearded rostros con vello; surcos sobre vello antes ${"%.0f".format(onHairBefore / bearded.coerceAtLeast(1) * 100)} %, ahora ${"%.0f".format(onHairAfter / bearded.coerceAtLeast(1) * 100)} %; falsos en rostros sin vello: $cleanFalse; nasogenianos visibles: sin máscara $nasoBefore, con máscara $nasoAfter")
-        org.junit.Assert.assertTrue(bearded >= 3)
+        // también las barbas poco pobladas (barba corta sobre piel oscura, canas dispersas en el mentón)
+        org.junit.Assert.assertTrue("rostros con vello: $bearded", bearded >= 6)
         org.junit.Assert.assertTrue("los surcos siguen sobre el vello", onHairAfter / bearded <= 0.02f)
         org.junit.Assert.assertTrue(onHairAfter < onHairBefore)
         org.junit.Assert.assertEquals(0, cleanFalse)

@@ -371,6 +371,42 @@ class UsageFlowsTest {
     }
 
     /**
+     * Revisión tras la captura: solo la foto recién tomada, sin «Eliminar», con Guardar y Repetir;
+     * Repetir la borra del expediente. Comparar abre la foto con la anterior de la misma expresión.
+     */
+    @Test
+    fun reviewAfterCaptureKeepsOrRetriesAndOpensCompare() {
+        var kept = 0; var retried = 0; var compared: List<String>? = null
+        val last = photos.last()
+        setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, last.displayName, onBack = {},
+            onCompare = { compared = it },
+            review = com.photomed.app.ui.gallery.ReviewActions(onKeep = { kept++ }, onRetry = { retried++ })) }
+        waitText("Guardar")
+        compose.onNodeWithText("Repetir", substring = true).assertExists()
+        compose.onNodeWithText("1/1", substring = true).assertExists()
+        assertTrue(compose.onAllNodesWithContentDescription("Eliminar").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithContentDescription("Comparar").performClick()
+        assertEquals(listOf(photos[2].displayName, last.displayName), compared)
+        compose.onNodeWithText("Guardar").performClick()
+        assertEquals(1, kept)
+        compose.onNodeWithText("Repetir", substring = true).performClick()
+        compose.waitUntil(5_000) { retried == 1 }
+        assertEquals(3, repo.photos(exp, Zone.LIPS).size)
+        assertTrue(repo.photos(exp, Zone.LIPS).none { it.displayName == last.displayName })
+    }
+
+    /** El visor normal también abre Comparar (y conserva Eliminar). */
+    @Test
+    fun viewerOpensCompare() {
+        var compared: List<String>? = null
+        setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, photos[1].displayName, onBack = {}, onCompare = { compared = it }) }
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Comparar").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Eliminar").assertExists()
+        compose.onNodeWithContentDescription("Comparar").performClick()
+        assertEquals(listOf(photos[0].displayName, photos[1].displayName), compared)
+    }
+
+    /**
      * Expresiones (arrugas dinámicas): Comparar empieza con las fotos en reposo, ofrece filtrar por
      * expresión y avisa si se comparan expresiones distintas.
      */

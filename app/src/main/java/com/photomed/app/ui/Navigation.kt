@@ -108,6 +108,7 @@ fun AppNavigation() {
             val seqArg = entry.arguments?.getString("seq")
             val seq = seqArg?.split(',')?.mapNotNull { Zone.fromId(it) }.orEmpty()
             CameraScreen(expId = exp, zone = zone, onBack = { entry.back() }, sequence = seq,
+                onCompare = { names -> entry.go("compare/$exp?zone=${zone.id}&sel=" + android.net.Uri.encode(names.joinToString("|"))) },
                 onNext = { next ->
                     // secuencia: la cámara de la zona siguiente sustituye a la actual; al final, vuelve
                     if (entry.lifecycle.currentState == Lifecycle.State.RESUMED) {
@@ -132,7 +133,8 @@ fun AppNavigation() {
             val exp = entry.arguments?.getString("exp").orEmpty()
             val zone = Zone.fromId(entry.arguments?.getString("zone")) ?: return@composable
             val name = entry.arguments?.getString("name").orEmpty()
-            PhotoViewerScreen(expId = exp, zone = zone, initialName = name, onBack = { entry.back() })
+            PhotoViewerScreen(expId = exp, zone = zone, initialName = name, onBack = { entry.back() },
+                onCompare = { names -> entry.go("compare/$exp?zone=${zone.id}&sel=" + android.net.Uri.encode(names.joinToString("|"))) })
         }
         composable("settings") { entry -> com.photomed.app.ui.settings.SettingsScreen(onBack = { entry.back() }) }
         composable("about") { entry ->

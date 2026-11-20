@@ -12,10 +12,16 @@ import kotlin.math.roundToInt
  *   pelos; un surco o una arruga son valles suaves y apenas la tienen;
  * - **color sin croma**: el vello (negro, castaño oscuro, gris, blanco) tiene un croma relativo
  *   C*ab / (L* + 10) mucho menor que la piel (la sombra baja L* y C* a la vez y lo conserva).
- * Referencia: piel de las mejillas y la frente (el mínimo de croma, por si hay colorete). Región:
- * óvalo de la cara bajo la base de la nariz, sin los labios. Se descartan manchas pequeñas.
+ * Referencia: piel de las mejillas junto a la nariz y de la frente (el mínimo de croma, por si hay
+ * colorete); son puntos centrales que siguen sobre la piel aunque la cara esté girada (los de la
+ * mejilla externa caían en el fondo y la referencia salía mal). Además del vello poblado se detecta el
+ * ralo (barba de pocos días, canas dispersas): textura algo mayor que la de la piel con menos croma.
+ * Región: óvalo de la cara bajo la base de la nariz, sin los labios. Se descartan manchas pequeñas.
  */
 object FacialHair {
+    /** Vello poco poblado: textura sobre la de la piel × [SPARSE_E] y croma relativo bajo × [SPARSE_C]. */
+    const val SPARSE_E = 1.6f
+    const val SPARSE_C = 0.75f
     class Result(val width: Int, val height: Int, val mask: BooleanArray, val fraction: Float) {
         /** ¿Vello en [p] (unidades del ancho)? */
         operator fun get(p: Pt): Boolean {
@@ -34,7 +40,7 @@ object FacialHair {
     fun fromMesh(lab: LabImage, mesh: List<Pt>): Result? {
         if (mesh.size < 468) return null
         val faceW = hypot(mesh[234].x - mesh[454].x, mesh[234].y - mesh[454].y)
-        return detect(lab, OVAL.map { mesh[it] }, mesh[2].y, LIPS.map { mesh[it] }, listOf(mesh[50], mesh[280], mesh[151]), faceW)
+        return detect(lab, OVAL.map { mesh[it] }, mesh[2].y, LIPS.map { mesh[it] }, listOf(mesh[205], mesh[425], mesh[151]), faceW)
     }
 
     /**
@@ -77,7 +83,9 @@ object FacialHair {
         for (i in 0 until n) {
             if (!reg[i] || i / w < top || lipMask?.get(i) == true) continue
             val c = chroma[i]; val e = energy[i]
-            m.data[i] = (c < 0.55f * refC && e > 1.2f * em) || (e > thr && c < 0.8f * refC)
+            m.data[i] = (c < 0.55f * refC && e > 1.2f * em) || (e > thr && c < 0.8f * refC) ||
+                // vello ralo (barba de pocos días, canas dispersas): algo de textura y menos croma
+                (e > SPARSE_E * em && c < SPARSE_C * refC)
         }
         // limpieza: apertura 3 × 3, cierre ~7 × 7 y sin manchas pequeñas
         var mm = MaskOps.erode(m, 1); mm = MaskOps.dilate(mm, 1)

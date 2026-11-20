@@ -595,3 +595,30 @@ bandas platismales, cada una con su gesto.
   ancho de boca) pasa su umbral.
 - Fantasma, fotos anteriores del visor, referencia de líneas previas y Comparar usan solo fotos con la
   misma expresión: comparar reposo contra contracción mezcla arrugas estáticas y dinámicas.
+
+## Cejas ajustadas a la imagen (2.22; `BrowRefine.kt`)
+
+La malla de cejas (MediaPipe, y más aún ML Kit) a veces queda por encima o por debajo del pelo de la
+ceja; como la altura de la frente se mide desde la ceja, el error pasa a la línea del pelo.
+
+- 13 columnas perpendiculares a la línea de los ojos, a lo largo de la ceja; en cada una se busca,
+  a ±8 % de la interpupilar, la franja del grosor de la ceja con más textura fina (pelo) que la piel de
+  encima y de debajo y más oscura (o algo más clara, si es canosa). Comparar con las dos franjas evita
+  confundirla con una arruga (fina) o con la sombra del párpado (lisa).
+- Solo se mueve si más de la mitad de las columnas la encuentran y coinciden (mediana de las
+  desviaciones < 2 % de la interpupilar), y como mucho un 6 %; toda la ceja se desplaza la mediana,
+  conservando la forma de la malla. Las columnas sobre gafas, pelo o fondo (segmentación) no cuentan.
+- Se aplica a las líneas y medidas del visor y a la altura de la frente guardada al capturar.
+
+## Vello facial poco poblado (2.22; `FacialHair.kt`)
+
+- Referencias de piel: puntos 205 y 425 (mejilla junto a la nariz) y 151 (frente). Los de la mejilla
+  externa (50, 280) caían en el fondo con la cara girada y la referencia de croma salía mal.
+- Regla nueva para el vello ralo: textura > 1,6 × la de la piel y croma relativo < 0,75 × el de la
+  piel (además de las del vello poblado). Validado en los 18 retratos: 6 con vello, 0 falsos positivos.
+
+## Revisión tras la captura (2.22)
+
+La foto se guarda al disparar (para no perderla si se cierra la app) y se abre el visor en modo
+revisión sobre la cámara: Guardar la conserva; Repetir la elimina del álbum y del expediente. El
+estado de la cámara (zona, expresión, zoom, ajustes) se conserva; el análisis en vivo se detiene.

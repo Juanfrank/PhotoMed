@@ -33,6 +33,9 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.CompareArrows
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.PrivacyTip
@@ -75,9 +78,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Revisión tras la captura: la foto recién tomada, con Guardar (se queda) o Repetir (se elimina). */
+class ReviewActions(val onKeep: () -> Unit, val onRetry: () -> Unit)
+
+/**
+ * Visor de fotos de una zona. [onCompare]: abre Comparar con las fotos dadas (nombres). [review]:
+ * modo revisión tras la captura (solo la foto recién tomada, con Guardar y Repetir).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: () -> Unit) = ImmersiveTheme {
+fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: () -> Unit,
+                      onCompare: ((List<String>) -> Unit)? = null, review: ReviewActions? = null) = ImmersiveTheme {
     val repo = LocalRepository.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -107,13 +118,22 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
 
     LaunchedEffect(reload) {
         photos = withContext(Dispatchers.IO) { repo.getExpediente(expId)?.let { repo.photos(it, zone) }.orEmpty() }
-        if (photos.isNullOrEmpty()) onBack()
+        if (photos.isNullOrEmpty() || (review != null && photos.orEmpty().none { it.displayName == initialName })) onBack()
     }
-    val list = photos ?: return@ImmersiveTheme
+    // en revisión: solo la foto recién tomada (las anteriores siguen sirviendo de referencia)
+    val all = photos ?: return@ImmersiveTheme
+    val list = if (review != null) all.filter { it.displayName == initialName } else all
     if (list.isEmpty()) return@ImmersiveTheme
     val pager = rememberPagerState(initialPage = list.indexOfFirst { it.displayName == initialName }.coerceAtLeast(0)) { list.size }
     val current = list[pager.currentPage.coerceIn(0, list.lastIndex)]
-    val galleryDelete = rememberGalleryDelete { ok -> if (ok) reload++ }
+    var retrying by remember { mutableStateOf(false) }
+    val galleryDelete = rememberGalleryDelete { ok ->
+        if (retrying) { retrying = false; if (ok) review?.onRetry?.invoke() } else if (ok) reload++
+    }
+    if (review != null) androidx.activity.compose.BackHandler(onBack = review.onKeep)
+    /** Comparar: la foto actual y la anterior con la misma expresión (si la hay). */
+    fun compareNames(p: Photo): List<String> =
+        listOfNotNull(all.filter { it.takenAt < p.takenAt && it.expression == p.expression }.maxByOrNull { it.takenAt }?.displayName, p.displayName)
 
     Scaffold(
         containerColor = Color.Black,
@@ -127,8 +147,11 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
+                navigationIcon = { IconButton(onClick = review?.onKeep ?: onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
                 actions = {
+                    if (onCompare != null) IconButton(onClick = { onCompare(compareNames(current)) }) {
+                        Icon(Icons.Default.CompareArrows, "Comparar")
+                    }
                     IconButton(onClick = { showLayers = !showLayers }) {
                         Icon(Icons.Default.Layers, if (showLayers) "Ocultar capas" else "Capas: contorno, línea del pelo, rasgos y surcos")
                     }
@@ -151,11 +174,27 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                             )
                         }
                     }
-                    IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Eliminar") }
+                    if (review == null) IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Eliminar") }
                 }
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
+        bottomBar = {
+            if (review != null) androidx.compose.foundation.layout.Row(
+                Modifier.fillMaxWidth().background(Color.Black).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+                androidx.compose.material3.OutlinedButton(enabled = !retrying, modifier = Modifier.weight(1f), onClick = {
+                    retrying = true
+                    scope.launch { galleryDelete(withContext(Dispatchers.IO) {
+                        com.photomed.app.align.ReliefStore.delete(context, current.uri.toString()); repo.deletePhotos(listOf(current)) }) }
+                }) {
+                    Icon(Icons.Default.Replay, null); androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 8.dp)); Text("Repetir", color = Color.White)
+                }
+                androidx.compose.material3.Button(onClick = review.onKeep, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.Check, null); androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 8.dp)); Text("Guardar")
+                }
+            }
+        },
     ) { padding ->
         androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().padding(padding).background(Color.Black)) {
             // selector de capas (arrugas, rasgos…) encima de la foto
@@ -181,7 +220,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     selected = selected, analyze = showLayers, alpha = annotAlpha.value,
                     // referencia: fotos anteriores de la misma zona (la más reciente primero)
                     // (solo con la misma expresión: las arrugas dinámicas aparecen con el gesto)
-                    previous = list.filter { it.takenAt < ph.takenAt && it.expression == ph.expression }.sortedByDescending { it.takenAt }.map { it.uri.toString() },
+                    previous = all.filter { it.takenAt < ph.takenAt && it.expression == ph.expression }.sortedByDescending { it.takenAt }.map { it.uri.toString() },
                     userVersion = userVersion, tracing = tracing && page == pager.currentPage,
                     onTraceRect = { rect, aspect ->
                         tracing = false

@@ -286,7 +286,11 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     /** Altura de la frente (cejas → línea de implantación) / interpupilar en una foto; null si no se mide. */
     fun hairlineIpd(photo: Bitmap): Float? = if (!tracksHairline) null else runCatching {
         val d = detector.detectFull(spec.detector, photo)
-        hairSkin?.labels(photo)?.let { HairSkin.hairline(it, d.points)?.heightIpd }
+        // cejas ajustadas a la imagen antes de medir la frente
+        hairSkin?.labels(photo)?.let { lb ->
+            val pts = runCatching { BrowRefine.refineKeys(d.points, FaceCrop.lum(photo), lb) }.getOrDefault(d.points)
+            HairSkin.hairline(lb, pts)?.heightIpd
+        }
     }.getOrNull()
 
     override fun close() { detector.close(); runCatching { segmenterOrNull?.close() }; runCatching { if (hairSkinLazy.isInitialized()) hairSkinLazy.value?.close() } }

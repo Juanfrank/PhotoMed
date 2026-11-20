@@ -151,14 +151,16 @@ object FaceAnnotations {
      * contorno de las alas) y labios con su topología real; surcos detectados en la imagen
      * ([RidgeTracker]) dentro de pasillos definidos por la malla, solo si se encuentran.
      */
-    fun fromMesh(mesh: List<Pt>, labels: FaceLabels?, lum: GrayImage?, lab: LabImage? = null, extras: MeasureExtras? = null,
+    fun fromMesh(meshIn: List<Pt>, labels: FaceLabels?, lum: GrayImage?, lab: LabImage? = null, extras: MeasureExtras? = null,
                  /** Datos del análisis para el aviso al usuario (p. ej. "vello": fracción con barba o bigote). */
                  info: MutableMap<String, Float>? = null,
                  /** Arrugas y surcos de fotos anteriores del paciente (coordenadas de la cara), como referencia. */
                  priors: List<PriorLine> = emptyList(),
                  /** Trazos añadidos a mano (mismas coordenadas que [mesh]). */
                  added: List<List<Pt>> = emptyList()): List<AnnotLine> {
-        if (mesh.size < 468) return face(keysFromMesh(mesh), labels, lum)
+        if (meshIn.size < 468) return face(keysFromMesh(meshIn), labels, lum)
+        // cejas ajustadas a su borde en la imagen (la malla a veces las deja arriba o abajo del pelo)
+        val mesh = if (lum != null) runCatching { BrowRefine.refineMesh(meshIn, lum, labels) }.getOrDefault(meshIn) else meshIn
         val keys = FaceKeys.canonical(keysFromMesh(mesh))
         val out = ArrayList<AnnotLine>()
         val snapped = if (labels != null) HairSkin.snapOval(labels, keys) else keys
