@@ -59,7 +59,7 @@ fun metricRows(m: LineMetrics): List<Pair<String, String>> =
         "Contraste ΔL*" to f1(m.contrastL),
         "Grado orientativo (0–5)" to (m.grade?.let { "$it · ${gradeLabel(it)}" } ?: "—"),
         "Escala" to scaleLabel(m.scale),
-    )
+    ) + listOfNotNull(m.note?.let { "Nota" to it })
 
 fun scaleLabel(s: String) = when (s) {
     "sensor de profundidad" -> "sensor de profundidad"
@@ -193,7 +193,7 @@ fun MetricsSheet(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
                         TableRow(listOf(if (area) "Zona" else "Línea") + cols, header = true)
                         rows.forEach { (name, v) ->
                             val m = v.second[0]
-                            TableRow(listOf(name) + (if (area) areaVals(m) else lineVals(m)).take(cols.size).mapIndexed { i, x -> fmt(i, x, area) }, dot = v.first)
+                            TableRow(listOf(name + if (m?.note != null) " ✱" else "") + (if (area) areaVals(m) else lineVals(m)).take(cols.size).mapIndexed { i, x -> fmt(i, x, area) }, dot = v.first)
                         }
                     } else {
                         val head = columns.map { it.first.replace(", ", "\n") }
@@ -203,7 +203,7 @@ fun MetricsSheet(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
                                 val vals = v.second.map { m -> (if (area) areaVals(m) else lineVals(m))[i] }
                                 val first = vals.firstOrNull { it != null }; val last = vals.lastOrNull { it != null }
                                 val delta = if (first != null && last != null && vals.count { it != null } >= 2) last - first else null
-                                TableRow(listOf(if (i == 0) "$name\n${c.replace("\n", " ")}" else "   ${c.replace("\n", " ")}") +
+                                TableRow(listOf(if (i == 0) "$name${if (v.second.any { it?.note != null }) " ✱" else ""}\n${c.replace("\n", " ")}" else "   ${c.replace("\n", " ")}") +
                                     vals.map { fmt(i, it, area) } + signed(delta, if (!area && i == 2) 2 else 1), dot = if (i == 0) v.first else null)
                             }
                             HorizontalDivider()

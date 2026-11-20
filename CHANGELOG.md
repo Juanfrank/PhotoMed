@@ -2,6 +2,15 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.16 — 20 de noviembre de 2026
+
+- **Barba y bigote ya no distorsionan los surcos.** La segmentación los clasificaba como piel del
+  rostro, así que el nasogeniano y la marioneta se trazaban sobre el vello y se desviaban a sus
+  bordes oscuros. Ahora se detecta el vello facial (textura fina y color sin croma frente a la piel de
+  mejillas y frente) y los surcos se trazan y miden solo sobre la piel visible; las líneas
+  parcialmente cubiertas llevan una nota (✱ en la tabla) y la foto, un aviso. En 18 retratos: trazos
+  sobre vello del 28 % al 0 % en los 5 con barba o bigote, sin falsos positivos en los demás.
+
 ## 2.15.5 — 20 de noviembre de 2026
 
 - **Corrección de raíz: MediaPipe no se iniciaba en la app instalada.** La minimización (R8)

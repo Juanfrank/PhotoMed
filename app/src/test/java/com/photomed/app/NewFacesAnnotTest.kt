@@ -187,4 +187,60 @@ class NewFacesAnnotTest {
         println("SIN MALLA: surcos medidos en $withMeasured de $faces rostros ($total líneas)")
         org.junit.Assert.assertTrue(withMeasured >= faces * 0.7)
     }
+
+    /**
+     * Barba y bigote: la segmentación los da como piel, así que los surcos se trazaban sobre el vello.
+     * Con [com.photomed.app.align.FacialHair] los surcos van solo por piel visible. Los rostros sin
+     * vello no deben marcarlo. Genera build/reports/beard/ (antes | ahora, vello en magenta).
+     */
+    @Test
+    fun foldsAvoidBeardAndMustache() {
+        val json = javaClass.getResourceAsStream("/stock/new/mesh.json")?.bufferedReader()?.readText()
+        assumeTrue("sin retratos nuevos", json != null)
+        val o = JSONObject(json!!)
+        val dir = File("build/reports/beard").apply { mkdirs() }
+        var bearded = 0; var onHairBefore = 0f; var onHairAfter = 0f; var cleanFalse = 0
+        val report = StringBuilder()
+        for (k in o.keys().asSequence().sorted()) {
+            val arr = o.getJSONArray(k)
+            val mesh = (0 until arr.length()).map { i -> arr.getJSONArray(i).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1).toFloat()) } }
+            val img = javaClass.getResourceAsStream("/stock/new/$k.jpg")?.let { BitmapFactory.decodeStream(it) } ?: continue
+            val labBmp = javaClass.getResourceAsStream("/stock/new/${k}_labels.png")?.let { BitmapFactory.decodeStream(it) }
+            val labels = labBmp?.let { b -> val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
+                FaceLabels(b.width, b.height, ByteArray(px.size) { Color.red(px[it]).toByte() }) }
+            val sw = 480; val sh = img.height * sw / img.width
+            val small = Bitmap.createScaledBitmap(img, sw, sh, true)
+            val px = IntArray(sw * sh).also { small.getPixels(it, 0, sw, 0, 0, sw, sh) }
+            val lum = GrayImage(sw, sh, FloatArray(px.size) { i -> val c = px[i]; (0.299f * Color.red(c) + 0.587f * Color.green(c) + 0.114f * Color.blue(c)) / 255f })
+            val lab = com.photomed.app.align.LabImage.fromArgb(px, sw, sh)
+            val hair = com.photomed.app.align.FacialHair.fromMesh(lab, mesh) ?: continue
+            // antes: sin la máscara de vello (sin Lab); ahora: con ella
+            val before = FaceAnnotations.fromMesh(mesh, labels, lum).filter { it.layer == AnnotLayer.FOLDS }
+            val after = FaceAnnotations.fromMesh(mesh, labels, lum, lab).filter { it.layer == AnnotLayer.FOLDS }
+            fun onHair(ls: List<com.photomed.app.align.AnnotLine>) = ls.flatMap { it.points }.let { pts -> if (pts.isEmpty()) 0f else hair.cover(pts) }
+            report.append("$k vello ${"%.0f".format(hair.fraction * 100)} %: surcos sobre vello antes ${"%.0f".format(onHair(before) * 100)} %, ahora ${"%.0f".format(onHair(after) * 100)} %\n")
+            if (hair.fraction >= 0.15f) { bearded++; onHairBefore += onHair(before); onHairAfter += onHair(after) }
+            if (k in setOf("px_1066116", "px_5990259", "px_638196", "px_8727557", "px_8558898", "px_29716433")) if (hair.fraction > 0.03f) cleanFalse++
+            // imagen antes | ahora (solo con vello)
+            if (hair.fraction >= 0.15f) {
+                val out = Bitmap.createBitmap(sw * 2, sh, Bitmap.Config.ARGB_8888); val c = Canvas(out)
+                for ((j, ls) in listOf(before, after).withIndex()) {
+                    c.save(); c.translate((j * sw).toFloat(), 0f); c.drawBitmap(small, 0f, 0f, null)
+                    if (j == 1) { val mp = Paint().apply { color = 0x66FF00FF }
+                        for (y in 0 until sh step 2) for (x in 0 until sw step 2) if (hair.mask[y * sw + x]) c.drawRect(x.toFloat(), y.toFloat(), x + 2f, y + 2f, mp) }
+                    for (l in ls) { val path = android.graphics.Path(); l.points.forEachIndexed { i, q -> if (i == 0) path.moveTo(q.x * sw, q.y * sw) else path.lineTo(q.x * sw, q.y * sw) }
+                        c.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 4f; color = 0x88000000.toInt() })
+                        c.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2f; color = Color.rgb(255, 171, 145) }) }
+                    c.restore()
+                }
+                File(dir, "$k.jpg").outputStream().use { out.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+            }
+            img.recycle(); small.recycle()
+        }
+        println(report); println("BARBA: $bearded rostros con vello; surcos sobre vello antes ${"%.0f".format(onHairBefore / bearded.coerceAtLeast(1) * 100)} %, ahora ${"%.0f".format(onHairAfter / bearded.coerceAtLeast(1) * 100)} %; falsos en rostros sin vello: $cleanFalse")
+        org.junit.Assert.assertTrue(bearded >= 3)
+        org.junit.Assert.assertTrue("los surcos siguen sobre el vello", onHairAfter / bearded <= 0.02f)
+        org.junit.Assert.assertTrue(onHairAfter < onHairBefore)
+        org.junit.Assert.assertEquals(0, cleanFalse)
+    }
 }

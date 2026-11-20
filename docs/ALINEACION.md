@@ -504,3 +504,18 @@ marioneta 0,8 mm, ceño 0,5 mm, frente 0,4 mm, patas de gallo 0,4 mm; rostro jov
   ruido limita las arrugas muy finas; la piel no es perfectamente lambertiana (dispersión
   subsuperficial, brillos), lo que tiende a suavizar el relieve. No hay validación en personas frente
   a perfilometría.
+
+## Barba y bigote (`FacialHair.kt`)
+
+La segmentación multiclase etiqueta la barba y el bigote como piel del rostro (en 5 retratos con
+vello: 0–10 % de «pelo» bajo la nariz), así que no servía para excluirlos. Detector propio en la
+parte inferior del óvalo (bajo la base de la nariz, sin labios), a la escala de la cara (~400 px):
+- energía de textura fina E = media 9 × 9 de |L* − G_σ1(L*)|; piel de referencia: discos en las
+  mejillas (50, 280) y la frente (151); umbral T = máx(2,2 · mediana, 1,6 · p90);
+- croma relativo c = C*ab / (L* + 10) (estable con la sombra); referencia: el menor de los discos;
+- vello si (c < 0,55 · c_ref y E > 1,2 · mediana) o (E > T y c < 0,8 · c_ref); apertura, cierre y
+  sin manchas < 0,4 % del área de la cara.
+Los surcos usan «piel y no vello» en el trazado (`RidgeTracker`) y se recortan al tramo fuera del
+vello; con ML Kit, el ajuste a la sombra ignora el vello y no se mide una línea con > 35 % sobre él.
+`foldsAvoidBeardAndMustache`: trazos sobre vello 28 % → 0 % en los 5 rostros con barba o bigote;
+ningún falso positivo en los rostros sin vello.

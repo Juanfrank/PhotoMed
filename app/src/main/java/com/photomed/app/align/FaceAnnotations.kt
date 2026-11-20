@@ -30,7 +30,7 @@ data class AnnotLine(val layer: AnnotLayer, val points: List<Pt>, val closed: Bo
  *   luminancia perpendicular a la línea) si hay contraste suficiente; si no, se marcan como estimados.
  */
 object FaceAnnotations {
-    fun face(points: Map<String, Pt>, labels: FaceLabels?, lum: GrayImage?): List<AnnotLine> {
+    fun face(points: Map<String, Pt>, labels: FaceLabels?, lum: GrayImage?, lab: LabImage? = null, info: MutableMap<String, Float>? = null): List<AnnotLine> {
         var p = FaceKeys.canonical(points)
         if (labels != null) p = HairSkin.snapOval(labels, p)
         val out = ArrayList<AnnotLine>()
@@ -65,10 +65,25 @@ object FaceAnnotations {
         // surcos (estimados y ajustados al valle de sombra), con medidas si se ajustaron a la sombra
         // (escala por la distancia interpupilar media; lado según la imagen)
         val scale = (LineMeasure.IPD_MM / ipd) to "interpupilar"
-        fun measured(l: AnnotLine, name: String, s: Float): AnnotLine =
-            if (l.estimated || lum == null) l
-            else l.copy(metrics = LineMeasure.line("$name (${if (s < 0) "izquierda" else "derecha"} de la imagen)", l.points, lum, scale,
-                halfMm = if (name == "Nasogeniano") 5f else 4f))
+        // barba y bigote (bajo la nariz): el ajuste a la sombra no puede ir al vello oscuro
+        val hair = run {
+            val nb = p["nose_bottom_1"]; val ov = g("oval_", 36)
+            if (lab == null || nb == null || ov == null) null else runCatching {
+                val lipsPoly = g("lip_upper_top_", 11)?.let { t -> g("lip_lower_bottom_", 9)?.let { b -> t + b } }
+                val cheeks = listOf(Pt(el.x, (el.y + nb.y) / 2), Pt(er.x, (er.y + nb.y) / 2))
+                val forehead = at(Pt((el.x + er.x) / 2, (el.y + er.y) / 2), 0f, 0.55f)
+                FacialHair.detect(lab, ov, nb.y, lipsPoly, cheeks + forehead, (ov.maxOf { it.x } - ov.minOf { it.x }).coerceAtLeast(ipd * 1.5f))
+            }.getOrNull()
+        }?.takeIf { it.fraction >= 0.02f }
+        hair?.let { info?.put("vello", it.fraction) }
+        fun measured(l: AnnotLine, name: String, s: Float): AnnotLine {
+            if (l.estimated || lum == null) return l
+            val covered = hair?.cover(l.points) ?: 0f
+            // casi todo sobre vello: no se mide (sería el borde de la barba, no un surco)
+            if (covered > 0.35f) return l.copy(estimated = true)
+            return l.copy(metrics = LineMeasure.line("$name (${if (s < 0) "izquierda" else "derecha"} de la imagen)", l.points, lum, scale,
+                halfMm = if (name == "Nasogeniano") 5f else 4f).copy(note = if (covered > 0.1f) "Parcialmente sobre barba o bigote" else null))
+        }
         val oval = g("oval_", 36)
         if (alaL != null && alaR != null && upTop != null) {
             val (aL, aR) = if (alaL.x <= alaR.x) alaL to alaR else alaR to alaL
@@ -76,14 +91,14 @@ object FaceAnnotations {
             for ((ala, corner, s) in listOf(Triple(aL, cL, -1f), Triple(aR, cR, 1f))) {
                 // nasogeniano: del ala, por fuera de la comisura
                 val nl = curve(at(ala, s * 0.10f, 0.02f), at(lerp(ala, corner, 0.5f), s * 0.20f, 0f), at(corner, s * 0.13f, -0.10f))
-                out += measured(refine(AnnotLayer.FOLDS, nl, lum, ipd), "Nasogeniano", s)
+                out += measured(refine(AnnotLayer.FOLDS, nl, lum, ipd, hair), "Nasogeniano", s)
                 // línea de marioneta: de la comisura hacia el borde mandibular
                 if (oval != null) {
                     val target = at(corner, s * 0.05f, -0.75f)
                     val jaw = oval.minBy { dist(it, target) }
                     val e = lerp(corner, jaw, 0.6f)
                     val ml = curve(at(corner, s * 0.03f, -0.04f), at(lerp(corner, e, 0.5f), s * 0.03f, 0f), e)
-                    out += measured(refine(AnnotLayer.FOLDS, ml, lum, ipd), "Marioneta", s)
+                    out += measured(refine(AnnotLayer.FOLDS, ml, lum, ipd, hair), "Marioneta", s)
                 }
             }
         }
@@ -136,7 +151,9 @@ object FaceAnnotations {
      * contorno de las alas) y labios con su topología real; surcos detectados en la imagen
      * ([RidgeTracker]) dentro de pasillos definidos por la malla, solo si se encuentran.
      */
-    fun fromMesh(mesh: List<Pt>, labels: FaceLabels?, lum: GrayImage?, lab: LabImage? = null, extras: MeasureExtras? = null): List<AnnotLine> {
+    fun fromMesh(mesh: List<Pt>, labels: FaceLabels?, lum: GrayImage?, lab: LabImage? = null, extras: MeasureExtras? = null,
+                 /** Datos del análisis para el aviso al usuario (p. ej. "vello": fracción con barba o bigote). */
+                 info: MutableMap<String, Float>? = null): List<AnnotLine> {
         if (mesh.size < 468) return face(keysFromMesh(mesh), labels, lum)
         val keys = FaceKeys.canonical(keysFromMesh(mesh))
         val out = ArrayList<AnnotLine>()
@@ -152,21 +169,35 @@ object FaceAnnotations {
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_ALA_L).toTypedArray(), perSeg = 4), false)
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_TIP).toTypedArray(), perSeg = 6), false)
         out += AnnotLine(AnnotLayer.LIPS, chain(LIPS_OUTER), true); out += AnnotLine(AnnotLayer.LIPS, chain(LIPS_INNER), true)
-        if (lum != null) out += folds(mesh, lum, labels, lab, extras)
+        if (lum != null) out += folds(mesh, lum, labels, lab, extras, info)
         return out
     }
 
     /** Surcos detectados en la imagen (solo los encontrados), con el ancho del pasillo según la cara y sus medidas. */
-    fun folds(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels? = null, lab: LabImage? = null, extras: MeasureExtras? = null): List<AnnotLine> {
+    fun folds(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels? = null, lab: LabImage? = null, extras: MeasureExtras? = null,
+              info: MutableMap<String, Float>? = null): List<AnnotLine> {
         val faceW = dist(mesh[234], mesh[454]).coerceAtLeast(1e-3f)
-        val skin = labels?.let { l -> { q: Pt -> l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()] == FaceLabels.FACE_SKIN } }
+        // barba y bigote: la segmentación los da como piel; los surcos solo se trazan sobre piel visible
+        val hair = lab?.let { runCatching { FacialHair.fromMesh(it, mesh) }.getOrNull() }
+        hair?.let { info?.put("vello", it.fraction) }
+        val skinLab = labels?.let { l -> { q: Pt -> l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()] == FaceLabels.FACE_SKIN } }
+        val skin: ((Pt) -> Boolean)? = if (hair == null || hair.fraction < 0.02f) skinLab
+            else { q: Pt -> (skinLab?.invoke(q) ?: true) && !hair[q] }
         val sc = scaleOf(mesh, extras)
         val folds = FOLD_CORRIDORS.mapIndexedNotNull { i, (name, idx) ->
             RidgeTracker.track(lum, idx.map { mesh[it] }, corridorHalf(name) * faceW, skin = skin,
                 anchorStart = name == "nasogeniano")?.let { r ->
                 val label = "${name.replaceFirstChar { it.uppercase() }} ${if (i % 2 == 0) "derecho" else "izquierdo"}"
-                AnnotLine(AnnotLayer.FOLDS, r.points, false,
-                    metrics = sc?.let { LineMeasure.line(label, r.points, lum, it, halfMm = if (name == "nasogeniano") 5f else 4f, relief = extras?.relief) })
+                // sin colas sobre el vello: tramo más largo fuera de él (el nasogeniano, desde el ala)
+                val pts = hair?.let { offHair(r.points, it, fromStart = name == "nasogeniano") } ?: r.points
+                if (pts.size < 5) return@mapIndexedNotNull null
+                // parte del recorrido anatómico del surco bajo barba o bigote: se mide solo lo visible
+                val axis = curve(*idx.map { mesh[it] }.toTypedArray(), perSeg = 6)
+                val covered = hair?.cover(axis) ?: 0f
+                val note = if (covered > 0.2f) "Parcialmente cubierto por barba o bigote (${(covered * 100).roundToInt()} % del recorrido): " +
+                    "se traza y mide solo la parte visible" else null
+                AnnotLine(AnnotLayer.FOLDS, pts, false,
+                    metrics = sc?.let { LineMeasure.line(label, pts, lum, it, halfMm = if (name == "nasogeniano") 5f else 4f, relief = extras?.relief).copy(note = note) })
             }
         }
         return folds + wrinkles(mesh, lum, labels, faceW, lab, extras)
@@ -345,6 +376,22 @@ object FaceAnnotations {
 
     private fun mid(a: Pt, b: Pt) = Pt((a.x + b.x) / 2, (a.y + b.y) / 2)
 
+    /**
+     * Tramo de [pts] fuera del vello (con un margen de ~2 px): el más largo, o con [fromStart] el
+     * que empieza en el primer punto (si el primero no está sobre vello).
+     */
+    private fun offHair(pts: List<Pt>, hair: FacialHair.Result, fromStart: Boolean): List<Pt> {
+        val d = 2f / hair.width
+        val bad = pts.map { q -> hair[q] || hair[Pt(q.x + d, q.y)] || hair[Pt(q.x - d, q.y)] || hair[Pt(q.x, q.y + d)] || hair[Pt(q.x, q.y - d)] }
+        if (bad.none { it }) return pts
+        if (fromStart && !bad[0]) return pts.subList(0, bad.indexOf(true))
+        var best = 0 until 0; var a = -1
+        for (i in 0..pts.size) {
+            if (i < pts.size && !bad[i]) { if (a < 0) a = i } else if (a >= 0) { if (i - a > best.count()) best = a until i; a = -1 }
+        }
+        return pts.slice(best)
+    }
+
     /** Escala en mm: la del iris, corregida con el sensor de profundidad si se midió al tomar la foto. */
     private fun scaleOf(mesh: List<Pt>, extras: MeasureExtras?): Pair<Float, String>? {
         val s = LineMeasure.scale(mesh) ?: return null
@@ -402,7 +449,7 @@ object FaceAnnotations {
      * Ajusta una línea estimada al valle de luminancia más cercano (perpendicular a la línea,
      * ±6 % de la interpupilar). Se acepta si el valle tiene contraste (≥ 3 niveles de 255 de media).
      */
-    fun refine(layer: AnnotLayer, line: List<Pt>, lum: GrayImage?, ipd: Float): AnnotLine {
+    fun refine(layer: AnnotLayer, line: List<Pt>, lum: GrayImage?, ipd: Float, hair: FacialHair.Result? = null): AnnotLine {
         if (lum == null || line.size < 4) return AnnotLine(layer, line, false, estimated = true)
         val w = lum.width.toFloat()
         fun l(q: Pt): Float {
@@ -423,7 +470,10 @@ object FaceAnnotations {
             var best = 0f; var bestL = Float.MAX_VALUE; var sum = 0f; var cnt = 0
             for (k in -steps..steps) {
                 val d = r * k / steps
-                val v = l(Pt(line[i].x + nx * d, line[i].y + ny * d)); if (v.isNaN()) continue
+                val q = Pt(line[i].x + nx * d, line[i].y + ny * d)
+                // el vello (más oscuro que la piel) no cuenta como valle de sombra
+                if (hair?.get(q) == true) continue
+                val v = l(q); if (v.isNaN()) continue
                 sum += v; cnt++
                 if (v < bestL) { bestL = v; best = d }
             }
@@ -527,14 +577,15 @@ object FaceCrop {
      * Líneas de la cara de [src] (malla [mesh] en unidades de su ancho), analizadas en el recorte.
      * [labelsOf]: segmentación pelo / piel del recorte.
      */
-    fun annotate(mesh: List<Pt>, src: Bitmap, labelsOf: (Bitmap, Crop) -> FaceLabels?, extras: MeasureExtras? = null): List<AnnotLine> {
+    fun annotate(mesh: List<Pt>, src: Bitmap, labelsOf: (Bitmap, Crop) -> FaceLabels?, extras: MeasureExtras? = null,
+                 info: MutableMap<String, Float>? = null): List<AnnotLine> {
         val c = crop(mesh, src.width, src.height)
         val b = bitmap(src, c)
         val m = mesh.map { c.toCrop(it) }
         val labels = runCatching { labelsOf(b, c) }.getOrNull()
         val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
         val ex = extras?.let { e -> MeasureExtras(e.relief?.let { relief(it, c, b.width, b.height) }, e.meta) }
-        val lines = FaceAnnotations.fromMesh(m, labels, lum(b), LabImage.fromArgb(px, b.width, b.height), ex)
+        val lines = FaceAnnotations.fromMesh(m, labels, lum(b), LabImage.fromArgb(px, b.width, b.height), ex, info)
         if (b !== src) b.recycle()
         return lines.map { l -> l.copy(points = l.points.map { c.toPhoto(it) }) }
     }
@@ -549,6 +600,7 @@ class PhotoAnnotator(private val context: Context) {
      * zona corporal…).
      */
     suspend fun analyze(bmp: Bitmap, zone: Zone, extras: MeasureExtras? = null): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        if (!enabled) return@withContext emptyList<AnnotLine>() to "Análisis no disponible"
         val spec = ZoneAlignment.of(zone)
         if (spec.detector == Detector.FACE) {
             // malla completa de MediaPipe (nariz, labios, ojos y pasillos de los surcos con su topología real)
@@ -556,11 +608,12 @@ class PhotoAnnotator(private val context: Context) {
             if (mesh != null && mesh.size >= 468) {
                 // análisis en el recorte de la cara a resolución fija (ver FaceCrop)
                 val seg = HairSkinSegmenter.createOrNull(context)
+                val info = HashMap<String, Float>()
                 val lines = try {
-                    FaceCrop.annotate(mesh, bmp, { b, _ -> seg?.labels(b) }, extras)
+                    FaceCrop.annotate(mesh, bmp, { b, _ -> seg?.labels(b) }, extras, info)
                 } finally { seg?.close() }
                 val note = if (lines.none { it.metrics != null }) "No se encontraron arrugas ni surcos medibles en esta foto (piel lisa, " +
-                    "poca resolución de la cara o luz muy plana)." else null
+                    "poca resolución de la cara o luz muy plana)." else beardNote(info)
                 return@withContext lines to note
             }
             // sin malla: puntos de ML Kit; surcos estimados y ajustados a la sombra, con medidas (escala
@@ -569,14 +622,28 @@ class PhotoAnnotator(private val context: Context) {
             val err = MediaPipeFace.lastError?.let { " (detalle: $it)" } ?: ""
             if (pts.size >= LiveDecision.MIN_POINTS) {
                 val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(bmp) }
-                val lines = FaceAnnotations.face(pts, labels, lumOf(bmp))
+                val info = HashMap<String, Float>()
+                val lines = FaceAnnotations.face(pts, labels, lumOf(bmp), labOf(bmp), info)
                 return@withContext lines to ("No se pudo obtener la malla facial completa$err: solo se miden los surcos " +
-                    "(nasogeniano, marioneta, valle lagrimal); frente, ceño, patas de gallo y ojeras necesitan la malla.")
+                    "(nasogeniano, marioneta, valle lagrimal); frente, ceño, patas de gallo y ojeras necesitan la malla." +
+                    (beardNote(info)?.let { " $it" } ?: ""))
             }
             return@withContext emptyList<AnnotLine>() to "No se detectó ninguna cara en la foto$err."
         }
         val mask = BodyRegion.of(zone, bmp) { b -> SubjectSegmenter().use { it.segment(b) } }
         (mask?.let { FaceAnnotations.body(it) } ?: emptyList()) to "Las medidas de arrugas y surcos son solo para zonas del rostro."
+    }
+
+    /** Aviso si hay barba o bigote: los surcos de la zona solo se trazan sobre la piel visible. */
+    private fun beardNote(info: Map<String, Float>): String? = info["vello"]?.takeIf { it >= 0.08f }?.let {
+        "Barba o bigote en ${(it * 100).roundToInt()} % de la parte inferior de la cara: los surcos de esa zona se trazan y " +
+            "miden solo sobre la piel visible (las líneas marcadas con ✱ son parciales)."
+    }
+
+    private fun labOf(bmp: Bitmap): LabImage {
+        val w = minOf(bmp.width, 480); val h = (bmp.height * w / bmp.width.toFloat()).roundToInt()
+        val s = Bitmap.createScaledBitmap(bmp, w, h, true)
+        return LabImage.fromArgb(IntArray(w * h).also { s.getPixels(it, 0, w, 0, 0, w, h) }, w, h)
     }
 
     private fun mlkitPoints(bmp: Bitmap): Map<String, Pt> =
@@ -639,6 +706,13 @@ class PhotoAnnotator(private val context: Context) {
     }
 
     companion object {
+        /**
+         * En las pruebas en la JVM (Robolectric) no hay modelos nativos: las llamadas a ML Kit no
+         * terminan y ocupan los hilos de fondo de las pruebas siguientes. Ahí el análisis no se hace
+         * (las pruebas ponen las líneas en la caché).
+         */
+        @Volatile var enabled: Boolean = android.os.Build.FINGERPRINT != "robolectric"
+
         /**
          * Relieve y escala guardados de la foto [uri], cargados como la foto (misma edición; [width]
          * con recorte 3:4 si [crop34], o lado mayor [width] si no).

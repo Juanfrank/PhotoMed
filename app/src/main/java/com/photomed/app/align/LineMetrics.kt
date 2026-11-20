@@ -37,6 +37,8 @@ data class LineMetrics(
     val scale: String = "iris",
     /** Origen de la profundidad: "sombreado" (una foto) o "relieve" (estéreo fotométrico). */
     val depthSource: String = "sombreado",
+    /** Advertencia sobre la medida (p. ej. surco parcialmente cubierto por barba o bigote). */
+    val note: String? = null,
 )
 
 /** Imagen en CIE L*a*b* (D65), para medir el color de la piel. */
