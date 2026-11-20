@@ -649,13 +649,13 @@ fun EdgeGhost(edges: com.photomed.app.align.FreeContour, alpha: Float, modifier:
  * para repetir el encuadre de la frente y seguir su evolución (tricología).
  */
 @Composable
-fun HairlineGuide(points: List<com.photomed.app.align.Pt>, color: Color, modifier: Modifier = Modifier) {
+fun HairlineGuide(points: List<com.photomed.app.align.Pt>, color: Color, modifier: Modifier = Modifier, dashed: Boolean = true) {
     if (points.size < 2) return
     Canvas(modifier) {
         val pts = points.map { Offset(it.x * size.width, it.y * size.width) }
         val k = (size.width / 360.dp.toPx()).coerceIn(0.35f, 1.4f)
         val path = smoothPath(pts, closed = false)
-        val dash = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx() * k, 4.dp.toPx() * k))
+        val dash = if (dashed) PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx() * k, 4.dp.toPx() * k)) else null
         drawPath(path, Shadow, style = Stroke(3.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
         drawPath(path, color, style = Stroke(1.6f.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
     }

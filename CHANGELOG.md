@@ -9,6 +9,8 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 - **Nuevo logotipo**: cámara clínica cuyo visor es un estetoscopio (icono adaptativo y temático).
 - **Novedades** dentro de la app (Acerca de y legal): este registro de cambios.
 - El modelo de pelo y piel vuelve a venir **incluido en la app** (sin descarga).
+- **Línea de implantación en vivo**: se ve también en la primera toma y sin superponer la referencia
+  (actual: línea continua; referencia: discontinua); aviso en pantalla si la segmentación no carga.
 
 ## 2.10 — 19 de noviembre de 2026
 

@@ -66,7 +66,7 @@ android {
     }
     androidResources {
         // El modelo de MediaPipe se mapea en memoria: no debe comprimirse.
-        noCompress += listOf("task")
+        noCompress += listOf("task", "tflite")
     }
     testOptions {
         unitTests.isReturnDefaultValues = true

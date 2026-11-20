@@ -355,6 +355,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             com.photomed.app.align.FaceFraming.of(art.controls, FaceControlKeys, pts) else null
         framedFace = com.photomed.app.align.FaceFraming.matches(fit, framedFace)
     }
+    // si la segmentación de pelo y piel no carga en este teléfono, decirlo una vez con el motivo
+    var hairSkinWarned by remember { mutableStateOf(false) }
+    LaunchedEffect(live) {
+        val h = live?.eval?.hints?.firstOrNull { it.startsWith("Detector (pelo y piel)") } ?: return@LaunchedEffect
+        if (!hairSkinWarned) { hairSkinWarned = true; snackbar.showSnackbar("Línea del pelo no disponible. $h") }
+    }
     val tone = GuideTone.of(live?.eval, matchingEnabled)
     /**
      * Cuero cabelludo: cada vista pide un ángulo de la cámara trasera hacia abajo (vértice cenital
@@ -778,9 +784,11 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         // modo libre: contorno de la referencia (si se superpone) o de lo que se ve ahora
                         free = if (showGhost && refFree != null) refFree else live?.freeContour)
                     }
-                    // línea de implantación frontal de la referencia (segmentación pelo / piel)
+                    // línea de implantación frontal: la de la referencia (discontinua) y la actual (continua)
                     val hl = refHairline
                     if (showContour && showGhost && hl != null) HairlineGuide(hl, tone.color, Modifier.fillMaxSize())
+                    val liveHl = live?.hairline
+                    if (showContour && liveHl != null) HairlineGuide(liveHl, Color(0xFFFFD54F), Modifier.fillMaxSize(), dashed = false)
                     if (matchingEnabled && expert) live?.let { LivePoints(it, tone, mirror = false) }
                 }
 

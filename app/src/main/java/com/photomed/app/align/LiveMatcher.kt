@@ -21,6 +21,8 @@ data class LiveFrame(
     val gaze: Pt? = null,
     /** Modo libre sin referencia: contorno de lo visible en el cuadro actual. */
     val freeContour: FreeContour? = null,
+    /** Línea de implantación frontal del cuadro actual (rostro frontal y frente). */
+    val hairline: List<Pt>? = null,
 )
 
 /**
@@ -145,6 +147,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             lastFree
         }
         return LiveFrame(eval, method = "estandarización", currentPointsAll = cur.points, standard = true, freeContour = free,
+            hairline = if (smooth) hairlineOf(frame, cur) else null,
             headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze)
     }
 
@@ -206,7 +209,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         matched = eval.status == MatchStatus.MATCH
         eval = withDiagnostic(eval, cur)
         val shown = if (drawKeys.size > MAX_DRAWN) drawKeys.filterIndexed { i, _ -> i % (drawKeys.size / MAX_DRAWN + 1) == 0 } else drawKeys
-        return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points, headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze)
+        return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points, headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze,
+            hairline = if (smooth) hairlineOf(frame, cur) else null)
     }
 
     /**
@@ -228,9 +232,29 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
 
     /** Sin puntos y con un error del detector: mostrarlo para poder diagnosticar en el dispositivo. */
     private fun withDiagnostic(e: MatchEval, cur: Detection): MatchEval {
+        // segmentación de pelo y piel que no carga en este teléfono: decirlo (la línea del pelo no saldría)
+        if (tracksHairline && cur.points.isNotEmpty() && hairSkin == null)
+            return e.copy(hints = e.hints + "Detector (pelo y piel): ${HairSkinSegmenter.lastError ?: "no disponible"}")
         if (spec.detector == Detector.NONE || cur.points.isNotEmpty()) return e
         val d = detector.diagnostic ?: return e
         return e.copy(hints = e.hints + "Detector ($engine): $d")
+    }
+
+    private var liveHairline: List<Pt>? = null
+    private var liveHairlineAt = 0L
+
+    /**
+     * Línea de implantación del cuadro actual (segmentación como mucho cada 0,5 s; se mantiene la
+     * última mientras haya rostro). Así se ve también en la primera toma y sin superponer la referencia.
+     */
+    private fun hairlineOf(frame: Bitmap, cur: Detection): List<Pt>? {
+        if (!tracksHairline || cur.points.size < LiveDecision.MIN_POINTS) { liveHairline = null; return null }
+        val now = System.currentTimeMillis()
+        if (now - liveHairlineAt > 500) {
+            liveHairlineAt = now
+            liveHairline = runCatching { hairSkin?.labels(frame)?.let { HairSkin.hairline(it, cur.points)?.points } }.getOrNull()
+        }
+        return liveHairline
     }
 
     /** Altura de la frente (cejas → línea de implantación) / interpupilar en una foto; null si no se mide. */

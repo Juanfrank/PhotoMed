@@ -46,21 +46,25 @@ class HairSkinSegmenter(context: Context) : Closeable {
             .setOutputCategoryMask(true).setOutputConfidenceMasks(false)
             .build())
 
-    fun labels(bmp: Bitmap): FaceLabels? = runCatching {
+    fun labels(bmp: Bitmap): FaceLabels? = runCatching<FaceLabels?> {
         val src = if (bmp.config == Bitmap.Config.ARGB_8888) bmp else bmp.copy(Bitmap.Config.ARGB_8888, false)
         val r = seg.segment(BitmapImageBuilder(src).build())
-        val m = r.categoryMask().orElse(null) ?: return null
+        val m = r.categoryMask().orElse(null) ?: error("sin máscara de categorías")
         val buf = ByteBufferExtractor.extract(m)
         val out = ByteArray(m.width * m.height); buf.rewind(); buf.get(out)
         FaceLabels(m.width, m.height, out)
-    }.getOrNull()
+    }.onFailure { lastError = it.message ?: it.javaClass.simpleName }.getOrNull()
 
     override fun close() = seg.close()
 
     companion object {
         const val MODEL = "selfie_multiclass.tflite"
         /** null si el modelo no se puede cargar (p. ej. dispositivo sin soporte). */
-        fun createOrNull(context: Context): HairSkinSegmenter? = runCatching { HairSkinSegmenter(context) }.getOrNull()
+        fun createOrNull(context: Context): HairSkinSegmenter? =
+            runCatching { HairSkinSegmenter(context) }.onFailure { lastError = it.message ?: it.javaClass.simpleName }.getOrNull()
+
+        /** Motivo del último fallo al cargar el modelo (para mostrarlo en pantalla y diagnosticar). */
+        @Volatile var lastError: String? = null
     }
 }
 
