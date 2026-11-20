@@ -7,7 +7,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
@@ -391,11 +393,8 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                     val bb = imgState.value ?: return@detectTapGestures
                     val a = annotsState.value ?: return@detectTapGestures
                     val sw = size.width.toFloat(); val sh = size.height.toFloat()
-                    val ia = bb.width / bb.height.toFloat()
-                    val w = minOf(sw, sh * ia); val h = w / ia
-                    val cx = sw / 2; val cy = sh / 2
-                    val px = cx + (s.x - cx - offset.x) / scale; val py = cy + (s.y - cy - offset.y) / scale
-                    val q = com.photomed.app.align.Pt((px - (sw - w) / 2) / w, (py - (sh - h) / 2) / w)
+                    val q = screenToPhoto(s.x, s.y, sw, sh, bb.width, bb.height, scale, offset.x, offset.y)
+                    val w = minOf(sw, sh * bb.width / bb.height.toFloat())
                     onSelectState.value(com.photomed.app.ui.compare.hitLine(a, layersState.value, q, 28.dp.toPx() / (w * scale)))
                 },
             )
@@ -432,22 +431,22 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()
                 .semantics { contentDescription = "Zona donde buscar el surco" }
                 .pointerInput(b) {
-                    detectDragGestures(
-                        onDragStart = { start = it; end = it },
-                        onDrag = { ch, _ -> end = ch.position },
-                        onDragEnd = {
-                            val s0 = start; val e0 = end
-                            if (s0 != null && e0 != null) {
-                                val sw = size.width.toFloat(); val sh = size.height.toFloat()
-                                val ia = b.width / b.height.toFloat()
-                                val w = minOf(sw, sh * ia); val h = w / ia
-                                fun n(o: androidx.compose.ui.geometry.Offset) = floatArrayOf((o.x - (sw - w) / 2) / w, (o.y - (sh - h) / 2) / w)
-                                val a0 = n(s0); val a1 = n(e0)
-                                onTraceRect(floatArrayOf(a0[0], a0[1], a1[0], a1[1]), b.height / b.width.toFloat())
-                            }
-                            start = null; end = null
-                        },
-                    )
+                    // rectángulo desde el primer toque hasta donde se suelta
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        start = down.position; end = down.position
+                        drag(down.id) { ch -> end = ch.position; ch.consume() }
+                        val s0 = start; val e0 = end
+                        if (s0 != null && e0 != null && (kotlin.math.abs(e0.x - s0.x) > 8f || kotlin.math.abs(e0.y - s0.y) > 8f)) {
+                            // de la pantalla a la foto, deshaciendo el zoom y el desplazamiento (antes se
+                            // ignoraban: con la foto ampliada, el surco se buscaba en otro sitio)
+                            val sw = size.width.toFloat(); val sh = size.height.toFloat()
+                            val a0 = screenToPhoto(s0.x, s0.y, sw, sh, b.width, b.height, scale, offset.x, offset.y)
+                            val a1 = screenToPhoto(e0.x, e0.y, sw, sh, b.width, b.height, scale, offset.x, offset.y)
+                            onTraceRect(floatArrayOf(a0.x, a0.y, a1.x, a1.y), b.height / b.width.toFloat())
+                        }
+                        start = null; end = null
+                    }
                 }) {
                 val s0 = start; val e0 = end
                 drawRect(Color.Black.copy(alpha = 0.25f))
@@ -460,4 +459,18 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
             }
         }
     }
+}
+
+
+/**
+ * Punto de la pantalla (en el área de la foto: [sw] × [sh] px) → punto de la foto en unidades de su
+ * ancho, para una foto de [imgW] × [imgH] ajustada al área y mostrada con zoom [scale] alrededor del
+ * centro y desplazamiento ([ox], [oy]).
+ */
+fun screenToPhoto(x: Float, y: Float, sw: Float, sh: Float, imgW: Int, imgH: Int, scale: Float, ox: Float, oy: Float): com.photomed.app.align.Pt {
+    val ia = imgW / imgH.toFloat()
+    val w = minOf(sw, sh * ia); val h = w / ia
+    val cx = sw / 2; val cy = sh / 2
+    val px = cx + (x - cx - ox) / scale; val py = cy + (y - cy - oy) / scale
+    return com.photomed.app.align.Pt((px - (sw - w) / 2) / w, (py - (sh - h) / 2) / w)
 }

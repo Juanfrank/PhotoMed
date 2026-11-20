@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -249,31 +250,48 @@ fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Ann
                     }
                     HorizontalDivider()
                 }
-            } else {
+            }
+        }
+        if (group != 2) {
+            // arrugas, surcos y ojeras: las cifras se desplazan en horizontal y la columna de eliminar queda
+            // fija a la derecha (antes iba al final de la fila y quedaba fuera de la pantalla)
             val cols = if (area) AREA_COLS.take(4) else LINE_COLS
+            val specs = ArrayList<RowSpec>()
             if (single) {
-                TableRow(listOf(if (area) "Zona" else "Línea") + cols, header = true)
+                specs += RowSpec(listOf(if (area) "Zona" else "Línea") + cols, header = true)
                 rows.forEach { (name, v) ->
                     val m = v.second[0]
-                    TableRow(listOf(label(name, v)) + (if (area) areaVals(m) else lineVals(m)).take(cols.size).mapIndexed { i, x -> fmt(i, x, area) }, line = v.first,
-                        action = onDelete?.let { del -> { DeleteLineButton(name, emptyList()) { c -> del(name, c ?: 0) } } })
+                    specs += RowSpec(listOf(label(name, v)) + (if (area) areaVals(m) else lineVals(m)).take(cols.size).mapIndexed { i, x -> fmt(i, x, area) },
+                        line = v.first, deleteName = name)
                 }
             } else {
                 val head = columns.map { it.first.replace(", ", "\n") }
-                TableRow(listOf(if (area) "Zona · medida" else "Línea · medida") + head + "Δ", header = true)
+                specs += RowSpec(listOf(if (area) "Zona · medida" else "Línea · medida") + head + "Δ", header = true)
                 rows.forEach { (name, v) ->
                     cols.forEachIndexed { i, c ->
                         val vals = v.second.map { m -> (if (area) areaVals(m) else lineVals(m))[i] }
                         val first = vals.firstOrNull { it != null }; val last = vals.lastOrNull { it != null }
                         val delta = if (first != null && last != null && vals.count { it != null } >= 2) last - first else null
-                        TableRow(listOf(if (i == 0) "${label(name, v)}\n${c.replace("\n", " ")}" else "   ${c.replace("\n", " ")}") +
+                        specs += RowSpec(listOf(if (i == 0) "${label(name, v)}\n${c.replace("\n", " ")}" else "   ${c.replace("\n", " ")}") +
                             vals.map { fmt(i, it, area) } + signed(delta, if (!area && i == 2) 2 else 1), line = if (i == 0) v.first else null,
-                            action = if (i == 0) onDelete?.let { del -> { DeleteLineButton(name,
-                                columns.mapIndexedNotNull { ci, col -> if (v.second[ci] != null) ci to col.first else null }) { c -> del(name, c) } } } else null)
+                            deleteName = if (i == 0) name else null,
+                            deletePhotos = if (i == 0) columns.mapIndexedNotNull { ci, col -> if (v.second[ci] != null) ci to col.first else null } else emptyList(),
+                            divider = i == cols.size - 1)
                     }
-                    HorizontalDivider()
                 }
             }
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                Column(Modifier.weight(1f).horizontalScroll(scroll)) {
+                    specs.forEach { r -> TableRow(r.cells, header = r.header, line = r.line, fixedHeight = ROW_H); if (r.divider) HorizontalDivider() }
+                }
+                if (onDelete != null) Column(Modifier.width(40.dp)) {
+                    specs.forEach { r ->
+                        androidx.compose.foundation.layout.Box(Modifier.height(ROW_H).width(40.dp), contentAlignment = Alignment.Center) {
+                            r.deleteName?.let { n -> DeleteLineButton(n, if (single) emptyList() else r.deletePhotos) { c -> onDelete(n, if (single) (c ?: 0) else c) } }
+                        }
+                        if (r.divider) HorizontalDivider()
+                    }
+                }
             }
         }
     }
@@ -298,12 +316,19 @@ fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Ann
         modifier = Modifier.padding(vertical = 12.dp))
 }
 
+/** Alto fijo de las filas de arrugas, surcos y ojeras (alinea las cifras con la columna fija de eliminar). */
+private val ROW_H = 46.dp
+
+/** Fila de la tabla preparada (celdas, línea, eliminar). */
+private class RowSpec(val cells: List<String>, val header: Boolean = false, val line: AnnotLine? = null, val deleteName: String? = null,
+                      val deletePhotos: List<Pair<Int, String>> = emptyList(), val divider: Boolean = false)
+
 /** Fila de la tabla: texto con contraste alto (cifras en negrita y color de primer plano). */
 @Composable
 private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLine? = null, wide: Boolean = false,
                      /** Acción al final de la fila (eliminar la línea). */
-                     action: (@Composable () -> Unit)? = null) {
-    Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                     action: (@Composable () -> Unit)? = null, fixedHeight: Dp? = null) {
+    Row(if (fixedHeight != null) Modifier.height(fixedHeight) else Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
         cells.forEachIndexed { i, c ->
             val w: Dp = if (i == 0) (if (wide) 210.dp else 170.dp) else 72.dp
             Row(Modifier.width(w), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = if (i == 0) Arrangement.Start else Arrangement.End) {

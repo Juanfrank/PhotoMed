@@ -2,6 +2,14 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.20.1 — 20 de noviembre de 2026
+
+- **Corrección**: el botón de eliminar un surco quedaba fuera de la pantalla (al final de una fila más
+  ancha que el teléfono). Ahora va en una columna fija a la derecha de la tabla, siempre visible.
+- **Corrección**: *Trazar surco* buscaba en otro sitio si la foto estaba ampliada o desplazada (no se
+  deshacía el zoom al convertir el rectángulo a la foto). Ahora se usa la misma conversión que al tocar
+  una línea, y el rectángulo empieza en el primer toque.
+
 ## 2.20 — 20 de noviembre de 2026
 
 - **Eliminar falsos positivos**: botón al final de cada fila de arrugas, surcos y ojeras en la tabla
