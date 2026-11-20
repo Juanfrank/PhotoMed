@@ -2,6 +2,18 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.12 — 20 de noviembre de 2026
+
+- **Capas sobre las fotos** (visor y comparar): contorno, línea del pelo, ojos y cejas, nariz,
+  labios y surcos faciales (nasogenianos, marioneta, valle lagrimal), con el estilo del contorno.
+  Los surcos se estiman con la geometría del rostro y se ajustan al valle de sombra de la piel; los
+  que no se pueden medir se dibujan discontinuos.
+- **Visor**: girar 90°, espejo horizontal y recorte de cada foto, sin modificar el original; la
+  edición se aplica también en Comparar, en la alineación y al exportar.
+- **Comparar**: girar 90°, espejo y recorte manual de toda la comparación; lo exportado incluye las
+  capas visibles, el recorte y la orientación.
+- **Cámara**: girar 90° y espejar la referencia superpuesta (o la guía, si no hay referencia).
+
 ## 2.11 — 19 de noviembre de 2026
 
 - **Licencia comercial de pago** (profesional, clínica e institucional; suscripción o perpetua),

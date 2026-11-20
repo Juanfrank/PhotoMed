@@ -101,4 +101,40 @@ class HairSkinTest {
         assertTrue(moves.average() < 0.05)
         assertTrue(occl.values.count { it > 20 } <= 3)
     }
+
+    @Test
+    fun aestheticAnnotationsOnStock() {
+        val json = javaClass.getResourceAsStream("/stock/stock_faces.json")?.bufferedReader()?.readText()
+        assumeTrue("sin retratos de stock", json != null)
+        val o = JSONObject(json!!)
+        val dir = File("build/reports/annot").apply { mkdirs() }
+        var n = 0; var refined = 0; var folds = 0
+        val colors = mapOf(com.photomed.app.align.AnnotLayer.CONTOUR to Color.CYAN, com.photomed.app.align.AnnotLayer.HAIRLINE to Color.YELLOW,
+            com.photomed.app.align.AnnotLayer.EYES to Color.rgb(128, 222, 234), com.photomed.app.align.AnnotLayer.NOSE to Color.rgb(179, 157, 219),
+            com.photomed.app.align.AnnotLayer.LIPS to Color.rgb(244, 143, 177), com.photomed.app.align.AnnotLayer.FOLDS to Color.rgb(255, 171, 145))
+        for (k in o.keys().asSequence().filter { it.endsWith("_r0") }.sorted()) {
+            val lab = labels(k) ?: continue
+            val img = javaClass.getResourceAsStream("/stock/$k.jpg")?.let { BitmapFactory.decodeStream(it) }?.copy(Bitmap.Config.ARGB_8888, true) ?: continue
+            val p = o.getJSONObject(k).getJSONObject("pts")
+            val pts = p.keys().asSequence().associateWith { kk -> p.getJSONArray(kk).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1).toFloat()) } }
+            val px = IntArray(img.width * img.height).also { img.getPixels(it, 0, img.width, 0, 0, img.width, img.height) }
+            val lum = com.photomed.app.align.GrayImage(img.width, img.height, FloatArray(px.size) { i -> val c = px[i]; (0.299f * Color.red(c) + 0.587f * Color.green(c) + 0.114f * Color.blue(c)) / 255f })
+            val lines = com.photomed.app.align.FaceAnnotations.face(pts, lab, lum)
+            n++
+            lines.filter { it.layer == com.photomed.app.align.AnnotLayer.FOLDS }.forEach { folds++; if (!it.estimated) refined++ }
+            val c = Canvas(img)
+            for (l in lines) {
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.getValue(l.layer); strokeWidth = 1.6f; style = Paint.Style.STROKE
+                    if (l.estimated) pathEffect = android.graphics.DashPathEffect(floatArrayOf(5f, 4f), 0f) }
+                val path = android.graphics.Path()
+                l.points.forEachIndexed { i, q -> if (i == 0) path.moveTo(q.x * img.width, q.y * img.width) else path.lineTo(q.x * img.width, q.y * img.width) }
+                if (l.closed) path.close()
+                c.drawPath(path, paint)
+            }
+            File(dir, "$k.png").outputStream().use { img.compress(Bitmap.CompressFormat.PNG, 90, it) }
+            assertTrue(k, com.photomed.app.align.AnnotLayer.entries.all { layer -> lines.any { it.layer == layer } || layer == com.photomed.app.align.AnnotLayer.HAIRLINE })
+        }
+        assumeTrue(n > 0)
+        println("ANOTACIONES: $n rostros · surcos ajustados al valle de sombra $refined de $folds")
+    }
 }

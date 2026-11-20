@@ -1,5 +1,22 @@
 package com.photomed.app.ui.gallery
 
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Flip
+import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.ui.graphics.asImageBitmap
+import com.photomed.app.ui.camera.drawAnnotations
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,6 +82,12 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     var confirmDelete by remember { mutableStateOf(false) }
     var shareMenu by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf<Pair<Photo, PhotoInfo?>?>(null) }
+    // capas de anotación y edición no destructiva (giro, espejo, recorte)
+    val layersState = com.photomed.app.ui.compare.rememberAnnotLayers()
+    var showLayers by remember { mutableStateOf(layersState.value.isNotEmpty()) }
+    var editing by remember { mutableStateOf(false) }
+    var cropping by remember { mutableStateOf(false) }
+    var editVersion by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(reload) {
         photos = withContext(Dispatchers.IO) { repo.getExpediente(expId)?.let { repo.photos(it, zone) }.orEmpty() }
@@ -90,6 +113,10 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
                 actions = {
+                    IconButton(onClick = { showLayers = !showLayers }) {
+                        Icon(Icons.Default.Layers, if (showLayers) "Ocultar capas" else "Capas: contorno, línea del pelo, rasgos y surcos")
+                    }
+                    IconButton(onClick = { editing = !editing }) { Icon(Icons.Default.Crop, if (editing) "Terminar edición" else "Girar, espejo y recorte") }
                     IconButton(onClick = {
                         scope.launch { info = current to withContext(Dispatchers.IO) { repo.readInfo(current) } }
                     }) { Icon(Icons.Default.Info, "Información") }
@@ -114,8 +141,43 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize().background(Color.Black), key = { list[it].key }) { page ->
-            ZoomableImage(model = list[page].uri, modifier = Modifier.fillMaxSize().padding(padding))
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            HorizontalPager(state = pager, modifier = Modifier.fillMaxSize().background(Color.Black), key = { list[it].key },
+                userScrollEnabled = !cropping) { page ->
+                PhotoPage(list[page], zone, if (showLayers) layersState.value else emptySet(), editVersion, Modifier.fillMaxSize())
+            }
+            androidx.compose.foundation.layout.Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .background(Color.Black.copy(alpha = 0.55f))) {
+                if (showLayers) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
+                    Modifier.fillMaxWidth().padding(vertical = 4.dp))
+                if (editing) {
+                    val e = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
+                    fun save(n: com.photomed.app.align.ImageEdit) { com.photomed.app.align.PhotoEdits.set(context, current.uri.toString(), n); editVersion++ }
+                    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly) {
+                        EditButton(Icons.Default.RotateRight, "Girar 90°") { save(e.rotated()) }
+                        EditButton(Icons.Default.Flip, "Espejo") { save(e.mirrored()) }
+                        EditButton(Icons.Default.Crop, "Recortar") { cropping = true }
+                        EditButton(Icons.Default.Restore, "Original", enabled = !e.isIdentity) { save(com.photomed.app.align.ImageEdit.NONE) }
+                    }
+                    Text("La foto original no se modifica; la edición se aplica también en Comparar y al exportar.",
+                        color = Color.LightGray, style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
+                }
+            }
+        }
+    }
+
+    if (cropping) {
+        val photo = current
+        val e = com.photomed.app.align.PhotoEdits.of(context, photo.uri.toString())
+        val img by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, photo.uri, e) {
+            value = runCatching { com.photomed.app.align.ImageOps.loadFull(context, photo.uri, 1600, e.copy(crop = null)).asImageBitmap() }.getOrNull()
+        }
+        img?.let { b ->
+            com.photomed.app.ui.components.CropEditor(b, aspect = null, initial = e.crop, onCancel = { cropping = false }) { r ->
+                com.photomed.app.align.PhotoEdits.set(context, photo.uri.toString(), e.copy(crop = r)); editVersion++; cropping = false
+            }
         }
     }
 
@@ -162,4 +224,61 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
 @Composable
 private fun InfoRow(label: String, value: String) {
     ListItem(overlineContent = { Text(label) }, headlineContent = { Text(value) })
+}
+
+@Composable
+private fun EditButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean = true, onClick: () -> Unit) {
+    androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        IconButton(onClick = onClick, enabled = enabled) { Icon(icon, label, tint = if (enabled) Color.White else Color.Gray) }
+        Text(label, color = if (enabled) Color.White else Color.Gray, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+/**
+ * Página del visor: la foto con su edición (giro, espejo, recorte) ajustada a la pantalla, con zoom
+ * (pellizco, doble toque) y las capas de anotación visibles en el mismo sistema de coordenadas.
+ */
+@Composable
+private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.align.AnnotLayer>, version: Int, modifier: Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val edit = remember(photo.uri, version) { com.photomed.app.align.PhotoEdits.of(context, photo.uri.toString()) }
+    val img by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, photo.uri, edit) {
+        value = runCatching { com.photomed.app.align.ImageOps.loadFull(context, photo.uri, 2048, edit).asImageBitmap() }.getOrNull()
+    }
+    val annots by androidx.compose.runtime.produceState<List<com.photomed.app.align.AnnotLine>?>(null, photo.uri, edit, layers.isNotEmpty()) {
+        if (layers.isEmpty()) return@produceState
+        val key = "full|${photo.uri}|${edit.hashCode()}"
+        value = com.photomed.app.align.PhotoAnnotator.cached(key) ?: runCatching {
+            com.photomed.app.align.PhotoAnnotator(context.applicationContext)
+                .annotate(com.photomed.app.align.ImageOps.loadFull(context, photo.uri, 1080, edit), zone)
+        }.getOrNull()?.also { com.photomed.app.align.PhotoAnnotator.put(key, it) }
+    }
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    val b = img
+    Box(modifier
+        .pointerInput(Unit) {
+            detectTransformGestures { _, pan, zoom, _ ->
+                scale = (scale * zoom).coerceIn(1f, 6f)
+                offset = if (scale == 1f) androidx.compose.ui.geometry.Offset.Zero else offset + pan
+            }
+        }
+        .pointerInput(Unit) { detectTapGestures(onDoubleTap = { scale = 1f; offset = androidx.compose.ui.geometry.Offset.Zero }) }
+        .semantics { contentDescription = "Fotografía ${photo.zone.label}, ${formatDateTime(photo.takenAt)}" },
+        contentAlignment = Alignment.Center) {
+        if (b == null) CircularProgressIndicator()
+        else androidx.compose.foundation.Canvas(Modifier.fillMaxSize().graphicsLayer {
+            scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
+        }) {
+            val ia = b.width / b.height.toFloat()
+            val w = minOf(size.width, size.height * ia); val h = w / ia
+            val left = (size.width - w) / 2; val top = (size.height - h) / 2
+            drawImage(b, dstOffset = androidx.compose.ui.unit.IntOffset(left.toInt(), top.toInt()),
+                dstSize = androidx.compose.ui.unit.IntSize(w.toInt(), h.toInt()), filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium)
+            annots?.let { a ->
+                val k = (w / 360.dp.toPx()).coerceIn(0.35f, 1.4f) / scale.coerceAtLeast(1f).let { kotlin.math.sqrt(it) }
+                drawAnnotations(a, layers, k) { p -> androidx.compose.ui.geometry.Offset(left + p.x * w, top + p.y * w) }
+            }
+        }
+    }
 }

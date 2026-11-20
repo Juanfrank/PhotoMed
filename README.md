@@ -141,3 +141,12 @@ Compose, Coil, Google ML Kit (rostro, pose, segmentación) y MediaPipe Face Land
 - **Modelo de pelo y piel** (MediaPipe Selfie Multiclass, 16 MB): incluido en la app.
 - **Calibración con fotos propias**: `python3 tools/eval/calibrate.py carpeta_neutras --smiles carpeta_sonrisas`
   mide la expresión en sus fotos (en su equipo) y propone los límites de expresión neutra.
+
+## Capas estéticas y edición
+
+- **Capas** (icono de capas en el visor y en Comparar): contorno, línea del pelo, ojos y cejas,
+  nariz, labios y surcos (nasogenianos, marioneta, valle lagrimal; ajustados al valle de sombra de
+  la piel o, si no hay contraste, estimados y discontinuos). Se recuerdan entre sesiones.
+- **Visor**: girar 90°, espejo y recorte de cada foto (edición no destructiva, aplicada en toda la app).
+- **Comparar**: Ajustes → Vista: girar 90°, espejo y recorte manual 3:4 de toda la comparación.
+- **Cámara**: girar 90° y espejar la referencia superpuesta (o la guía sin referencia).

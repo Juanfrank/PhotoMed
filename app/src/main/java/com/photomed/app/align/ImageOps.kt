@@ -16,13 +16,29 @@ import coil.size.Scale
 /** Carga, recorte 3:4, corrección de perspectiva y escala de grises. */
 object ImageOps {
 
-    suspend fun load34(context: Context, uri: Uri, width: Int): Bitmap {
+    /**
+     * Foto en el encuadre 3:4 de [width] de ancho, con su edición guardada (giro, espejo, recorte;
+     * ver [PhotoEdits]) aplicada antes del recorte 3:4. [edit] = null usa la guardada.
+     */
+    suspend fun load34(context: Context, uri: Uri, width: Int, edit: ImageEdit? = null): Bitmap {
+        val e = edit ?: PhotoEdits.of(context, uri.toString())
+        if (!e.isIdentity) return centerCrop34(e.apply(loadFull(context, uri, width * 2, ImageEdit.NONE)), width)
         val request = ImageRequest.Builder(context)
             .data(uri).size(width, width * 4 / 3).scale(Scale.FILL).precision(Precision.EXACT)
             .allowHardware(false).build()
         val bmp = (context.imageLoader.execute(request) as? SuccessResult)?.drawable
             ?.let { (it as BitmapDrawable).bitmap } ?: error("No se pudo abrir la imagen")
         return centerCrop34(bmp, width)
+    }
+
+    /** Foto completa (sin recorte 3:4), lado mayor ≤ [maxSide], con su edición aplicada. */
+    suspend fun loadFull(context: Context, uri: Uri, maxSide: Int, edit: ImageEdit? = null): Bitmap {
+        val request = ImageRequest.Builder(context)
+            .data(uri).size(maxSide, maxSide).scale(Scale.FIT).precision(Precision.INEXACT)
+            .allowHardware(false).build()
+        val bmp = (context.imageLoader.execute(request) as? SuccessResult)?.drawable
+            ?.let { (it as BitmapDrawable).bitmap } ?: error("No se pudo abrir la imagen")
+        return (edit ?: PhotoEdits.of(context, uri.toString())).apply(bmp)
     }
 
     fun centerCrop34(src: Bitmap, width: Int): Bitmap {

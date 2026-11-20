@@ -1,5 +1,10 @@
 package com.photomed.app.ui.compare
 
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.Flip
+import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
@@ -170,6 +175,14 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     var crop by remember { mutableStateOf<Similarity?>(null) }
     /** Orden de la cuadrícula y lado a lado (solo presentación; la referencia no cambia). */
     var gridOrder by remember { mutableStateOf(GridOrder.OLDEST_FIRST) }
+    // Vista de la comparación: capas de anotación, giro (pasos de 90°), espejo y recorte manual
+    val layersState = rememberAnnotLayers()
+    var showLayers by remember { mutableStateOf(layersState.value.isNotEmpty()) }
+    var viewRot by remember { mutableStateOf(0) }
+    var viewMirror by remember { mutableStateOf(false) }
+    /** Recorte elegido a mano (rectángulo 3:4 sobre la referencia); tiene prioridad sobre el automático. */
+    var manualCrop by remember { mutableStateOf<FloatArray?>(null) }
+    var cropEditing by remember { mutableStateOf(false) }
     var dragKey by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     var manualOrder by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -213,7 +226,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         )
     }
     fun resultOf(p: Photo): AlignmentResult? = if (useAligned && alignedFor.contains(p.key) && alignedFor == derive().seqKeys) alignments[p.key] else null
-    fun transformOf(p: Photo): Similarity? = CompareExport.withCrop(resultOf(p)?.transform, crop)
+    /** Recorte efectivo: el manual (rectángulo 3:4 normalizado) o el automático según la alineación. */
+    fun effectiveCrop(): Similarity? = manualCrop?.let { r ->
+        val w = (r[2] - r[0]).coerceAtLeast(0.05f); val k = 1f / w
+        Similarity(k, 0f, -k * r[0], -k * r[1] * 4f / 3f)
+    } ?: crop
+    fun transformOf(p: Photo): Similarity? = CompareExport.withCrop(resultOf(p)?.transform, effectiveCrop())
     val (photos, _, _, seq, seqKeys, n, timeline, reference, target, validAlign) = derive()
 
     // Recorte común según la alineación: el mayor 3:4 que cubren todas las fotos alineadas.
@@ -318,6 +336,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
                 actions = {
+                    IconButton(onClick = { showLayers = !showLayers }, enabled = seq != null) {
+                        Icon(Icons.Default.Layers, if (showLayers) "Ocultar capas" else "Capas: contorno, línea del pelo, rasgos y surcos")
+                    }
                     IconButton(onClick = { reversed = !reversed; resetAlignment() }, enabled = seq != null) {
                         Icon(Icons.Default.SwapHoriz, "Invertir el orden")
                     }
@@ -362,6 +383,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         val models: Map<String, Any> = seq?.associate { p ->
             p.key to key(p.key) { rememberCorrected(p.uri, resultOf(p)?.keystoneDeg ?: 0f, Perspective.DEFAULT_FOCAL, colorAdjusts[p.key]) }
         }.orEmpty()
+        // anotaciones (contorno, línea del pelo, rasgos, surcos) de cada foto, en su foto corregida
+        val layers = if (showLayers) layersState.value else emptySet()
+        val annots: Map<String, List<com.photomed.app.align.AnnotLine>> = seq?.mapNotNull { p ->
+            key("a" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, layers.isNotEmpty()).value }?.let { p.key to it }
+        }?.toMap().orEmpty()
+        val view = CompareView(viewRot, viewMirror, layers, models.mapNotNull { (k, m) -> annots[k]?.let { m to it } }.toMap())
         if (all != null && photos.size < 2) {
             EmptyState(Icons.Default.Compare, "Se necesitan dos fotografías",
                 "Tome al menos dos fotografías de una zona para compararlas.", Modifier.padding(padding))
@@ -384,7 +411,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 }
             }
 
+            if (showLayers) LayerChips(layersState.value, { layersState.value = it }, Modifier.fillMaxWidth().padding(top = 4.dp))
             // Área de comparación
+            androidx.compose.runtime.CompositionLocalProvider(LocalCompareView provides view) {
             Box(
                 Modifier.weight(1f).fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact, vertical = Md3Spacing.s2),
                 contentAlignment = Alignment.Center,
@@ -409,14 +438,14 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                             position = timeline.dividerPosition, onPositionChange = { timelineState = timeline.withDivider(it) },
                             zoom = zoom, onZoomChange = { zoom = it },
                             beforeLabel = label(timeline.from), afterLabel = label(timeline.to),
-                            modifier = Modifier.aspectRatio(3f / 4f).clip(MaterialTheme.shapes.medium),
+                            modifier = Modifier.aspectRatio(view.aspect).clip(MaterialTheme.shapes.medium),
                         )
 
                         Mode.SIDE -> BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             val gap = Md3Spacing.s1
                             // Hasta 3 fotos caben a lo ancho; con más, desplazamiento horizontal (2,4 visibles).
-                            val cellW: Dp = if (n <= 3) minOf((maxWidth - gap * (n - 1)) / n, maxHeight * 3f / 4f)
-                            else minOf((maxWidth - gap * 2) / 2.4f, maxHeight * 3f / 4f)
+                            val cellW: Dp = if (n <= 3) minOf((maxWidth - gap * (n - 1)) / n, maxHeight * view.aspect)
+                            else minOf((maxWidth - gap * 2) / 2.4f, maxHeight * view.aspect)
                             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(gap)) {
                                 shownOrder.forEach { i -> val p = seq[i]; PhotoCell(models.getValue(p.key), label(i), transformOf(p), zoom, Modifier.width(cellW)) }
                             }
@@ -424,12 +453,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
 
                         Mode.GRID -> BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             val gap = Md3Spacing.s1
-                            val cols = gridColumns(n, maxWidth.value, maxHeight.value)
+                            val cols = gridColumns(n, maxWidth.value, maxHeight.value, view.aspect)
                             val rows = (n + cols - 1) / cols
-                            val cellW: Dp = minOf((maxWidth - gap * (cols - 1)) / cols, ((maxHeight - gap * (rows - 1)) / rows) * 3f / 4f)
+                            val cellW: Dp = minOf((maxWidth - gap * (cols - 1)) / cols, ((maxHeight - gap * (rows - 1)) / rows) * view.aspect)
                             // Mantener pulsada una foto y arrastrarla: se reordena (orden manual)
                             val density = androidx.compose.ui.platform.LocalDensity.current
-                            val stepX = with(density) { (cellW + gap).toPx() }; val stepY = stepX * 4f / 3f
+                            val stepX = with(density) { (cellW + gap).toPx() }; val stepY = with(density) { (cellW / view.aspect + gap).toPx() }
                             val orderKeys = shownOrder.map { seq[it].key }
                             Column(verticalArrangement = Arrangement.spacedBy(gap)) {
                                 shownOrder.chunked(cols).forEachIndexed { r, rowIdx ->
@@ -474,19 +503,20 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                         }
 
                         Mode.FADE -> Box(
-                            Modifier.aspectRatio(3f / 4f).clip(MaterialTheme.shapes.medium).background(Color.Black).clipToBounds()
+                            Modifier.aspectRatio(view.aspect).clip(MaterialTheme.shapes.medium).background(Color.Black).clipToBounds()
                         ) {
                             val layer = Modifier.fillMaxSize().graphicsLayer {
                                 scaleX = zoom.scale; scaleY = zoom.scale; translationX = zoom.offset.x; translationY = zoom.offset.y
                             }
-                            AsyncImage(models.getValue(from.key), label(timeline.from), contentScale = ContentScale.Crop,
-                                modifier = layer.alignedBy(transformOf(from)))
-                            AsyncImage(models.getValue(to.key), label(timeline.to), contentScale = ContentScale.Crop,
-                                modifier = layer.alignedBy(transformOf(to)).graphicsLayer { alpha = timeline.fraction })
+                            ComparePhoto(models.getValue(from.key), transformOf(from), label(timeline.from), layer)
+                            ComparePhoto(models.getValue(to.key), transformOf(to), label(timeline.to), layer,
+                                Modifier.fillMaxSize().graphicsLayer { alpha = timeline.fraction })
                             Label(if (timeline.fraction < 0.5f) label(timeline.from) else label(timeline.to), Modifier.align(Alignment.TopStart))
                         }
                     }
                 }
+            }
+
             }
 
             // Línea de tiempo (fundido, o deslizador con más de dos fotos): recorre 1→2→…→N.
@@ -603,7 +633,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                                     contentDescription = "${p.zone.label}, ${formatDate(p.takenAt)}"
                                 }
                         ) {
-                            AsyncImage(p.uri, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
+                            AsyncImage(com.photomed.app.ui.photoModel(context, p.uri), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
                                 .graphicsLayer { alpha = if (isSel || selected.size < 2) 1f else 0.6f })
                             if (badge != null) {
                                 Text(
@@ -647,6 +677,17 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     "Todas las fotos al área común que dejan tras alinearse, sin bordes negros.") {
                     cropToAlign = it; prefs.edit().putBoolean("compare_crop", it).apply()
                     if (it && !validAlign) scope.launch { snackbar.showSnackbar("Se aplicará al alinear automáticamente") }
+                }
+                Text("Vista", style = MaterialTheme.typography.bodyLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
+                    androidx.compose.material3.OutlinedButton(onClick = { viewRot = (viewRot + 1) % 4 }) { Icon(Icons.Default.RotateRight, null); Text(" 90°") }
+                    androidx.compose.material3.OutlinedButton(onClick = { viewMirror = !viewMirror }) { Icon(Icons.Default.Flip, null); Text(" Espejo") }
+                    androidx.compose.material3.OutlinedButton(onClick = { settings = false; cropEditing = true }, enabled = seq != null) {
+                        Icon(Icons.Default.Crop, null); Text(" Recortar")
+                    }
+                }
+                if (viewRot != 0 || viewMirror || manualCrop != null) androidx.compose.material3.TextButton(onClick = { viewRot = 0; viewMirror = false; manualCrop = null }) {
+                    Text("Restablecer la vista (giro, espejo y recorte manual)")
                 }
                 Text("Orden de la cuadrícula y lado a lado", style = MaterialTheme.typography.bodyLarge)
                 Column(Modifier.selectableGroup()) {
@@ -715,8 +756,27 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         }
     }
 
+    // Recorte manual: rectángulo 3:4 sobre la referencia (alineada), aplicado a todas las fotos
+    if (cropEditing) {
+        val ref = derive().seq?.firstOrNull()
+        val img by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, ref?.uri) {
+            value = ref?.let { runCatching { com.photomed.app.align.ImageOps.load34(context, it.uri, 900).asImageBitmap() }.getOrNull() }
+        }
+        val b = img
+        if (ref == null) cropEditing = false
+        else if (b != null) com.photomed.app.ui.components.CropEditor(b, aspect = 3f / 4f, initial = manualCrop,
+            onCancel = { cropEditing = false }) { r -> manualCrop = r; cropEditing = false }
+    }
+
     if (exportSheet && seq != null) {
         val shown = seq.mapNotNull { p -> resultOf(p)?.let { p.key to it } }.toMap()
+        // anotaciones ya calculadas (caché) para dibujarlas en lo exportado
+        val exportAnnots = seq.mapNotNull { p ->
+            com.photomed.app.align.PhotoAnnotator.cached("34|${p.uri}|${com.photomed.app.align.PhotoEdits.of(context, p.uri.toString()).hashCode()}")?.let { base ->
+                val phi = shown[p.key]?.keystoneDeg ?: 0f
+                p.key to (if (phi == 0f) base else base.map { l -> l.copy(points = l.points.map { com.photomed.app.align.Perspective.mapPt(it, phi) }) })
+            }
+        }.toMap()
         ExportSheet(
             count = seq.size, aligned = shown.isNotEmpty(), colorMatched = colorAdjusts.isNotEmpty(), cropped = crop != null,
             onDismiss = { exportSheet = false },
@@ -725,7 +785,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 val labels = stampLabels(seq.map { it.takenAt })
                 seq.mapIndexed { i, p ->
                     val d = labels[i]
-                    CompareExport.render(context, p, shown[p.key], colorAdjusts[p.key], width = 300, crop = crop) to
+                    CompareExport.render(context, p, shown[p.key], colorAdjusts[p.key], width = 300, crop = effectiveCrop(),
+                        annots = exportAnnots[p.key], layers = if (showLayers) layersState.value else emptySet(),
+                        orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror)) to
                         (if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d")
                 }
             },
@@ -737,7 +799,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 val r = CompareExport.build(context, repo, seq, shown, colorAdjusts,
                     individual = ch.kind == ExportKind.INDIVIDUAL, grid = ch.kind == ExportKind.GRID, anonymize = anonymize, dir = dir,
                     onProgress = progress, side = ch.kind == ExportKind.SIDE, gif = ch.gif.takeIf { ch.kind == ExportKind.GIF },
-                    gifTiming = ch.timing, crop = crop, labels = stampLabels(seq.map { it.takenAt }), order = order)
+                    gifTiming = ch.timing, crop = effectiveCrop(), labels = stampLabels(seq.map { it.takenAt }), order = order,
+                    annots = exportAnnots, layers = if (showLayers) layersState.value else emptySet(),
+                    orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror))
                 when {
                     r.files.isEmpty() -> "No se pudo exportar ninguna imagen"
                     toGallery && e != null -> {
@@ -810,10 +874,10 @@ private fun CheckItem(text: String, checked: Boolean, onChange: (Boolean) -> Uni
 
 @Composable
 private fun PhotoCell(model: Any, label: String, t: Similarity?, zoom: ZoomState, modifier: Modifier) {
-    Box(modifier.aspectRatio(3f / 4f).clip(MaterialTheme.shapes.small).background(Color.Black).clipToBounds()) {
-        AsyncImage(model, label, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().graphicsLayer {
+    Box(modifier.aspectRatio(LocalCompareView.current.aspect).clip(MaterialTheme.shapes.small).background(Color.Black).clipToBounds()) {
+        ComparePhoto(model, t, label, Modifier.fillMaxSize().graphicsLayer {
             scaleX = zoom.scale; scaleY = zoom.scale; translationX = zoom.offset.x; translationY = zoom.offset.y
-        }.alignedBy(t))
+        })
         Label(label, Modifier.align(Alignment.TopStart))
     }
 }
@@ -865,7 +929,7 @@ private fun rememberCorrected(uri: android.net.Uri, pitchDeg: Float, focalNorm: 
     // φ exacto: la semejanza se calculó sobre la foto corregida con este mismo ángulo
     val key = pitchDeg
     val state = androidx.compose.runtime.produceState<Any>(uri, uri, key, focalNorm, color) {
-        if (key == 0f && color == null) { value = uri; return@produceState }
+        if (key == 0f && color == null) { value = com.photomed.app.ui.photoModel(context, uri); return@produceState }
         value = withContext(Dispatchers.Default) {
             runCatching {
                 var bmp = ImageOps.correctPerspective(ImageOps.load34(context, uri, 1080), key, focalNorm)

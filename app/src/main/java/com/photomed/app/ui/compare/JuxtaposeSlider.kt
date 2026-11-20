@@ -90,11 +90,11 @@ fun JuxtaposeSlider(
             scaleX = zoom.scale; scaleY = zoom.scale
             translationX = zoom.offset.x; translationY = zoom.offset.y
         }
-        AsyncImage(after, "Después", contentScale = ContentScale.Crop, modifier = layer.alignedBy(afterTransform))
+        ComparePhoto(after, afterTransform, "Después", layer)
         Box(Modifier.fillMaxSize().drawWithContent {
             clipRect(right = size.width * position) { this@drawWithContent.drawContent() }
         }) {
-            AsyncImage(before, "Antes", contentScale = ContentScale.Crop, modifier = layer.alignedBy(beforeTransform))
+            ComparePhoto(before, beforeTransform, "Antes", layer)
         }
 
         // Divisor y manija

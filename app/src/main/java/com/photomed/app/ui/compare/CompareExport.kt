@@ -46,7 +46,12 @@ object CompareExport {
      * alineación), en el encuadre 3:4.
      */
     suspend fun render(context: Context, photo: Photo, result: AlignmentResult?, color: ColorAdjust?, width: Int = WIDTH,
-                       crop: Similarity? = null): Bitmap {
+                       crop: Similarity? = null,
+                       /** Líneas de anotación (en la foto corregida) y capas visibles, dibujadas como en pantalla. */
+                       annots: List<com.photomed.app.align.AnnotLine>? = null,
+                       layers: Set<com.photomed.app.align.AnnotLayer> = emptySet(),
+                       /** Giro y espejo de la vista (después de alinear y recortar). */
+                       orient: com.photomed.app.align.ImageEdit? = null): Bitmap {
         var bmp = ImageOps.load34(context, photo.uri, width)
         val ks = result?.keystoneDeg ?: 0f
         return withContext(Dispatchers.Default) {
@@ -55,8 +60,31 @@ object CompareExport {
                 val px = IntArray(bmp.width * bmp.height).also { bmp.getPixels(it, 0, bmp.width, 0, 0, bmp.width, bmp.height) }
                 bmp = Bitmap.createBitmap(color.apply(px), bmp.width, bmp.height, Bitmap.Config.ARGB_8888)
             }
-            transformed(bmp, withCrop(result?.transform, crop))
+            if (annots != null && layers.isNotEmpty()) bmp = drawAnnotations(bmp, annots, layers)
+            val out = transformed(bmp, withCrop(result?.transform, crop))
+            if (orient == null || orient.isIdentity) out else orient.copy(crop = null).apply(out)
         }
+    }
+
+    /** Dibuja las anotaciones visibles sobre una copia de la foto (mismo estilo que en pantalla). */
+    fun drawAnnotations(src: Bitmap, lines: List<com.photomed.app.align.AnnotLine>, layers: Set<com.photomed.app.align.AnnotLayer>): Bitmap {
+        val b = src.copy(Bitmap.Config.ARGB_8888, true)
+        val c = Canvas(b); val w = b.width.toFloat()
+        val k = w / 1080f * 3f
+        for (l in lines) {
+            if (l.layer !in layers || l.points.size < 2) continue
+            val path = android.graphics.Path()
+            l.points.forEachIndexed { i, q -> if (i == 0) path.moveTo(q.x * w, q.y * w) else path.lineTo(q.x * w, q.y * w) }
+            if (l.closed) path.close()
+            val dash = if (l.estimated) android.graphics.DashPathEffect(floatArrayOf(7f * k, 5f * k), 0f) else null
+            fun paint(color: Int, width: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = width; this.color = color; strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND; pathEffect = dash
+            }
+            c.drawPath(path, paint(0x66000000, 3.6f * k))
+            c.drawPath(path, paint(com.photomed.app.ui.camera.annotColor(l.layer).let { android.graphics.Color.argb((it.alpha * 255).toInt(), (it.red * 255).toInt(), (it.green * 255).toInt(), (it.blue * 255).toInt()) }, 1.5f * k))
+        }
+        return b
     }
 
     /** Semejanza de la foto seguida del recorte común (si lo hay). */
@@ -83,7 +111,8 @@ object CompareExport {
         val n = images.size
         val cols = cols0 ?: if (n <= 3) n else ceil(sqrt(n.toDouble())).toInt()
         val rows = (n + cols - 1) / cols
-        val cellH = cellW * 4 / 3; val gap = 8
+        // celdas con la proporción de las fotos (3:4, o 4:3 si la vista está girada)
+        val cellH = images.firstOrNull()?.first?.let { cellW * it.height / it.width } ?: (cellW * 4 / 3); val gap = 8
         val out = Bitmap.createBitmap(cols * cellW + (cols + 1) * gap, rows * cellH + (rows + 1) * gap, Bitmap.Config.ARGB_8888)
         val c = Canvas(out)
         c.drawColor(android.graphics.Color.rgb(0x1B, 0x1B, 0x1F))
@@ -165,7 +194,7 @@ object CompareExport {
      * la primera) en [GifTiming.steps] pasos por fundido o cortinilla (como el deslizador).
      */
     fun gifFrames(images: List<Pair<Bitmap, String>>, mode: GifMode, timing: GifTiming = GifTiming()): List<Pair<IntArray, Int>> {
-        val w = GIF_W; val h = w * 4 / 3
+        val w = GIF_W; val h = images.firstOrNull()?.first?.let { w * it.height / it.width } ?: (w * 4 / 3)
         val scaled = images.map { (b, l) -> Bitmap.createScaledBitmap(b, w, h, true) to l }
         val out = ArrayList<Pair<IntArray, Int>>()
         fun frame(a: Int, t: Float): IntArray {
@@ -203,6 +232,11 @@ object CompareExport {
         crop: Similarity? = null,
         /** Etiquetas (fecha, y hora si hay fotos del mismo día); por defecto, la fecha. */
         labels: List<String>? = null,
+        /** Anotaciones por clave de foto y capas visibles. */
+        annots: Map<String, List<com.photomed.app.align.AnnotLine>> = emptyMap(),
+        layers: Set<com.photomed.app.align.AnnotLayer> = emptySet(),
+        /** Giro y espejo de la vista. */
+        orient: com.photomed.app.align.ImageEdit? = null,
         /** Orden de presentación (índices de [seq]) para la cuadrícula y lado a lado. */
         order: List<Int>? = null,
     ): Result {
@@ -213,11 +247,11 @@ object CompareExport {
         seq.forEachIndexed { i, p ->
             coroutineContext.ensureActive()
             onProgress(i, seq.size)
-            val b = runCatching { render(context, p, results[p.key], colors[p.key], crop = crop) }.getOrNull()
+            val b = runCatching { render(context, p, results[p.key], colors[p.key], crop = crop, annots = annots[p.key], layers = layers, orient = orient) }.getOrNull()
             if (b == null) { failed++; return@forEachIndexed }
             val d = labels?.getOrNull(i) ?: formatDate(p.takenAt)
             val label = if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d"
-            rendered += (if (grid || side || gif != null) Bitmap.createScaledBitmap(b, 540, 720, true) else b) to label
+            rendered += (if (grid || side || gif != null) Bitmap.createScaledBitmap(b, 540, 540 * b.height / b.width, true) else b) to label
             if (individual) withContext(Dispatchers.IO) {
                 val name = if (anonymize) anonymizedName(p, i + 1).removeSuffix(".jpg") + "_ajustada.jpg"
                 else p.displayName.removeSuffix(".jpg") + "_ajustada.jpg"
@@ -239,7 +273,7 @@ object CompareExport {
         if (gif != null && rendered.size >= 2) {
             coroutineContext.ensureActive()
             val bytes = withContext(Dispatchers.Default) {
-                val enc = GifEncoder(GIF_W, GIF_W * 4 / 3)
+                val enc = GifEncoder(GIF_W, rendered.first().first.let { GIF_W * it.height / it.width })
                 gifFrames(rendered, gif, gifTiming).forEach { (px, ms) -> enc.add(px, ms) }
                 enc.toByteArray()
             }

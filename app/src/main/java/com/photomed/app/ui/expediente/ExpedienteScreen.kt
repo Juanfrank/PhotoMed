@@ -1,5 +1,6 @@
 package com.photomed.app.ui.expediente
 
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.heading
@@ -425,7 +426,7 @@ private fun ZoneCard(zone: Zone, photos: List<Photo>, order: Int? = null, select
                 .background(Md3Palette.neutral17) // fondo oscuro fijo: guía legible en claro y oscuro
         ) {
             if (last != null) {
-                AsyncImage(model = last.uri, contentDescription = null, contentScale = ContentScale.Crop,
+                AsyncImage(model = com.photomed.app.ui.photoModel(LocalContext.current, last.uri), contentDescription = null, contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize())
             } else {
                 GuideOverlay(zone = zone, showContour = true, showGrid = false, modifier = Modifier.fillMaxSize().padding(8.dp))

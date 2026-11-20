@@ -33,13 +33,13 @@ data class Timeline(val count: Int, val segment: Int, val fraction: Float) {
 }
 
 /** Columnas de la cuadrícula que maximizan el tamaño de celdas 3:4 en un área [w]×[h]. */
-fun gridColumns(n: Int, w: Float, h: Float): Int {
+fun gridColumns(n: Int, w: Float, h: Float, aspect: Float = 3f / 4f): Int {
     if (n <= 1) return 1
     var best = 1
     var bestCell = 0f
     for (c in 1..n) {
         val rows = ceil(n / c.toFloat())
-        val cellW = min(w / c, h / rows * 3f / 4f)
+        val cellW = min(w / c, h / rows * aspect)
         if (cellW > bestCell + 0.01f) { bestCell = cellW; best = c }
     }
     return best

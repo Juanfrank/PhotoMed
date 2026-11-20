@@ -225,7 +225,7 @@ fun ZoneGalleryScreen(
                             )
                             .semantics { if (selecting) selected = isSel },
                     ) {
-                        AsyncImage(photo.uri, desc, contentScale = ContentScale.Crop,
+                        AsyncImage(com.photomed.app.ui.photoModel(LocalContext.current, photo.uri), desc, contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize().then(if (isSel) Modifier.padding(10.dp).clip(MaterialTheme.shapes.small) else Modifier))
                         if (selecting) {
                             Icon(

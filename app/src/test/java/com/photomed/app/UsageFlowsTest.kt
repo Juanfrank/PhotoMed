@@ -238,6 +238,26 @@ class UsageFlowsTest {
     }
 
     @Test
+    fun viewerEditBarSavesRotationAndMirror() {
+        com.photomed.app.align.PhotoEdits.clearCache()
+        setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, photos[0].displayName, onBack = {}) }
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Girar, espejo y recorte").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Girar, espejo y recorte").performClick()
+        compose.onNodeWithContentDescription("Girar 90°").performClick()
+        compose.onNodeWithContentDescription("Espejo").performClick()
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val e = com.photomed.app.align.PhotoEdits.of(ctx, photos[0].uri.toString())
+        assertEquals(1, e.rot); assertTrue(e.mirror)
+        compose.onNodeWithContentDescription("Original").performClick()
+        assertTrue(com.photomed.app.align.PhotoEdits.of(ctx, photos[0].uri.toString()).isIdentity)
+        // capas: los interruptores aparecen y se recuerdan
+        compose.onNodeWithContentDescription("Capas", substring = true).performClick()
+        compose.onNodeWithText("Surcos").performClick()
+        compose.waitForIdle()
+        assertTrue(ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!.contains("FOLDS"))
+    }
+
+    @Test
     fun compareNPhotosModesAndSelectionStress() {
         setContent { CompareScreen(exp.id, Zone.LIPS, onBack = {}, initialSelection = photos.map { it.displayName }) }
         waitText("Comparar 4 fotos")
@@ -435,6 +455,19 @@ class CompareExportTest {
         val head = gif.readBytes().copyOfRange(0, 6).toString(Charsets.US_ASCII)
         assertEquals("GIF89a", head)
         println("GIF exportado: %.1f MB".format(gif.length() / 1e6))
+        // vista girada 90° y con capas: cuadrícula apaisada y las líneas dibujadas
+        val line = com.photomed.app.align.AnnotLine(com.photomed.app.align.AnnotLayer.LIPS,
+            listOf(com.photomed.app.align.Pt(0.2f, 0.6f), com.photomed.app.align.Pt(0.8f, 0.6f)), false)
+        val r3 = com.photomed.app.ui.compare.CompareExport.build(ctx, repo, photos.take(2), emptyMap(), emptyMap(),
+            individual = true, grid = false, anonymize = true, dir = File(tmp.root, "out3"),
+            annots = mapOf(photos[0].key to listOf(line)), layers = setOf(com.photomed.app.align.AnnotLayer.LIPS),
+            orient = com.photomed.app.align.ImageEdit(rot = 1))
+        val rotated = android.graphics.BitmapFactory.decodeFile(r3.files[0].absolutePath)
+        assertTrue("girada: apaisada", rotated.width > rotated.height)
+        // tras girar 90° en sentido horario, la línea horizontal y = 0,6·ancho queda vertical
+        val x = (rotated.width - 1 - 0.6f * 1080 * 1f).toInt().coerceIn(0, rotated.width - 1)
+        val hit = (0 until rotated.height).any { y -> val c = rotated.getPixel(x, y); android.graphics.Color.red(c) > 200 && android.graphics.Color.blue(c) > 150 && android.graphics.Color.green(c) < 170 }
+        assertTrue("línea de labios dibujada", hit)
         File("build/reports").mkdirs(); gif.copyTo(File("build/reports/export_demo.gif"), overwrite = true)
         r2.files[0].copyTo(File("build/reports/export_side.jpg"), overwrite = true)
     }

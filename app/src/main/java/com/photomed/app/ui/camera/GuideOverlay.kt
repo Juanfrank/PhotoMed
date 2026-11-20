@@ -660,3 +660,31 @@ fun HairlineGuide(points: List<com.photomed.app.align.Pt>, color: Color, modifie
         drawPath(path, color, style = Stroke(1.6f.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
     }
 }
+
+/** Colores de las capas de anotación (mismo estilo de trazo que el contorno de la guía). */
+fun annotColor(layer: com.photomed.app.align.AnnotLayer): Color = when (layer) {
+    com.photomed.app.align.AnnotLayer.CONTOUR -> ContourColor
+    com.photomed.app.align.AnnotLayer.HAIRLINE -> Color(0xFFFFD54F)
+    com.photomed.app.align.AnnotLayer.EYES -> Color(0xFF80DEEA)
+    com.photomed.app.align.AnnotLayer.NOSE -> Color(0xFFB39DDB)
+    com.photomed.app.align.AnnotLayer.LIPS -> Color(0xFFF48FB1)
+    com.photomed.app.align.AnnotLayer.FOLDS -> Color(0xFFFFAB91)
+}
+
+/**
+ * Dibuja las líneas de anotación visibles ([layers]) con el estilo del contorno: sombra + trazo
+ * suave (Catmull-Rom); las estimadas, discontinuas. [map]: de coordenadas de la foto (unidades del
+ * ancho) a píxeles del lienzo; [k]: escala del grosor.
+ */
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAnnotations(
+    lines: List<com.photomed.app.align.AnnotLine>, layers: Set<com.photomed.app.align.AnnotLayer>,
+    k: Float, map: (com.photomed.app.align.Pt) -> Offset,
+) {
+    for (l in lines) {
+        if (l.layer !in layers || l.points.size < 2) continue
+        val path = smoothPath(l.points.map(map), l.closed)
+        val dash = if (l.estimated) PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx() * k, 5.dp.toPx() * k)) else null
+        drawPath(path, Shadow, style = Stroke(3.6.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
+        drawPath(path, annotColor(l.layer), style = Stroke(1.5.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
+    }
+}

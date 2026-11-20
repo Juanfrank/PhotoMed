@@ -1,7 +1,10 @@
 package com.photomed.app.ui.camera
 
+import androidx.compose.ui.graphics.asImageBitmap
 import android.Manifest
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.MoreVert
@@ -280,6 +283,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     /** Condiciones guardadas con la referencia (zoom, distancia…). */
     var refCond by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var adaptGuide by remember { mutableStateOf(true) }
+    /** Giro (pasos de 90°) y espejo de la referencia superpuesta, o de la guía si no hay referencia. */
+    var refOrient by remember { mutableStateOf(com.photomed.app.align.ImageEdit.NONE) }
+    var ghostBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     /** Primera toma (sin referencia): el rostro coincide con el marco de la guía → la guía se ajusta a la cara. */
     var framedFace by remember { mutableStateOf(false) }
     var autoArmed by remember { mutableStateOf(true) }
@@ -304,13 +310,17 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     matchingFlag.set(matchingEnabled)
 
     // Referencia para la coincidencia en vivo: la foto superpuesta (encuadre 3:4), con el motor elegido.
-    LaunchedEffect(ghost?.key, matcher) {
+    LaunchedEffect(ghost?.key, matcher, refOrient) {
         val g = ghost ?: return@LaunchedEffect
         live = null
         refSilhouette = null
         refFree = null
         refEdges = null
-        val bmp = runCatching { ImageOps.load34(context, g.uri, 360) }.getOrNull() ?: return@LaunchedEffect
+        // referencia girada / espejada: se transforma la imagen misma (fantasma, puntos, bordes, guía
+        // adaptada y coincidencia quedan coherentes)
+        fun oriented(b: android.graphics.Bitmap, w: Int) = if (refOrient.isIdentity) b else ImageOps.centerCrop34(refOrient.apply(b), w)
+        ghostBitmap = runCatching { oriented(ImageOps.load34(context, g.uri, 720), 720).asImageBitmap() }.getOrNull()
+        val bmp = runCatching { oriented(ImageOps.load34(context, g.uri, 360), 360) }.getOrNull() ?: return@LaunchedEffect
         val m = matcher
         pipeline.post {
             runCatching { m.setReference(bmp) }
@@ -737,6 +747,21 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         onClick = { expert = !expert; prefs.edit().putBoolean("camera_expert", expert).apply(); more = false },
                     )
                     androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(if (photos.isNotEmpty()) "Girar la referencia 90°" else "Girar la guía 90°") },
+                        leadingIcon = { Icon(Icons.Default.RotateRight, null) },
+                        onClick = { refOrient = refOrient.rotated() },
+                    )
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(if (photos.isNotEmpty()) "Espejo de la referencia" else "Espejo de la guía") },
+                        leadingIcon = { Icon(Icons.Default.Flip, null) },
+                        onClick = { refOrient = refOrient.mirrored() },
+                    )
+                    if (!refOrient.isIdentity) androidx.compose.material3.DropdownMenuItem(
+                        text = { Text("Orientación original") },
+                        leadingIcon = { Icon(Icons.Default.Restore, null) },
+                        onClick = { refOrient = com.photomed.app.align.ImageEdit.NONE; more = false },
+                    )
+                    androidx.compose.material3.DropdownMenuItem(
                         text = { Text("Mostrar las ayudas otra vez") },
                         leadingIcon = { Icon(Icons.Default.TouchApp, null) },
                         onClick = { more = false; com.photomed.app.ui.components.CoachMarks.resetAll(context) },
@@ -762,8 +787,11 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     if (showGhost && g != null && ghostEdges && edges != null) {
                         EdgeGhost(edges, (ghostAlpha + 0.25f).coerceAtMost(1f), Modifier.fillMaxSize())
                     } else if (showGhost && g != null) {
-                        AsyncImage(
-                            model = g.uri,
+                        val gb = ghostBitmap
+                        if (gb != null) androidx.compose.foundation.Image(gb, "Foto anterior superpuesta", contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().graphicsLayer { alpha = ghostAlpha })
+                        else AsyncImage(
+                            model = com.photomed.app.ui.photoModel(context, g.uri),
                             contentDescription = "Foto anterior superpuesta",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize().graphicsLayer { alpha = ghostAlpha },
@@ -772,17 +800,23 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     // líneas de referencia: en el modo simple, solo al acercarse a la coincidencia
                     val linesVisible = expert || !matchingEnabled || (GuideTone.degree(live?.eval) ?: 0f) >= 0.6f
                     androidx.compose.runtime.CompositionLocalProvider(LocalGuideLines provides linesVisible) {
+                    val adaptPts = when {
+                        adaptGuide && showGhost && refPoints.isNotEmpty() -> refPoints
+                        // primera toma: con la cara dentro del marco, el contorno se ajusta a ella
+                        adaptGuide && framedFace -> live?.currentPointsAll.orEmpty()
+                        else -> emptyMap()
+                    }
+                    val adaptSil = if (adaptGuide && showGhost) refSilhouette else null
+                    // sin referencia que la oriente, la guía dibujada se gira / espeja con el control de la referencia
+                    val orientGuide = adaptPts.isEmpty() && adaptSil == null && (ghost == null || !showGhost)
+                    com.photomed.app.ui.compare.OrientBox(if (orientGuide) refOrient.rot else 0, orientGuide && refOrient.mirror, Modifier.fillMaxSize(), fit = true) {
                     GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize(),
-                        tone = tone, adaptTo = when {
-                            adaptGuide && showGhost && refPoints.isNotEmpty() -> refPoints
-                            // primera toma: con la cara dentro del marco, el contorno se ajusta a ella
-                            adaptGuide && framedFace -> live?.currentPointsAll.orEmpty()
-                            else -> emptyMap()
-                        },
-                        silhouette = if (adaptGuide && showGhost) refSilhouette else null,
+                        tone = tone, adaptTo = adaptPts,
+                        silhouette = adaptSil,
                         side = if (zone.hasLimbSides) limbSide else LimbSide.BOTH,
                         // modo libre: contorno de la referencia (si se superpone) o de lo que se ve ahora
                         free = if (showGhost && refFree != null) refFree else live?.freeContour)
+                    }
                     }
                     // línea de implantación frontal: la de la referencia (discontinua) y la actual (continua)
                     val hl = refHairline
@@ -903,6 +937,13 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
 
         if (showGhost && photos.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                // girar (pasos de 90°) y espejar la referencia superpuesta
+                IconButton(onClick = { refOrient = refOrient.rotated() }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.RotateRight, "Girar la referencia 90°", tint = if (refOrient.rot != 0) GuideTone.MATCH.color else Color.White)
+                }
+                IconButton(onClick = { refOrient = refOrient.mirrored() }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Flip, "Espejo de la referencia", tint = if (refOrient.mirror) GuideTone.MATCH.color else Color.White)
+                }
                 androidx.compose.material3.FilterChip(
                     selected = ghostEdges,
                     onClick = { ghostEdges = !ghostEdges; prefs.edit().putBoolean("ghost_edges", ghostEdges).apply() },
