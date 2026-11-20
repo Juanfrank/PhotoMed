@@ -90,6 +90,72 @@ object FaceAnnotations {
         return out
     }
 
+    // Topología de la malla de MediaPipe (478 puntos; conexiones oficiales FACE_LANDMARKS_*)
+    private val EYE_R = intArrayOf(33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7)
+    private val EYE_L = intArrayOf(362, 398, 384, 385, 386, 387, 388, 466, 263, 249, 390, 373, 374, 380, 381, 382)
+    private val BROW_R = intArrayOf(70, 63, 105, 66, 107, 55, 65, 52, 53, 46)
+    private val BROW_L = intArrayOf(300, 293, 334, 296, 336, 285, 295, 282, 283, 276)
+    // Nariz con trazado estético: líneas estéticas del dorso (de la cabeza de la ceja a los puntos
+    // de definición de la punta), borde de cada ala hasta el subnasal y arco de la punta
+    private val NOSE_DORSAL_R = intArrayOf(55, 193, 122, 196, 3, 51, 45)
+    private val NOSE_DORSAL_L = intArrayOf(285, 417, 351, 419, 248, 281, 275)
+    private val NOSE_ALA_R = intArrayOf(115, 48, 64, 98, 97, 2)
+    private val NOSE_ALA_L = intArrayOf(344, 278, 294, 327, 326, 2)
+    private val NOSE_TIP = intArrayOf(45, 1, 275)
+    private val LIPS_OUTER = intArrayOf(61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146)
+    private val LIPS_INNER = intArrayOf(78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95)
+    /** Pasillos de los surcos (eje por puntos de la malla, a cada lado): nasogeniano, marioneta, valle lagrimal. */
+    val FOLD_CORRIDORS: List<Pair<String, IntArray>> = listOf(
+        "nasogeniano" to intArrayOf(203, 206, 216, 212), "nasogeniano" to intArrayOf(423, 426, 436, 432),
+        "marioneta" to intArrayOf(43, 202, 210, 169), "marioneta" to intArrayOf(273, 422, 430, 394),
+        "valle lagrimal" to intArrayOf(128, 121, 120, 119), "valle lagrimal" to intArrayOf(357, 350, 349, 348),
+    )
+
+    /** Claves de los grupos (como ML Kit) a partir de la malla, para óvalo, línea del pelo y puntos. */
+    fun keysFromMesh(mesh: List<Pt>): Map<String, Pt> {
+        val out = LinkedHashMap<String, Pt>()
+        for ((g, idx) in FaceMeshMap.GROUPS) idx.forEachIndexed { k, i -> mesh.getOrNull(i)?.let { out["$g$k"] = it } }
+        for ((k, i) in FaceMeshMap.SINGLE) mesh.getOrNull(i)?.let { out[k] = it }
+        return out
+    }
+
+    /**
+     * Líneas a partir de la malla completa de MediaPipe (478 puntos): ojos, cejas, nariz (dorso y
+     * contorno de las alas) y labios con su topología real; surcos detectados en la imagen
+     * ([RidgeTracker]) dentro de pasillos definidos por la malla, solo si se encuentran.
+     */
+    fun fromMesh(mesh: List<Pt>, labels: FaceLabels?, lum: GrayImage?): List<AnnotLine> {
+        if (mesh.size < 468) return face(keysFromMesh(mesh), labels, lum)
+        val keys = FaceKeys.canonical(keysFromMesh(mesh))
+        val out = ArrayList<AnnotLine>()
+        val p = if (labels != null) HairSkin.snapOval(labels, keys) else keys
+        (0 until 36).mapNotNull { p["oval_$it"] }.takeIf { it.size == 36 }?.let { out += AnnotLine(AnnotLayer.CONTOUR, it, true) }
+        labels?.let { HairSkin.hairline(it, keys)?.points?.let { h -> out += AnnotLine(AnnotLayer.HAIRLINE, h, false) } }
+        fun chain(idx: IntArray) = idx.map { mesh[it] }
+        out += AnnotLine(AnnotLayer.EYES, chain(EYE_R), true); out += AnnotLine(AnnotLayer.EYES, chain(EYE_L), true)
+        out += AnnotLine(AnnotLayer.EYES, chain(BROW_R), true); out += AnnotLine(AnnotLayer.EYES, chain(BROW_L), true)
+        out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_DORSAL_R).toTypedArray(), perSeg = 4), false)
+        out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_DORSAL_L).toTypedArray(), perSeg = 4), false)
+        out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_ALA_R).toTypedArray(), perSeg = 4), false)
+        out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_ALA_L).toTypedArray(), perSeg = 4), false)
+        out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_TIP).toTypedArray(), perSeg = 6), false)
+        out += AnnotLine(AnnotLayer.LIPS, chain(LIPS_OUTER), true); out += AnnotLine(AnnotLayer.LIPS, chain(LIPS_INNER), true)
+        if (lum != null) out += folds(mesh, lum, labels)
+        return out
+    }
+
+    /** Surcos detectados en la imagen (solo los encontrados), con el ancho del pasillo según la cara. */
+    fun folds(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels? = null): List<AnnotLine> {
+        val faceW = dist(mesh[234], mesh[454]).coerceAtLeast(1e-3f)
+        val skin = labels?.let { l -> { q: Pt -> l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()] == FaceLabels.FACE_SKIN } }
+        return FOLD_CORRIDORS.mapNotNull { (name, idx) ->
+            RidgeTracker.track(lum, idx.map { mesh[it] }, corridorHalf(name) * faceW, skin = skin)?.let { AnnotLine(AnnotLayer.FOLDS, it.points, false) }
+        }
+    }
+
+    /** Semiancho del pasillo de cada surco, relativo al ancho de la cara. */
+    fun corridorHalf(name: String) = if (name == "valle lagrimal") 0.035f else 0.05f
+
     /** Contorno del sujeto (zonas corporales) desde una máscara. */
     fun body(mask: Mask): List<AnnotLine> {
         // outlineOf ya está en unidades del ancho (x e y divididas por el ancho de la máscara)
@@ -174,6 +240,12 @@ class PhotoAnnotator(private val context: Context) {
     suspend fun annotate(bmp: Bitmap, zone: Zone): List<AnnotLine> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val spec = ZoneAlignment.of(zone)
         if (spec.detector == Detector.FACE) {
+            // malla completa de MediaPipe (nariz, labios, ojos y pasillos de los surcos con su topología real)
+            val mesh = runCatching { MediaPipeFace(context).use { it.mesh(bmp) } }.getOrNull()
+            if (mesh != null && mesh.size >= 468) {
+                val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(bmp) }
+                return@withContext FaceAnnotations.fromMesh(mesh, labels, lumOf(bmp))
+            }
             val pts = LandmarkDetector(stream = false, context, FaceEngine.get(context)).use { it.detect(Detector.FACE, bmp) }
             if (pts.size >= LiveDecision.MIN_POINTS) {
                 val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(bmp) }

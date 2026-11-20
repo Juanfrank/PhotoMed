@@ -4,6 +4,13 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.12 — 20 de noviembre de 2026
 
+- **Rasgos con la malla completa de MediaPipe (478 puntos)**: ojos, cejas, labios (contornos externo
+  e interno) y nariz con trazado estético (líneas estéticas del dorso, bordes de las alas y punta).
+- **Surcos detectados en la imagen**: detector de crestas Hessiano multiescala dentro de pasillos
+  definidos por la malla (nasogeniano, marioneta, valle lagrimal), trazado por programación
+  dinámica y solo sobre piel del rostro; si no hay surco claro, no se dibuja. En 18 retratos
+  reales nuevos: nasogeniano en 17; en piel joven y lisa, prácticamente nada.
+
 - **Capas sobre las fotos** (visor y comparar): contorno, línea del pelo, ojos y cejas, nariz,
   labios y surcos faciales (nasogenianos, marioneta, valle lagrimal), con el estilo del contorno.
   Los surcos se estiman con la geometría del rostro y se ajustan al valle de sombra de la piel; los

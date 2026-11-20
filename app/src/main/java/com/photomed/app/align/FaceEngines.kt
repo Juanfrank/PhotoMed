@@ -92,5 +92,13 @@ class MediaPipeFace(context: Context) : Closeable {
         return Detection(pts, e?.first, e?.second?.let { -it }, e?.third)
     }
 
+    /** Malla completa (478 puntos; x e y divididas por el ancho de la imagen) o null sin rostro. */
+    fun mesh(bmp: Bitmap): List<Pt>? {
+        val argb = if (bmp.config == Bitmap.Config.ARGB_8888) bmp else bmp.copy(Bitmap.Config.ARGB_8888, false)
+        val face = lm.detect(BitmapImageBuilder(argb).build()).faceLandmarks().firstOrNull() ?: return null
+        val k = bmp.height / bmp.width.toFloat()
+        return face.map { Pt(it.x(), it.y() * k) }
+    }
+
     override fun close() = lm.close()
 }

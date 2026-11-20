@@ -412,3 +412,14 @@ mantienen la guía estándar.
 ![Guía con distintos cabeceos](capturas/guia_cabeceo.png)
 
 ![Guía adaptada a rostros inclinados](../app/src/test/snapshots/images/com.photomed.app_GuideAdaptTest_adaptedGuideOnTiltedFaces.png)
+
+## Capas estéticas (visor y comparar)
+
+- Rasgos con la malla completa de MediaPipe (478 puntos, conexiones oficiales): ojos, cejas, labios
+  y nariz (líneas estéticas del dorso 55→45 / 285→275, alas 115→2 / 344→2, punta 45–1–275).
+- Surcos (`RidgeTracker`): respuesta de valle Hessiana multiescala (σ 2–5,5 px a 720 de ancho)
+  ponderada por la alineación con el pasillo; pasillos por la malla (nasogeniano 203-206-216-212,
+  marioneta 43-202-210-169, valle lagrimal 128-121-120-119 y sus simétricos); trazado por
+  programación dinámica; aceptado si la respuesta media ≥ 0,03, ≥ 2,2 × la media del pasillo, y
+  ≥ 75 % del trazado sobre piel del rostro (sin barba, manos ni gafas). `NewFacesAnnotTest`
+  (18 retratos de Pexels, `tools/eval/new_faces.py`): nasogeniano en 17; rostro joven liso: 1 trazo.
