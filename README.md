@@ -3,7 +3,8 @@
 Aplicación Android para fotografía clínica en **estética médica**: captura estandarizada por zonas,
 comparación antes/después con alineación automática y organización por expediente.
 
-Autor: **Juan Medina** · juanfrank11@gmail.com · Licencia [MIT](LICENSE) ·
+Autor: **Juan Medina** · juanfrank11@gmail.com · [Licencia comercial](LICENSE) (uso concedido a ProntoCare) ·
+[Novedades](CHANGELOG.md) ·
 [Política de privacidad](PRIVACY.md) · [Términos y condiciones](TERMS.md)
 
 ## Funciones

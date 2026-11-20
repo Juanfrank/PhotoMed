@@ -1,21 +1,64 @@
-MIT License
+# Licencia comercial de PhotoMed
 
-Copyright (c) 2026 Juan Medina <juanfrank11@gmail.com>
+**Versión:** 1.0 · **Vigente desde:** 19 de noviembre de 2026
+**Titular:** Juan Medina — juanfrank11@gmail.com
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Copyright © 2026 Juan Medina. **Todos los derechos reservados.**
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+## 1. Objeto
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+PhotoMed (el código fuente, la aplicación compilada, sus guías, textos, logotipos y documentación,
+en adelante "el Software") es software propietario de uso comercial. Esta licencia sustituye a la
+licencia MIT con la que se publicaron las versiones anteriores a la 2.11.
+
+## 2. Uso sujeto a licencia
+
+Salvo lo previsto en la sección 3, **nadie puede usar, copiar, instalar, modificar, distribuir,
+sublicenciar, vender ni explotar comercialmente el Software sin una licencia escrita del titular**.
+Las licencias comerciales (por usuario, por clínica o institucionales) se conceden caso por caso;
+solicítelas en juanfrank11@gmail.com.
+
+## 3. Concesión expresa a ProntoCare
+
+El titular concede expresamente a **ProntoCare**, a sus empresas afiliadas y al personal,
+profesionales y contratistas que actúen en su nombre, una licencia **no exclusiva, mundial,
+gratuita y sin plazo** para:
+
+1. usar, instalar y ejecutar el Software en cualquier número de dispositivos, **incluido el uso
+   comercial** y la prestación de servicios de salud y estética médica a terceros;
+2. reproducir y distribuir el Software a su personal y a los profesionales de su red para esos fines;
+3. adaptar o modificar el Software para sus propias necesidades.
+
+ProntoCare no puede vender, sublicenciar ni ceder el Software o esta licencia a terceros ajenos a
+su organización sin autorización escrita del titular, ni retirar los avisos de autoría.
+
+## 4. Restricciones generales
+
+Está prohibido, sin licencia: redistribuir el Software o versiones modificadas; ofrecerlo como
+servicio a terceros; eliminar avisos de derechos de autor o de licencias de terceros; y usar el
+nombre o el logotipo de PhotoMed para productos derivados.
+
+## 5. Componentes de terceros
+
+El Software incluye componentes que se rigen por sus propias licencias, que esta licencia no
+modifica: AndroidX, Jetpack Compose, CameraX y ExifInterface (Apache 2.0), Coil (Apache 2.0),
+MediaPipe Tasks y los modelos Face Landmarker y Selfie Multiclass (Apache 2.0), Google ML Kit
+(Términos de ML Kit) y las ilustraciones derivadas de **Open Pain Illustration** (Digital Health
+Zurich / Universidad de Zúrich, CC BY 4.0, con atribución y cambios indicados en los Términos).
+
+## 6. Versiones anteriores
+
+Las copias de versiones anteriores a la 2.11 obtenidas bajo la licencia MIT conservan esa licencia
+para esas copias. Las versiones 2.11 y posteriores se rigen exclusivamente por esta licencia.
+
+## 7. Garantía y responsabilidad
+
+EL SOFTWARE SE ENTREGA "TAL CUAL", SIN GARANTÍAS DE NINGÚN TIPO, EXPRESAS O IMPLÍCITAS, INCLUIDAS
+LAS DE COMERCIABILIDAD, IDONEIDAD PARA UN FIN DETERMINADO Y NO INFRACCIÓN. EN LA MEDIDA PERMITIDA
+POR LA LEY, EL TITULAR NO SERÁ RESPONSABLE DE NINGÚN DAÑO DERIVADO DEL USO DEL SOFTWARE.
+PhotoMed no es un dispositivo médico (ver los Términos y condiciones).
+
+## 8. Terminación
+
+Cualquier licencia concedida termina automáticamente si se incumplen sus condiciones; en ese caso
+debe dejar de usar el Software y eliminar sus copias.

@@ -8,8 +8,8 @@ Al instalar o usar PhotoMed usted acepta estos términos. Si no está de acuerdo
 ## 1. Objeto
 
 PhotoMed es una herramienta de software para la **toma estandarizada, organización y comparación
-de fotografías clínicas** en estética médica. Se distribuye como software de código abierto bajo la
-licencia MIT (ver “Licencia”).
+de fotografías clínicas** en estética médica. Es software propietario de uso comercial, sujeto a la
+**Licencia comercial de PhotoMed** (ver “Licencia”), que concede expresamente su uso a ProntoCare.
 
 ## 2. Usuarios
 
@@ -44,7 +44,8 @@ datos ni a los de sus pacientes, que permanecen en su dispositivo.
 
 ## 6. Propiedad intelectual
 
-El código de PhotoMed es © 2026 Juan Medina y se licencia bajo **MIT**. Las fotografías y los datos
+PhotoMed es © 2026 Juan Medina, todos los derechos reservados, y se rige por la **Licencia
+comercial de PhotoMed** (las versiones anteriores a la 2.11 se publicaron bajo MIT). Las fotografías y los datos
 que usted genera son suyos o de sus pacientes, según corresponda. Los contornos anatómicos se
 derivan de **Open Pain Illustration** (Digital Health Zurich / Universidad de Zúrich), con licencia
 CC BY 4.0 (<https://creativecommons.org/licenses/by/4.0/>), adaptados (recorte, extracción de trazos,

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Propuesta A · "Línea": estetoscopio de trazo continuo cuya campana es un objetivo de cámara -->
+  <defs>
+    <linearGradient id="bgA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3FBFA"/><stop offset="1" stop-color="#DDF3F0"/></linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="232" fill="url(#bgA)"/>
+  <g fill="none" stroke="#0F766E" stroke-width="54" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M318 214 C318 430 360 528 444 566"/>
+    <path d="M570 214 C570 430 528 528 444 566"/>
+    <path d="M444 566 C444 760 520 846 616 838 C700 830 742 790 742 742"/>
+  </g>
+  <circle cx="318" cy="196" r="34" fill="#0F766E"/>
+  <circle cx="570" cy="196" r="34" fill="#0F766E"/>
+  <!-- objetivo -->
+  <circle cx="742" cy="592" r="166" fill="#FFFFFF" stroke="#0F766E" stroke-width="40"/>
+  <circle cx="742" cy="592" r="116" fill="#0B4F4A"/>
+  <g stroke="#2DD4BF" stroke-width="10" stroke-linecap="round">
+    <path d="M742 476 L776 560"/><path d="M842 534 L776 592"/><path d="M842 650 L760 640"/>
+    <path d="M742 708 L708 624"/><path d="M642 650 L708 592"/><path d="M642 534 L724 544"/>
+  </g>
+  <circle cx="742" cy="592" r="38" fill="#0F172A"/>
+  <path d="M672 520 A104 104 0 0 1 744 488" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" opacity="0.85"/>
+</svg>

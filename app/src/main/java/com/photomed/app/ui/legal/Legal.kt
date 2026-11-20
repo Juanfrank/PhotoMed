@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PrivacyTip
@@ -68,7 +69,8 @@ const val AUTHOR_EMAIL = "juanfrank11@gmail.com"
 enum class LegalDoc(val title: String, val asset: String) {
     PRIVACY("Política de privacidad", "legal/PRIVACY.md"),
     TERMS("Términos y condiciones", "legal/TERMS.md"),
-    LICENSE("Licencia MIT", "legal/LICENSE.md"),
+    LICENSE("Licencia comercial", "legal/LICENSE.md"),
+    CHANGELOG("Novedades (registro de cambios)", "legal/CHANGELOG.md"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -116,6 +118,7 @@ fun AboutScreen(onBack: () -> Unit, onDoc: (LegalDoc) -> Unit) {
                             LegalDoc.PRIVACY -> Icons.Outlined.PrivacyTip
                             LegalDoc.TERMS -> Icons.Outlined.Gavel
                             LegalDoc.LICENSE -> Icons.Outlined.Description
+                            LegalDoc.CHANGELOG -> Icons.Outlined.NewReleases
                         }, null)
                     },
                     trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null) },

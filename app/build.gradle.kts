@@ -15,8 +15,8 @@ android {
         applicationId = "com.photomed.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = 3
+        versionName = "2.11"
     }
 
     // ML Kit incluye bibliotecas nativas por arquitectura: un APK por ABI para instalación directa
@@ -115,7 +115,7 @@ dependencies {
 // Los documentos legales viven en la raíz del repo (LICENSE, PRIVACY.md, TERMS.md)
 // y se empaquetan como assets para mostrarlos dentro de la aplicación.
 val copyLegalDocs by tasks.registering(Copy::class) {
-    from(rootProject.file("PRIVACY.md"), rootProject.file("TERMS.md"))
+    from(rootProject.file("PRIVACY.md"), rootProject.file("TERMS.md"), rootProject.file("CHANGELOG.md"))
     from(rootProject.file("LICENSE")) { rename { "LICENSE.md" } }
     into(layout.buildDirectory.dir("generated/legal/legal"))
 }

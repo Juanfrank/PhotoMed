@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Propuesta B · "Lente": la campana es un gran objetivo de cristal sobre fondo oscuro -->
+  <defs>
+    <linearGradient id="bgB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0B2545"/><stop offset="1" stop-color="#13315C"/></linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E2E8F0"/><stop offset="0.5" stop-color="#94A3B8"/><stop offset="1" stop-color="#F8FAFC"/></linearGradient>
+    <radialGradient id="glass" cx="0.38" cy="0.35" r="0.75"><stop offset="0" stop-color="#7DD3FC"/><stop offset="0.45" stop-color="#2563EB"/><stop offset="0.8" stop-color="#4C1D95"/><stop offset="1" stop-color="#1E1B4B"/></radialGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="232" fill="url(#bgB)"/>
+  <g fill="none" stroke="#E0F2FE" stroke-width="44" stroke-linecap="round">
+    <path d="M356 150 C356 300 400 360 512 392"/>
+    <path d="M668 150 C668 300 624 360 512 392"/>
+    <path d="M512 392 L512 424"/>
+  </g>
+  <circle cx="356" cy="136" r="30" fill="#E0F2FE"/>
+  <circle cx="668" cy="136" r="30" fill="#E0F2FE"/>
+  <circle cx="512" cy="646" r="236" fill="url(#ring)"/>
+  <circle cx="512" cy="646" r="198" fill="#0F172A"/>
+  <circle cx="512" cy="646" r="176" fill="url(#glass)"/>
+  <circle cx="512" cy="646" r="118" fill="none" stroke="#93C5FD" stroke-width="6" opacity="0.6"/>
+  <circle cx="512" cy="646" r="62" fill="#0F172A" opacity="0.85"/>
+  <!-- reflejo con forma de cruz médica -->
+  <g fill="#FFFFFF" opacity="0.9"><rect x="400" y="516" width="22" height="70" rx="11"/><rect x="376" y="540" width="70" height="22" rx="11"/></g>
+  <path d="M590 770 A150 150 0 0 0 640 700" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" opacity="0.45"/>
+</svg>
