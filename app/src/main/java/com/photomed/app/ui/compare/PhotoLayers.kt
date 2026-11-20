@@ -122,14 +122,22 @@ fun PhotoContent(model: Any, transform: Similarity?, annots: List<AnnotLine>?, l
  * contenedor sigue siendo 3:4 y el contenido girado se reduce para caber entero.
  */
 @Composable
-fun OrientBox(rot: Int, mirror: Boolean, modifier: Modifier = Modifier, fit: Boolean = false, content: @Composable () -> Unit) {
+fun OrientBox(rot: Int, mirror: Boolean, modifier: Modifier = Modifier, fit: Boolean = false,
+              /**
+               * Con giro impar en un contenedor 3:4: el contenido 3:4 girado lo cubre entero (como la
+               * imagen girada y recortada al centro en 3:4, p. ej. la referencia de la cámara).
+               */
+              fill34: Boolean = false, content: @Composable () -> Unit) {
     BoxWithConstraints(modifier.fillMaxSize().graphicsLayer { scaleX = if (mirror) -1f else 1f }) {
         val odd = rot % 2 == 1
+        // fit: el contenido girado (alto h, ancho visible h) cabe entero: h ≤ ancho y ¾h ≤ alto
+        val hFit = minOf(maxWidth, maxHeight / 0.75f)
         Box(
             Modifier.align(Alignment.Center)
                 .then(when {
                     !odd -> Modifier.fillMaxSize()
-                    fit -> Modifier.requiredSize(minOf(maxHeight, maxWidth * 4f / 3f) * 0.75f, minOf(maxHeight, maxWidth * 4f / 3f))
+                    fill34 -> Modifier.requiredSize(maxHeight, maxHeight * 4f / 3f)
+                    fit -> Modifier.requiredSize(hFit * 0.75f, hFit)
                     else -> Modifier.requiredSize(maxHeight, maxWidth)
                 })
                 .graphicsLayer { rotationZ = 90f * (rot % 4) },

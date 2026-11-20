@@ -289,6 +289,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var adaptGuide by remember { mutableStateOf(true) }
     /** Giro (pasos de 90°) y espejo de la referencia superpuesta, o de la guía si no hay referencia. */
     var refOrient by remember { mutableStateOf(com.photomed.app.align.ImageEdit.NONE) }
+    // guía adaptada a la referencia SIN girar (se dibuja girada entera cuando la referencia está girada)
+    var refGuide by remember { mutableStateOf<com.photomed.app.align.LiveMatcher.GuideRef?>(null) }
     var ghostBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     /** Primera toma (sin referencia): el rostro coincide con el marco de la guía → la guía se ajusta a la cara. */
     var framedFace by remember { mutableStateOf(false) }
@@ -324,10 +326,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         // adaptada y coincidencia quedan coherentes)
         fun oriented(b: android.graphics.Bitmap, w: Int) = if (refOrient.isIdentity) b else ImageOps.centerCrop34(refOrient.apply(b), w)
         ghostBitmap = runCatching { oriented(ImageOps.load34(context, g.uri, 720), 720).asImageBitmap() }.getOrNull()
-        val bmp = runCatching { oriented(ImageOps.load34(context, g.uri, 360), 360) }.getOrNull() ?: return@LaunchedEffect
+        val upright = runCatching { ImageOps.load34(context, g.uri, 360) }.getOrNull() ?: return@LaunchedEffect
+        val bmp = oriented(upright, 360)
         val m = matcher
+        val orient = refOrient
+        refGuide = null
         pipeline.post {
             runCatching { m.setReference(bmp) }
+            refGuide = if (orient.isIdentity) null else runCatching { m.guideOf(upright) }.getOrNull()
             refPoints = m.referencePoints
             refSilhouette = m.referenceSilhouette
             refFree = m.referenceFree
@@ -869,16 +875,21 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     // líneas de referencia: en el modo simple, solo al acercarse a la coincidencia
                     val linesVisible = expert || !matchingEnabled || (GuideTone.degree(live?.eval) ?: 0f) >= 0.6f
                     androidx.compose.runtime.CompositionLocalProvider(LocalGuideLines provides linesVisible) {
+                    // referencia girada: la guía se adapta a la referencia sin girar y se gira entera
+                    // (la deformación de la guía solo admite cabezas casi verticales)
+                    val rg = refGuide.takeIf { !refOrient.isIdentity && adaptGuide && showGhost && ghost != null }
                     val adaptPts = when {
+                        rg != null -> rg.points
                         adaptGuide && showGhost && refPoints.isNotEmpty() -> refPoints
                         // primera toma: con la cara dentro del marco, el contorno se ajusta a ella
                         adaptGuide && framedFace -> live?.currentPointsAll.orEmpty()
                         else -> emptyMap()
                     }
-                    val adaptSil = if (adaptGuide && showGhost) refSilhouette else null
+                    val adaptSil = if (rg != null) rg.silhouette else if (adaptGuide && showGhost) refSilhouette else null
                     // sin referencia que la oriente, la guía dibujada se gira / espeja con el control de la referencia
-                    val orientGuide = adaptPts.isEmpty() && adaptSil == null && (ghost == null || !showGhost)
-                    com.photomed.app.ui.compare.OrientBox(if (orientGuide) refOrient.rot else 0, orientGuide && refOrient.mirror, Modifier.fillMaxSize(), fit = true) {
+                    val orientGuide = rg != null || (adaptPts.isEmpty() && adaptSil == null && (ghost == null || !showGhost))
+                    com.photomed.app.ui.compare.OrientBox(if (orientGuide) refOrient.rot else 0, orientGuide && refOrient.mirror, Modifier.fillMaxSize(),
+                        fit = rg == null, fill34 = rg != null) {
                     GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize(),
                         tone = tone, adaptTo = adaptPts,
                         silhouette = adaptSil,
@@ -889,7 +900,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     }
                     // línea de implantación frontal: la de la referencia (discontinua) y la actual (continua)
                     val hl = refHairline
-                    if (showContour && showGhost && hl != null) HairlineGuide(hl, tone.color, Modifier.fillMaxSize())
+                    val rgh = refGuide?.hairline.takeIf { !refOrient.isIdentity && refGuide != null }
+                    if (showContour && showGhost && rgh != null)
+                        com.photomed.app.ui.compare.OrientBox(refOrient.rot, refOrient.mirror, Modifier.fillMaxSize(), fill34 = true) {
+                            HairlineGuide(rgh, tone.color, Modifier.fillMaxSize())
+                        }
+                    else if (showContour && showGhost && hl != null) HairlineGuide(hl, tone.color, Modifier.fillMaxSize())
                     val liveHl = live?.hairline
                     if (showContour && liveHl != null) HairlineGuide(liveHl, Color(0xFFFFD54F), Modifier.fillMaxSize(), dashed = false)
                     if (matchingEnabled && expert) live?.let { LivePoints(it, tone, mirror = false) }

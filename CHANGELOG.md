@@ -2,6 +2,17 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.15 — 20 de noviembre de 2026
+
+- **Importar fotos a un expediente** (menú ⋮ del expediente → *Importar fotos*): se eligen varias
+  fotos con el selector del sistema y se asigna a cada una su ángulo (o el mismo a todas). Las
+  vistas del rostro llegan con una sugerencia (frontal, oblicuo o perfil y su lado, por el giro de
+  la cabeza). Se conserva la fecha de toma de la foto; se guardan con los datos del paciente y sin
+  los metadatos originales (ubicación, dispositivo).
+- **Corrección**: al girar la referencia 90° el contorno adaptado se deformaba (la adaptación de la
+  guía solo admite cabezas casi verticales). Ahora se adapta a la referencia sin girar y se gira
+  entero, alineado con la foto superpuesta; la guía genérica girada cabe entera en el encuadre.
+
 ## 2.14 — 20 de noviembre de 2026
 
 - **Medición de relieve con la pantalla** (cámara frontal, menú ⋯ → *Medición de relieve*): al

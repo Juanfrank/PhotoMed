@@ -96,6 +96,28 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     private val segmenter: SubjectSegmenter?
         get() = segmenterOrNull ?: runCatching { SubjectSegmenter() }.getOrNull()?.also { segmenterOrNull = it }
 
+    /** Datos de una referencia para dibujar la guía adaptada (sin cambiar la referencia de la coincidencia). */
+    class GuideRef(val points: Map<String, Pt>, val silhouette: Silhouette?, val hairline: List<Pt>?)
+
+    /**
+     * Guía adaptada a [bmp] (puntos con el óvalo ajustado, silueta y línea de implantación), para
+     * dibujarla sobre la referencia sin girar cuando la referencia se muestra girada: la guía se
+     * adapta en vertical y se gira entera (sin deformarla).
+     */
+    fun guideOf(bmp: Bitmap): GuideRef {
+        var r = detector.detectFull(spec.detector, bmp)
+        val faceView = zone.guide == com.photomed.app.data.GuideType.FACE_FRONT || zone.guide == com.photomed.app.data.GuideType.FACE_OBLIQUE
+        val labels = if (faceView || tracksHairline) runCatching { hairSkin?.labels(bmp) }.getOrNull() else null
+        if (labels != null && faceView && r.points.isNotEmpty()) r = r.copy(points = HairSkin.snapOval(labels, r.points))
+        val hl = if (!tracksHairline || labels == null) null else runCatching { HairSkin.hairline(labels, r.points)?.points }.getOrNull()
+        val sil = runCatching {
+            val plain = zone.guide == com.photomed.app.data.GuideType.HANDS || zone.guide == com.photomed.app.data.GuideType.FEET
+            val mask = if (plain) ForegroundOnPlain.mask(bmp.rgb(), bmp.width, bmp.height) else SubjectSegmenter().use { s -> s.segment(bmp) }
+            mask?.let { Silhouette.fromMask(it, Silhouette.axisOf(r.points)) }
+        }.getOrNull()
+        return GuideRef(r.points, sil, hl)
+    }
+
     fun setReference(bmp: Bitmap) {
         ref = detector.detectFull(spec.detector, bmp)
         // Segmentación pelo / piel de la referencia (vistas faciales): óvalo ajustado al límite real de

@@ -4,6 +4,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.foundation.background
@@ -110,6 +111,19 @@ fun ExpedienteScreen(
     var reload by remember { mutableIntStateOf(0) }
     var editing by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    // importación de fotos: selector del sistema → ángulo de cada foto → guardado en el expediente
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var importItems by remember { mutableStateOf<List<com.photomed.app.data.ImportItem>?>(null) }
+    var importBusy by remember { mutableStateOf<String?>(null) }
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(50)) { uris ->
+        if (uris.isNotEmpty()) scope.launch {
+            importBusy = "Analizando ${uris.size} ${if (uris.size == 1) "foto" else "fotos"}…"
+            importItems = runCatching { com.photomed.app.data.PhotoImport.prepare(context, uris, default = null) }.getOrNull()
+                ?: uris.map { com.photomed.app.data.ImportItem(it, System.currentTimeMillis(), false, null) }
+            importBusy = null
+        }
+    }
 
     LaunchedEffect(reload) {
         val (e, list) = withContext(Dispatchers.IO) {
@@ -130,7 +144,35 @@ fun ExpedienteScreen(
         onBack = onBack, onZone = onZone, onCompare = onCompare,
         onEdit = { editing = true }, onDelete = { confirmDelete = true },
         onSequence = onSequence,
+        onImport = {
+            picker.launch(androidx.activity.result.PickVisualMediaRequest(
+                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+        },
     )
+    importItems?.let { items ->
+        ImportPhotosDialog(items, onDismiss = { importItems = null }) { chosen ->
+            importItems = null
+            val e = exp ?: return@ImportPhotosDialog
+            scope.launch {
+                importBusy = "Importando ${chosen.size} ${if (chosen.size == 1) "foto" else "fotos"}…"
+                val saved = runCatching { com.photomed.app.data.PhotoImport.import(context, repo, e, chosen) }.getOrDefault(emptyList())
+                importBusy = null
+                reload++
+                val failed = chosen.size - saved.size
+                snackbar.showSnackbar("Importadas ${saved.size} de ${chosen.size}" + if (failed > 0) " ($failed no se pudieron leer)" else "")
+            }
+        }
+    }
+    importBusy?.let { msg ->
+        androidx.compose.ui.window.Dialog(onDismissRequest = {}) {
+            androidx.compose.material3.Card {
+                Row(Modifier.padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.CircularProgressIndicator(Modifier.size(28.dp))
+                    Text(msg, Modifier.padding(start = 16.dp))
+                }
+            }
+        }
+    }
 
     val current = exp
     if (editing && current != null) {
@@ -182,6 +224,8 @@ fun ExpedienteContent(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSequence: (List<Zone>) -> Unit = {},
+    /** Importar fotos de la galería u otra fuente, asignando el ángulo de cada una. */
+    onImport: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var menu by remember { mutableStateOf(false) }
@@ -214,6 +258,11 @@ fun ExpedienteContent(
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Importar fotos") },
+                                leadingIcon = { Icon(Icons.Default.AddPhotoAlternate, null) },
+                                onClick = { menu = false; onImport() },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Eliminar expediente") },
                                 leadingIcon = { Icon(Icons.Default.Delete, null) },
