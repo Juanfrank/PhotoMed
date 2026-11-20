@@ -4,9 +4,8 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.11 — 19 de noviembre de 2026
 
-- **Licencia comercial de pago**: PhotoMed pasa de la licencia MIT (gratuita) a licencias de pago
-  (profesional, clínica e institucional; suscripción o perpetua), con **licencia institucional
-  expresa para ProntoCare**.
+- **Licencia comercial de pago** (profesional, clínica e institucional; suscripción o perpetua),
+  con **licencia institucional gratuita para ProntoCare**.
 - **Nuevo logotipo**: cámara clínica cuyo visor es un estetoscopio (icono adaptativo y temático).
 - **Novedades** dentro de la app (Acerca de y legal): este registro de cambios.
 - El modelo de pelo y piel vuelve a venir **incluido en la app** (sin descarga).

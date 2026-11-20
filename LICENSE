@@ -8,14 +8,15 @@ Copyright © 2026 Juan Medina. **Todos los derechos reservados.**
 ## 1. Objeto
 
 PhotoMed (el código fuente, la aplicación compilada, sus guías, textos, logotipos y documentación,
-en adelante "el Software") es software propietario que se licencia **de forma onerosa (de pago)**.
-Esta licencia sustituye a la licencia MIT con la que se publicaron las versiones anteriores a la 2.11.
+en adelante "el Software") es software propietario que se licencia **de forma onerosa (de pago)**,
+con la única excepción de la licencia gratuita concedida a ProntoCare en la sección 3.
 
 ## 2. Licencias de pago
 
-PhotoMed **no es gratuito**. Usar, copiar, instalar, modificar, distribuir, sublicenciar, vender o
-explotar comercialmente el Software requiere una **licencia de pago** emitida por escrito por el
-titular (orden de compra, factura o contrato). Sin licencia vigente no hay derecho de uso.
+Salvo para ProntoCare (sección 3), PhotoMed **no es gratuito**. Usar, copiar, instalar, modificar,
+distribuir, sublicenciar, vender o explotar comercialmente el Software requiere una **licencia de
+pago** emitida por escrito por el titular (orden de compra, factura o contrato). Sin licencia
+vigente no hay derecho de uso.
 
 ### 2.1 Modalidades
 
@@ -41,16 +42,16 @@ titular (orden de compra, factura o contrato). Sin licencia vigente no hay derec
 ## 3. Licencia expresa a ProntoCare
 
 El titular concede expresamente a **ProntoCare**, a sus empresas afiliadas y al personal,
-profesionales y contratistas que actúen en su nombre, una **licencia institucional** no exclusiva y
-mundial para:
+profesionales y contratistas que actúen en su nombre, una **licencia institucional gratuita**, no
+exclusiva, mundial y sin plazo, sin límite de usuarios, dispositivos ni sedes, para:
 
 1. usar, instalar y ejecutar el Software en sus dispositivos, **incluido el uso comercial** y la
    prestación de servicios de salud y estética médica a terceros;
 2. reproducir y distribuir el Software a su personal y a los profesionales de su red para esos fines;
 3. adaptar o modificar el Software para sus propias necesidades.
 
-Esta licencia es **onerosa (de pago)**: su precio, número de usuarios o sedes, duración y forma de
-pago son los del acuerdo comercial entre ProntoCare y el titular. ProntoCare no puede vender,
+Esta licencia **no tiene coste** para ProntoCare (ni cuotas, ni suscripción, ni pago por usuario,
+dispositivo o sede) e incluye las versiones futuras del Software. ProntoCare no puede vender,
 sublicenciar ni ceder el Software o esta licencia a terceros ajenos a su organización sin
 autorización escrita del titular, ni retirar los avisos de autoría.
 
@@ -68,19 +69,14 @@ MediaPipe Tasks y los modelos Face Landmarker y Selfie Multiclass (Apache 2.0), 
 (Términos de ML Kit) y las ilustraciones derivadas de **Open Pain Illustration** (Digital Health
 Zurich / Universidad de Zúrich, CC BY 4.0, con atribución y cambios indicados en los Términos).
 
-## 6. Versiones anteriores
-
-Las copias de versiones anteriores a la 2.11 obtenidas bajo la licencia MIT conservan esa licencia
-para esas copias. Las versiones 2.11 y posteriores se rigen exclusivamente por esta licencia.
-
-## 7. Garantía y responsabilidad
+## 6. Garantía y responsabilidad
 
 EL SOFTWARE SE ENTREGA "TAL CUAL", SIN GARANTÍAS DE NINGÚN TIPO, EXPRESAS O IMPLÍCITAS, INCLUIDAS
 LAS DE COMERCIABILIDAD, IDONEIDAD PARA UN FIN DETERMINADO Y NO INFRACCIÓN. EN LA MEDIDA PERMITIDA
 POR LA LEY, EL TITULAR NO SERÁ RESPONSABLE DE NINGÚN DAÑO DERIVADO DEL USO DEL SOFTWARE.
 PhotoMed no es un dispositivo médico (ver los Términos y condiciones).
 
-## 8. Terminación
+## 7. Terminación
 
 Cualquier licencia concedida termina automáticamente si se incumplen sus condiciones; en ese caso
 debe dejar de usar el Software y eliminar sus copias.
