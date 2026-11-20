@@ -1,0 +1,105 @@
+package com.photomed.app.align
+
+import kotlin.math.exp
+import kotlin.math.hypot
+import kotlin.math.roundToInt
+
+/**
+ * Contorno de la mandíbula y el mentón (parte del óvalo bajo la boca), más preciso que el ajuste por
+ * segmentación: la segmentación pelo / piel suele dar el cuello como piel de la cara (el contorno se
+ * salía por debajo del mentón) y la barba como parte de la cara (el contorno rodeaba la barba).
+ *
+ * Se parte del óvalo de la malla (fiable en el mentón) y, a lo largo de la normal de cada punto, se
+ * busca el borde de luminosidad de la mandíbula (la sombra bajo el mentón y la mandíbula: más claro
+ * dentro, más oscuro fuera) en una ventana pequeña, sobre todo hacia dentro (−[IN] … +[OUT] del ancho
+ * de la cara), con una penalización gaussiana por alejarse de la malla. Donde hay vello facial, una
+ * mano u otra oclusión (etiqueta que no es piel), el punto se queda en la malla. Los desplazamientos
+ * se suavizan a lo largo del contorno.
+ */
+object JawContour {
+    const val IN = 0.05f
+    const val OUT = 0.05f
+    const val SIGMA = 0.025f
+
+    /**
+     * Contorno lateral e inferior de la cara (del nivel de los ojos al mentón), ajustado al borde visible:
+     * - lados (mejillas y mandíbula): el mayor cambio de color L*a*b* entre dentro y fuera (cara —piel o
+     *   vello— frente a fondo, pelo de la cabeza o ropa), en ambos sentidos (−[IN] … +[OUT] del ancho);
+     * - bajo el mentón (normal hacia abajo): el borde de sombra claro → oscuro, poco hacia fuera, para no
+     *   bajar al cuello (que tiene el mismo color de piel);
+     * con penalización gaussiana (σ [SIGMA]) por alejarse de la malla; donde la etiqueta es ropa u otro
+     * objeto delante de la cara (mano), el punto se queda en la malla. Desplazamientos suavizados.
+     * [mesh]: claves de la malla sin ajustar; [snapped]: con el óvalo ajustado a la segmentación (la
+     * frente se conserva de ahí).
+     */
+    fun refine(mesh: Map<String, Pt>, snapped: Map<String, Pt>, lum: GrayImage, labels: FaceLabels?, hair: FacialHair.Result?,
+               lab: LabImage? = null): Map<String, Pt> {
+        val oval = (0 until 36).map { mesh["oval_$it"] ?: return snapped }
+        val w = lum.width.toFloat()
+        val faceW = oval.maxOf { it.x } - oval.minOf { it.x }
+        val eyeY = listOfNotNull(mesh[Landmarks.EYE_L], mesh[Landmarks.EYE_R]).map { it.y }.average().toFloat()
+            .takeIf { !it.isNaN() } ?: (oval.minOf { it.y } + (oval.maxOf { it.y } - oval.minOf { it.y }) * 0.4f)
+        val sides = oval.indices.filter { oval[it].y > eyeY }
+        if (sides.size < 8) return snapped
+        val k = (faceW * w / 400f).coerceAtLeast(0.6f)
+        val g = PhotometricStereo.blur(lum.data, lum.width, lum.height, 1.2f * k)
+        val ls = lab?.let { Triple(PhotometricStereo.blur(it.l, it.width, it.height, 1.2f * k), PhotometricStereo.blur(it.a, it.width, it.height, 1.2f * k),
+            PhotometricStereo.blur(it.b, it.width, it.height, 1.2f * k)) }
+        fun idx(q: Pt, iw: Int, ih: Int): Int { val x = (q.x * iw).roundToInt().coerceIn(0, iw - 1); val y = (q.y * iw).roundToInt().coerceIn(0, ih - 1); return y * iw + x }
+        fun lumAt(q: Pt) = g[idx(q, lum.width, lum.height)]
+        fun labAt(q: Pt): FloatArray? = if (ls == null || lab == null) null else idx(q, lab.width, lab.height).let { floatArrayOf(ls.first[it], ls.second[it], ls.third[it]) }
+        val cx = oval.map { it.x }.average().toFloat(); val cy = oval.map { it.y }.average().toFloat()
+        fun normal(i: Int): Pt? {
+            val o = oval[i]; val a = oval[(i + 35) % 36]; val b = oval[(i + 1) % 36]
+            var nx = -(b.y - a.y); var ny = b.x - a.x
+            val nn = hypot(nx, ny).takeIf { it > 1e-6f } ?: return null
+            nx /= nn; ny /= nn
+            if (nx * (o.x - cx) + ny * (o.y - cy) < 0) { nx = -nx; ny = -ny }
+            return Pt(nx, ny)
+        }
+        val offs = FloatArray(36)
+        val step = 1f / w
+        for (i in sides) {
+            val o = oval[i]; val n = normal(i) ?: continue
+            // objeto delante de la cara (ropa, mano u otro): se queda en la malla
+            val occl = labels?.let { l -> val c = l[(o.x * l.width).roundToInt(), (o.y * l.width).roundToInt()]
+                c == FaceLabels.CLOTHES || c == FaceLabels.OTHER } == true
+            if (occl) continue
+            val chin = n.y > 0.75f   // bajo el mentón: sombra, poco hacia fuera
+            val dMin = -IN * faceW; val dMax = (if (chin) 0.02f else OUT) * faceW
+            val h = 2.5f * step * k
+            var best = 0f; var bestScore = 0f
+            var d = dMin
+            while (d <= dMax) {
+                val q = Pt(o.x + n.x * d, o.y + n.y * d)
+                val qi = Pt(q.x - n.x * h, q.y - n.y * h); val qo = Pt(q.x + n.x * h, q.y + n.y * h)
+                val edge = when {
+                    chin -> lumAt(qi) - lumAt(qo)                         // claro dentro → oscuro fuera
+                    lab == null -> kotlin.math.abs(lumAt(qi) - lumAt(qo))
+                    else -> { val a = labAt(qi)!!; val b = labAt(qo)!!
+                        // ΔE*ab / 100 (en la misma escala que la luminancia 0..1)
+                        hypot(hypot(a[0] - b[0], a[1] - b[1]), a[2] - b[2]) / 100f }
+                }
+                val prior = exp(-(d / (SIGMA * faceW)) * (d / (SIGMA * faceW)) / 2)
+                val sc = edge * prior
+                if (sc > bestScore) { bestScore = sc; best = d }
+                d += step
+            }
+            if (bestScore > (if (chin) 0.015f else 0.03f)) offs[i] = best
+        }
+        val n36 = 36
+        val med = FloatArray(n36) { i -> if (i !in sides) 0f else (-2..2).map { offs[(i + it + n36) % n36] }.sorted()[2] }
+        val sm = FloatArray(n36) { i -> if (i !in sides) 0f else (-1..1).map { med[(i + it + n36) % n36] }.average().toFloat() }
+        val out = snapped.toMutableMap()
+        for (i in sides) {
+            val o = oval[i]; val n = normal(i) ?: continue
+            out["oval_$i"] = Pt(o.x + n.x * sm[i], o.y + n.y * sm[i])
+        }
+        // transición con la parte superior (ajustada a la segmentación)
+        for (i in oval.indices.filter { it !in sides && ((it + 1) % 36 in sides || (it + 35) % 36 in sides) }) {
+            val s0 = snapped["oval_$i"] ?: continue; val r = out["oval_${if ((i + 1) % 36 in sides) (i + 1) % 36 else (i + 35) % 36}"] ?: continue
+            out["oval_$i"] = Pt((s0.x * 2 + r.x) / 3, (s0.y * 2 + r.y) / 3)
+        }
+        return out
+    }
+}

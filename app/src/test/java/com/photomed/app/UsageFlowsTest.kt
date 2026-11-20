@@ -309,6 +309,12 @@ class UsageFlowsTest {
         val table = compose.onNodeWithText("Arrugas y surcos").fetchSemanticsNode().boundsInRoot
         assertTrue("chips encima de la foto", chips.bottom <= photoBox.top + 1f)
         assertTrue("tabla debajo de la foto", table.top >= photoBox.bottom - 1f)
+        // opacidad de trazos y números: empieza en 50 %
+        compose.onNodeWithText("Opacidad 50 %").assertExists()
+        compose.onNodeWithContentDescription("Opacidad de los trazos y números")
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(0.8f) }
+        compose.waitForIdle()
+        assertEquals(0.8f, ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getFloat("annot_alpha", 0f), 0.01f)
         // contornos internos (ojos, nariz, labios) de una vez
         compose.onNodeWithText("Contornos internos").performClick()
         compose.waitForIdle()

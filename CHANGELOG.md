@@ -2,6 +2,18 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.19 — 20 de noviembre de 2026
+
+- **Números fuera de los trazos**: cada número va a un lado de su línea, con una guía fina, sin
+  tapar el trazo ni la piel (en 4 retratos de ejemplo, 82 de 83 sin tocar ninguna línea).
+- **Opacidad de trazos y números** ajustable con un control deslizante (empieza en 50 %), en el visor
+  y en Comparar; se recuerda y se aplica al exportar.
+- **Mejillas, mandíbula y mentón más precisos**: del nivel de los ojos hacia abajo, el contorno
+  parte de la malla y se ajusta al borde visible de la cara (mayor cambio de color L*a*b* entre cara
+  y fondo, en ambos sentidos); bajo el mentón, al borde de sombra, para no bajar al cuello (mentón:
+  antes hasta 6 % del ancho de la cara por debajo, ahora < 1 %). Corrige los huecos (trazo separado de
+  la mejilla) y los trazos por dentro del borde de la mandíbula.
+
 ## 2.18 — 20 de noviembre de 2026
 
 - **Líneas numeradas**: cada línea medida lleva en la foto el mismo número que su fila en la tabla

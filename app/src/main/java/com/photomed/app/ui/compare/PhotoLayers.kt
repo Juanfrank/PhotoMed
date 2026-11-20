@@ -31,6 +31,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import coil.compose.AsyncImage
 import com.photomed.app.align.AnnotLayer
 import com.photomed.app.align.AnnotLine
@@ -45,6 +47,36 @@ import com.photomed.app.ui.camera.annotColor
 import com.photomed.app.ui.camera.drawAnnotations
 
 private const val PREF_LAYERS = "annot_layers"
+private const val PREF_ALPHA = "annot_alpha"
+
+/** Opacidad de los trazos y números sobre las fotos (se recuerda; por defecto 50 %). */
+@Composable
+fun rememberAnnotAlpha(): MutableState<Float> {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("photomed", Context.MODE_PRIVATE) }
+    return remember {
+        object : MutableState<Float> {
+            private val s = mutableStateOf(prefs.getFloat(PREF_ALPHA, 0.5f))
+            override var value: Float
+                get() = s.value
+                set(v) { s.value = v; prefs.edit().putFloat(PREF_ALPHA, v).apply() }
+            override fun component1() = value
+            override fun component2(): (Float) -> Unit = { value = it }
+        }
+    }
+}
+
+/** Control de la opacidad de los trazos y números (10–100 %). */
+@Composable
+fun OpacitySlider(alpha: Float, onChange: (Float) -> Unit, modifier: Modifier = Modifier, light: Boolean = false) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text("Opacidad ${(alpha * 100).toInt()} %", style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+            color = if (light) androidx.compose.ui.graphics.Color.White else androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(end = 8.dp))
+        androidx.compose.material3.Slider(value = alpha, onValueChange = onChange, valueRange = 0.1f..1f,
+            modifier = Modifier.weight(1f).semantics { contentDescription = "Opacidad de los trazos y números" })
+    }
+}
 
 /** Capas de anotación visibles (se recuerdan entre sesiones; por defecto, ninguna). */
 @Composable
@@ -120,12 +152,13 @@ fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boole
 fun PhotoContent(model: Any, transform: Similarity?, annots: List<AnnotLine>?, layers: Set<AnnotLayer>,
                  description: String?, modifier: Modifier = Modifier,
                  /** Números de las líneas medidas (los mismos en todas las fotos y en la tabla). */
-                 numbers: Map<String, Int>? = annots?.let { com.photomed.app.align.MeasureNumbering.of(listOf(it)) }) {
+                 numbers: Map<String, Int>? = annots?.let { com.photomed.app.align.MeasureNumbering.of(listOf(it)) },
+                 alpha: Float = 0.5f) {
     Box(modifier.alignedBy(transform)) {
         AsyncImage(model, description, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         if (annots != null && layers.isNotEmpty()) Canvas(Modifier.fillMaxSize()) {
             val k = (size.width / 360.dp.toPx()).coerceIn(0.35f, 1.4f)
-            drawAnnotations(annots, layers, k, numbers = numbers) { p: Pt -> Offset(p.x * size.width, p.y * size.width) }
+            drawAnnotations(annots, layers, k, numbers = numbers, alpha = alpha) { p: Pt -> Offset(p.x * size.width, p.y * size.width) }
         }
     }
 }
@@ -165,6 +198,8 @@ data class CompareView(
     val mirror: Boolean = false,
     val layers: Set<AnnotLayer> = emptySet(),
     val annots: Map<Any, List<AnnotLine>> = emptyMap(),
+    /** Opacidad de los trazos y números. */
+    val alpha: Float = 0.5f,
 ) {
     /** Proporción (ancho/alto) de cada celda: 3:4, o 4:3 con giro de 90° o 270°. */
     val aspect: Float get() = if (rot % 2 == 1) 4f / 3f else 3f / 4f
@@ -178,6 +213,6 @@ fun ComparePhoto(model: Any, transform: Similarity?, description: String?, layer
     val v = LocalCompareView.current
     OrientBox(v.rot, v.mirror, modifier) {
         PhotoContent(model, transform, v.annots[model], v.layers, description, layer,
-            numbers = com.photomed.app.align.MeasureNumbering.of(v.annots.values.toList()))
+            numbers = com.photomed.app.align.MeasureNumbering.of(v.annots.values.toList()), alpha = v.alpha)
     }
 }

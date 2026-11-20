@@ -275,6 +275,18 @@ class NewFacesAnnotTest {
             val nums = com.photomed.app.align.MeasureNumbering.of(listOf(lines))
             val big = Bitmap.createScaledBitmap(img, 1080, img.height * 1080 / img.width, true)
             val out = com.photomed.app.ui.compare.CompareExport.drawAnnotations(big, lines, AnnotLayer.entries.toSet(), nums)
+            // los números no se superponen a los trazos (ni entre sí), salvo falta de sitio
+            val r = 5.5f * 3f / 1080f
+            val pl = com.photomed.app.align.MeasureNumbering.place(lines, nums, r, lines)
+            val segs = lines.filter { it.points.size >= 2 }.flatMap { l -> (1 until l.points.size).map { l.points[it - 1] to l.points[it] } +
+                if (l.closed) listOf(l.points.last() to l.points.first()) else emptyList() }
+            fun segDist(q: Pt, a: Pt, b: Pt): Float { val vx = b.x - a.x; val vy = b.y - a.y; val l2 = vx * vx + vy * vy
+                val t = if (l2 < 1e-12f) 0f else (((q.x - a.x) * vx + (q.y - a.y) * vy) / l2).coerceIn(0f, 1f)
+                return kotlin.math.hypot(q.x - (a.x + vx * t), q.y - (a.y + vy * t)) }
+            val clear = pl.count { p -> segs.minOf { segDist(p.at, it.first, it.second) } >= r }
+            report.append("  números fuera de los trazos: $clear de ${pl.size}\n")
+            org.junit.Assert.assertEquals(nums.size, pl.size)
+            org.junit.Assert.assertTrue("números sobre los trazos: ${pl.size - clear} de ${pl.size}", clear >= pl.size * 0.9f)
             File(dir, "$k.jpg").outputStream().use { out.compress(Bitmap.CompressFormat.JPEG, 88, it) }
             report.append(k).append('\n')
             lines.mapNotNull { it.metrics }.sortedBy { nums[it.name] }.forEach { m ->
@@ -284,5 +296,54 @@ class NewFacesAnnotTest {
         }
         File(dir, "medidas.txt").writeText(report.toString())
         println(report)
+    }
+
+    /**
+     * Mandíbula y mentón: el contorno inferior parte de la malla y solo se ajusta al borde de sombra
+     * cercano (−4 % … +2 % del ancho de la cara): no baja al cuello ni rodea la barba, y es suave.
+     */
+    @Test
+    fun jawContourStaysOnTheJaw() {
+        val json = javaClass.getResourceAsStream("/stock/new/mesh.json")?.bufferedReader()?.readText()
+        assumeTrue("sin retratos nuevos", json != null)
+        val o = JSONObject(json!!)
+        var faces = 0; var maxOut = 0f; var maxIn = 0f; var maxKink = 0f; var oldBelow = 0f; var newBelow = 0f
+        for (k in o.keys().asSequence().sorted()) {
+            val arr = o.getJSONArray(k)
+            val mesh = (0 until arr.length()).map { i -> arr.getJSONArray(i).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1).toFloat()) } }
+            val img = javaClass.getResourceAsStream("/stock/new/$k.jpg")?.let { BitmapFactory.decodeStream(it) } ?: continue
+            val labBmp = javaClass.getResourceAsStream("/stock/new/${k}_labels.png")?.let { BitmapFactory.decodeStream(it) }
+            val labels = labBmp?.let { b -> val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
+                FaceLabels(b.width, b.height, ByteArray(px.size) { Color.red(px[it]).toByte() }) } ?: continue
+            val sw = 480; val sh = img.height * sw / img.width
+            val px = IntArray(sw * sh).also { Bitmap.createScaledBitmap(img, sw, sh, true).getPixels(it, 0, sw, 0, 0, sw, sh) }
+            val lum = GrayImage(sw, sh, FloatArray(px.size) { i -> val c = px[i]; (0.299f * Color.red(c) + 0.587f * Color.green(c) + 0.114f * Color.blue(c)) / 255f })
+            val keys = com.photomed.app.align.FaceKeys.canonical(FaceAnnotations.keysFromMesh(mesh))
+            val snapped = com.photomed.app.align.HairSkin.snapOval(labels, keys)
+            val labImg = com.photomed.app.align.LabImage.fromArgb(px, sw, sh)
+            val hair = com.photomed.app.align.FacialHair.fromMesh(labImg, mesh)
+            val refined = com.photomed.app.align.JawContour.refine(keys, snapped, lum, labels, hair, labImg)
+            val oval = (0 until 36).map { keys["oval_$it"]!! }
+            val faceW = oval.maxOf { it.x } - oval.minOf { it.x }
+            val eyeY = listOfNotNull(keys[com.photomed.app.align.Landmarks.EYE_L], keys[com.photomed.app.align.Landmarks.EYE_R]).map { it.y }.average().toFloat()
+            val lower = (0 until 36).filter { oval[it].y > eyeY }
+            val cx = oval.map { it.x }.average().toFloat(); val cy = oval.map { it.y }.average().toFloat()
+            fun radial(q: Pt) = kotlin.math.hypot(q.x - cx, q.y - cy)
+            val offs = lower.map { (radial(refined["oval_$it"]!!) - radial(oval[it])) / faceW }
+            maxOut = maxOf(maxOut, offs.max()); maxIn = maxOf(maxIn, -offs.min())
+            for (j in 1 until lower.size - 1) maxKink = maxOf(maxKink, kotlin.math.abs(offs[j - 1] - 2 * offs[j] + offs[j + 1]))
+            // mentón (punto más bajo): cuánto baja respecto a la malla, antes (segmentación) y ahora
+            val chin = lower.maxBy { oval[it].y }
+            oldBelow = maxOf(oldBelow, (snapped["oval_$chin"]!!.y - oval[chin].y) / faceW)
+            newBelow = maxOf(newBelow, (refined["oval_$chin"]!!.y - oval[chin].y) / faceW)
+            faces++
+        }
+        println("MANDÍBULA: $faces rostros; desplazamiento máx. fuera ${"%.3f".format(maxOut)}, dentro ${"%.3f".format(maxIn)} (× ancho); " +
+            "quiebro máx. ${"%.3f".format(maxKink)}; mentón bajo la malla: antes ${"%.3f".format(oldBelow)}, ahora ${"%.3f".format(newBelow)}")
+        org.junit.Assert.assertTrue(faces >= 10)
+        org.junit.Assert.assertTrue(maxOut <= com.photomed.app.align.JawContour.OUT + 0.005f)
+        org.junit.Assert.assertTrue(maxIn <= com.photomed.app.align.JawContour.IN + 0.005f)
+        org.junit.Assert.assertTrue("contorno con quiebros", maxKink < 0.03f)
+        org.junit.Assert.assertTrue(newBelow <= 0.025f)
     }
 }

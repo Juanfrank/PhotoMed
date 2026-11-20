@@ -533,3 +533,17 @@ ningún falso positivo en los rostros sin vello.
   las fotos. Cada número se coloca en la primera posición de su línea que no se solapa con los
   anteriores.
 - Nasogeniano: fuerza ≥ 0,018 y contraste ≥ 1,6 (resto 0,03 / 2,2), pasillo ± 0,06 × ancho de cara.
+
+## Mandíbula y mentón (`JawContour.kt`, 2.19)
+
+La segmentación da el cuello como piel de la cara y la barba como cara: el óvalo ajustado a ella
+bajaba por debajo del mentón (hasta 6 % del ancho de la cara en 18 retratos), rodeaba la barba o
+dejaba huecos. Del nivel de los ojos hacia abajo, el contorno parte de la malla de MediaPipe y, por
+la normal de cada punto, busca el borde visible: en los lados, el mayor ΔE*ab entre dentro y fuera
+(±2,5 px, ±5 % del ancho de la cara); bajo el mentón, el borde claro → oscuro (sombra), como mucho
++2 % hacia fuera; penalización gaussiana (σ 2,5 %) por alejarse de la malla; ropa u otro objeto
+delante: no se mueve; mediana de 5 y media de 3. `jawContourStaysOnTheJaw`: desplazamientos −2,1 % …
++2,9 %, mentón < 1 % bajo la malla, sin quiebros.
+
+Números de las líneas: a un lado de su línea (normal, 1,8–3 radios), sin tocar ningún trazo visible ni
+otro número, con una guía fina hasta la línea.

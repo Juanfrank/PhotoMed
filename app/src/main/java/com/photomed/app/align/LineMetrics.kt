@@ -311,17 +311,43 @@ object MeasureNumbering {
         return listOf(0.5f, 0.3f, 0.7f, 0.15f, 0.85f, 0f, 1f).map { p[(it * (p.size - 1)).toInt()] }
     }
 
+    /** Número colocado: centro de la pastilla y punto de su línea al que apunta (guía). */
+    class Placement(val line: AnnotLine, val at: Pt, val target: Pt)
+
     /**
-     * Posición de cada número sin solaparse con los ya colocados ([r]: radio de la pastilla en
-     * unidades del ancho); si ninguna posición de la línea queda libre, la menos solapada.
+     * Posición de cada número FUERA de los trazos: desplazado a un lado de su línea (a lo largo de la
+     * normal, 1,8–3 radios), sin tocar ninguna línea visible ([all]) ni otro número ([r]: radio de la
+     * pastilla en unidades del ancho). Si no hay sitio libre, el de mayor holgura.
      */
-    fun place(lines: List<AnnotLine>, numbers: Map<String, Int>, r: Float): List<Pair<AnnotLine, Pt>> {
-        val placed = ArrayList<Pair<AnnotLine, Pt>>()
+    fun place(lines: List<AnnotLine>, numbers: Map<String, Int>, r: Float, all: List<AnnotLine> = lines): List<Placement> {
+        val segs = all.filter { it.points.size >= 2 }.flatMap { l ->
+            val p = l.points
+            (1 until p.size).map { p[it - 1] to p[it] } + if (l.closed) listOf(p.last() to p.first()) else emptyList()
+        }
+        fun segDist(q: Pt, a: Pt, b: Pt): Float {
+            val vx = b.x - a.x; val vy = b.y - a.y; val l2 = vx * vx + vy * vy
+            val t = if (l2 < 1e-12f) 0f else (((q.x - a.x) * vx + (q.y - a.y) * vy) / l2).coerceIn(0f, 1f)
+            return kotlin.math.hypot(q.x - (a.x + vx * t), q.y - (a.y + vy * t))
+        }
+        val placed = ArrayList<Placement>()
         for (l in lines.filter { it.metrics?.name?.let { n -> numbers[n] } != null && it.points.size >= 2 }.sortedBy { numbers[it.metrics!!.name] }) {
-            val c = candidates(l)
-            fun clearance(q: Pt) = placed.minOfOrNull { kotlin.math.hypot(it.second.x - q.x, it.second.y - q.y) } ?: Float.MAX_VALUE
-            val best = c.firstOrNull { clearance(it) >= 2.1f * r } ?: c.maxBy { clearance(it) }
-            placed += l to best
+            val p = l.points
+            val cands = ArrayList<Pair<Pt, Pt>>()
+            for (base in candidates(l)) {
+                val i = p.indexOf(base).coerceAtLeast(0)
+                val a = p[(i - 1).coerceAtLeast(0)]; val b = p[(i + 1).coerceAtMost(p.size - 1)]
+                var nx = -(b.y - a.y); var ny = b.x - a.x
+                val nn = kotlin.math.hypot(nx, ny).takeIf { it > 1e-7f } ?: continue
+                nx /= nn; ny /= nn
+                for (k in floatArrayOf(1.8f, 2.4f, 3.0f)) for (sgn in floatArrayOf(1f, -1f))
+                    cands += Pt(base.x + sgn * nx * k * r, base.y + sgn * ny * k * r) to base
+            }
+            fun lineClear(q: Pt) = segs.minOfOrNull { segDist(q, it.first, it.second) } ?: Float.MAX_VALUE
+            fun badgeClear(q: Pt) = placed.minOfOrNull { kotlin.math.hypot(it.at.x - q.x, it.at.y - q.y) } ?: Float.MAX_VALUE
+            val best = cands.firstOrNull { lineClear(it.first) >= 1.15f * r && badgeClear(it.first) >= 2.1f * r }
+                ?: cands.maxByOrNull { minOf(lineClear(it.first) / 1.15f, badgeClear(it.first) / 2.1f) }
+                ?: continue
+            placed += Placement(l, best.first, best.second)
         }
         return placed
     }

@@ -180,6 +180,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     val layersState = rememberAnnotLayers()
     var showLayers by remember { mutableStateOf(layersState.value.isNotEmpty()) }
     var metricsSheet by remember { mutableStateOf(false) }
+    // opacidad de los trazos y números (se recuerda; empieza en 50 %)
+    val annotAlpha = rememberAnnotAlpha()
     var viewRot by remember { mutableStateOf(0) }
     var viewMirror by remember { mutableStateOf(false) }
     /** Recorte elegido a mano (rectángulo 3:4 sobre la referencia); tiene prioridad sobre el automático. */
@@ -391,7 +393,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             // con el panel de capas abierto se analizan las fotos aunque no haya capas encendidas (la tabla de medidas lo necesita)
             key("a" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, showLayers).value }?.let { p.key to it }
         }?.toMap().orEmpty()
-        val view = CompareView(viewRot, viewMirror, layers, models.mapNotNull { (k, m) -> annots[k]?.let { m to it } }.toMap())
+        val view = CompareView(viewRot, viewMirror, layers, models.mapNotNull { (k, m) -> annots[k]?.let { m to it } }.toMap(), annotAlpha.value)
         if (all != null && photos.size < 2) {
             EmptyState(Icons.Default.Compare, "Se necesitan dos fotografías",
                 "Tome al menos dos fotografías de una zona para compararlas.", Modifier.padding(padding))
@@ -416,6 +418,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
 
             if (showLayers) LayerChips(layersState.value, { layersState.value = it }, Modifier.fillMaxWidth().padding(top = 4.dp),
                 onMetrics = { metricsSheet = !metricsSheet })
+            if (showLayers) OpacitySlider(annotAlpha.value, { annotAlpha.value = it }, Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact))
             // análisis de arrugas y rasgos en curso: barra de proceso visible
             if (showLayers && seq != null && seq.any { annots[it.key] == null }) Row(
                 Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -808,7 +811,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     val d = labels[i]
                     CompareExport.render(context, p, shown[p.key], colorAdjusts[p.key], width = 300, crop = effectiveCrop(),
                         annots = exportAnnots[p.key], layers = if (showLayers) layersState.value else emptySet(),
-                        orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror)) to
+                        orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror), annotAlpha = annotAlpha.value) to
                         (if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d")
                 }
             },
@@ -821,7 +824,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     individual = ch.kind == ExportKind.INDIVIDUAL, grid = ch.kind == ExportKind.GRID, anonymize = anonymize, dir = dir,
                     onProgress = progress, side = ch.kind == ExportKind.SIDE, gif = ch.gif.takeIf { ch.kind == ExportKind.GIF },
                     gifTiming = ch.timing, crop = effectiveCrop(), labels = stampLabels(seq.map { it.takenAt }), order = order,
-                    annots = exportAnnots, layers = if (showLayers) layersState.value else emptySet(),
+                    annots = exportAnnots, layers = if (showLayers) layersState.value else emptySet(), annotAlpha = annotAlpha.value,
                     orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror))
                 when {
                     r.files.isEmpty() -> "No se pudo exportar ninguna imagen"

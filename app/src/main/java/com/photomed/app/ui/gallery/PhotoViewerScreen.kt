@@ -92,6 +92,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     // línea tocada (ficha de medidas) y tabla de medidas
     var selected by remember { mutableStateOf<com.photomed.app.align.AnnotLine?>(null) }
     var metricsSheet by remember { mutableStateOf(false) }
+    // opacidad de los trazos y números (se recuerda; empieza en 50 %)
+    val annotAlpha = com.photomed.app.ui.compare.rememberAnnotAlpha()
     // líneas analizadas de cada foto (para la tabla) y motivo si no hay medidas
     val annotsByUri = remember { androidx.compose.runtime.mutableStateMapOf<String, List<com.photomed.app.align.AnnotLine>>() }
     val notesByUri = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
@@ -152,6 +154,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
             // selector de capas (arrugas, rasgos…) encima de la foto
             if (showLayers) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
                 Modifier.fillMaxWidth().padding(vertical = 4.dp), onMetrics = { metricsSheet = !metricsSheet })
+            if (showLayers) com.photomed.app.ui.compare.OpacitySlider(annotAlpha.value, { annotAlpha.value = it },
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp), light = true)
             // análisis en curso: barra de proceso visible
             val analyzing = showLayers && annotsByUri[current.uri.toString()] == null
             if (analyzing) androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
@@ -164,7 +168,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize().background(Color.Black), key = { list[it].key },
                 userScrollEnabled = !cropping) { page ->
                 PhotoPage(list[page], zone, if (showLayers) layersState.value else emptySet(), editVersion, Modifier.fillMaxSize(),
-                    selected = selected, analyze = showLayers,
+                    selected = selected, analyze = showLayers, alpha = annotAlpha.value,
                     onSelect = { hit ->
                         selected = hit
                         // toque sin línea medida y ninguna capa de arrugas visible: cómo verlas
@@ -290,6 +294,8 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                       selected: com.photomed.app.align.AnnotLine? = null, onSelect: (com.photomed.app.align.AnnotLine?) -> Unit = {},
                       /** Analizar la foto (panel de capas abierto), aunque no haya capas encendidas: la tabla lo necesita. */
                       analyze: Boolean = layers.isNotEmpty(),
+                      /** Opacidad de los trazos y números. */
+                      alpha: Float = 0.5f,
                       onAnalyzed: (List<com.photomed.app.align.AnnotLine>, String?) -> Unit = { _, _ -> }) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val edit = remember(photo.uri, version) { com.photomed.app.align.PhotoEdits.of(context, photo.uri.toString()) }
@@ -364,7 +370,7 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                     drawPath(path, Color.White.copy(alpha = 0.85f), style = androidx.compose.ui.graphics.drawscope.Stroke(
                         width = 7.dp.toPx() * k, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
                 }
-                drawAnnotations(a, layers, k, numbers = com.photomed.app.align.MeasureNumbering.of(listOf(a))) { p -> map(p) }
+                drawAnnotations(a, layers, k, numbers = com.photomed.app.align.MeasureNumbering.of(listOf(a)), alpha = alpha) { p -> map(p) }
             }
         }
     }

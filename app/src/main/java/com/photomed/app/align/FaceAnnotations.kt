@@ -157,7 +157,10 @@ object FaceAnnotations {
         if (mesh.size < 468) return face(keysFromMesh(mesh), labels, lum)
         val keys = FaceKeys.canonical(keysFromMesh(mesh))
         val out = ArrayList<AnnotLine>()
-        val p = if (labels != null) HairSkin.snapOval(labels, keys) else keys
+        val snapped = if (labels != null) HairSkin.snapOval(labels, keys) else keys
+        // mandíbula y mentón: desde la malla, al borde de sombra de la mandíbula (la segmentación lleva el
+        // contorno al cuello o al borde de la barba)
+        val p = if (lum != null) JawContour.refine(keys, snapped, lum, labels, lab?.let { l -> runCatching { FacialHair.fromMesh(l, mesh) }.getOrNull() }, lab) else snapped
         // medidas de los rasgos (mm con la escala del iris o del sensor)
         val sc = scaleOf(mesh, extras)
         fun fm(f: (Float, String) -> LineMetrics?): LineMetrics? = sc?.let { runCatching { f(it.first, it.second) }.getOrNull() }

@@ -702,21 +702,26 @@ fun lineColor(l: com.photomed.app.align.AnnotLine): Color {
  */
 fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLineNumbers(
     lines: List<com.photomed.app.align.AnnotLine>, layers: Set<com.photomed.app.align.AnnotLayer>,
-    numbers: Map<String, Int>, k: Float, map: (com.photomed.app.align.Pt) -> Offset,
+    numbers: Map<String, Int>, k: Float, map: (com.photomed.app.align.Pt) -> Offset, alpha: Float = 1f,
 ) {
     val r = 7.dp.toPx() * k.coerceIn(0.7f, 1.2f)
     val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.WHITE; textAlign = android.graphics.Paint.Align.CENTER
-        textSize = r * 1.15f; typeface = android.graphics.Typeface.DEFAULT_BOLD
+        textSize = r * 1.15f; typeface = android.graphics.Typeface.DEFAULT_BOLD; this.alpha = (alpha * 255).toInt()
     }
-    // radio en unidades del ancho de la foto (para colocar los números sin solaparse)
+    // radio en unidades del ancho de la foto (para colocar los números fuera de los trazos)
     val o0 = map(com.photomed.app.align.Pt(0f, 0f)); val o1 = map(com.photomed.app.align.Pt(1f, 0f))
     val rUnits = r / kotlin.math.hypot(o1.x - o0.x, o1.y - o0.y).coerceAtLeast(1f)
-    for ((l, at) in com.photomed.app.align.MeasureNumbering.place(lines.filter { it.layer in layers }, numbers, rUnits)) {
-        val n = numbers[l.metrics!!.name] ?: continue
-        val c = map(at)
-        drawCircle(Color(0xE6202020), r, c)
-        drawCircle(lineColor(l), r, c, style = Stroke(1.6.dp.toPx()))
+    val visible = lines.filter { it.layer in layers }
+    for (pl in com.photomed.app.align.MeasureNumbering.place(visible, numbers, rUnits, visible)) {
+        val n = numbers[pl.line.metrics!!.name] ?: continue
+        val c = map(pl.at); val t = map(pl.target)
+        val col = lineColor(pl.line)
+        // guía fina de la pastilla a su línea
+        val dx = t.x - c.x; val dy = t.y - c.y; val dl = kotlin.math.hypot(dx, dy).coerceAtLeast(1f)
+        drawLine(col.copy(alpha = 0.9f * alpha), Offset(c.x + dx / dl * r, c.y + dy / dl * r), t, strokeWidth = 1.dp.toPx())
+        drawCircle(Color(0xE6202020).copy(alpha = 0.9f * alpha), r, c)
+        drawCircle(col.copy(alpha = alpha), r, c, style = Stroke(1.6.dp.toPx()))
         drawContext.canvas.nativeCanvas.drawText(n.toString(), c.x, c.y + paint.textSize * 0.36f, paint)
     }
 }
@@ -731,16 +736,18 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAnnotations(
     k: Float,
     /** Números de las líneas medidas (nombre → número) o null para no numerarlas. */
     numbers: Map<String, Int>? = null,
+    /** Opacidad de los trazos y los números (ajustable por el usuario). */
+    alpha: Float = 1f,
     map: (com.photomed.app.align.Pt) -> Offset,
 ) {
     for (l in lines) {
         if (l.layer !in layers || l.points.size < 2) continue
         val path = smoothPath(l.points.map(map), l.closed)
         val col = lineColor(l)
-        if (l.filled) { drawPath(path, col.copy(alpha = 0.28f)); drawPath(path, col.copy(alpha = 0.7f), style = Stroke(1.dp.toPx() * k)); continue }
+        if (l.filled) { drawPath(path, col.copy(alpha = 0.28f * alpha)); drawPath(path, col.copy(alpha = 0.7f * alpha), style = Stroke(1.dp.toPx() * k)); continue }
         val dash = if (l.estimated) PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx() * k, 5.dp.toPx() * k)) else null
-        drawPath(path, Shadow, style = Stroke(3.6.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
-        drawPath(path, col, style = Stroke(1.5.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
+        drawPath(path, Shadow.copy(alpha = Shadow.alpha * alpha), style = Stroke(3.6.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
+        drawPath(path, col.copy(alpha = alpha), style = Stroke(1.5.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
     }
-    if (numbers != null) drawLineNumbers(lines, layers, numbers, k, map)
+    if (numbers != null) drawLineNumbers(lines, layers, numbers, k, map, alpha)
 }
