@@ -518,3 +518,18 @@ Los surcos usan «piel y no vello» en el trazado (`RidgeTracker`) y se recortan
 vello; con ML Kit, el ajuste a la sombra ignora el vello y no se mide una línea con > 35 % sobre él.
 `foldsAvoidBeardAndMustache`: trazos sobre vello 28 % → 0 % en los 5 rostros con barba o bigote;
 ningún falso positivo en los rostros sin vello.
+
+## Rasgos, línea del pelo y numeración (2.18; `FeatureMetrics.kt`, `MeasureNumbering`)
+
+- Rasgos (malla de MediaPipe, mm con la escala del iris o del sensor): labio superior (61↔291 ancho,
+  0↔13 alto, área del bermellón, 2↔0 filtrum, picos 37/267 frente a 0 para el arco de Cupido), labio
+  inferior (14↔17 alto, área, inferior/superior), ojos (33↔133 / 362↔263 ancho, 159↔145 / 386↔374
+  alto, inclinación cantal en el eje entre pupilas), cejas (longitud del borde superior y altura sobre
+  la pupila), nariz (98↔327 ancho alar, mediana 34,9 mm en 18 retratos; 168↔2 alto), contorno
+  (234↔454, tercio medio cejas → subnasal, tercio inferior subnasal → mentón).
+- Línea del pelo: interpolación de la línea de implantación en el eje de la cara, frente a las cejas
+  (107/336 centro, 105/334 pico, 70/300 cola); entradas temporales = cola − centro.
+- Numeración: arrugas y surcos, ojeras y rasgos; por capa y nombre; en Comparar, sobre la unión de
+  las fotos. Cada número se coloca en la primera posición de su línea que no se solapa con los
+  anteriores.
+- Nasogeniano: fuerza ≥ 0,018 y contraste ≥ 1,6 (resto 0,03 / 2,2), pasillo ± 0,06 × ancho de cara.

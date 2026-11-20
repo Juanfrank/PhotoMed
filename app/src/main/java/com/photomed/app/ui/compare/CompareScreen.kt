@@ -53,6 +53,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -414,13 +415,13 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             }
 
             if (showLayers) LayerChips(layersState.value, { layersState.value = it }, Modifier.fillMaxWidth().padding(top = 4.dp),
-                onMetrics = { metricsSheet = true })
-            if (metricsSheet && seq != null) {
-                val stamps = stampLabels(seq.map { it.takenAt })
-                MetricsSheet(seq.mapIndexed { i, p -> stamps[i] to annots[p.key].orEmpty() }, layersState.value,
-                    onDismiss = { metricsSheet = false }, loading = seq.any { annots[it.key] == null },
-                    note = seq.firstNotNullOfOrNull { photoAnnotationNote(context, it.uri) },
-                    onShowLayers = { layersState.value = it })
+                onMetrics = { metricsSheet = !metricsSheet })
+            // análisis de arrugas y rasgos en curso: barra de proceso visible
+            if (showLayers && seq != null && seq.any { annots[it.key] == null }) Row(
+                Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                LinearProgressIndicator(Modifier.weight(1f).semantics { contentDescription = "Analizando arrugas y rasgos" })
+                Text("Analizando ${seq.count { annots[it.key] != null }}/${seq.size}…", style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 10.dp))
             }
             // Área de comparación
             androidx.compose.runtime.CompositionLocalProvider(LocalCompareView provides view) {
@@ -527,6 +528,16 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 }
             }
 
+            }
+
+            // tabla de medidas: debajo de las fotos, sin taparlas
+            if (metricsSheet && showLayers && seq != null) {
+                val stamps = stampLabels(seq.map { it.takenAt })
+                MetricsPanel(seq.mapIndexed { i, p -> stamps[i] to annots[p.key].orEmpty() }, layersState.value,
+                    onClose = { metricsSheet = false }, loading = seq.any { annots[it.key] == null },
+                    note = seq.firstNotNullOfOrNull { photoAnnotationNote(context, it.uri) },
+                    onShowLayers = { layersState.value = it },
+                    modifier = Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.42f).dp))
             }
 
             // Línea de tiempo (fundido, o deslizador con más de dos fotos): recorre 1→2→…→N.

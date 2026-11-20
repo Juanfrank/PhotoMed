@@ -46,7 +46,8 @@ private fun signed(v: Float?, digits: Int) = v?.let { String.format(Locale.getDe
 
 /** Filas (etiqueta, valor) de las medidas de una línea o zona. */
 fun metricRows(m: LineMetrics): List<Pair<String, String>> =
-    if (m.areaMm2 != null || m.deltaE != null) listOfNotNull(
+    if (m.isFeature) m.features.map { (k, v) -> k.substringBeforeLast(",") to featureValue(k, v) } + ("Escala" to scaleLabel(m.scale))
+    else if (m.areaMm2 != null || m.deltaE != null) listOfNotNull(
         "Área" to "${f1(m.areaMm2?.div(100f))} cm²",
         "ΔL* frente a la mejilla" to "${f1(m.deltaL)} (más oscura)",
         m.deltaE?.let { "ΔE*ab frente a la mejilla" to f1(it) },
@@ -60,6 +61,17 @@ fun metricRows(m: LineMetrics): List<Pair<String, String>> =
         "Grado orientativo (0–5)" to (m.grade?.let { "$it · ${gradeLabel(it)}" } ?: "—"),
         "Escala" to scaleLabel(m.scale),
     ) + listOfNotNull(m.note?.let { "Nota" to it })
+
+/** Valor de una medida de rasgo con su unidad (la de la etiqueta tras la coma). */
+fun featureValue(label: String, v: Float): String {
+    val unit = label.substringAfterLast(",", "").trim()
+    return when (unit) {
+        "mm²" -> String.format(Locale.getDefault(), "%.0f mm²", v)
+        "°" -> String.format(Locale.getDefault(), "%.1f°", v)
+        "" -> f2(v)
+        else -> "${f1(v)} $unit"
+    }
+}
 
 fun scaleLabel(s: String) = when (s) {
     "sensor de profundidad" -> "sensor de profundidad"
@@ -107,19 +119,19 @@ private fun insidePoly(q: Pt, poly: List<Pt>): Boolean {
 
 /** Ficha de la línea tocada, con acceso a la tabla completa. */
 @Composable
-fun MetricsCard(line: AnnotLine, onTable: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
+fun MetricsCard(line: AnnotLine, onTable: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier, number: Int? = null) {
     val m = line.metrics ?: return
     Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f))) {
         Column(Modifier.padding(start = 16.dp, end = 4.dp, bottom = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Canvas(Modifier.size(10.dp)) { drawCircle(annotColor(line.layer)) }
-                Text(m.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 8.dp).weight(1f))
+                Canvas(Modifier.size(10.dp)) { drawCircle(com.photomed.app.ui.camera.lineColor(line)) }
+                Text((number?.let { "$it · " } ?: "") + m.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 8.dp).weight(1f))
                 IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Cerrar") }
             }
             metricRows(m).forEach { (k, v) ->
                 Row(Modifier.fillMaxWidth().padding(end = 12.dp, top = 2.dp)) {
                     Text(k, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Text(v, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    Text(v, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
             TextButton(onClick = onTable) {
@@ -144,101 +156,148 @@ private fun fmt(i: Int, v: Float?, area: Boolean) = when {
 /**
  * Tabla de medidas de una o varias fotos. Con una foto: una fila por línea. Con varias ([columns],
  * en el orden de la comparación): por cada línea y medida, el valor de cada foto y la diferencia
- * entre la última y la primera.
+ * entre la última y la primera. Hoja inferior (se superpone); en el visor y en comparar se usa el
+ * panel fijo [MetricsPanel], debajo de la foto.
  */
 @Composable
 fun MetricsSheet(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>, onDismiss: () -> Unit,
-                 /** Aún se están analizando las fotos. */
-                 loading: Boolean = false,
-                 /** Motivo si no hay medidas (cara no detectada entera, zona corporal…). */
-                 note: String? = null,
-                 /** Encender en la foto las capas de las líneas medidas que están ocultas. */
-                 onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null) {
+                 loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null) {
     SafeBottomSheet(onDismiss = onDismiss) {
         Column(Modifier.padding(horizontal = 16.dp).heightIn(max = 640.dp).verticalScroll(rememberScrollState())) {
             Text("Medidas de líneas y surcos", style = MaterialTheme.typography.titleLarge)
-            // todas las líneas medidas, estén o no visibles sus capas en la foto
-            val byName = LinkedHashMap<String, Pair<AnnotLayer, MutableList<LineMetrics?>>>()
-            columns.forEachIndexed { ci, (_, lines) ->
-                lines.filter { it.metrics != null }.forEach { l ->
-                    val e = byName.getOrPut(l.metrics!!.name) { l.layer to MutableList(columns.size) { null } }
-                    e.second[ci] = l.metrics
-                }
-            }
-            if (byName.isEmpty()) {
-                if (loading) Row(Modifier.padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.CircularProgressIndicator(Modifier.size(22.dp))
-                    Text("Analizando la foto…", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 12.dp))
-                } else Text(note ?: "No se encontraron arrugas ni surcos medibles.",
-                    style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 16.dp))
-            }
-            // medidas parciales (sin malla facial): el motivo, también con medidas
-            if (byName.isNotEmpty() && note != null) Text(note, style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
-            val hidden = byName.values.map { it.first }.toSet() - layers
-            if (hidden.isNotEmpty() && onShowLayers != null) {
-                TextButton(onClick = { onShowLayers(layers + hidden) }) {
-                    Text("Mostrar en la foto: " + hidden.sortedBy { it.ordinal }.joinToString(", ") { it.label })
-                }
-            }
-            val ordered = byName.entries.sortedWith(compareBy({ it.value.first.ordinal }, { it.key }))
-            val single = columns.size == 1
-            val scroll = rememberScrollState()
-            for (area in listOf(false, true)) {
-                val rows = ordered.filter { (it.value.second.firstNotNullOfOrNull { m -> m }?.let { m -> m.areaMm2 != null || m.deltaE != null } ?: false) == area }
-                if (rows.isEmpty()) continue
-                val cols = if (area) AREA_COLS.take(4) else LINE_COLS
-                Column(Modifier.horizontalScroll(scroll).padding(top = 12.dp)) {
-                    if (single) {
-                        TableRow(listOf(if (area) "Zona" else "Línea") + cols, header = true)
-                        rows.forEach { (name, v) ->
-                            val m = v.second[0]
-                            TableRow(listOf(name + if (m?.note != null) " ✱" else "") + (if (area) areaVals(m) else lineVals(m)).take(cols.size).mapIndexed { i, x -> fmt(i, x, area) }, dot = v.first)
-                        }
-                    } else {
-                        val head = columns.map { it.first.replace(", ", "\n") }
-                        TableRow(listOf(if (area) "Zona · medida" else "Línea · medida") + head + "Δ", header = true)
-                        rows.forEach { (name, v) ->
-                            cols.forEachIndexed { i, c ->
-                                val vals = v.second.map { m -> (if (area) areaVals(m) else lineVals(m))[i] }
-                                val first = vals.firstOrNull { it != null }; val last = vals.lastOrNull { it != null }
-                                val delta = if (first != null && last != null && vals.count { it != null } >= 2) last - first else null
-                                TableRow(listOf(if (i == 0) "$name${if (v.second.any { it?.note != null }) " ✱" else ""}\n${c.replace("\n", " ")}" else "   ${c.replace("\n", " ")}") +
-                                    vals.map { fmt(i, it, area) } + signed(delta, if (!area && i == 2) 2 else 1), dot = if (i == 0) v.first else null)
-                            }
-                            HorizontalDivider()
-                        }
-                    }
-                }
-            }
-            if (ordered.any { it.value.second.any { m -> m?.type != null } }) {
-                Text("Tipo probable de ojera: " + ordered.mapNotNull { e -> e.value.second.lastOrNull { it?.type != null }?.let { "${e.key}: ${it.type}" } }.joinToString("; "),
-                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
-            }
-            val all = ordered.flatMap { it.value.second }.filterNotNull()
-            val scale = all.firstOrNull()?.scale
-            val relief = all.any { it.depthSource == "relieve" }
-            Text(METRICS_NOTE + (if (scale == "interpupilar") " (Escala: distancia interpupilar de 63 mm; iris no fiable.)" else "") +
-                (if (scale == "sensor de profundidad") " Escala medida con el sensor de profundidad del teléfono." else "") +
-                (if (relief) " Profundidad medida en el relieve (estéreo fotométrico con la pantalla)." else "") +
-                " Grado: profundidad < ${LineMeasure.GRADE_MM.joinToString(" / ") { f2(it) }} mm → 0 a 4; mayor → 5.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 12.dp))
+            MetricsContent(columns, layers, loading, note, onShowLayers)
         }
     }
 }
 
+/** Panel fijo de medidas (debajo de la foto, sin taparla), con su título y botón de cierre. */
 @Composable
-private fun TableRow(cells: List<String>, header: Boolean = false, dot: AnnotLayer? = null) {
+fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>, onClose: () -> Unit, modifier: Modifier = Modifier,
+                 loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null) {
+    androidx.compose.material3.Surface(modifier, color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 2.dp) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Medidas", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Cerrar las medidas") }
+            }
+            HorizontalDivider()
+            Column(Modifier.padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
+                MetricsContent(columns, layers, loading, note, onShowLayers)
+            }
+        }
+    }
+}
+
+/** Contenido de la tabla de medidas (ver [MetricsSheet]). */
+@Composable
+fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>,
+                   loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null) {
+    // todas las líneas medidas, estén o no visibles sus capas en la foto
+    val byName = LinkedHashMap<String, Pair<AnnotLine, MutableList<LineMetrics?>>>()
+    columns.forEachIndexed { ci, (_, lines) ->
+        lines.filter { it.metrics != null }.forEach { l ->
+            val e = byName.getOrPut(l.metrics!!.name) { l to MutableList(columns.size) { null } }
+            e.second[ci] = l.metrics
+        }
+    }
+    val numbers = com.photomed.app.align.MeasureNumbering.of(columns.map { it.second })
+    if (loading) Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f))
+        Text("Analizando…", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 12.dp))
+    }
+    if (byName.isEmpty() && !loading) Text(note ?: "No se encontraron arrugas ni surcos medibles.",
+        style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 16.dp))
+    // medidas parciales (sin malla facial): el motivo, también con medidas
+    if (byName.isNotEmpty() && note != null) Text(note, style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+    val hidden = byName.values.map { it.first.layer }.toSet() - layers
+    if (hidden.isNotEmpty() && onShowLayers != null) {
+        TextButton(onClick = { onShowLayers(layers + hidden) }) {
+            Text("Mostrar en la foto: " + hidden.sortedBy { it.ordinal }.joinToString(", ") { it.label })
+        }
+    }
+    val ordered = byName.entries.sortedBy { numbers[it.key] ?: Int.MAX_VALUE }
+    val single = columns.size == 1
+    val scroll = rememberScrollState()
+    fun label(name: String, v: Pair<AnnotLine, List<LineMetrics?>>) = "${numbers[name] ?: ""}  $name" + if (v.second.any { it?.note != null }) " ✱" else ""
+    for (group in 0..2) {
+        val rows = ordered.filter { e -> e.value.second.firstNotNullOfOrNull { it }?.let { com.photomed.app.align.MeasureNumbering.group(it) } == group }
+        if (rows.isEmpty()) continue
+        val area = group == 1
+        Text(listOf("Arrugas y surcos", "Ojeras", "Rasgos")[group], style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp))
+        Column(Modifier.horizontalScroll(scroll).padding(top = 4.dp)) {
+            if (group == 2) {
+                // rasgos: una fila por medida
+                TableRow(listOf("Rasgo · medida") + (if (single) listOf("Valor") else columns.map { it.first.replace(", ", "\n") } + "Δ"), header = true)
+                rows.forEach { (name, v) ->
+                    val labels = v.second.firstNotNullOfOrNull { it }?.features?.map { it.first }.orEmpty()
+                    labels.forEachIndexed { i, lab ->
+                        val vals = v.second.map { m -> m?.features?.firstOrNull { it.first == lab }?.second }
+                        val first = vals.firstOrNull { it != null }; val last = vals.lastOrNull { it != null }
+                        val delta = if (!single && first != null && last != null && vals.count { it != null } >= 2) last - first else null
+                        TableRow(listOf(if (i == 0) "${label(name, v)}\n${lab}" else "   $lab") + vals.map { it?.let { x -> featureValue(lab, x) } ?: "—" } +
+                            (if (single) emptyList() else listOf(signed(delta, if (lab.endsWith("mm²")) 0 else 1))), line = if (i == 0) v.first else null, wide = true)
+                    }
+                    HorizontalDivider()
+                }
+            } else {
+            val cols = if (area) AREA_COLS.take(4) else LINE_COLS
+            if (single) {
+                TableRow(listOf(if (area) "Zona" else "Línea") + cols, header = true)
+                rows.forEach { (name, v) ->
+                    val m = v.second[0]
+                    TableRow(listOf(label(name, v)) + (if (area) areaVals(m) else lineVals(m)).take(cols.size).mapIndexed { i, x -> fmt(i, x, area) }, line = v.first)
+                }
+            } else {
+                val head = columns.map { it.first.replace(", ", "\n") }
+                TableRow(listOf(if (area) "Zona · medida" else "Línea · medida") + head + "Δ", header = true)
+                rows.forEach { (name, v) ->
+                    cols.forEachIndexed { i, c ->
+                        val vals = v.second.map { m -> (if (area) areaVals(m) else lineVals(m))[i] }
+                        val first = vals.firstOrNull { it != null }; val last = vals.lastOrNull { it != null }
+                        val delta = if (first != null && last != null && vals.count { it != null } >= 2) last - first else null
+                        TableRow(listOf(if (i == 0) "${label(name, v)}\n${c.replace("\n", " ")}" else "   ${c.replace("\n", " ")}") +
+                            vals.map { fmt(i, it, area) } + signed(delta, if (!area && i == 2) 2 else 1), line = if (i == 0) v.first else null)
+                    }
+                    HorizontalDivider()
+                }
+            }
+            }
+        }
+    }
+    if (ordered.any { it.value.second.any { m -> m?.type != null } }) {
+        Text("Tipo probable de ojera: " + ordered.mapNotNull { e -> e.value.second.lastOrNull { it?.type != null }?.let { "${e.key}: ${it.type}" } }.joinToString("; "),
+            style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+    }
+    if (ordered.any { it.value.second.any { m -> m?.note != null } }) Text("✱ Parcialmente cubierto por barba o bigote: se mide solo la parte visible.",
+        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+    val all = ordered.flatMap { it.value.second }.filterNotNull()
+    val scale = all.firstOrNull()?.scale
+    val relief = all.any { it.depthSource == "relieve" }
+    Text(METRICS_NOTE + (if (scale == "interpupilar") " (Escala: distancia interpupilar de 63 mm; iris no fiable.)" else "") +
+        (if (scale == "sensor de profundidad") " Escala medida con el sensor de profundidad del teléfono." else "") +
+        (if (relief) " Profundidad medida en el relieve (estéreo fotométrico con la pantalla)." else "") +
+        " Grado: profundidad < ${LineMeasure.GRADE_MM.joinToString(" / ") { f2(it) }} mm → 0 a 4; mayor → 5." +
+        " Rasgos: distancias proyectadas en la foto (dependen del giro de la cabeza).",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = 12.dp))
+}
+
+/** Fila de la tabla: texto con contraste alto (cifras en negrita y color de primer plano). */
+@Composable
+private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLine? = null, wide: Boolean = false) {
     Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
         cells.forEachIndexed { i, c ->
-            val w: Dp = if (i == 0) 150.dp else 62.dp
+            val w: Dp = if (i == 0) (if (wide) 210.dp else 170.dp) else 72.dp
             Row(Modifier.width(w), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = if (i == 0) Arrangement.Start else Arrangement.End) {
-                if (i == 0 && dot != null) Canvas(Modifier.size(8.dp)) { drawCircle(annotColor(dot)) }
-                Text(c, style = if (header) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodySmall,
-                    fontWeight = if (header) FontWeight.SemiBold else FontWeight.Normal,
+                if (i == 0 && line != null) Canvas(Modifier.size(9.dp)) { drawCircle(com.photomed.app.ui.camera.lineColor(line)) }
+                Text(c, style = if (header) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium,
+                    fontWeight = when { header -> FontWeight.Bold; i > 0 -> FontWeight.SemiBold; else -> FontWeight.Normal },
+                    color = if (header || i > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
                     textAlign = if (i == 0) TextAlign.Start else TextAlign.End,
-                    modifier = Modifier.padding(start = if (i == 0 && dot != null) 6.dp else 0.dp))
+                    modifier = Modifier.padding(start = if (i == 0 && line != null) 6.dp else 0.dp))
             }
         }
     }

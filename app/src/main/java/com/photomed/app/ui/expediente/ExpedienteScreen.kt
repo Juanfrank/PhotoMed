@@ -156,11 +156,13 @@ fun ExpedienteScreen(
             val e = exp ?: return@ImportPhotosDialog
             scope.launch {
                 importBusy = "Importando ${chosen.size} ${if (chosen.size == 1) "foto" else "fotos"}…"
-                val saved = runCatching { com.photomed.app.data.PhotoImport.import(context, repo, e, chosen) }.getOrDefault(emptyList())
+                val r = runCatching { com.photomed.app.data.PhotoImport.importAll(context, repo, e, chosen) }.getOrNull()
                 importBusy = null
                 reload++
-                val failed = chosen.size - saved.size
-                snackbar.showSnackbar("Importadas ${saved.size} de ${chosen.size}" + if (failed > 0) " ($failed no se pudieron leer)" else "")
+                val saved = r?.saved?.size ?: 0; val dup = r?.duplicates ?: 0
+                val failed = chosen.size - saved - dup
+                snackbar.showSnackbar("Importadas $saved de ${chosen.size}" + (if (dup > 0) " ($dup ya estaban en el expediente)" else "") +
+                    if (failed > 0) " ($failed no se pudieron leer)" else "")
             }
         }
     }

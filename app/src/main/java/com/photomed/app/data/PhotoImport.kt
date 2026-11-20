@@ -71,9 +71,41 @@ object PhotoImport {
      * Guarda las fotos en el expediente. [decode]: imagen con su orientación aplicada. Devuelve las
      * fotos guardadas (las que no se pudieron leer se omiten).
      */
+    /** Resultado: fotos guardadas y las omitidas por estar ya importadas (misma foto de origen). */
+    class Result(val saved: List<Photo>, val duplicates: Int)
+
+    /** SHA-1 del archivo de origen (para no importar dos veces la misma foto). */
+    fun sha1(input: InputStream): String {
+        val md = java.security.MessageDigest.getInstance("SHA-1"); val buf = ByteArray(64 * 1024)
+        while (true) { val n = input.read(buf); if (n < 0) break; md.update(buf, 0, n) }
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Idempotente: una foto ya importada en el expediente (misma huella SHA-1 del archivo de origen,
+     * guardada en sus datos) no se vuelve a importar, ni dos veces en la misma tanda.
+     */
+    suspend fun importAll(
+        context: Context, repo: PhotoRepository, exp: Expediente, items: List<ImportItem>,
+        decode: suspend (Uri) -> Bitmap = { ImageOps.loadFull(context, it, 4096, ImageEdit.NONE) },
+        hashOf: (Uri) -> String? = { u -> runCatching { context.contentResolver.openInputStream(u)?.use { sha1(it) } }.getOrNull() },
+    ): Result {
+        val known = HashSet<String>()
+        withContext(Dispatchers.IO) { repo.photos(exp).forEach { p -> repo.readInfo(p)?.conditions?.get("SourceHash")?.let { known += it } } }
+        val todo = ArrayList<ImportItem>(); val hashes = HashMap<Uri, String>(); var dup = 0
+        for (it in items) {
+            val h = withContext(Dispatchers.IO) { hashOf(it.uri) }
+            if (h != null && !known.add(h)) { dup++; continue }
+            if (h != null) hashes[it.uri] = h
+            todo += it
+        }
+        return Result(import(context, repo, exp, todo, decode, hashes), dup)
+    }
+
     suspend fun import(
         context: Context, repo: PhotoRepository, exp: Expediente, items: List<ImportItem>,
         decode: suspend (Uri) -> Bitmap = { ImageOps.loadFull(context, it, 4096, ImageEdit.NONE) },
+        hashes: Map<Uri, String> = emptyMap(),
     ): List<Photo> {
         val used = HashSet<Long>()
         // nombres únicos por zona y fecha (el nombre lleva la fecha al milisegundo)
@@ -89,7 +121,8 @@ object PhotoImport {
                 withContext(Dispatchers.IO) {
                     f.outputStream().use { o -> bmp.compress(Bitmap.CompressFormat.JPEG, 95, o) }
                     out += repo.savePhoto(exp, zone, f, takenAt = t,
-                        conditions = mapOf("Source" to "importada", "DateSource" to if (it.dateFromPhoto) "EXIF" else "importación"))
+                        conditions = mapOf("Source" to "importada", "DateSource" to if (it.dateFromPhoto) "EXIF" else "importación") +
+                            (hashes[it.uri]?.let { h -> mapOf("SourceHash" to h) } ?: emptyMap()))
                 }
             } finally { f.delete() }
         }

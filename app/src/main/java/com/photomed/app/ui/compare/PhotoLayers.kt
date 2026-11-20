@@ -72,6 +72,11 @@ fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, mod
     Row(modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (onMetrics != null) androidx.compose.material3.AssistChip(onClick = onMetrics, label = { Text("Medidas") },
             leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.TableChart, null, Modifier.size(18.dp)) })
+        // contornos internos (ojos y cejas, nariz, labios) de una vez: se ven solo el contorno y las arrugas
+        val inner = setOf(AnnotLayer.EYES, AnnotLayer.NOSE, AnnotLayer.LIPS)
+        val innerOn = inner.all { it in layers }
+        FilterChip(selected = innerOn, onClick = { onChange(if (innerOn) layers - inner else layers + inner) },
+            label = { Text("Contornos internos") }, colors = FilterChipDefaults.filterChipColors())
         AnnotLayer.entries.forEach { l ->
             val on = l in layers
             FilterChip(
@@ -113,12 +118,14 @@ fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boole
 /** Foto 3:4 (modelo de Coil) con la semejanza de alineación y sus anotaciones en la misma capa. */
 @Composable
 fun PhotoContent(model: Any, transform: Similarity?, annots: List<AnnotLine>?, layers: Set<AnnotLayer>,
-                 description: String?, modifier: Modifier = Modifier) {
+                 description: String?, modifier: Modifier = Modifier,
+                 /** Números de las líneas medidas (los mismos en todas las fotos y en la tabla). */
+                 numbers: Map<String, Int>? = annots?.let { com.photomed.app.align.MeasureNumbering.of(listOf(it)) }) {
     Box(modifier.alignedBy(transform)) {
         AsyncImage(model, description, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         if (annots != null && layers.isNotEmpty()) Canvas(Modifier.fillMaxSize()) {
             val k = (size.width / 360.dp.toPx()).coerceIn(0.35f, 1.4f)
-            drawAnnotations(annots, layers, k) { p: Pt -> Offset(p.x * size.width, p.y * size.width) }
+            drawAnnotations(annots, layers, k, numbers = numbers) { p: Pt -> Offset(p.x * size.width, p.y * size.width) }
         }
     }
 }
@@ -170,6 +177,7 @@ val LocalCompareView = androidx.compose.runtime.staticCompositionLocalOf { Compa
 fun ComparePhoto(model: Any, transform: Similarity?, description: String?, layer: Modifier, modifier: Modifier = Modifier.fillMaxSize()) {
     val v = LocalCompareView.current
     OrientBox(v.rot, v.mirror, modifier) {
-        PhotoContent(model, transform, v.annots[model], v.layers, description, layer)
+        PhotoContent(model, transform, v.annots[model], v.layers, description, layer,
+            numbers = com.photomed.app.align.MeasureNumbering.of(v.annots.values.toList()))
     }
 }

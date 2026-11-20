@@ -14,7 +14,18 @@ import org.json.JSONObject
 data class ImageEdit(val rot: Int = 0, val mirror: Boolean = false, val crop: FloatArray? = null) {
     val isIdentity: Boolean get() = rot % 4 == 0 && !mirror && crop == null
 
-    fun rotated() = copy(rot = (rot + 1) % 4, crop = null)
+    /**
+     * Un giro más de 90° conservando el recorte (girado con la imagen): girar 4 veces devuelve la
+     * edición original (antes se perdía el recorte). El recorte va en el marco girado y espejado:
+     * con espejo, el nuevo giro horario equivale a uno antihorario de ese marco.
+     */
+    fun rotated(): ImageEdit {
+        val c = crop?.let { r ->
+            if (!mirror) floatArrayOf(1f - r[3], r[0], 1f - r[1], r[2])   // horario: (x, y) → (1 − y, x)
+            else floatArrayOf(r[1], 1f - r[2], r[3], 1f - r[0])           // antihorario: (x, y) → (y, 1 − x)
+        }
+        return copy(rot = (rot + 1) % 4, crop = c)
+    }
     fun mirrored() = copy(mirror = !mirror, crop = crop?.let { floatArrayOf(1f - it[2], it[1], 1f - it[0], it[3]) })
 
     /** Aplica giro → espejo → recorte. */

@@ -158,17 +158,29 @@ object FaceAnnotations {
         val keys = FaceKeys.canonical(keysFromMesh(mesh))
         val out = ArrayList<AnnotLine>()
         val p = if (labels != null) HairSkin.snapOval(labels, keys) else keys
-        (0 until 36).mapNotNull { p["oval_$it"] }.takeIf { it.size == 36 }?.let { out += AnnotLine(AnnotLayer.CONTOUR, it, true) }
-        labels?.let { HairSkin.hairline(it, keys)?.points?.let { h -> out += AnnotLine(AnnotLayer.HAIRLINE, h, false) } }
+        // medidas de los rasgos (mm con la escala del iris o del sensor)
+        val sc = scaleOf(mesh, extras)
+        fun fm(f: (Float, String) -> LineMetrics?): LineMetrics? = sc?.let { runCatching { f(it.first, it.second) }.getOrNull() }
+        (0 until 36).mapNotNull { p["oval_$it"] }.takeIf { it.size == 36 }?.let {
+            out += AnnotLine(AnnotLayer.CONTOUR, it, true, metrics = fm { mm, s -> FeatureMetrics.contour(mesh, mm, s) })
+        }
+        labels?.let { HairSkin.hairline(it, keys)?.points?.let { h ->
+            out += AnnotLine(AnnotLayer.HAIRLINE, h, false, metrics = fm { mm, s -> FeatureMetrics.hairline(mesh, h, mm, s) })
+        } }
         fun chain(idx: IntArray) = idx.map { mesh[it] }
-        out += AnnotLine(AnnotLayer.EYES, chain(EYE_R), true); out += AnnotLine(AnnotLayer.EYES, chain(EYE_L), true)
-        out += AnnotLine(AnnotLayer.EYES, chain(BROW_R), true); out += AnnotLine(AnnotLayer.EYES, chain(BROW_L), true)
+        out += AnnotLine(AnnotLayer.EYES, chain(EYE_R), true, metrics = fm { mm, s -> FeatureMetrics.eye(mesh, true, mm, s) })
+        out += AnnotLine(AnnotLayer.EYES, chain(EYE_L), true, metrics = fm { mm, s -> FeatureMetrics.eye(mesh, false, mm, s) })
+        out += AnnotLine(AnnotLayer.EYES, chain(BROW_R), true, metrics = fm { mm, s -> FeatureMetrics.brow(mesh, true, mm, s) })
+        out += AnnotLine(AnnotLayer.EYES, chain(BROW_L), true, metrics = fm { mm, s -> FeatureMetrics.brow(mesh, false, mm, s) })
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_DORSAL_R).toTypedArray(), perSeg = 4), false)
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_DORSAL_L).toTypedArray(), perSeg = 4), false)
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_ALA_R).toTypedArray(), perSeg = 4), false)
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_ALA_L).toTypedArray(), perSeg = 4), false)
-        out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_TIP).toTypedArray(), perSeg = 6), false)
-        out += AnnotLine(AnnotLayer.LIPS, chain(LIPS_OUTER), true); out += AnnotLine(AnnotLayer.LIPS, chain(LIPS_INNER), true)
+        out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_TIP).toTypedArray(), perSeg = 6), false,
+            metrics = fm { mm, s -> FeatureMetrics.nose(mesh, mm, s) })
+        // labios: bermellón superior e inferior, cada uno con sus medidas
+        out += AnnotLine(AnnotLayer.LIPS, FeatureMetrics.upperLipPoly(mesh), true, metrics = fm { mm, s -> FeatureMetrics.upperLip(mesh, mm, s) })
+        out += AnnotLine(AnnotLayer.LIPS, FeatureMetrics.lowerLipPoly(mesh), true, metrics = fm { mm, s -> FeatureMetrics.lowerLip(mesh, mm, s) })
         if (lum != null) out += folds(mesh, lum, labels, lab, extras, info)
         return out
     }
@@ -194,8 +206,12 @@ object FaceAnnotations {
             val covered = if (axis === full) 0f else 1f - LineMeasure.length(axis) / LineMeasure.length(full).coerceAtLeast(1e-6f)
             // tramo visible demasiado corto (menos de ~6 mm o del 20 % del recorrido): no hay surco medible
             if (axis.size < 4 || LineMeasure.length(axis) < 0.04f * faceW || covered > 0.8f) return@mapIndexedNotNull null
+            val naso = name == "nasogeniano"
+            // nasogeniano más sensible (umbrales menores): es el surco clínico de referencia
             RidgeTracker.track(lum, axis, corridorHalf(name) * faceW, stations = if (axis === full) 28 else 20, skin = skin,
-                anchorStart = name == "nasogeniano")?.let { r ->
+                minStrength = if (naso) NASO_MIN_STRENGTH else RidgeTracker.MIN_STRENGTH,
+                minContrast = if (naso) NASO_MIN_CONTRAST else RidgeTracker.MIN_CONTRAST,
+                anchorStart = naso)?.let { r ->
                 // sin colas sobre el vello (el trazado se mueve a los lados del eje)
                 val pts = hair?.let { offHair(r.points, it, fromStart = name == "nasogeniano") } ?: r.points
                 if (pts.size < 5) return@mapIndexedNotNull null
@@ -441,7 +457,9 @@ object FaceAnnotations {
     }
 
     /** Semiancho del pasillo de cada surco, relativo al ancho de la cara. */
-    fun corridorHalf(name: String) = if (name == "valle lagrimal") 0.035f else 0.05f
+    fun corridorHalf(name: String) = when (name) { "valle lagrimal" -> 0.035f; "nasogeniano" -> 0.06f; else -> 0.05f }
+    const val NASO_MIN_STRENGTH = 0.018f
+    const val NASO_MIN_CONTRAST = 1.6f
 
     /** Contorno del sujeto (zonas corporales) desde una máscara. */
     fun body(mask: Mask): List<AnnotLine> {

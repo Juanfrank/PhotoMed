@@ -676,20 +676,71 @@ fun annotColor(layer: com.photomed.app.align.AnnotLayer): Color = when (layer) {
 }
 
 /**
+ * Color de cada línea según su tipo (no solo su capa): cada surco y arruga con el suyo, para
+ * distinguirlos a simple vista; los rasgos, con el de su capa.
+ */
+fun lineColor(l: com.photomed.app.align.AnnotLine): Color {
+    val n = l.metrics?.name ?: return annotColor(l.layer)
+    return when {
+        n.startsWith("Nasogeniano") -> Color(0xFFFF7043)
+        n.startsWith("Marioneta") -> Color(0xFFEC407A)
+        n.startsWith("Valle lagrimal") -> Color(0xFFBA68C8)
+        n.startsWith("Frente") -> Color(0xFFFFEE58)
+        n.startsWith("Ceño, raíz") -> Color(0xFFFFA726)
+        n.startsWith("Ceño") -> Color(0xFFFF5252)
+        n.startsWith("Pata de gallo") -> Color(0xFF66BB6A)
+        n.startsWith("Ojera") -> Color(0xFF9575CD)
+        n.startsWith("Labio inferior") -> Color(0xFFF06292)
+        n.startsWith("Ceja") -> Color(0xFF4DD0E1)
+        else -> annotColor(l.layer)
+    }
+}
+
+/**
+ * Números de las líneas medidas ([numbers]: nombre → número), en una pastilla oscura con el borde del
+ * color de la línea, junto a cada línea visible.
+ */
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLineNumbers(
+    lines: List<com.photomed.app.align.AnnotLine>, layers: Set<com.photomed.app.align.AnnotLayer>,
+    numbers: Map<String, Int>, k: Float, map: (com.photomed.app.align.Pt) -> Offset,
+) {
+    val r = 7.dp.toPx() * k.coerceIn(0.7f, 1.2f)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE; textAlign = android.graphics.Paint.Align.CENTER
+        textSize = r * 1.15f; typeface = android.graphics.Typeface.DEFAULT_BOLD
+    }
+    // radio en unidades del ancho de la foto (para colocar los números sin solaparse)
+    val o0 = map(com.photomed.app.align.Pt(0f, 0f)); val o1 = map(com.photomed.app.align.Pt(1f, 0f))
+    val rUnits = r / kotlin.math.hypot(o1.x - o0.x, o1.y - o0.y).coerceAtLeast(1f)
+    for ((l, at) in com.photomed.app.align.MeasureNumbering.place(lines.filter { it.layer in layers }, numbers, rUnits)) {
+        val n = numbers[l.metrics!!.name] ?: continue
+        val c = map(at)
+        drawCircle(Color(0xE6202020), r, c)
+        drawCircle(lineColor(l), r, c, style = Stroke(1.6.dp.toPx()))
+        drawContext.canvas.nativeCanvas.drawText(n.toString(), c.x, c.y + paint.textSize * 0.36f, paint)
+    }
+}
+
+/**
  * Dibuja las líneas de anotación visibles ([layers]) con el estilo del contorno: sombra + trazo
  * suave (Catmull-Rom); las estimadas, discontinuas. [map]: de coordenadas de la foto (unidades del
  * ancho) a píxeles del lienzo; [k]: escala del grosor.
  */
 fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAnnotations(
     lines: List<com.photomed.app.align.AnnotLine>, layers: Set<com.photomed.app.align.AnnotLayer>,
-    k: Float, map: (com.photomed.app.align.Pt) -> Offset,
+    k: Float,
+    /** Números de las líneas medidas (nombre → número) o null para no numerarlas. */
+    numbers: Map<String, Int>? = null,
+    map: (com.photomed.app.align.Pt) -> Offset,
 ) {
     for (l in lines) {
         if (l.layer !in layers || l.points.size < 2) continue
         val path = smoothPath(l.points.map(map), l.closed)
-        if (l.filled) { drawPath(path, annotColor(l.layer).copy(alpha = 0.28f)); drawPath(path, annotColor(l.layer).copy(alpha = 0.7f), style = Stroke(1.dp.toPx() * k)); continue }
+        val col = lineColor(l)
+        if (l.filled) { drawPath(path, col.copy(alpha = 0.28f)); drawPath(path, col.copy(alpha = 0.7f), style = Stroke(1.dp.toPx() * k)); continue }
         val dash = if (l.estimated) PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx() * k, 5.dp.toPx() * k)) else null
         drawPath(path, Shadow, style = Stroke(3.6.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
-        drawPath(path, annotColor(l.layer), style = Stroke(1.5.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
+        drawPath(path, col, style = Stroke(1.5.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
     }
+    if (numbers != null) drawLineNumbers(lines, layers, numbers, k, map)
 }

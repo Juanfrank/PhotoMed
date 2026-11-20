@@ -2,6 +2,26 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.18 — 20 de noviembre de 2026
+
+- **Líneas numeradas**: cada línea medida lleva en la foto el mismo número que su fila en la tabla
+  (también en Comparar, igual en todas las fotos, y al exportar), colocado sin solaparse.
+- **Colores por tipo**: nasogeniano, marioneta, valle lagrimal, frente, ceño, raíz nasal, patas de
+  gallo, ojeras, cejas y labios con colores distintos.
+- **Tabla de medidas debajo de la foto** (no superpuesta) en el visor y en Comparar, con cifras de
+  mayor contraste y secciones (arrugas y surcos, ojeras, rasgos).
+- **Selector de capas encima de la foto**, chip **Contornos internos** (ojos y cejas, nariz y labios
+  de una vez) y **barra de progreso** visible mientras se analizan arrugas y rasgos.
+- **Medidas de los rasgos**: labio superior (ancho, alto, área, filtrum, arco de Cupido) e inferior
+  (alto, área, proporción), ojos (ancho, alto, inclinación cantal), cejas (longitud, altura), nariz
+  (ancho alar, alto) y contorno (ancho, tercios medio e inferior).
+- **Línea del pelo**: altura de la frente (cejas → pelo) en el centro, sobre cada ceja y su cola, y
+  entradas temporales, para seguir los patrones de calvicie.
+- **Surco nasogeniano más sensible** (umbrales menores y pasillo más ancho): en 18 retratos, en los 18
+  (antes 16).
+- **Idempotencia**: girar 4 veces conserva el recorte (antes se perdía); importar dos veces la misma
+  foto no la duplica; pruebas de repetición de ediciones, plantillas, recortes, numeración y análisis.
+
 ## 2.17 — 20 de noviembre de 2026
 
 - **MediaPipe como motor estándar** de puntos faciales; ya no se elige en Ajustes. ML Kit queda

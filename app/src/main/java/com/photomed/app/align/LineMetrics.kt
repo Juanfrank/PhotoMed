@@ -39,7 +39,12 @@ data class LineMetrics(
     val depthSource: String = "sombreado",
     /** Advertencia sobre la medida (p. ej. surco parcialmente cubierto por barba o bigote). */
     val note: String? = null,
-)
+    /** Medidas de un rasgo (etiqueta con unidad, valor): labios, ojos, cejas, nariz, línea del pelo… */
+    val features: List<Pair<String, Float>> = emptyList(),
+) {
+    /** Medida de un rasgo (no de una arruga ni de una zona). */
+    val isFeature: Boolean get() = features.isNotEmpty()
+}
 
 /** Imagen en CIE L*a*b* (D65), para medir el color de la piel. */
 class LabImage(val width: Int, val height: Int, val l: FloatArray, val a: FloatArray, val b: FloatArray) {
@@ -277,4 +282,47 @@ object LineMeasure {
     private fun median(v: List<Float>) = v.sorted()[v.size / 2]
     private fun d(a: Pt, b: Pt) = hypot(a.x - b.x, a.y - b.y)
     private fun mid(a: Pt, b: Pt) = Pt((a.x + b.x) / 2, (a.y + b.y) / 2)
+}
+
+/**
+ * Numeración de las líneas medidas para relacionar imagen y tabla: el mismo número en la foto y en
+ * su fila. Orden: arrugas y surcos, zonas (ojeras) y rasgos; dentro de cada grupo, por capa y nombre.
+ * Con varias fotos (comparar) se numera la unión de nombres, igual en todas.
+ */
+object MeasureNumbering {
+    fun group(m: LineMetrics) = when { m.isFeature -> 2; m.areaMm2 != null || m.deltaE != null -> 1; else -> 0 }
+
+    fun of(sets: List<List<AnnotLine>>): Map<String, Int> {
+        val byName = LinkedHashMap<String, AnnotLine>()
+        for (s in sets) for (l in s) { val m = l.metrics ?: continue; byName.putIfAbsent(m.name, l) }
+        return byName.values.sortedWith(compareBy({ group(it.metrics!!) }, { it.layer.ordinal }, { it.metrics!!.name }))
+            .mapIndexed { i, l -> l.metrics!!.name to i + 1 }.toMap()
+    }
+
+    /** Punto donde se dibuja el número de una línea: centro de las zonas, mitad de las abiertas, lado derecho de los contornos cerrados. */
+    fun anchor(l: AnnotLine): Pt = candidates(l).first()
+
+    /** Posiciones posibles del número sobre la línea, en orden de preferencia. */
+    private fun candidates(l: AnnotLine): List<Pt> {
+        val p = l.points
+        if (l.filled) return listOf(Pt(p.map { it.x }.average().toFloat(), p.map { it.y }.average().toFloat())) + p
+        if (l.closed) return listOf(p.maxBy { it.x }, p.minBy { it.y }, p.maxBy { it.y }, p.minBy { it.x }) +
+            listOf(0.125f, 0.375f, 0.625f, 0.875f).map { p[(it * (p.size - 1)).toInt()] }
+        return listOf(0.5f, 0.3f, 0.7f, 0.15f, 0.85f, 0f, 1f).map { p[(it * (p.size - 1)).toInt()] }
+    }
+
+    /**
+     * Posición de cada número sin solaparse con los ya colocados ([r]: radio de la pastilla en
+     * unidades del ancho); si ninguna posición de la línea queda libre, la menos solapada.
+     */
+    fun place(lines: List<AnnotLine>, numbers: Map<String, Int>, r: Float): List<Pair<AnnotLine, Pt>> {
+        val placed = ArrayList<Pair<AnnotLine, Pt>>()
+        for (l in lines.filter { it.metrics?.name?.let { n -> numbers[n] } != null && it.points.size >= 2 }.sortedBy { numbers[it.metrics!!.name] }) {
+            val c = candidates(l)
+            fun clearance(q: Pt) = placed.minOfOrNull { kotlin.math.hypot(it.second.x - q.x, it.second.y - q.y) } ?: Float.MAX_VALUE
+            val best = c.firstOrNull { clearance(it) >= 2.1f * r } ?: c.maxBy { clearance(it) }
+            placed += l to best
+        }
+        return placed
+    }
 }

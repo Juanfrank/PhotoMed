@@ -251,4 +251,38 @@ class NewFacesAnnotTest {
         // los surcos visibles por encima del bigote se siguen trazando
         org.junit.Assert.assertTrue("se pierden nasogenianos visibles: $nasoAfter de $nasoBefore", nasoAfter >= nasoBefore)
     }
+
+    /** Ejemplos con todas las capas, colores por tipo y números (como al exportar): build/reports/numbered/. */
+    @Test
+    fun numberedExamples() {
+        val json = javaClass.getResourceAsStream("/stock/new/mesh.json")?.bufferedReader()?.readText()
+        assumeTrue("sin retratos nuevos", json != null)
+        val o = JSONObject(json!!)
+        val dir = File("build/reports/numbered").apply { mkdirs() }
+        val report = StringBuilder()
+        for (k in listOf("px_12596614", "px_14697557", "px_3823495", "px_1066116")) {
+            val arr = o.optJSONArray(k) ?: continue
+            val mesh = (0 until arr.length()).map { i -> arr.getJSONArray(i).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1).toFloat()) } }
+            val img = javaClass.getResourceAsStream("/stock/new/$k.jpg")?.let { BitmapFactory.decodeStream(it) } ?: continue
+            val labBmp = javaClass.getResourceAsStream("/stock/new/${k}_labels.png")?.let { BitmapFactory.decodeStream(it) }
+            val labels = labBmp?.let { b -> val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
+                FaceLabels(b.width, b.height, ByteArray(px.size) { Color.red(px[it]).toByte() }) }
+            val sw = 480; val sh = img.height * sw / img.width
+            val small = Bitmap.createScaledBitmap(img, sw, sh, true)
+            val px = IntArray(sw * sh).also { small.getPixels(it, 0, sw, 0, 0, sw, sh) }
+            val lum = GrayImage(sw, sh, FloatArray(px.size) { i -> val c = px[i]; (0.299f * Color.red(c) + 0.587f * Color.green(c) + 0.114f * Color.blue(c)) / 255f })
+            val lines = FaceAnnotations.fromMesh(mesh, labels, lum, com.photomed.app.align.LabImage.fromArgb(px, sw, sh))
+            val nums = com.photomed.app.align.MeasureNumbering.of(listOf(lines))
+            val big = Bitmap.createScaledBitmap(img, 1080, img.height * 1080 / img.width, true)
+            val out = com.photomed.app.ui.compare.CompareExport.drawAnnotations(big, lines, AnnotLayer.entries.toSet(), nums)
+            File(dir, "$k.jpg").outputStream().use { out.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+            report.append(k).append('\n')
+            lines.mapNotNull { it.metrics }.sortedBy { nums[it.name] }.forEach { m ->
+                report.append("  ${nums[m.name]} ${m.name}: ").append(if (m.isFeature) m.features.joinToString("; ") { "${it.first}=${"%.1f".format(it.second)}" }
+                    else "long ${"%.1f".format(m.lengthMm ?: 0f)} mm, prof ${"%.2f".format(m.depthMm ?: 0f)} mm").append('\n')
+            }
+        }
+        File(dir, "medidas.txt").writeText(report.toString())
+        println(report)
+    }
 }

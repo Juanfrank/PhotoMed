@@ -297,10 +297,27 @@ class UsageFlowsTest {
         compose.onNodeWithContentDescription("Fotografía", substring = true).performTouchInput {
             click(androidx.compose.ui.geometry.Offset(x - page.left, y - page.top))
         }
-        waitText("Frente, línea 1")
+        // ficha con el número de la línea (el mismo que en la foto y en la tabla)
+        waitText("1 · Frente, línea 1")
         compose.onNodeWithText("0.31 mm").assertExists()
         compose.onNodeWithText("Tabla de medidas").performClick()
-        waitText("Medidas de líneas y surcos")
+        // la tabla va en un panel debajo de la foto (no superpuesta)
+        waitText("Arrugas y surcos")
+        // diseño: selector de capas encima de la foto y tabla debajo, sin taparla
+        val photoBox = compose.onNodeWithContentDescription("Fotografía", substring = true).fetchSemanticsNode().boundsInRoot
+        val chips = compose.onNodeWithText("Contornos internos").fetchSemanticsNode().boundsInRoot
+        val table = compose.onNodeWithText("Arrugas y surcos").fetchSemanticsNode().boundsInRoot
+        assertTrue("chips encima de la foto", chips.bottom <= photoBox.top + 1f)
+        assertTrue("tabla debajo de la foto", table.top >= photoBox.bottom - 1f)
+        // contornos internos (ojos, nariz, labios) de una vez
+        compose.onNodeWithText("Contornos internos").performClick()
+        compose.waitForIdle()
+        val on = ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!
+        assertTrue(on, listOf("EYES", "NOSE", "LIPS").all { it in on })
+        compose.onNodeWithText("Contornos internos").performClick()
+        compose.waitForIdle()
+        val off = ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!
+        assertTrue(off, listOf("EYES", "NOSE", "LIPS").none { it in off } && "FOREHEAD" in off)
         assertTrue(compose.onAllNodesWithText("Frente, línea 1", substring = true).fetchSemanticsNodes().size >= 2) // ficha y tabla
     }
 
@@ -325,7 +342,7 @@ class UsageFlowsTest {
         compose.onNodeWithContentDescription("Capas", substring = true).performClick()
         waitText("Medidas")
         compose.onNodeWithText("Medidas").performClick()
-        waitText("Nasogeniano derecho")
+        waitText("Nasogeniano derecho", substring = true)
         compose.onNodeWithText("Mostrar en la foto: Surcos").performClick()
         compose.waitForIdle()
         assertTrue(ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!.contains("FOLDS"))

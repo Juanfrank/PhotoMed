@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -147,7 +148,19 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().padding(padding).background(Color.Black)) {
+            // selector de capas (arrugas, rasgos…) encima de la foto
+            if (showLayers) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
+                Modifier.fillMaxWidth().padding(vertical = 4.dp), onMetrics = { metricsSheet = !metricsSheet })
+            // análisis en curso: barra de proceso visible
+            val analyzing = showLayers && annotsByUri[current.uri.toString()] == null
+            if (analyzing) androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f).semantics { contentDescription = "Analizando arrugas y rasgos" })
+                Text("Analizando arrugas y rasgos…", color = Color.White, style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 10.dp))
+            }
+            Box(Modifier.weight(1f).fillMaxWidth()) {
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize().background(Color.Black), key = { list[it].key },
                 userScrollEnabled = !cropping) { page ->
                 PhotoPage(list[page], zone, if (showLayers) layersState.value else emptySet(), editVersion, Modifier.fillMaxSize(),
@@ -165,30 +178,38 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                         if (note != null) notesByUri[list[page].uri.toString()] = note else notesByUri.remove(list[page].uri.toString())
                     })
             }
-            androidx.compose.foundation.layout.Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .background(Color.Black.copy(alpha = 0.55f))) {
+            androidx.compose.foundation.layout.Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
                 selected?.takeIf { showLayers && it.layer in layersState.value }?.let { l ->
+                    val nums = com.photomed.app.align.MeasureNumbering.of(listOf(annotsByUri[current.uri.toString()].orEmpty()))
                     com.photomed.app.ui.compare.MetricsCard(l, onTable = { metricsSheet = true }, onClose = { selected = null },
-                        modifier = Modifier.fillMaxWidth().padding(8.dp))
+                        modifier = Modifier.fillMaxWidth().padding(8.dp), number = l.metrics?.name?.let { nums[it] })
                 }
-                if (showLayers) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
-                    Modifier.fillMaxWidth().padding(vertical = 4.dp), onMetrics = { metricsSheet = true })
-                if (editing) {
-                    // la edición se lee al pulsar (no la de la última composición) para encadenar giro, espejo…
-                    fun now() = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
-                    val e = remember(current.uri, editVersion) { now() }
-                    fun save(n: com.photomed.app.align.ImageEdit) { com.photomed.app.align.PhotoEdits.set(context, current.uri.toString(), n); editVersion++ }
-                    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly) {
-                        EditButton(Icons.Default.RotateRight, "Girar 90°") { save(now().rotated()) }
-                        EditButton(Icons.Default.Flip, "Espejo") { save(now().mirrored()) }
-                        EditButton(Icons.Default.Crop, "Recortar") { cropping = true }
-                        EditButton(Icons.Default.Restore, "Original", enabled = !e.isIdentity) { save(com.photomed.app.align.ImageEdit.NONE) }
-                    }
-                    Text("La foto original no se modifica; la edición se aplica también en Comparar y al exportar.",
-                        color = Color.LightGray, style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
+            }
+            }
+            // tabla de medidas: debajo de la foto, sin taparla
+            if (metricsSheet && showLayers) {
+                val u = current.uri.toString()
+                val lines = annotsByUri[u]
+                com.photomed.app.ui.compare.MetricsPanel(listOf(formatDateTime(current.takenAt) to lines.orEmpty()), layersState.value,
+                    onClose = { metricsSheet = false }, loading = lines == null, note = notesByUri[u],
+                    onShowLayers = { layersState.value = it },
+                    modifier = Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.45f).dp))
+            }
+            if (editing) androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))) {
+                // la edición se lee al pulsar (no la de la última composición) para encadenar giro, espejo…
+                fun now() = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
+                val e = remember(current.uri, editVersion) { now() }
+                fun save(n: com.photomed.app.align.ImageEdit) { com.photomed.app.align.PhotoEdits.set(context, current.uri.toString(), n); editVersion++ }
+                androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly) {
+                    EditButton(Icons.Default.RotateRight, "Girar 90°") { save(now().rotated()) }
+                    EditButton(Icons.Default.Flip, "Espejo") { save(now().mirrored()) }
+                    EditButton(Icons.Default.Crop, "Recortar") { cropping = true }
+                    EditButton(Icons.Default.Restore, "Original", enabled = !e.isIdentity) { save(com.photomed.app.align.ImageEdit.NONE) }
                 }
+                Text("La foto original no se modifica; la edición se aplica también en Comparar y al exportar.",
+                    color = Color.LightGray, style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
             }
         }
     }
@@ -207,14 +228,6 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     }
 
     LaunchedEffect(pager.currentPage) { selected = null }
-    if (metricsSheet) {
-        val u = current.uri.toString()
-        val lines = annotsByUri[u]
-        com.photomed.app.ui.compare.MetricsSheet(listOf(formatDateTime(current.takenAt) to lines.orEmpty()), layersState.value,
-            onDismiss = { metricsSheet = false }, loading = lines == null, note = notesByUri[u],
-            onShowLayers = { layersState.value = it })
-    }
-
     if (confirmDelete) {
         ConfirmDialog(
             title = "¿Eliminar fotografía?",
@@ -351,7 +364,7 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                     drawPath(path, Color.White.copy(alpha = 0.85f), style = androidx.compose.ui.graphics.drawscope.Stroke(
                         width = 7.dp.toPx() * k, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
                 }
-                drawAnnotations(a, layers, k) { p -> map(p) }
+                drawAnnotations(a, layers, k, numbers = com.photomed.app.align.MeasureNumbering.of(listOf(a))) { p -> map(p) }
             }
         }
     }

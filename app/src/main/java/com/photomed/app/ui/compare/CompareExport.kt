@@ -51,7 +51,9 @@ object CompareExport {
                        annots: List<com.photomed.app.align.AnnotLine>? = null,
                        layers: Set<com.photomed.app.align.AnnotLayer> = emptySet(),
                        /** Giro y espejo de la vista (después de alinear y recortar). */
-                       orient: com.photomed.app.align.ImageEdit? = null): Bitmap {
+                       orient: com.photomed.app.align.ImageEdit? = null,
+                       /** Números de las líneas (comunes a todas las fotos, como en la tabla). */
+                       numbers: Map<String, Int>? = null): Bitmap {
         var bmp = ImageOps.load34(context, photo.uri, width)
         val ks = result?.keystoneDeg ?: 0f
         return withContext(Dispatchers.Default) {
@@ -60,14 +62,16 @@ object CompareExport {
                 val px = IntArray(bmp.width * bmp.height).also { bmp.getPixels(it, 0, bmp.width, 0, 0, bmp.width, bmp.height) }
                 bmp = Bitmap.createBitmap(color.apply(px), bmp.width, bmp.height, Bitmap.Config.ARGB_8888)
             }
-            if (annots != null && layers.isNotEmpty()) bmp = drawAnnotations(bmp, annots, layers)
+            if (annots != null && layers.isNotEmpty()) bmp = drawAnnotations(bmp, annots, layers,
+                numbers ?: com.photomed.app.align.MeasureNumbering.of(listOf(annots)))
             val out = transformed(bmp, withCrop(result?.transform, crop))
             if (orient == null || orient.isIdentity) out else orient.copy(crop = null).apply(out)
         }
     }
 
     /** Dibuja las anotaciones visibles sobre una copia de la foto (mismo estilo que en pantalla). */
-    fun drawAnnotations(src: Bitmap, lines: List<com.photomed.app.align.AnnotLine>, layers: Set<com.photomed.app.align.AnnotLayer>): Bitmap {
+    fun drawAnnotations(src: Bitmap, lines: List<com.photomed.app.align.AnnotLine>, layers: Set<com.photomed.app.align.AnnotLayer>,
+                        numbers: Map<String, Int> = com.photomed.app.align.MeasureNumbering.of(listOf(lines))): Bitmap {
         val b = src.copy(Bitmap.Config.ARGB_8888, true)
         val c = Canvas(b); val w = b.width.toFloat()
         val k = w / 1080f * 3f
@@ -76,7 +80,7 @@ object CompareExport {
             val path = android.graphics.Path()
             l.points.forEachIndexed { i, q -> if (i == 0) path.moveTo(q.x * w, q.y * w) else path.lineTo(q.x * w, q.y * w) }
             if (l.closed) path.close()
-            val col = com.photomed.app.ui.camera.annotColor(l.layer).let { android.graphics.Color.argb((it.alpha * 255).toInt(), (it.red * 255).toInt(), (it.green * 255).toInt(), (it.blue * 255).toInt()) }
+            val col = com.photomed.app.ui.camera.lineColor(l).let { android.graphics.Color.argb((it.alpha * 255).toInt(), (it.red * 255).toInt(), (it.green * 255).toInt(), (it.blue * 255).toInt()) }
             if (l.filled) {
                 c.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = (col and 0x00FFFFFF) or 0x48000000 })
                 continue
@@ -87,7 +91,19 @@ object CompareExport {
                 strokeJoin = Paint.Join.ROUND; pathEffect = dash
             }
             c.drawPath(path, paint(0x66000000, 3.6f * k))
-            c.drawPath(path, paint(com.photomed.app.ui.camera.annotColor(l.layer).let { android.graphics.Color.argb((it.alpha * 255).toInt(), (it.red * 255).toInt(), (it.green * 255).toInt(), (it.blue * 255).toInt()) }, 1.5f * k))
+            c.drawPath(path, paint(col, 1.5f * k))
+        }
+        // números (los mismos que en la tabla de medidas)
+        val r = 5.5f * k
+        val txt = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textAlign = Paint.Align.CENTER; textSize = r * 1.15f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD }
+        for ((l, a) in com.photomed.app.align.MeasureNumbering.place(lines.filter { it.layer in layers }, numbers, r / w)) {
+            val n = numbers[l.metrics!!.name] ?: continue
+            val x = a.x * w; val y = a.y * w
+            val col = com.photomed.app.ui.camera.lineColor(l).let { android.graphics.Color.argb(255, (it.red * 255).toInt(), (it.green * 255).toInt(), (it.blue * 255).toInt()) }
+            c.drawCircle(x, y, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xE6202020.toInt() })
+            c.drawCircle(x, y, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.6f * k / 1.5f; color = col })
+            c.drawText(n.toString(), x, y + txt.textSize * 0.36f, txt)
         }
         return b
     }
@@ -249,10 +265,11 @@ object CompareExport {
         val files = mutableListOf<File>(); var failed = 0
         val rendered = mutableListOf<Pair<Bitmap, String>>()
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val numbers = com.photomed.app.align.MeasureNumbering.of(annots.values.toList())
         seq.forEachIndexed { i, p ->
             coroutineContext.ensureActive()
             onProgress(i, seq.size)
-            val b = runCatching { render(context, p, results[p.key], colors[p.key], crop = crop, annots = annots[p.key], layers = layers, orient = orient) }.getOrNull()
+            val b = runCatching { render(context, p, results[p.key], colors[p.key], crop = crop, annots = annots[p.key], layers = layers, orient = orient, numbers = numbers) }.getOrNull()
             if (b == null) { failed++; return@forEachIndexed }
             val d = labels?.getOrNull(i) ?: formatDate(p.takenAt)
             val label = if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d"

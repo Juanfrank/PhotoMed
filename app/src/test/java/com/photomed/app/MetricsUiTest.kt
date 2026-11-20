@@ -54,7 +54,8 @@ class MetricsUiTest {
         } }
         compose.waitForIdle()
         compose.onNodeWithText("Medidas de líneas y surcos").assertIsDisplayed()
-        compose.onNodeWithText("Nasogeniano derecho\nLong. mm").assertExists()
+        // número de la línea (el mismo que en la foto) + nombre + medida
+        compose.onNodeWithText("1  Nasogeniano derecho\nLong. mm").assertExists()
         compose.onNodeWithText("-2.0").assertExists()      // longitud
         compose.onNodeWithText("-0.50").assertExists()     // profundidad
         assertTrue(compose.onAllNodesWithText("Ojera derecha", substring = true).fetchSemanticsNodes().isNotEmpty())
