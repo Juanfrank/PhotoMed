@@ -139,6 +139,7 @@ fun ExpedienteScreen(
         }
     }
 
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     ExpedienteContent(
         exp = exp, photos = photos, snackbar = snackbar,
         onBack = onBack, onZone = onZone, onCompare = onCompare,
@@ -162,6 +163,7 @@ fun ExpedienteScreen(
                 snackbar.showSnackbar("Importadas ${saved.size} de ${chosen.size}" + if (failed > 0) " ($failed no se pudieron leer)" else "")
             }
         }
+    }
     }
     importBusy?.let { msg ->
         androidx.compose.ui.window.Dialog(onDismissRequest = {}) {

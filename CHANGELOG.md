@@ -2,6 +2,14 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.15.2 — 20 de noviembre de 2026
+
+- **Corrección**: la página de importación ya no es una ventana de diálogo aparte (en algunos
+  teléfonos no recibía la altura de la barra de navegación y el botón de abajo quedaba debajo); va en
+  la ventana de la app como el resto de pantallas, y el botón *Importar* está también arriba.
+  Pruebas: barra de navegación simulada en la ventana de la app y regla que impide diálogos a
+  pantalla completa.
+
 ## 2.15.1 — 20 de noviembre de 2026
 
 - **Corrección**: el botón *Importar al expediente* quedaba bajo los botones de navegación del

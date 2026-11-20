@@ -44,8 +44,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.photomed.app.data.ImportItem
 import com.photomed.app.data.Zone
@@ -60,14 +58,21 @@ import com.photomed.app.ui.formatDateTime
 @Composable
 fun ImportPhotosDialog(initial: List<ImportItem>, onDismiss: () -> Unit, onImport: (List<ImportItem>) -> Unit) {
     var items by remember(initial) { mutableStateOf(initial) }
-    // pantalla completa de borde a borde: la ventana no reserva las barras del sistema y cada barra
-    // de la app se aparta de ellas (la de abajo, de los botones de navegación del teléfono)
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    // Página a pantalla completa dentro de la ventana de la app (no un Dialog: la ventana de un
+    // diálogo no recibe en todos los teléfonos la altura de la barra de navegación y el botón de abajo
+    // quedaba debajo de ella). Atrás cierra la página.
+    androidx.activity.compose.BackHandler(onBack = onDismiss)
+    androidx.compose.material3.Surface(Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text("Importar ${items.size} ${if (items.size == 1) "foto" else "fotos"}") },
                     navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Cancelar") } },
+                    // también arriba, siempre al alcance
+                    actions = {
+                        androidx.compose.material3.TextButton(onClick = { onImport(items) },
+                            enabled = items.isNotEmpty() && items.none { it.zone == null }) { Text("Importar") }
+                    },
                 )
             },
             bottomBar = {
