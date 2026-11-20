@@ -2,6 +2,16 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.15.5 — 20 de noviembre de 2026
+
+- **Corrección de raíz: MediaPipe no se iniciaba en la app instalada.** La minimización (R8)
+  renombraba Flogger, el registro que MediaPipe busca por nombre al iniciarse, así que la malla
+  facial (arrugas de la frente, ceño, patas de gallo, ojeras), la segmentación pelo / piel, la
+  medición de relieve y la sugerencia de ángulo al importar fallaban siempre en el APK, aunque la
+  cara estuviera completa. Ahora se conservan, y la compilación falla si R8 vuelve a renombrar
+  clases de MediaPipe, protobuf o Flogger.
+- El aviso muestra el primer error real (no su repetición).
+
 ## 2.15.4 — 20 de noviembre de 2026
 
 - **Corrección**: el aviso «no se detectó la cara entera» salía cuando lo que fallaba era la malla

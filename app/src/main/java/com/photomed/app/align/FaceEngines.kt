@@ -116,8 +116,10 @@ class MediaPipeFace(context: Context) : Closeable {
          */
         suspend fun <T> withShared(context: Context, block: (MediaPipeFace) -> T): T? = lock.withLockCompat {
             val m = shared ?: runCatching { MediaPipeFace(context.applicationContext) }
-                .onFailure { lastError = "no se pudo cargar el modelo: ${it.message ?: it.javaClass.simpleName}" }.getOrNull()?.also { shared = it }
-            m?.let { mp -> runCatching { block(mp) }.onFailure { lastError = it.message ?: it.javaClass.simpleName }.getOrNull() }
+                // se conserva el primer error (los siguientes de una clase que no se inició solo repiten su nombre)
+                .onFailure { if (lastError == null) lastError = "no se pudo cargar el modelo: ${it.javaClass.simpleName}: ${it.message}" + (it.cause?.let { c -> " (${c.javaClass.simpleName}: ${c.message})" } ?: "") }
+                .getOrNull()?.also { shared = it }
+            m?.let { mp -> runCatching { block(mp) }.onFailure { if (lastError == null) lastError = "${it.javaClass.simpleName}: ${it.message}" }.getOrNull() }
         }
 
         private suspend fun <T> kotlinx.coroutines.sync.Mutex.withLockCompat(action: suspend () -> T): T {

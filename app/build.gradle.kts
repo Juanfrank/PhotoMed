@@ -15,8 +15,8 @@ android {
         applicationId = "com.photomed.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "2.15.4"
+        versionCode = 12
+        versionName = "2.15.5"
     }
 
     // ML Kit incluye bibliotecas nativas por arquitectura: un APK por ABI para instalación directa
@@ -121,3 +121,22 @@ val copyLegalDocs by tasks.registering(Copy::class) {
 }
 android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/legal"))
 tasks.named("preBuild") { dependsOn(copyLegalDocs) }
+
+// Tras R8: MediaPipe carga por reflexión clases propias, de protobuf y de Flogger; si R8 las renombra o
+// las quita, MediaPipe falla solo en la build de publicación (las pruebas no lo ven). La build falla.
+afterEvaluate {
+    tasks.matching { it.name == "minifyReleaseWithR8" }.configureEach {
+        doLast {
+            val f = layout.buildDirectory.file("outputs/mapping/release/mapping.txt").get().asFile
+            if (!f.exists()) return@doLast
+            val pkgs = listOf("com.google.mediapipe.", "com.google.protobuf.", "com.google.common.flogger.")
+            val bad = f.readLines().filter { l -> !l.startsWith(" ") && l.endsWith(":") && pkgs.any { l.startsWith(it) } }
+                // las lambdas sintéticas del compilador no se buscan por nombre
+                .filter { l -> val (from, to) = l.removeSuffix(":").split(" -> "); from != to && "\$\$ExternalSynthetic" !in from }
+            if (bad.isNotEmpty()) throw GradleException(
+                "R8 renombró o quitó ${bad.size} clases que MediaPipe usa por reflexión (revise proguard-rules.pro): " + bad.take(5))
+            val need = "com.google.common.flogger.backend.system.DefaultPlatform -> com.google.common.flogger.backend.system.DefaultPlatform:"
+            if (f.readLines().none { it == need }) throw GradleException("Falta Flogger DefaultPlatform en la build: MediaPipe no se iniciaría")
+        }
+    }
+}
