@@ -17,9 +17,9 @@ import kotlin.math.roundToInt
  * se suavizan a lo largo del contorno.
  */
 object JawContour {
-    const val IN = 0.05f
+    const val IN = 0.08f
     const val OUT = 0.05f
-    const val SIGMA = 0.025f
+    const val SIGMA = 0.04f
 
     /**
      * Contorno lateral e inferior de la cara (del nivel de los ojos al mentón), ajustado al borde visible:
@@ -57,17 +57,30 @@ object JawContour {
             if (nx * (o.x - cx) + ny * (o.y - cy) < 0) { nx = -nx; ny = -ny }
             return Pt(nx, ny)
         }
-        val offs = FloatArray(36)
+        val offs = FloatArray(36) { Float.NaN }
         val step = 1f / w
         for (i in sides) {
             val o = oval[i]; val n = normal(i) ?: continue
-            // objeto delante de la cara (ropa, mano u otro): se queda en la malla
-            val occl = labels?.let { l -> val c = l[(o.x * l.width).roundToInt(), (o.y * l.width).roundToInt()]
+            // objeto DELANTE de la cara (mano, ropa subida…): se comprueba dentro de la cara (6 % hacia
+            // dentro), no en el punto de la malla: si la malla cae fuera, sobre ropa o fondo (p. ej. un
+            // pañuelo), es justo donde hay que ajustarlo
+            val occl = labels?.let { l -> val q = Pt(o.x - n.x * 0.06f * faceW, o.y - n.y * 0.06f * faceW)
+                val c = l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()]
                 c == FaceLabels.CLOTHES || c == FaceLabels.OTHER } == true
-            if (occl) continue
+            if (occl) { offs[i] = Float.NaN; continue }
             val chin = n.y > 0.75f   // bajo el mentón: sombra, poco hacia fuera
             val dMin = -IN * faceW; val dMax = (if (chin) 0.02f else OUT) * faceW
             val h = 2.5f * step * k
+            // color de la propia cara junto a este punto (10–14 % hacia dentro: piel o barba)
+            val ref = if (lab == null) null else listOf(0.10f, 0.12f, 0.14f).mapNotNull { f -> labAt(Pt(o.x - n.x * f * faceW, o.y - n.y * f * faceW)) }
+                .let { v -> FloatArray(3) { c -> v.map { it[c] }.average().toFloat() } }
+            // parecido a la cara (0..1): ΔE con L* a 0,8 de peso (tolera algo de sombra en la mejilla, pero
+            // no el fondo oscuro, que en L* se aleja mucho más)
+            fun faceLike(q: Pt): Float {
+                val r = ref ?: return 1f; val v = labAt(q) ?: return 1f
+                val de = hypot(hypot((v[0] - r[0]) * 0.8f, v[1] - r[1]), v[2] - r[2])
+                return 1f / (1f + exp((de - 20f) / 3f))
+            }
             var best = 0f; var bestScore = 0f
             var d = dMin
             while (d <= dMax) {
@@ -81,15 +94,18 @@ object JawContour {
                         hypot(hypot(a[0] - b[0], a[1] - b[1]), a[2] - b[2]) / 100f }
                 }
                 val prior = exp(-(d / (SIGMA * faceW)) * (d / (SIGMA * faceW)) / 2)
-                val sc = edge * prior
+                // borde DE LA CARA: dentro parecido a la cara, fuera no (descarta bordes del fondo)
+                val sc = edge * prior * (if (chin || ref == null) 1f else faceLike(qi) * (1f - faceLike(qo)))
                 if (sc > bestScore) { bestScore = sc; best = d }
                 d += step
             }
-            if (bestScore > (if (chin) 0.015f else 0.03f)) offs[i] = best
+            offs[i] = if (bestScore > (if (chin) 0.015f else 0.03f)) best else Float.NaN
         }
+        // suavizado solo con los puntos medidos (los que no tienen borde claro no arrastran a 0)
         val n36 = 36
-        val med = FloatArray(n36) { i -> if (i !in sides) 0f else (-2..2).map { offs[(i + it + n36) % n36] }.sorted()[2] }
-        val sm = FloatArray(n36) { i -> if (i !in sides) 0f else (-1..1).map { med[(i + it + n36) % n36] }.average().toFloat() }
+        val med = FloatArray(n36) { i -> if (i !in sides) 0f else (-2..2).map { offs[(i + it + n36) % n36] }.filter { !it.isNaN() }
+            .let { v -> if (v.isEmpty()) 0f else v.sorted()[v.size / 2] } }
+        val sm = FloatArray(n36) { i -> if (i !in sides) 0f else (-2..2).map { med[(i + it + n36) % n36] * (3 - kotlin.math.abs(it)) }.sum() / 9f }
         val out = snapped.toMutableMap()
         for (i in sides) {
             val o = oval[i]; val n = normal(i) ?: continue

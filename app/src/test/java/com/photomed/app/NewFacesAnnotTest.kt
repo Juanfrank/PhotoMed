@@ -307,7 +307,7 @@ class NewFacesAnnotTest {
         val json = javaClass.getResourceAsStream("/stock/new/mesh.json")?.bufferedReader()?.readText()
         assumeTrue("sin retratos nuevos", json != null)
         val o = JSONObject(json!!)
-        var faces = 0; var maxOut = 0f; var maxIn = 0f; var maxKink = 0f; var oldBelow = 0f; var newBelow = 0f
+        var faces = 0; var maxOut = 0f; var maxIn = 0f; var maxKink = 0f; var oldBelow = 0f; var newBelow = 0f; var userCase = 0f
         for (k in o.keys().asSequence().sorted()) {
             val arr = o.getJSONArray(k)
             val mesh = (0 until arr.length()).map { i -> arr.getJSONArray(i).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1).toFloat()) } }
@@ -336,6 +336,14 @@ class NewFacesAnnotTest {
             val chin = lower.maxBy { oval[it].y }
             oldBelow = maxOf(oldBelow, (snapped["oval_$chin"]!!.y - oval[chin].y) / faceW)
             newBelow = maxOf(newBelow, (refined["oval_$chin"]!!.y - oval[chin].y) / faceW)
+            // caso marcado por el usuario: en este retrato la malla cae sobre el pañuelo, a la derecha de la
+            // imagen (oval por el lado de 361 / 288); el borde real de la mejilla (la barba blanca) está hacia dentro
+            if (k == "px_12596614") {
+                val right = lower.filter { oval[it].x > cx && oval[it].y > keys["nose_bottom_1"]!!.y && oval[it].y < keys["lip_lower_bottom_4"]!!.y }
+                val inward = right.map { -(radial(refined["oval_$it"]!!) - radial(oval[it])) / faceW }
+                println("PAÑUELO: desplazamiento hacia dentro en el lado derecho ${inward.joinToString { "%.3f".format(it) }}")
+                userCase = inward.average().toFloat()
+            }
             faces++
         }
         println("MANDÍBULA: $faces rostros; desplazamiento máx. fuera ${"%.3f".format(maxOut)}, dentro ${"%.3f".format(maxIn)} (× ancho); " +
@@ -345,5 +353,7 @@ class NewFacesAnnotTest {
         org.junit.Assert.assertTrue(maxIn <= com.photomed.app.align.JawContour.IN + 0.005f)
         org.junit.Assert.assertTrue("contorno con quiebros", maxKink < 0.03f)
         org.junit.Assert.assertTrue(newBelow <= 0.025f)
+        // borde medido a mano en la foto: 2,7 % y 1,4 % del ancho de la cara hacia dentro (media ≈ 2 %)
+        org.junit.Assert.assertTrue("el contorno no se ajusta al borde de la mejilla (pañuelo): ${userCase}", userCase in 0.014f..0.03f)
     }
 }

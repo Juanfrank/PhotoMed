@@ -2,6 +2,15 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.19.1 — 20 de noviembre de 2026
+
+- **Corrección del contorno lateral** (no se ajustaba al borde de la cara): cuando la malla cae fuera
+  de la cara, sobre ropa o un pañuelo, se tomaba como algo delante de la cara y no se movía. Ahora la
+  oclusión se comprueba dentro de la cara, y el borde buscado es el de la cara (dentro parecido al
+  color de la propia cara junto a ese punto, fuera no), no un borde del fondo. En el retrato marcado,
+  el contorno se mueve 2,6 % y 1,5 % del ancho de la cara hacia dentro, sobre el borde de la barba
+  (medido a mano: 2,7 % y 1,4 %).
+
 ## 2.19 — 20 de noviembre de 2026
 
 - **Números fuera de los trazos**: cada número va a un lado de su línea, con una guía fina, sin
