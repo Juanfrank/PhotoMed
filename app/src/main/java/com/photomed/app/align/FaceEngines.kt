@@ -16,12 +16,13 @@ enum class FaceEngine(val label: String, val description: String) {
     MEDIAPIPE("MediaPipe Face Landmarker", "478 puntos 3D (malla facial) agrupados como ML Kit; pose 3D de la cabeza; modelo de 3,7 MB.");
 
     companion object {
-        private const val KEY = "face_engine"
-        fun get(context: Context): FaceEngine =
-            runCatching { valueOf(context.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString(KEY, ML_KIT.name)!!) }
-                .getOrDefault(ML_KIT)
-        fun set(context: Context, e: FaceEngine) =
-            context.getSharedPreferences("photomed", Context.MODE_PRIVATE).edit().putString(KEY, e.name).apply()
+        /**
+         * Motor de la app: MediaPipe (malla de 478 puntos) siempre; ML Kit queda como respaldo en el
+         * mismo cuadro si MediaPipe falla o no encuentra la cara ([LandmarkDetector]) y como
+         * comprobación de la malla en las fotos ([PhotoAnnotator]). Ya no se elige en los ajustes.
+         */
+        @Suppress("UNUSED_PARAMETER")
+        fun get(context: Context): FaceEngine = MEDIAPIPE
     }
 }
 

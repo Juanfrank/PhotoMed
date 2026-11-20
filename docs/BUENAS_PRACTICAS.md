@@ -18,7 +18,7 @@ Cada referencia indica **dónde se aplica** en PhotoMed.
 |---|---|
 | **Google ML Kit** Face Detection (contornos de 133 puntos, ángulos de Euler) y Pose Detection (33 puntos, BlazePose). | Detector en el dispositivo; la pose de la cabeza (guiñada/cabeceo) se exige igual a la de la referencia. |
 | Bazarevsky V et al. *BlazePose: On-device real-time body pose tracking.* arXiv:2006.10204 (2020). | Base del detector corporal (hombros, caderas, rodillas, manos, pies). |
-| Kartynnik Y et al. *Real-time facial surface geometry from monocular video on mobile GPUs.* arXiv:1907.06724 (2019) — **MediaPipe Face Landmarker** (478 puntos 3D + matriz de pose, Apache 2.0). | **Segundo motor seleccionable** en la app y detector de la evaluación con imágenes reales (`tools/eval`). |
+| Kartynnik Y et al. *Real-time facial surface geometry from monocular video on mobile GPUs.* arXiv:1907.06724 (2019) — **MediaPipe Face Landmarker** (478 puntos 3D + matriz de pose, Apache 2.0). | **Motor estándar** de la app (ML Kit como respaldo y comprobación) y detector de la evaluación con imágenes reales (`tools/eval`). |
 | Huang GB et al. *Labeled Faces in the Wild.* UMass Tech. Rep. 07-49 (2007). | Banco de pruebas de falsos positivos / negativos (misma persona, otra persona, mismo encuadre). |
 
 ## Registro (alineación) de imágenes

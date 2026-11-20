@@ -230,15 +230,14 @@ de personas distintas se solapan: varían más con la pose y la expresión); y e
 forma cambia con el tratamiento. La identidad la garantiza el expediente; la coincidencia mide el
 **encuadre**.
 
-#### Motores de puntos faciales intercambiables
+#### Motor de puntos faciales
 
-Ajustes → “Motor de puntos faciales”: **Google ML Kit** (133 puntos de contorno + 7 puntos, ángulos de
-Euler) o **MediaPipe Face Landmarker** (478 puntos 3D + matriz de pose; Apache 2.0, modelo incluido).
-`FaceMeshMap` agrupa la malla de MediaPipe con las mismas claves que ML Kit (óvalo, cejas, ojos,
-labios, nariz, pupilas por el iris), de modo que alineación, coincidencia, perspectiva, guía adaptada
-y estandarización funcionan igual con ambos. Referencia y cuadro actual usan siempre el mismo motor
-(al cambiarlo se recalcula la referencia). La evaluación con LFW (`tools/eval`) se hizo con esta misma
-agrupación de MediaPipe.
+Motor de puntos faciales (desde 2.17, sin elección en Ajustes): **MediaPipe Face Landmarker** (478
+puntos 3D + matriz de pose; Apache 2.0, modelo incluido) como estándar. **Google ML Kit** (133
+puntos de contorno + 7 puntos, ángulos de Euler) como respaldo en el mismo cuadro si MediaPipe falla
+o no encuentra la cara (tras 5 fallos seguidos se usa solo ML Kit en esa sesión de cámara) y, en las
+fotos, como comprobación de la malla: los centros de los ojos de ambos deben coincidir (± 25 % de la
+interpupilar); si no, la malla se rehace sobre la cara que encuentra ML Kit.
 
 #### Estandarización sin foto de referencia (primera toma de una zona)
 

@@ -30,10 +30,10 @@ data class Detection(val points: Map<String, Pt>, val yaw: Float? = null, val pi
 }
 
 /**
- * Detector de puntos: rostro con el motor elegido ([FaceEngine]: ML Kit o MediaPipe) y cuerpo con
+ * Detector de puntos: rostro con MediaPipe y ML Kit de respaldo ([FaceEngine]) y cuerpo con
  * ML Kit Pose. Ambos motores devuelven las mismas claves de puntos.
  */
-class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: FaceEngine = FaceEngine.ML_KIT) : Closeable {
+class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: FaceEngine = FaceEngine.MEDIAPIPE) : Closeable {
     /** Motivo por el que MediaPipe no se pudo iniciar (si se pidió). */
     var initError: String? = null
         private set

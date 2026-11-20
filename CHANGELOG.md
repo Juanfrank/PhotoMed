@@ -2,6 +2,15 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.17 — 20 de noviembre de 2026
+
+- **MediaPipe como motor estándar** de puntos faciales; ya no se elige en Ajustes. ML Kit queda
+  como respaldo (si MediaPipe falla o no encuentra la cara, en el mismo cuadro) y como comprobación
+  de la malla en las fotos (los ojos de ambos deben coincidir; si no, la malla se rehace).
+- **Surcos visibles junto a barba o bigote**: se descartaban si el bigote tapaba más de la mitad de
+  su recorrido. Ahora la búsqueda se limita primero a la parte visible y se trazan hasta el borde del
+  vello (en 18 retratos: los 9 nasogenianos visibles en rostros con vello, ninguno sobre el vello).
+
 ## 2.16 — 20 de noviembre de 2026
 
 - **Barba y bigote ya no distorsionan los surcos.** La segmentación los clasificaba como piel del

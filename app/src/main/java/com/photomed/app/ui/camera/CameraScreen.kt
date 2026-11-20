@@ -301,7 +301,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     // Hilo de análisis con motor intercambiable: el analizador usa siempre el LiveMatcher actual;
     // al cambiar de motor el anterior se cierra en el mismo hilo (sin usar uno cerrado).
     val pipeline = remember { AnalysisPipeline<LiveMatcher>(Executors.newSingleThreadExecutor()) }
-    var engine by remember { mutableStateOf(com.photomed.app.align.FaceEngine.get(context)) }
+    val engine = com.photomed.app.align.FaceEngine.MEDIAPIPE
     val matcher = remember(zone, engine) { LiveMatcher(zone, context.applicationContext, engine) }
     SideEffect { pipeline.swap(matcher) }
     matcher.threshold = threshold
@@ -528,7 +528,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     }
 
     fun captureConditions(): Map<String, String> = buildMap {
-        put("Engine", engine.label)
+        // motor que dio los puntos: MediaPipe, o ML Kit si MediaPipe no estuvo disponible
+        put("Engine", if (matcher.detectorUnavailable) "ML Kit (respaldo)" else engine.label)
         if (zone.hasLimbSides) put("Side", limbSide.label)
         put("Zoom", "%.2f".format(java.util.Locale.US, zoomRatio))
         live?.let { f ->
@@ -1116,8 +1117,6 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         MatchSettingsSheet(
             autoCapture = autoCapture,
             threshold = threshold,
-            engine = engine,
-            onEngine = { engine = it; com.photomed.app.align.FaceEngine.set(context, it) },
             zoomAssist = zoomAssist,
             onZoomAssist = {
                 zoomAssist = it; prefs.edit().putBoolean("zoom_assist", it).apply()
@@ -1156,8 +1155,6 @@ fun MatchSettingsSheet(
     threshold: Float,
     zoomAssist: Boolean,
     onZoomAssist: (Boolean) -> Unit,
-    engine: com.photomed.app.align.FaceEngine = com.photomed.app.align.FaceEngine.ML_KIT,
-    onEngine: (com.photomed.app.align.FaceEngine) -> Unit = {},
     onAutoCapture: (Boolean) -> Unit,
     onThreshold: (Float) -> Unit,
     useGaze: Boolean = true,
@@ -1173,7 +1170,7 @@ fun MatchSettingsSheet(
     onDismiss: () -> Unit,
 ) {
     SafeBottomSheet(onDismiss = onDismiss) {
-        MatchSettingsContent(autoCapture, threshold, onAutoCapture, onThreshold, zoomAssist, onZoomAssist, engine, onEngine, useGaze, onUseGaze,
+        MatchSettingsContent(autoCapture, threshold, onAutoCapture, onThreshold, zoomAssist, onZoomAssist, useGaze, onUseGaze,
             feedback, onFeedback, nearCapture, onNearCapture, burst, onBurst, expert, onExpert)
     }
 }
@@ -1182,8 +1179,6 @@ fun MatchSettingsSheet(
 fun MatchSettingsContent(
     autoCapture: Boolean, threshold: Float, onAutoCapture: (Boolean) -> Unit, onThreshold: (Float) -> Unit,
     zoomAssist: Boolean = true, onZoomAssist: (Boolean) -> Unit = {},
-    engine: com.photomed.app.align.FaceEngine = com.photomed.app.align.FaceEngine.ML_KIT,
-    onEngine: (com.photomed.app.align.FaceEngine) -> Unit = {},
     useGaze: Boolean = true,
     onUseGaze: (Boolean) -> Unit = {},
     feedback: Boolean = true,
@@ -1239,19 +1234,6 @@ fun MatchSettingsContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Switch(checked = useGaze, onCheckedChange = null)
-        }
-        Text("Motor de puntos faciales", style = MaterialTheme.typography.bodyLarge)
-        com.photomed.app.align.FaceEngine.entries.forEach { e ->
-            Row(
-                Modifier.fillMaxWidth().selectable(engine == e, role = Role.RadioButton) { onEngine(e) }.padding(vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = engine == e, onClick = null)
-                Column(Modifier.padding(start = 8.dp)) {
-                    Text(e.label, style = MaterialTheme.typography.bodyMedium)
-                    Text(e.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
         }
         Text("Umbral mínimo de puntos coincidentes: ${(threshold * 100).toInt()} %", style = MaterialTheme.typography.bodyLarge)
         Slider(

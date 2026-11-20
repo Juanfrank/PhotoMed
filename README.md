@@ -16,7 +16,8 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · [Licencia comercial de pago](
   (Digital Health Zurich, CC BY 4.0).
 - **Asistencia sin referencia** (primera toma): vista estándar por la pose de la cabeza (0°/45°/perfil),
   plano de Frankfort, iluminación y exposición; condiciones de captura guardadas en el XMP.
-- **Dos motores de puntos faciales** intercambiables en Ajustes: Google ML Kit o MediaPipe Face Landmarker.
+- **Puntos faciales con MediaPipe Face Landmarker** (malla de 478 puntos) y Google ML Kit como respaldo
+  (si MediaPipe falla o no encuentra la cara) y comprobación de la malla en las fotos.
 - **Guía adaptada a la foto de referencia**: el contorno y las líneas (cejas, ojos, nariz, boca,
   mandíbula; hombros, caderas, rodillas…) se desplazan a la anatomía detectada.
 - **Superposición de la foto anterior** con opacidad ajustable, vista en **espejo** (frontal, por defecto), cuadrícula, **nivel** (inclinación y

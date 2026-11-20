@@ -185,15 +185,20 @@ object FaceAnnotations {
             else { q: Pt -> (skinLab?.invoke(q) ?: true) && !hair[q] }
         val sc = scaleOf(mesh, extras)
         val folds = FOLD_CORRIDORS.mapIndexedNotNull { i, (name, idx) ->
-            RidgeTracker.track(lum, idx.map { mesh[it] }, corridorHalf(name) * faceW, skin = skin,
+            val label = "${name.replaceFirstChar { it.uppercase() }} ${if (i % 2 == 0) "derecho" else "izquierdo"}"
+            val full = curve(*idx.map { mesh[it] }.toTypedArray(), perSeg = 6)
+            // con barba o bigote, el pasillo se acorta a su parte visible ANTES de buscar el surco (si no,
+            // el tramo visible no llega al mínimo de longitud del pasillo completo y el surco se descarta
+            // aunque se vea); el nasogeniano, desde el ala hasta donde empieza el vello
+            val axis = if (hair == null || hair.fraction < 0.02f) full else offHair(full, hair, fromStart = name == "nasogeniano")
+            val covered = if (axis === full) 0f else 1f - LineMeasure.length(axis) / LineMeasure.length(full).coerceAtLeast(1e-6f)
+            // tramo visible demasiado corto (menos de ~6 mm o del 20 % del recorrido): no hay surco medible
+            if (axis.size < 4 || LineMeasure.length(axis) < 0.04f * faceW || covered > 0.8f) return@mapIndexedNotNull null
+            RidgeTracker.track(lum, axis, corridorHalf(name) * faceW, stations = if (axis === full) 28 else 20, skin = skin,
                 anchorStart = name == "nasogeniano")?.let { r ->
-                val label = "${name.replaceFirstChar { it.uppercase() }} ${if (i % 2 == 0) "derecho" else "izquierdo"}"
-                // sin colas sobre el vello: tramo más largo fuera de él (el nasogeniano, desde el ala)
+                // sin colas sobre el vello (el trazado se mueve a los lados del eje)
                 val pts = hair?.let { offHair(r.points, it, fromStart = name == "nasogeniano") } ?: r.points
                 if (pts.size < 5) return@mapIndexedNotNull null
-                // parte del recorrido anatómico del surco bajo barba o bigote: se mide solo lo visible
-                val axis = curve(*idx.map { mesh[it] }.toTypedArray(), perSeg = 6)
-                val covered = hair?.cover(axis) ?: 0f
                 val note = if (covered > 0.2f) "Parcialmente cubierto por barba o bigote (${(covered * 100).roundToInt()} % del recorrido): " +
                     "se traza y mide solo la parte visible" else null
                 AnnotLine(AnnotLayer.FOLDS, pts, false,
@@ -646,6 +651,19 @@ class PhotoAnnotator(private val context: Context) {
         return LabImage.fromArgb(IntArray(w * h).also { s.getPixels(it, 0, w, 0, 0, w, h) }, w, h)
     }
 
+    /** Ojos de la malla (centros de iris 468 / 473 o párpados) frente a los de ML Kit. */
+    private fun consistent(mesh: List<Pt>, ml: Map<String, Pt>): Boolean {
+        val l = ml[Landmarks.EYE_L]; val r = ml[Landmarks.EYE_R]
+        if (mesh.size < 468 || l == null || r == null) return true // sin ML Kit no se puede contrastar
+        val mr = if (mesh.size > 473) mesh[468] else Pt((mesh[33].x + mesh[133].x) / 2, (mesh[33].y + mesh[133].y) / 2)
+        val mlft = if (mesh.size > 473) mesh[473] else Pt((mesh[263].x + mesh[362].x) / 2, (mesh[263].y + mesh[362].y) / 2)
+        val ipd = hypot(l.x - r.x, l.y - r.y).coerceAtLeast(1e-4f)
+        // los dos emparejamientos (los nombres izquierda / derecha pueden ir cruzados entre motores)
+        val a = maxOf(hypot(mr.x - r.x, mr.y - r.y), hypot(mlft.x - l.x, mlft.y - l.y))
+        val b = maxOf(hypot(mr.x - l.x, mr.y - l.y), hypot(mlft.x - r.x, mlft.y - r.y))
+        return minOf(a, b) < 0.25f * ipd
+    }
+
     private fun mlkitPoints(bmp: Bitmap): Map<String, Pt> =
         runCatching { LandmarkDetector(stream = false, context, FaceEngine.ML_KIT).use { it.detect(Detector.FACE, bmp) } }.getOrDefault(emptyMap())
 
@@ -662,9 +680,14 @@ class PhotoAnnotator(private val context: Context) {
                 .let { if (it.config == Bitmap.Config.ARGB_8888) it else it.copy(Bitmap.Config.ARGB_8888, false) }
         }
         // 1) foto reducida (mismas unidades: x e y / ancho)
-        MediaPipeFace.withShared(context) { mp -> mp.mesh(scaled(bmp, 1280)) }?.let { return it }
+        val first = MediaPipeFace.withShared(context) { mp -> mp.mesh(scaled(bmp, 1280)) }
+        // ML Kit como complemento de precisión: los centros de los ojos de la malla deben coincidir con
+        // los de ML Kit (± 25 % de la interpupilar); si no, la malla se ha ajustado mal (otra cara,
+        // oclusión, giro) y se rehace sobre la cara que encuentra ML Kit
+        val ml = mlkitPoints(bmp)
+        if (first != null && consistent(first, ml)) return first
         // 2) recorte alrededor de la cara de ML Kit
-        val pts = mlkitPoints(bmp).values
+        val pts = ml.values
         if (pts.size >= 10) {
             val minX = pts.minOf { it.x } * bmp.width; val maxX = pts.maxOf { it.x } * bmp.width
             val minY = pts.minOf { it.y } * bmp.width; val maxY = pts.maxOf { it.y } * bmp.width
@@ -676,10 +699,13 @@ class PhotoAnnotator(private val context: Context) {
                 val crop = scaled(Bitmap.createBitmap(bmp, x0.toInt(), y0.toInt(), w.toInt(), h.toInt()), 720)
                 val k = w.toInt() / crop.width.toFloat()
                 MediaPipeFace.withShared(context) { mp -> mp.mesh(crop) }?.let { m ->
-                    return m.map { Pt((it.x * crop.width * k + x0.toInt()) / bmp.width, (it.y * crop.width * k + y0.toInt()) / bmp.width) }
+                    val mm = m.map { Pt((it.x * crop.width * k + x0.toInt()) / bmp.width, (it.y * crop.width * k + y0.toInt()) / bmp.width) }
+                    if (consistent(mm, ml)) return mm
                 }
             }
         }
+        // la primera malla, aunque ML Kit no la confirme (puede ser ML Kit el que falla)
+        if (first != null) return first
         // 3) marco ampliado
         return MediaPipeFace.withShared(context) { mp -> meshPadded(mp, scaled(bmp, 1024)) }
             .also { if (it == null && MediaPipeFace.lastError == null) MediaPipeFace.lastError = "MediaPipe no encontró la cara" }

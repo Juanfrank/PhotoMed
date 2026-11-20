@@ -35,7 +35,7 @@ data class LiveFrame(
  *   coincidencia de contornos.
  * Se llama desde el hilo de análisis (bloqueante).
  */
-class LiveMatcher(private val zone: Zone, context: android.content.Context? = null, engine: FaceEngine = FaceEngine.ML_KIT) : Closeable {
+class LiveMatcher(private val zone: Zone, context: android.content.Context? = null, engine: FaceEngine = FaceEngine.MEDIAPIPE) : Closeable {
     private val spec = ZoneAlignment.of(zone)
     private val appContext = context?.applicationContext
     /** Segmentación pelo / piel (MediaPipe multiclase); null si no hay contexto o modelo. */
@@ -47,6 +47,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         private set
     private val detector = LandmarkDetector(stream = true, context, engine)
     val engine: FaceEngine = detector.engine
+    /** MediaPipe no disponible (error al iniciar o fallos repetidos): los puntos vienen de ML Kit. */
+    val detectorUnavailable: Boolean get() = detector.mediaPipeUnavailable
     private val edges = EdgeAligner(spec.contours)
     private var ref: Detection = Detection.EMPTY
     private var refGray: GrayImage? = null

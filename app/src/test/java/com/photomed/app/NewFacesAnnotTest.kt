@@ -199,7 +199,7 @@ class NewFacesAnnotTest {
         assumeTrue("sin retratos nuevos", json != null)
         val o = JSONObject(json!!)
         val dir = File("build/reports/beard").apply { mkdirs() }
-        var bearded = 0; var onHairBefore = 0f; var onHairAfter = 0f; var cleanFalse = 0
+        var bearded = 0; var onHairBefore = 0f; var onHairAfter = 0f; var cleanFalse = 0; var nasoBefore = 0; var nasoAfter = 0
         val report = StringBuilder()
         for (k in o.keys().asSequence().sorted()) {
             val arr = o.getJSONArray(k)
@@ -219,7 +219,13 @@ class NewFacesAnnotTest {
             val after = FaceAnnotations.fromMesh(mesh, labels, lum, lab).filter { it.layer == AnnotLayer.FOLDS }
             fun onHair(ls: List<com.photomed.app.align.AnnotLine>) = ls.flatMap { it.points }.let { pts -> if (pts.isEmpty()) 0f else hair.cover(pts) }
             report.append("$k vello ${"%.0f".format(hair.fraction * 100)} %: surcos sobre vello antes ${"%.0f".format(onHair(before) * 100)} %, ahora ${"%.0f".format(onHair(after) * 100)} %\n")
-            if (hair.fraction >= 0.15f) { bearded++; onHairBefore += onHair(before); onHairAfter += onHair(after) }
+            if (hair.fraction >= 0.15f) { bearded++; onHairBefore += onHair(before); onHairAfter += onHair(after)
+                // nasogenianos (desde el ala) cuyo inicio está sobre piel visible: no se pierden con la máscara
+                fun naso(ls: List<com.photomed.app.align.AnnotLine>) = ls.count { f -> listOf(129, 358).any { i ->
+                    kotlin.math.hypot(f.points.first().x - mesh[i].x, f.points.first().y - mesh[i].y) < 0.025f } }
+                nasoBefore += before.count { f -> !hair[f.points.first()] && listOf(129, 358).any { i ->
+                    kotlin.math.hypot(f.points.first().x - mesh[i].x, f.points.first().y - mesh[i].y) < 0.025f } }
+                nasoAfter += naso(after) }
             if (k in setOf("px_1066116", "px_5990259", "px_638196", "px_8727557", "px_8558898", "px_29716433")) if (hair.fraction > 0.03f) cleanFalse++
             // imagen antes | ahora (solo con vello)
             if (hair.fraction >= 0.15f) {
@@ -237,10 +243,12 @@ class NewFacesAnnotTest {
             }
             img.recycle(); small.recycle()
         }
-        println(report); println("BARBA: $bearded rostros con vello; surcos sobre vello antes ${"%.0f".format(onHairBefore / bearded.coerceAtLeast(1) * 100)} %, ahora ${"%.0f".format(onHairAfter / bearded.coerceAtLeast(1) * 100)} %; falsos en rostros sin vello: $cleanFalse")
+        println(report); println("BARBA: $bearded rostros con vello; surcos sobre vello antes ${"%.0f".format(onHairBefore / bearded.coerceAtLeast(1) * 100)} %, ahora ${"%.0f".format(onHairAfter / bearded.coerceAtLeast(1) * 100)} %; falsos en rostros sin vello: $cleanFalse; nasogenianos visibles: sin máscara $nasoBefore, con máscara $nasoAfter")
         org.junit.Assert.assertTrue(bearded >= 3)
         org.junit.Assert.assertTrue("los surcos siguen sobre el vello", onHairAfter / bearded <= 0.02f)
         org.junit.Assert.assertTrue(onHairAfter < onHairBefore)
         org.junit.Assert.assertEquals(0, cleanFalse)
+        // los surcos visibles por encima del bigote se siguen trazando
+        org.junit.Assert.assertTrue("se pierden nasogenianos visibles: $nasoAfter de $nasoBefore", nasoAfter >= nasoBefore)
     }
 }

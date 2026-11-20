@@ -32,7 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
-import com.photomed.app.align.FaceEngine
 import com.photomed.app.align.LiveMatch
 import com.photomed.app.ui.camera.MatchSettingsContent
 import com.photomed.app.ui.components.SectionHeader
@@ -50,7 +49,6 @@ fun SettingsScreen(onBack: () -> Unit) {
     var threshold by remember { mutableFloatStateOf(prefs.getFloat("match_threshold_v2", LiveMatch.DEFAULT_THRESHOLD)) }
     var zoom by remember { mutableStateOf(prefs.getBoolean("zoom_assist", true)) }
     var mirror by remember { mutableStateOf(prefs.getBoolean("mirror_front", true)) }
-    var engine by remember { mutableStateOf(FaceEngine.get(context)) }
     var feedback by remember { mutableStateOf(prefs.getBoolean("guide_feedback", true)) }
     var nearCapture by remember { mutableStateOf(prefs.getBoolean("auto_capture_near", true)) }
     var burst by remember { mutableStateOf(prefs.getBoolean("burst", true)) }
@@ -67,7 +65,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                 onAutoCapture = { auto = it; prefs.edit().putBoolean("auto_capture", it).apply() },
                 onThreshold = { threshold = it; prefs.edit().putFloat("match_threshold_v2", it).apply() },
                 zoomAssist = zoom, onZoomAssist = { zoom = it; prefs.edit().putBoolean("zoom_assist", it).apply() },
-                engine = engine, onEngine = { engine = it; FaceEngine.set(context, it) },
                 useGaze = alignGaze, onUseGaze = { alignGaze = it; prefs.edit().putBoolean(AlignOptions.PREF_GAZE, it).apply() },
                 feedback = feedback, onFeedback = { feedback = it; prefs.edit().putBoolean("guide_feedback", it).apply() },
                 nearCapture = nearCapture, onNearCapture = { nearCapture = it; prefs.edit().putBoolean("auto_capture_near", it).apply() },
