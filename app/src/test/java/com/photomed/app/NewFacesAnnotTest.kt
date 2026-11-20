@@ -160,4 +160,31 @@ class NewFacesAnnotTest {
         org.junit.Assert.assertTrue(newSmall > oldSmall)
         org.junit.Assert.assertEquals(newLines, measured)
     }
+
+    /**
+     * Sin malla de MediaPipe (falla en el teléfono): con los puntos de tipo ML Kit, los surcos
+     * ajustados a la sombra llevan medidas (escala interpupilar) en la mayoría de los rostros.
+     */
+    @Test
+    fun foldsMeasuredWithoutMesh() {
+        val json = javaClass.getResourceAsStream("/stock/new/mesh.json")?.bufferedReader()?.readText()
+        assumeTrue("sin retratos nuevos", json != null)
+        val o = JSONObject(json!!)
+        var faces = 0; var withMeasured = 0; var total = 0
+        for (k in o.keys().asSequence().sorted()) {
+            val arr = o.getJSONArray(k)
+            val mesh = (0 until arr.length()).map { i -> arr.getJSONArray(i).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1).toFloat()) } }
+            val img = javaClass.getResourceAsStream("/stock/new/$k.jpg")?.let { BitmapFactory.decodeStream(it) } ?: continue
+            val sw = 480; val sh = img.height * sw / img.width
+            val sm = Bitmap.createScaledBitmap(img, sw, sh, true); val px = IntArray(sw * sh).also { sm.getPixels(it, 0, sw, 0, 0, sw, sh) }
+            val lum = GrayImage(sw, sh, FloatArray(px.size) { i -> val c = px[i]; (0.299f * Color.red(c) + 0.587f * Color.green(c) + 0.114f * Color.blue(c)) / 255f })
+            val lines = FaceAnnotations.face(FaceAnnotations.keysFromMesh(mesh), null, lum)
+            val m = lines.mapNotNull { it.metrics }
+            faces++; total += m.size; if (m.isNotEmpty()) withMeasured++
+            m.forEach { mm -> org.junit.Assert.assertEquals("interpupilar", mm.scale); org.junit.Assert.assertTrue(mm.lengthMm!! in 3f..80f) }
+            img.recycle(); sm.recycle()
+        }
+        println("SIN MALLA: surcos medidos en $withMeasured de $faces rostros ($total líneas)")
+        org.junit.Assert.assertTrue(withMeasured >= faces * 0.7)
+    }
 }

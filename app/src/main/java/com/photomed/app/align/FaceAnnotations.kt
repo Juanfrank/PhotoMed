@@ -62,7 +62,13 @@ object FaceAnnotations {
         val upTop = g("lip_upper_top_", 11); val lowBot = g("lip_lower_bottom_", 9)
         if (upTop != null && lowBot != null) out += AnnotLine(AnnotLayer.LIPS, upTop + lowBot, true)
         g("lip_upper_bottom_", 9)?.let { inner -> if (upTop != null) out += AnnotLine(AnnotLayer.LIPS, listOf(upTop.first()) + inner + upTop.last(), false) }
-        // surcos (estimados y ajustados al valle de sombra)
+        // surcos (estimados y ajustados al valle de sombra), con medidas si se ajustaron a la sombra
+        // (escala por la distancia interpupilar media; lado según la imagen)
+        val scale = (LineMeasure.IPD_MM / ipd) to "interpupilar"
+        fun measured(l: AnnotLine, name: String, s: Float): AnnotLine =
+            if (l.estimated || lum == null) l
+            else l.copy(metrics = LineMeasure.line("$name (${if (s < 0) "izquierda" else "derecha"} de la imagen)", l.points, lum, scale,
+                halfMm = if (name == "Nasogeniano") 5f else 4f))
         val oval = g("oval_", 36)
         if (alaL != null && alaR != null && upTop != null) {
             val (aL, aR) = if (alaL.x <= alaR.x) alaL to alaR else alaR to alaL
@@ -70,14 +76,14 @@ object FaceAnnotations {
             for ((ala, corner, s) in listOf(Triple(aL, cL, -1f), Triple(aR, cR, 1f))) {
                 // nasogeniano: del ala, por fuera de la comisura
                 val nl = curve(at(ala, s * 0.10f, 0.02f), at(lerp(ala, corner, 0.5f), s * 0.20f, 0f), at(corner, s * 0.13f, -0.10f))
-                out += refine(AnnotLayer.FOLDS, nl, lum, ipd)
+                out += measured(refine(AnnotLayer.FOLDS, nl, lum, ipd), "Nasogeniano", s)
                 // línea de marioneta: de la comisura hacia el borde mandibular
                 if (oval != null) {
                     val target = at(corner, s * 0.05f, -0.75f)
                     val jaw = oval.minBy { dist(it, target) }
                     val e = lerp(corner, jaw, 0.6f)
                     val ml = curve(at(corner, s * 0.03f, -0.04f), at(lerp(corner, e, 0.5f), s * 0.03f, 0f), e)
-                    out += refine(AnnotLayer.FOLDS, ml, lum, ipd)
+                    out += measured(refine(AnnotLayer.FOLDS, ml, lum, ipd), "Marioneta", s)
                 }
             }
         }
@@ -89,7 +95,7 @@ object FaceAnnotations {
                 val inner = if (s < 0) eye.maxBy { it.x } else eye.minBy { it.x }
                 val ctr = Pt(eye.map { it.x }.average().toFloat(), eye.map { it.y }.average().toFloat())
                 val tt = curve(at(inner, 0f, -0.10f), at(ctr, -s * 0.05f, -0.30f), at(ctr, s * 0.22f, -0.36f))
-                out += refine(AnnotLayer.FOLDS, tt, lum, ipd)
+                out += measured(refine(AnnotLayer.FOLDS, tt, lum, ipd), "Valle lagrimal", s)
             }
         }
         return out
@@ -545,10 +551,8 @@ class PhotoAnnotator(private val context: Context) {
     suspend fun analyze(bmp: Bitmap, zone: Zone, extras: MeasureExtras? = null): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val spec = ZoneAlignment.of(zone)
         if (spec.detector == Detector.FACE) {
-            // malla completa de MediaPipe (nariz, labios, ojos y pasillos de los surcos con su topología real);
-            // en primeros planos (frente, ojos) la cara no cabe entera y el detector falla: se reintenta con
-            // la foto dentro de un marco más amplio
-            val mesh = runCatching { MediaPipeFace(context).use { mp -> mp.mesh(bmp) ?: meshPadded(mp, bmp) } }.getOrNull()
+            // malla completa de MediaPipe (nariz, labios, ojos y pasillos de los surcos con su topología real)
+            val mesh = meshRobust(bmp)
             if (mesh != null && mesh.size >= 468) {
                 // análisis en el recorte de la cara a resolución fija (ver FaceCrop)
                 val seg = HairSkinSegmenter.createOrNull(context)
@@ -559,18 +563,59 @@ class PhotoAnnotator(private val context: Context) {
                     "poca resolución de la cara o luz muy plana)." else null
                 return@withContext lines to note
             }
-            val pts = LandmarkDetector(stream = false, context, FaceEngine.get(context)).use { it.detect(Detector.FACE, bmp) }
-            val why = "No se detectó la cara entera, así que no se pueden medir arrugas. En primeros planos " +
-                "(frente, ojos) use la foto frontal u oblicua del mismo día."
+            // sin malla: puntos de ML Kit; surcos estimados y ajustados a la sombra, con medidas (escala
+            // por la distancia interpupilar), sin frente, ceño, patas de gallo ni ojeras
+            val pts = mlkitPoints(bmp)
+            val err = MediaPipeFace.lastError?.let { " (detalle: $it)" } ?: ""
             if (pts.size >= LiveDecision.MIN_POINTS) {
                 val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(bmp) }
-                val lum = lumOf(bmp)
-                return@withContext FaceAnnotations.face(pts, labels, lum) to why
+                val lines = FaceAnnotations.face(pts, labels, lumOf(bmp))
+                return@withContext lines to ("No se pudo obtener la malla facial completa$err: solo se miden los surcos " +
+                    "(nasogeniano, marioneta, valle lagrimal); frente, ceño, patas de gallo y ojeras necesitan la malla.")
             }
-            return@withContext emptyList<AnnotLine>() to why
+            return@withContext emptyList<AnnotLine>() to "No se detectó ninguna cara en la foto$err."
         }
         val mask = BodyRegion.of(zone, bmp) { b -> SubjectSegmenter().use { it.segment(b) } }
         (mask?.let { FaceAnnotations.body(it) } ?: emptyList()) to "Las medidas de arrugas y surcos son solo para zonas del rostro."
+    }
+
+    private fun mlkitPoints(bmp: Bitmap): Map<String, Pt> =
+        runCatching { LandmarkDetector(stream = false, context, FaceEngine.ML_KIT).use { it.detect(Detector.FACE, bmp) } }.getOrDefault(emptyMap())
+
+    /**
+     * Malla de MediaPipe con reintentos: la foto reducida (≤ 1280 px), un recorte alrededor de la
+     * cara que encuentra ML Kit y la foto dentro de un marco más amplio (primeros planos).
+     */
+    private suspend fun meshRobust(bmp: Bitmap): List<Pt>? {
+        MediaPipeFace.lastError = null
+        fun scaled(b: Bitmap, maxSide: Int): Bitmap {
+            val s = maxSide / maxOf(b.width, b.height).toFloat()
+            return if (s >= 1f && b.config == Bitmap.Config.ARGB_8888) b
+            else Bitmap.createScaledBitmap(b, (b.width * minOf(1f, s)).roundToInt(), (b.height * minOf(1f, s)).roundToInt(), true)
+                .let { if (it.config == Bitmap.Config.ARGB_8888) it else it.copy(Bitmap.Config.ARGB_8888, false) }
+        }
+        // 1) foto reducida (mismas unidades: x e y / ancho)
+        MediaPipeFace.withShared(context) { mp -> mp.mesh(scaled(bmp, 1280)) }?.let { return it }
+        // 2) recorte alrededor de la cara de ML Kit
+        val pts = mlkitPoints(bmp).values
+        if (pts.size >= 10) {
+            val minX = pts.minOf { it.x } * bmp.width; val maxX = pts.maxOf { it.x } * bmp.width
+            val minY = pts.minOf { it.y } * bmp.width; val maxY = pts.maxOf { it.y } * bmp.width
+            val side = maxOf(maxX - minX, maxY - minY) * 1.8f
+            val cx = (minX + maxX) / 2; val cy = (minY + maxY) / 2
+            val x0 = (cx - side / 2).coerceIn(0f, bmp.width - 1f); val y0 = (cy - side / 2).coerceIn(0f, bmp.height - 1f)
+            val w = side.coerceAtMost(bmp.width - x0); val h = side.coerceAtMost(bmp.height - y0)
+            if (w > 32 && h > 32) {
+                val crop = scaled(Bitmap.createBitmap(bmp, x0.toInt(), y0.toInt(), w.toInt(), h.toInt()), 720)
+                val k = w.toInt() / crop.width.toFloat()
+                MediaPipeFace.withShared(context) { mp -> mp.mesh(crop) }?.let { m ->
+                    return m.map { Pt((it.x * crop.width * k + x0.toInt()) / bmp.width, (it.y * crop.width * k + y0.toInt()) / bmp.width) }
+                }
+            }
+        }
+        // 3) marco ampliado
+        return MediaPipeFace.withShared(context) { mp -> meshPadded(mp, scaled(bmp, 1024)) }
+            .also { if (it == null && MediaPipeFace.lastError == null) MediaPipeFace.lastError = "MediaPipe no encontró la cara" }
     }
 
     /** Malla con la foto centrada en un lienzo 1,8 veces mayor (la cara cabe entera en el detector). */

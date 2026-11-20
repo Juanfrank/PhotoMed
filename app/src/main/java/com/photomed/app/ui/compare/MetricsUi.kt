@@ -172,6 +172,9 @@ fun MetricsSheet(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
                 } else Text(note ?: "No se encontraron arrugas ni surcos medibles.",
                     style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 16.dp))
             }
+            // medidas parciales (sin malla facial): el motivo, también con medidas
+            if (byName.isNotEmpty() && note != null) Text(note, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
             val hidden = byName.values.map { it.first }.toSet() - layers
             if (hidden.isNotEmpty() && onShowLayers != null) {
                 TextButton(onClick = { onShowLayers(layers + hidden) }) {

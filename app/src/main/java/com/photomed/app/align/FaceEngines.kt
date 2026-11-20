@@ -103,4 +103,26 @@ class MediaPipeFace(context: Context) : Closeable {
     }
 
     override fun close() = lm.close()
+
+    companion object {
+        private var shared: MediaPipeFace? = null
+        private val lock = kotlinx.coroutines.sync.Mutex()
+        /** Motivo del último fallo de la malla (para mostrarlo al usuario y diagnosticar). */
+        @Volatile var lastError: String? = null
+
+        /**
+         * Una sola instancia para el análisis de fotos, usada de una en una (varias a la vez, con
+         * fotos grandes, pueden agotar la memoria). null si no se puede crear.
+         */
+        suspend fun <T> withShared(context: Context, block: (MediaPipeFace) -> T): T? = lock.withLockCompat {
+            val m = shared ?: runCatching { MediaPipeFace(context.applicationContext) }
+                .onFailure { lastError = "no se pudo cargar el modelo: ${it.message ?: it.javaClass.simpleName}" }.getOrNull()?.also { shared = it }
+            m?.let { mp -> runCatching { block(mp) }.onFailure { lastError = it.message ?: it.javaClass.simpleName }.getOrNull() }
+        }
+
+        private suspend fun <T> kotlinx.coroutines.sync.Mutex.withLockCompat(action: suspend () -> T): T {
+            lock()
+            try { return action() } finally { unlock() }
+        }
+    }
 }

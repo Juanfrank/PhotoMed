@@ -2,6 +2,14 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.15.4 — 20 de noviembre de 2026
+
+- **Corrección**: el aviso «no se detectó la cara entera» salía cuando lo que fallaba era la malla
+  facial de MediaPipe en el teléfono, aunque la cara estuviera completa. Ahora la malla se reintenta
+  (foto reducida, recorte alrededor de la cara, marco ampliado) con una sola instancia compartida;
+  si aun así falla, se miden igualmente los surcos (nasogeniano, marioneta, valle lagrimal) con los
+  puntos de ML Kit y el aviso muestra el error real de MediaPipe.
+
 ## 2.15.3 — 20 de noviembre de 2026
 
 - **Corrección: no se mostraban las medidas de las arrugas.** Las capas de arrugas vienen apagadas
