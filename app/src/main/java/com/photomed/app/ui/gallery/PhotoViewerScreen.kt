@@ -151,12 +151,14 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 if (showLayers) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
                     Modifier.fillMaxWidth().padding(vertical = 4.dp))
                 if (editing) {
-                    val e = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
+                    // la edición se lee al pulsar (no la de la última composición) para encadenar giro, espejo…
+                    fun now() = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
+                    val e = remember(current.uri, editVersion) { now() }
                     fun save(n: com.photomed.app.align.ImageEdit) { com.photomed.app.align.PhotoEdits.set(context, current.uri.toString(), n); editVersion++ }
                     androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly) {
-                        EditButton(Icons.Default.RotateRight, "Girar 90°") { save(e.rotated()) }
-                        EditButton(Icons.Default.Flip, "Espejo") { save(e.mirrored()) }
+                        EditButton(Icons.Default.RotateRight, "Girar 90°") { save(now().rotated()) }
+                        EditButton(Icons.Default.Flip, "Espejo") { save(now().mirrored()) }
                         EditButton(Icons.Default.Crop, "Recortar") { cropping = true }
                         EditButton(Icons.Default.Restore, "Original", enabled = !e.isIdentity) { save(com.photomed.app.align.ImageEdit.NONE) }
                     }
