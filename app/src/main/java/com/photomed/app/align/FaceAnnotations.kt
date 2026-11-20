@@ -9,10 +9,13 @@ import kotlin.math.roundToInt
 /** Capas de anotación estética que se pueden mostrar sobre una foto (visor y comparar). */
 enum class AnnotLayer(val label: String) {
     CONTOUR("Contorno"), HAIRLINE("Línea del pelo"), EYES("Ojos y cejas"), NOSE("Nariz"), LIPS("Labios"), FOLDS("Surcos"),
+    FOREHEAD("Frente"), GLABELLA("Ceño"), CROWS_FEET("Patas de gallo"), DARK_CIRCLES("Ojeras"),
 }
 
 /** Una línea de anotación (x del ancho, y en unidades del ancho). [estimated]: posición estimada, no medida. */
-data class AnnotLine(val layer: AnnotLayer, val points: List<Pt>, val closed: Boolean, val estimated: Boolean = false)
+data class AnnotLine(val layer: AnnotLayer, val points: List<Pt>, val closed: Boolean, val estimated: Boolean = false,
+                     /** Zona (relleno translúcido) en lugar de solo trazo, p. ej. ojeras. */
+                     val filled: Boolean = false)
 
 /**
  * Líneas estéticas a partir de los puntos del rostro (iguales con ML Kit y MediaPipe), la
@@ -106,7 +109,8 @@ object FaceAnnotations {
     private val LIPS_INNER = intArrayOf(78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95)
     /** Pasillos de los surcos (eje por puntos de la malla, a cada lado): nasogeniano, marioneta, valle lagrimal. */
     val FOLD_CORRIDORS: List<Pair<String, IntArray>> = listOf(
-        "nasogeniano" to intArrayOf(203, 206, 216, 212), "nasogeniano" to intArrayOf(423, 426, 436, 432),
+        // nasogeniano: nace en el pliegue alar-facial (129 / 358) y baja hasta el lateral de la comisura (57 / 287)
+        "nasogeniano" to intArrayOf(129, 203, 206, 186, 57), "nasogeniano" to intArrayOf(358, 423, 426, 410, 287),
         "marioneta" to intArrayOf(43, 202, 210, 169), "marioneta" to intArrayOf(273, 422, 430, 394),
         "valle lagrimal" to intArrayOf(128, 121, 120, 119), "valle lagrimal" to intArrayOf(357, 350, 349, 348),
     )
@@ -148,9 +152,119 @@ object FaceAnnotations {
     fun folds(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels? = null): List<AnnotLine> {
         val faceW = dist(mesh[234], mesh[454]).coerceAtLeast(1e-3f)
         val skin = labels?.let { l -> { q: Pt -> l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()] == FaceLabels.FACE_SKIN } }
-        return FOLD_CORRIDORS.mapNotNull { (name, idx) ->
-            RidgeTracker.track(lum, idx.map { mesh[it] }, corridorHalf(name) * faceW, skin = skin)?.let { AnnotLine(AnnotLayer.FOLDS, it.points, false) }
+        val folds = FOLD_CORRIDORS.mapNotNull { (name, idx) ->
+            RidgeTracker.track(lum, idx.map { mesh[it] }, corridorHalf(name) * faceW, skin = skin,
+                anchorStart = name == "nasogeniano")?.let { AnnotLine(AnnotLayer.FOLDS, it.points, false) }
         }
+        return folds + wrinkles(mesh, lum, labels, faceW)
+    }
+
+    /**
+     * Arrugas de la frente (horizontales), del ceño (verticales entre las cejas), patas de gallo
+     * (rayos desde el canto externo) y ojeras (zona infraorbitaria más oscura que la mejilla).
+     */
+    fun wrinkles(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels?, faceW: Float): List<AnnotLine> {
+        val out = ArrayList<AnnotLine>()
+        val skin = labels?.let { l -> { q: Pt -> l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()] == FaceLabels.FACE_SKIN } }
+        val eR = mesh[468].takeIf { mesh.size > 473 } ?: mesh[159]; val eL = mesh[473].takeIf { mesh.size > 473 } ?: mesh[386]
+        val ipd = dist(eR, eL).coerceAtLeast(1e-4f)
+        val ex = Pt((eL.x - eR.x) / ipd, (eL.y - eR.y) / ipd)
+        val up = Pt(ex.y, -ex.x).let { if (it.y > 0) Pt(-it.x, -it.y) else it }
+        fun along(p: Pt, a: Float, b: Float) = Pt(p.x + ex.x * a + up.x * b, p.y + ex.y * a + up.y * b)
+        fun proj(p: Pt, o: Pt) = Pair((p.x - o.x) * ex.x + (p.y - o.y) * ex.y, (p.x - o.x) * up.x + (p.y - o.y) * up.y)
+        val mid = Pt((eR.x + eL.x) / 2, (eR.y + eL.y) / 2)
+        // frente: franjas horizontales entre las cejas y la línea del pelo (o el borde superior del óvalo)
+        run {
+            val browTop = intArrayOf(70, 63, 105, 66, 107, 336, 296, 334, 293, 300).maxOf { proj(mesh[it], mid).second }
+            // hasta el borde superior del rostro (la línea del pelo puede caer baja con flequillo o canas)
+            val top = proj(mesh[10], mid).second
+            val lo = browTop + 0.035f * faceW; val hi = top - 0.015f * faceW
+            val xl = proj(mesh[70], mid).first + 0.02f * faceW; val xr = proj(mesh[300], mid).first - 0.02f * faceW
+            val step = 0.03f * faceW
+            if (hi - lo > step && xr - xl > 0.2f * faceW) {
+                val found = ArrayList<Pair<Float, RidgeTracker.Result>>()
+                var y = lo
+                while (y <= hi) {
+                    val axis = listOf(along(mid, xl, y), along(mid, (xl + xr) / 2, y), along(mid, xr, y))
+                    RidgeTracker.track(lum, axis, step * 0.6f, stations = 30, offsets = 8, minStrength = 0.016f, minContrast = 1.8f, skin = skin)
+                        ?.let { found += y to it }
+                    y += step * 0.5f
+                }
+                val kept = ArrayList<Pair<Float, RidgeTracker.Result>>()
+                for (f in found.sortedByDescending { it.second.strength }) {
+                    val fy = f.second.points.map { proj(it, mid).second }.average().toFloat()
+                    if (kept.none { k -> kotlin.math.abs(k.second.points.map { proj(it, mid).second }.average().toFloat() - fy) < step * 0.8f }) kept += f
+                }
+                kept.take(6).forEach { out += AnnotLine(AnnotLayer.FOREHEAD, it.second.points, false) }
+            }
+        }
+        // ceño: líneas verticales junto a la cabeza de cada ceja
+        run {
+            val hR = mesh[107]; val hL = mesh[336]
+            val base = proj(mesh[168], mid).second
+            val topY = maxOf(proj(hR, mid).second, proj(hL, mid).second) + 0.09f * faceW
+            for (t in floatArrayOf(0.28f, 0.72f)) {
+                val x = proj(hR, mid).first + (proj(hL, mid).first - proj(hR, mid).first) * t
+                val axis = listOf(along(mid, x, base), along(mid, x, (base + topY) / 2), along(mid, x, topY))
+                RidgeTracker.track(lum, axis, 0.028f * faceW, stations = 20, offsets = 8, minStrength = 0.025f, minContrast = 2.0f, skin = skin)
+                    ?.let { out += AnnotLine(AnnotLayer.GLABELLA, it.points, false) }
+            }
+        }
+        // patas de gallo: rayos desde el canto externo hacia la sien
+        for ((canthus, center) in listOf(mesh[33] to Pt((mesh[33].x + mesh[133].x) / 2, (mesh[33].y + mesh[133].y) / 2),
+                                         mesh[263] to Pt((mesh[263].x + mesh[362].x) / 2, (mesh[263].y + mesh[362].y) / 2))) {
+            val ox = canthus.x - center.x; val oy = canthus.y - center.y; val on = hypot(ox, oy).coerceAtLeast(1e-5f)
+            val dx = ox / on; val dy = oy / on
+            for (deg in floatArrayOf(-38f, -14f, 10f, 34f)) {
+                val a = Math.toRadians(deg.toDouble()); val s = if (dx > 0) 1f else -1f
+                val rx = (dx * kotlin.math.cos(a) - dy * kotlin.math.sin(a) * s).toFloat(); val ry = (dx * kotlin.math.sin(a) * s + dy * kotlin.math.cos(a)).toFloat()
+                val p0 = Pt(canthus.x + rx * 0.05f * faceW, canthus.y + ry * 0.05f * faceW)
+                val p1 = Pt(canthus.x + rx * 0.17f * faceW, canthus.y + ry * 0.17f * faceW)
+                RidgeTracker.track(lum, listOf(p0, Pt((p0.x + p1.x) / 2, (p0.y + p1.y) / 2), p1), 0.02f * faceW, stations = 16, offsets = 6,
+                    minStrength = 0.022f, minContrast = 2.0f, skin = skin)?.let { out += AnnotLine(AnnotLayer.CROWS_FEET, it.points, false) }
+            }
+        }
+        // ojeras: entre el párpado inferior y el surco palpebromalar, si es más oscura que la mejilla
+        val under = listOf(
+            intArrayOf(33, 7, 163, 144, 145, 153, 154, 155, 133) to intArrayOf(245, 128, 121, 120, 119, 118, 117, 111, 143),
+            intArrayOf(263, 249, 390, 373, 374, 380, 381, 382, 362) to intArrayOf(465, 357, 350, 349, 348, 347, 346, 340, 372),
+        )
+        val cheeks = listOf(50, 280)
+        for ((i, pair) in under.withIndex()) {
+            val poly = pair.first.map { mesh[it] } + pair.second.map { mesh[it] }
+            val region = meanLum(lum, poly) ?: continue
+            val cheek = meanLumDisc(lum, mesh[cheeks[i]], 0.035f * faceW) ?: continue
+            // zona infraorbitaria al menos un 12 % más oscura que la mejilla (sombra o pigmento)
+            if (region < cheek * 0.88f) out += AnnotLine(AnnotLayer.DARK_CIRCLES, poly, true, filled = true)
+        }
+        return out
+    }
+
+    /** Luminancia media dentro de un polígono (píxeles de [lum]). */
+    private fun meanLum(lum: GrayImage, poly: List<Pt>): Float? {
+        val w = lum.width.toFloat()
+        val xs = poly.map { it.x * w }; val ys = poly.map { it.y * w }
+        var s = 0f; var n = 0
+        for (y in ys.min().toInt()..ys.max().toInt()) for (x in xs.min().toInt()..xs.max().toInt()) {
+            if (x !in 0 until lum.width || y !in 0 until lum.height) continue
+            var inside = false; var j = poly.size - 1
+            for (i in poly.indices) {
+                if ((ys[i] > y) != (ys[j] > y) && x < (xs[j] - xs[i]) * (y - ys[i]) / (ys[j] - ys[i]) + xs[i]) inside = !inside
+                j = i
+            }
+            if (inside) { s += lum[x, y]; n++ }
+        }
+        return if (n < 10) null else s / n
+    }
+
+    private fun meanLumDisc(lum: GrayImage, c: Pt, r: Float): Float? {
+        val w = lum.width.toFloat(); val cx = c.x * w; val cy = c.y * w; val rr = r * w
+        var s = 0f; var n = 0
+        for (y in (cy - rr).toInt()..(cy + rr).toInt()) for (x in (cx - rr).toInt()..(cx + rr).toInt()) {
+            if (x !in 0 until lum.width || y !in 0 until lum.height) continue
+            if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= rr * rr) { s += lum[x, y]; n++ }
+        }
+        return if (n < 10) null else s / n
     }
 
     /** Semiancho del pasillo de cada surco, relativo al ancho de la cara. */

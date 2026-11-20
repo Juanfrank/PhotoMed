@@ -62,19 +62,19 @@ data class ZoneAlignment(
                     "oreja, ojo, nariz y perfil",
                 )
                 GuideType.FOREHEAD -> ZoneAlignment(
-                    Detector.FACE, L.group("brow_") + L.group("eye_") + L.ovalRange(0..6) + L.ovalRange(30..35),
+                    Detector.FACE, L.group("brow_") + L.group("eye_") + L.ovalRange(0..6) + L.ovalRange(30..35) + L.mesh(L.MESH_BROWS) + L.mesh(L.MESH_EYES),
                     listOf(r("cejas", 0.5f, 0.9f, 0.4f, 0.08f), r("frente", 0.5f, 0.3f, 0.45f, 0.15f, 0.8f)),
                     listOf("Cabeza de ceja derecha", "Cabeza de ceja izquierda"),
                     "cejas y contorno frontal",
                 )
                 GuideType.PERIOCULAR -> ZoneAlignment(
-                    Detector.FACE, L.group("eye_") + L.group("brow_") + setOf(L.EYE_L, L.EYE_R),
+                    Detector.FACE, L.group("eye_") + L.group("brow_") + setOf(L.EYE_L, L.EYE_R) + L.mesh(L.MESH_EYES) + L.mesh(L.MESH_BROWS),
                     listOf(r("ojos", 0.5f, 0.69f, 0.4f, 0.08f), r("cejas", 0.5f, 0.5f, 0.4f, 0.06f, 0.7f)),
                     listOf("Pupila derecha", "Pupila izquierda"),
                     "contornos palpebrales y cejas",
                 )
                 GuideType.LIPS -> ZoneAlignment(
-                    Detector.FACE, L.group("lip_") + L.group("nose_") + setOf(L.MOUTH_L, L.MOUTH_R),
+                    Detector.FACE, L.group("lip_") + L.group("nose_") + setOf(L.MOUTH_L, L.MOUTH_R) + L.mesh(L.MESH_LIPS) + L.mesh(L.MESH_NOSE),
                     listOf(r("labios", 0.5f, 0.69f, 0.3f, 0.1f), r("base nasal", 0.5f, 0.2f, 0.25f, 0.08f, 0.6f),
                         r("mentón", 0.5f, 1.2f, 0.4f, 0.1f, 0.6f)),
                     listOf("Comisura derecha", "Comisura izquierda"),
@@ -231,13 +231,30 @@ object Landmarks {
 
     fun ovalRange(r: IntRange): Set<String> = r.map { "oval_$it" }.toSet()
 
-    val FACE_ALL: Set<String> = FACE_CONTOURS.flatMap { (g, n) -> (0 until n).map { "$g$it" } }.toSet() +
+    // Rasgos de la malla completa de MediaPipe (claves "m<índice>"): ojos, cejas, nariz y labios con su
+    // topología real. Solo los aporta el motor MediaPipe; con ML Kit no están y no cuentan.
+    val MESH_EYES = intArrayOf(33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7,
+        362, 398, 384, 385, 386, 387, 388, 466, 263, 249, 390, 373, 374, 380, 381, 382)
+    val MESH_BROWS = intArrayOf(70, 63, 105, 66, 107, 55, 65, 52, 53, 46, 300, 293, 334, 296, 336, 285, 295, 282, 283, 276)
+    val MESH_NOSE = intArrayOf(168, 6, 197, 195, 5, 4, 1, 19, 94, 2, 193, 122, 196, 3, 51, 45, 417, 351, 419, 248, 281, 275,
+        115, 48, 64, 98, 97, 344, 278, 294, 327, 326, 129, 358)
+    val MESH_LIPS = intArrayOf(61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146,
+        78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95)
+    fun mesh(idx: IntArray): Set<String> = idx.map { "m$it" }.toSet()
+    val MESH_FEATURES: Set<String> = mesh(MESH_EYES) + mesh(MESH_BROWS) + mesh(MESH_NOSE) + mesh(MESH_LIPS)
+    /** Región de un punto de la malla (para la validación por rasgo). */
+    fun meshRegion(key: String): String? {
+        val i = key.removePrefix("m").toIntOrNull() ?: return null
+        return when (i) { in MESH_EYES -> "ojos"; in MESH_BROWS -> "cejas"; in MESH_NOSE -> "nariz"; in MESH_LIPS -> "labios"; else -> null }
+    }
+
+    val FACE_ALL: Set<String> = MESH_FEATURES + FACE_CONTOURS.flatMap { (g, n) -> (0 until n).map { "$g$it" } }.toSet() +
         setOf(EYE_L, EYE_R, NOSE_BASE, MOUTH_L, MOUTH_R, EAR_L, EAR_R)
 
     val TRUNK = setOf(SHOULDER_L, SHOULDER_R, HIP_L, HIP_R, ELBOW_L, ELBOW_R)
 
     /** Nombre legible de la región de un punto (para informar qué contornos se usaron). */
-    fun regionOf(key: String): String = when {
+    fun regionOf(key: String): String = meshRegion(key) ?: when {
         key.startsWith("oval_") -> key.removePrefix("oval_").toInt().let {
             if (it in 0..6 || it in 30..35) "frente" else if (it in 12..24) "mandíbula" else "mejillas"
         }

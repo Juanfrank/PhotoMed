@@ -76,6 +76,11 @@ object CompareExport {
             val path = android.graphics.Path()
             l.points.forEachIndexed { i, q -> if (i == 0) path.moveTo(q.x * w, q.y * w) else path.lineTo(q.x * w, q.y * w) }
             if (l.closed) path.close()
+            val col = com.photomed.app.ui.camera.annotColor(l.layer).let { android.graphics.Color.argb((it.alpha * 255).toInt(), (it.red * 255).toInt(), (it.green * 255).toInt(), (it.blue * 255).toInt()) }
+            if (l.filled) {
+                c.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = (col and 0x00FFFFFF) or 0x48000000 })
+                continue
+            }
             val dash = if (l.estimated) android.graphics.DashPathEffect(floatArrayOf(7f * k, 5f * k), 0f) else null
             fun paint(color: Int, width: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 style = Paint.Style.STROKE; strokeWidth = width; this.color = color; strokeCap = Paint.Cap.ROUND

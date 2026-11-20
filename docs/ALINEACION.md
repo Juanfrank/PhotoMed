@@ -423,3 +423,15 @@ mantienen la guía estándar.
   programación dinámica; aceptado si la respuesta media ≥ 0,03, ≥ 2,2 × la media del pasillo, y
   ≥ 75 % del trazado sobre piel del rostro (sin barba, manos ni gafas). `NewFacesAnnotTest`
   (18 retratos de Pexels, `tools/eval/new_faces.py`): nasogeniano en 17; rostro joven liso: 1 trazo.
+
+### Validación por rasgo y nuevas arrugas
+
+- **Rasgos de la malla en la alineación**: claves `m<i>` de MediaPipe (ojos 32, cejas 20, nariz 34,
+  labios 40) en las zonas faciales; Comparar alinea con MediaPipe y `FeatureMatch` da, tras alinear,
+  la coincidencia por rasgo = 1 − RMS/(0,10 × interpupilar), con aviso por debajo del 60 %.
+- **Nasogeniano**: pasillo 129-203-206-186-57 (y 358-423-426-410-287), anclado en el pliegue
+  alar-facial (definición anatómica: del ala nasal a un punto lateral a la comisura oral).
+- **Frente**: franjas horizontales entre las cejas y el borde superior del rostro, supresión de
+  duplicados, hasta 6 líneas. **Ceño**: dos pasillos verticales junto a la cabeza de las cejas.
+  **Patas de gallo**: 4 rayos desde el canto externo (−38° a +34°). **Ojeras**: zona entre el
+  párpado inferior y el surco palpebromalar, si es ≥ 12 % más oscura que la mejilla.

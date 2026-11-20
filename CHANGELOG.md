@@ -4,6 +4,14 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.12 — 20 de noviembre de 2026
 
+- **Alineación y validación con ojos, cejas, nariz y labios** (malla completa de MediaPipe): más
+  puntos para alinear y para la coincidencia en vivo, y en Comparar la coincidencia por rasgo
+  (ojos, cejas, nariz, labios, contorno) con aviso del rasgo que no coincide.
+- **Surco nasogeniano anatómico**: nace en el pliegue alar-facial y baja hasta el lateral de la
+  comisura.
+- **Nuevas capas**: arrugas de la frente, ceño, patas de gallo y ojeras (zona más oscura que la
+  mejilla).
+
 - **Rasgos con la malla completa de MediaPipe (478 puntos)**: ojos, cejas, labios (contornos externo
   e interno) y nariz con trazado estético (líneas estéticas del dorso, bordes de las alas y punta).
 - **Surcos detectados en la imagen**: detector de crestas Hessiano multiescala dentro de pasillos

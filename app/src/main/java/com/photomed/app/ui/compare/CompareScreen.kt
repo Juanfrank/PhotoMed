@@ -894,6 +894,15 @@ private fun AlignmentDetails(res: AlignmentResult, prefix: String) {
         ), style = style, color = color,
     )
     if (res.keystoneDeg != 0f) Text("Perspectiva vertical %+.1f° (%s)".format(res.keystoneDeg, res.keystoneSource), style = style, color = color)
+    // validación por rasgo: ojos, cejas, nariz, labios y contorno tras alinear
+    if (res.featureScores.isNotEmpty()) {
+        Text("Coincidencia por rasgo: " + res.featureScores.joinToString(" · ") { (n, v) -> "$n ${(v * 100).roundToInt()} %" },
+            style = style, color = color, modifier = Modifier.semantics { contentDescription = "Coincidencia por rasgo" })
+        val low = res.featureScores.filter { it.second < com.photomed.app.align.FeatureMatch.WARN }.map { it.first }
+        if (low.isNotEmpty() && low.size < res.featureScores.size)
+            Text("No coinciden: ${low.joinToString(", ")} (expresión, pose o cambio local distinto del resto)",
+                style = style, color = MaterialTheme.colorScheme.error)
+    }
     if (res.regionScores.isNotEmpty() && res.method.contains("ontorno")) {
         Text("Contornos: " + res.regionScores.sortedByDescending { it.second }.take(4)
             .joinToString(" · ") { (nm, v) -> "$nm ${(v.coerceIn(0f, 1f) * 100).roundToInt()}%" }, style = style, color = color)

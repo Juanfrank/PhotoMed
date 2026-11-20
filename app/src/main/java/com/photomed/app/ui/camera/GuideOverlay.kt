@@ -669,6 +669,10 @@ fun annotColor(layer: com.photomed.app.align.AnnotLayer): Color = when (layer) {
     com.photomed.app.align.AnnotLayer.NOSE -> Color(0xFFB39DDB)
     com.photomed.app.align.AnnotLayer.LIPS -> Color(0xFFF48FB1)
     com.photomed.app.align.AnnotLayer.FOLDS -> Color(0xFFFFAB91)
+    com.photomed.app.align.AnnotLayer.FOREHEAD -> Color(0xFFFFE082)
+    com.photomed.app.align.AnnotLayer.GLABELLA -> Color(0xFFFF8A65)
+    com.photomed.app.align.AnnotLayer.CROWS_FEET -> Color(0xFFA5D6A7)
+    com.photomed.app.align.AnnotLayer.DARK_CIRCLES -> Color(0xFFCE93D8)
 }
 
 /**
@@ -683,6 +687,7 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAnnotations(
     for (l in lines) {
         if (l.layer !in layers || l.points.size < 2) continue
         val path = smoothPath(l.points.map(map), l.closed)
+        if (l.filled) { drawPath(path, annotColor(l.layer).copy(alpha = 0.28f)); drawPath(path, annotColor(l.layer).copy(alpha = 0.7f), style = Stroke(1.dp.toPx() * k)); continue }
         val dash = if (l.estimated) PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx() * k, 5.dp.toPx() * k)) else null
         drawPath(path, Shadow, style = Stroke(3.6.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
         drawPath(path, annotColor(l.layer), style = Stroke(1.5.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))

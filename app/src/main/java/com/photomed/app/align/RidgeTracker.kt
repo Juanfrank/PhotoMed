@@ -39,7 +39,12 @@ object RidgeTracker {
     fun track(lum: GrayImage, center: List<Pt>, halfWidth: Float, stations: Int = 28, offsets: Int = 14,
               minStrength: Float = MIN_STRENGTH, minContrast: Float = MIN_CONTRAST,
               /** Piel del rostro (opcional): solo cuenta la respuesta sobre piel; el trazado debe ir por piel. */
-              skin: ((Pt) -> Boolean)? = null): Result? {
+              skin: ((Pt) -> Boolean)? = null,
+              /**
+               * El surco nace en el primer punto del eje (p. ej. el nasogeniano en el ala de la nariz): el
+               * trazado empieza ahí y solo se recorta por el final.
+               */
+              anchorStart: Boolean = false): Result? {
         if (center.size < 2) return null
         val w = lum.width.toFloat()
         val scale = lum.width / 720f
@@ -107,7 +112,7 @@ object RidgeTracker {
         // programación dinámica: máxima respuesta con penalización de cambios bruscos de desplazamiento
         val lam = 0.06f * norm
         val acc = Array(nS) { FloatArray(2 * K + 1) }; val from = Array(nS) { IntArray(2 * K + 1) }
-        for (k in 0..2 * K) acc[0][k] = R[0][k]
+        for (k in 0..2 * K) acc[0][k] = if (anchorStart && kotlin.math.abs(k - K) > 2) -1e9f else R[0][k]
         for (s in 1 until nS) for (k in 0..2 * K) {
             var best = -Float.MAX_VALUE; var bi = k
             for (j in max(0, k - 3)..min(2 * K, k + 3)) {
@@ -124,7 +129,11 @@ object RidgeTracker {
         val mean = vals.average().toFloat()
         val on = BooleanArray(nS) { vals[it] >= 0.45f * mean && vals[it] >= 1.2f * bg }
         var bestA = 0; var bestB = -1; var a = -1
-        for (s in 0..nS) {
+        if (anchorStart) {
+            // desde el origen hasta la última estación con surco, si la mayor parte del tramo lo tiene
+            val last = (nS - 1 downTo 0).firstOrNull { on[it] } ?: -1
+            if (last >= 0 && (0..last).count { on[it] } >= (last + 1) * 0.6f) bestB = last
+        } else for (s in 0..nS) {
             if (s < nS && on[s]) { if (a < 0) a = s } else if (a >= 0) { if (s - 1 - a > bestB - bestA) { bestA = a; bestB = s - 1 }; a = -1 }
         }
         if (bestB - bestA + 1 < nS * 0.4f) return null

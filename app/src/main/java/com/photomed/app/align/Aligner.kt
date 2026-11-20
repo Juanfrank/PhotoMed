@@ -23,6 +23,11 @@ data class AlignmentResult(
     val keystoneDeg: Float = 0f,
     /** Origen de la estimación de perspectiva. */
     val keystoneSource: String = "",
+    /**
+     * Validación por rasgo tras alinear: coincidencia (0..1) de ojos, cejas, nariz, labios y contorno
+     * (ver [FeatureMatch]); vacía si no hay puntos del rostro en ambas fotos.
+     */
+    val featureScores: List<Pair<String, Float>> = emptyList(),
     /** Mirada de cada foto (ver [Gaze]) si se evaluó; null si no hay ojos o está desactivada. */
     val gazeBefore: Pt? = null,
     val gazeAfter: Pt? = null,
@@ -73,7 +78,9 @@ class Aligner(private val context: Context) {
             val b = ImageOps.load34(context, before, DETECT_W)
             val a0 = ImageOps.load34(context, after, DETECT_W)
             val needDetect = options.points || (options.gaze && spec.detector == Detector.FACE)
-            val (bDet, aDet0) = if (needDetect) LandmarkDetector(stream = false, context, FaceEngine.get(context)).use {
+            // rostro: MediaPipe (malla completa: ojos, cejas, nariz y labios finos); ML Kit si no está disponible
+            val engine = if (spec.detector == Detector.FACE) FaceEngine.MEDIAPIPE else FaceEngine.get(context)
+            val (bDet, aDet0) = if (needDetect) LandmarkDetector(stream = false, context, engine).use {
                 it.detectFull(spec.detector, b) to it.detectFull(spec.detector, a0)
             } else Detection.EMPTY to Detection.EMPTY
             ensureActive()
@@ -196,7 +203,9 @@ class Aligner(private val context: Context) {
                 m = "Puntos anatómicos"
             }
         }
-        return AlignmentResult(r.transform, m, lm?.second.orEmpty(), r.score, r.regionScores, phi, src, gb, ga)
+        // validación por rasgo con la transformación final (después → antes)
+        val features = if (spec.detector == Detector.FACE && options.points) FeatureMatch.scores(bPts, aPts, r.transform) else emptyList()
+        return AlignmentResult(r.transform, m, lm?.second.orEmpty(), r.score, r.regionScores, phi, src, featureScores = features, gazeBefore = gb, gazeAfter = ga)
     }
 
     private fun estimateKeystone(spec: ZoneAlignment, b: Bitmap, a: Bitmap, bPts: Map<String, Pt>, aPts: Map<String, Pt>,

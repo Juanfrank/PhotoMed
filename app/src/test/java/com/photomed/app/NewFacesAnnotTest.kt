@@ -36,7 +36,10 @@ class NewFacesAnnotTest {
         val dir = File("build/reports/new_faces").apply { mkdirs() }
         val colors = mapOf(AnnotLayer.CONTOUR to Color.rgb(124, 245, 228), AnnotLayer.HAIRLINE to Color.rgb(255, 213, 79),
             AnnotLayer.EYES to Color.rgb(128, 222, 234), AnnotLayer.NOSE to Color.rgb(179, 157, 219),
-            AnnotLayer.LIPS to Color.rgb(244, 143, 177), AnnotLayer.FOLDS to Color.rgb(255, 171, 145))
+            AnnotLayer.LIPS to Color.rgb(244, 143, 177), AnnotLayer.FOLDS to Color.rgb(255, 171, 145),
+            AnnotLayer.FOREHEAD to Color.rgb(255, 224, 130), AnnotLayer.GLABELLA to Color.rgb(255, 138, 101),
+            AnnotLayer.CROWS_FEET to Color.rgb(165, 214, 167), AnnotLayer.DARK_CIRCLES to Color.rgb(206, 147, 216))
+        val counts = HashMap<AnnotLayer, Int>()
         val report = StringBuilder()
         var withNaso = 0; var faces = 0; var youngFolds = -1
         for (k in o.keys().asSequence().sorted()) {
@@ -55,9 +58,11 @@ class NewFacesAnnotTest {
             faces++
             val folds = lines.filter { it.layer == AnnotLayer.FOLDS }
             // nasogenianos: surcos cuyo inicio está junto al ala de la nariz
-            if (folds.any { f -> kotlin.math.hypot(f.points.first().x - mesh[206].x, f.points.first().y - mesh[206].y) < 0.08f ||
-                    kotlin.math.hypot(f.points.first().x - mesh[426].x, f.points.first().y - mesh[426].y) < 0.08f }) withNaso++
-            if (k == "px_1066116") youngFolds = folds.size
+            // nasogeniano: nace en el pliegue alar-facial (129 / 358)
+            val naso = folds.filter { f -> listOf(129, 358).any { i -> kotlin.math.hypot(f.points.first().x - mesh[i].x, f.points.first().y - mesh[i].y) < 0.025f } }
+            if (naso.isNotEmpty()) withNaso++
+            lines.groupBy { it.layer }.forEach { (l, v) -> counts[l] = (counts[l] ?: 0) + v.size }
+            if (k == "px_1066116") youngFolds = lines.count { it.layer in setOf(AnnotLayer.FOLDS, AnnotLayer.FOREHEAD, AnnotLayer.GLABELLA, AnnotLayer.CROWS_FEET) }
             // diagnóstico de cada pasillo (sin umbrales)
             val faceW = kotlin.math.hypot(mesh[234].x - mesh[454].x, mesh[234].y - mesh[454].y)
             val diag = FaceAnnotations.FOLD_CORRIDORS.joinToString(" ") { (n, idx) ->
@@ -71,6 +76,7 @@ class NewFacesAnnotTest {
                 val path = android.graphics.Path()
                 l.points.forEachIndexed { i, q -> if (i == 0) path.moveTo(q.x * w, q.y * w) else path.lineTo(q.x * w, q.y * w) }
                 if (l.closed) path.close()
+                if (l.filled) { c.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = (colors.getValue(l.layer) and 0x00FFFFFF) or 0x48000000 }); continue }
                 c.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5f; color = 0x66000000; strokeJoin = Paint.Join.ROUND })
                 c.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2.2f; color = colors.getValue(l.layer); strokeJoin = Paint.Join.ROUND })
             }
@@ -78,9 +84,10 @@ class NewFacesAnnotTest {
         }
         File(dir, "report.txt").writeText(report.toString())
         println(report)
-        println("SURCOS: nasogeniano en $withNaso de $faces rostros; rostro joven y liso: $youngFolds surcos")
+        println("SURCOS: nasogeniano (desde el ala) en $withNaso de $faces rostros; rostro joven y liso: $youngFolds surcos")
+        println("CAPAS: " + counts.entries.sortedBy { it.key.ordinal }.joinToString { "${it.key.label}=${it.value}" })
         // la mayoría de los rostros (casi todos adultos mayores) muestran el surco nasogeniano; la piel joven y lisa, casi nada
         org.junit.Assert.assertTrue(withNaso >= faces * 0.6)
-        org.junit.Assert.assertTrue(youngFolds in 0..1)
+        org.junit.Assert.assertTrue(youngFolds in 0..2)
     }
 }

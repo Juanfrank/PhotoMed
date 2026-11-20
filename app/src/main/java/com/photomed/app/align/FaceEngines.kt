@@ -55,6 +55,8 @@ object FaceMeshMap {
         fun p(i: Int): Pt? = if (i < count) xy(i).let { (x, y) -> Pt(x, y * h / w) } else null
         for ((g, idx) in GROUPS) idx.forEachIndexed { k, i -> p(i)?.let { out["$g$k"] = it } }
         for ((k, i) in SINGLE) p(i)?.let { out[k] = it }
+        // rasgos de la malla completa (ojos, cejas, nariz, labios) para alinear y validar con más precisión
+        for (k in Landmarks.MESH_FEATURES) p(k.removePrefix("m").toInt())?.let { out[k] = it }
         return out
     }
 
