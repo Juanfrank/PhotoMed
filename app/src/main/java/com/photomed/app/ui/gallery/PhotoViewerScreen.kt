@@ -63,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.photomed.app.data.Photo
+import com.photomed.app.data.expression
 import com.photomed.app.data.PhotoInfo
 import com.photomed.app.data.Zone
 import com.photomed.app.ui.LocalRepository
@@ -121,7 +122,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black.copy(alpha = 0.6f)),
                 title = {
                     Column {
-                        Text(zone.label)
+                        Text(zone.label + current.expression.takeIf { it != com.photomed.app.data.FacialExpression.NEUTRAL }?.let { " · ${it.label}" }.orEmpty())
                         Text("${formatDateTime(current.takenAt)} · ${pager.currentPage + 1}/${list.size}",
                             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -179,7 +180,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 PhotoPage(ph, zone, if (showLayers) layersState.value else emptySet(), editVersion, Modifier.fillMaxSize(),
                     selected = selected, analyze = showLayers, alpha = annotAlpha.value,
                     // referencia: fotos anteriores de la misma zona (la más reciente primero)
-                    previous = list.filter { it.takenAt < ph.takenAt }.sortedByDescending { it.takenAt }.map { it.uri.toString() },
+                    // (solo con la misma expresión: las arrugas dinámicas aparecen con el gesto)
+                    previous = list.filter { it.takenAt < ph.takenAt && it.expression == ph.expression }.sortedByDescending { it.takenAt }.map { it.uri.toString() },
                     userVersion = userVersion, tracing = tracing && page == pager.currentPage,
                     onTraceRect = { rect, aspect ->
                         tracing = false

@@ -95,6 +95,7 @@ import com.photomed.app.align.Pt
 import com.photomed.app.align.ZoneAlignment
 import com.photomed.app.data.Expediente
 import com.photomed.app.data.Photo
+import com.photomed.app.data.expression
 import com.photomed.app.data.Zone
 import com.photomed.app.ui.LocalRepository
 import com.photomed.app.ui.components.EmptyState
@@ -146,6 +147,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     var exp by remember { mutableStateOf<Expediente?>(null) }
     var all by remember { mutableStateOf<List<Photo>?>(null) }
     var zoneFilter by remember { mutableStateOf(initialZone) }
+    /** Filtro por expresión facial (arrugas dinámicas); null = todas. */
+    var expFilter by remember { mutableStateOf<com.photomed.app.data.FacialExpression?>(null) }
     var selected by remember { mutableStateOf<List<String>>(emptyList()) }
     var reversed by remember { mutableStateOf(false) }
     var mode by remember { mutableStateOf(Mode.SLIDER) }
@@ -207,7 +210,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         val pre = initialSelection.mapNotNull { n -> photos.firstOrNull { it.displayName == n }?.key }.take(Timeline.MAX_PHOTOS)
         if (pre.size >= 2) { selected = pre; return@LaunchedEffect }
         val z = zoneFilter ?: photos.lastOrNull()?.zone
-        val inZone = photos.filter { it.zone == z }
+        val zonePhotos = photos.filter { it.zone == z }
+        // misma expresión: en reposo si hay dos o más; si no, la de la última foto
+        val ex = if (zonePhotos.count { it.expression == com.photomed.app.data.FacialExpression.NEUTRAL } >= 2) com.photomed.app.data.FacialExpression.NEUTRAL
+            else zonePhotos.lastOrNull()?.expression
+        val inZone = zonePhotos.filter { it.expression == ex }
+        if (zonePhotos.map { it.expression }.distinct().size > 1) expFilter = ex
         if (inZone.size >= 2) selected = listOf(inZone.first().key, inZone.last().key)
     }
 
@@ -226,7 +234,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         return CompareDerived(
             photos = photos,
             zonesWithPhotos = Zone.entries.filter { z -> photos.any { it.zone == z } },
-            visible = photos.filter { zoneFilter == null || it.zone == zoneFilter }.reversed(),
+            visible = photos.filter { (zoneFilter == null || it.zone == zoneFilter) && (expFilter == null || it.expression == expFilter) }.reversed(),
             seq = seq, seqKeys = seqKeys, n = n, timeline = timeline, reference = reference, target = target,
             validAlign = alignedFor == seqKeys,
         )
@@ -385,7 +393,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     ) { padding ->
         val (photos, zonesWithPhotos, visible, seq, seqKeys, n, timeline, reference, target, validAlign) = derive()
         // referencia de arrugas: fotos anteriores del paciente en la misma zona (la más reciente primero)
-        fun previousOf(p: com.photomed.app.data.Photo) = photos.filter { it.zone == p.zone && it.takenAt < p.takenAt }
+        fun previousOf(p: com.photomed.app.data.Photo) = photos.filter { it.zone == p.zone && it.expression == p.expression && it.takenAt < p.takenAt }
             .sortedByDescending { it.takenAt }.map { it.uri.toString() }
         val aligning = alignJob?.isActive == true
         // Modelos (con perspectiva y color corregidos) de cada foto de la secuencia.
@@ -425,6 +433,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             if (showLayers) LayerChips(layersState.value, { layersState.value = it }, Modifier.fillMaxWidth().padding(top = 4.dp),
                 onMetrics = { metricsSheet = !metricsSheet })
             if (showLayers) OpacitySlider(annotAlpha.value, { annotAlpha.value = it }, Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact))
+            // expresiones distintas en la comparación: las arrugas dinámicas no son comparables
+            seq?.map { it.expression }?.distinct()?.takeIf { it.size > 1 }?.let { ex ->
+                Text("Atención: compara expresiones distintas (${ex.joinToString(" / ") { it.label }}); las arrugas dinámicas solo se comparan con la misma expresión.",
+                    color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = Md3Spacing.marginCompact, vertical = 2.dp))
+            }
             // análisis de arrugas y rasgos en curso: barra de proceso visible
             if (showLayers && seq != null && seq.any { annots[it.key] == null }) Row(
                 Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -646,6 +660,19 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 }
             }
 
+            // Filtro por expresión (arrugas dinámicas): solo si hay fotos con distintas expresiones
+            val exps = photos.filter { zoneFilter == null || it.zone == zoneFilter }.map { it.expression }.distinct()
+            if (exps.size > 1) Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Md3Spacing.marginCompact),
+                horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2),
+            ) {
+                FilterChip(selected = expFilter == null, onClick = { expFilter = null }, label = { Text("Todas las expresiones") })
+                exps.sortedBy { it.ordinal }.forEach { e ->
+                    FilterChip(selected = expFilter == e, onClick = { expFilter = e }, label = { Text(e.label) },
+                        leadingIcon = if (expFilter == e) { { Icon(Icons.Default.Check, null, Modifier.size(FilterChipDefaults.IconSize)) } } else null)
+                }
+            }
+
             // Selección múltiple (toggle) de imágenes; el número indica el orden en la comparación.
             LazyRow(
                 Modifier.fillMaxWidth().height(136.dp),
@@ -685,7 +712,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                                 )
                             }
                         }
-                        Text((stripStamps[p.key] ?: formatDate(p.takenAt)).replace(", ", "\n"), style = MaterialTheme.typography.labelSmall,
+                        Text((stripStamps[p.key] ?: formatDate(p.takenAt)).replace(", ", "\n") +
+                            p.expression.takeIf { it != com.photomed.app.data.FacialExpression.NEUTRAL }?.let { "\n" + it.label.substringBefore(" (") }.orEmpty(),
+                            style = MaterialTheme.typography.labelSmall,
                             maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
                 }

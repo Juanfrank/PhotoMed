@@ -370,6 +370,28 @@ class UsageFlowsTest {
         assertTrue(ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!.contains("FOLDS"))
     }
 
+    /**
+     * Expresiones (arrugas dinámicas): Comparar empieza con las fotos en reposo, ofrece filtrar por
+     * expresión y avisa si se comparan expresiones distintas.
+     */
+    @Test
+    fun compareFiltersByExpressionAndWarnsWhenMixed() {
+        val jpeg = File(tmp.root, "e.jpg").apply { writeBytes(this@UsageFlowsTest.javaClass.getResourceAsStream("/blank.jpg")!!.readBytes()) }
+        repo.savePhoto(exp, Zone.LIPS, jpeg, takenAt = 1_763_400_000_000L + 200 * day,
+            variant = com.photomed.app.data.FacialExpression.variantTag(com.photomed.app.data.FacialExpression.SMILE))
+        setContent { CompareScreen(exp.id, Zone.LIPS, onBack = {}) }
+        waitText("Todas las expresiones")
+        compose.onNodeWithText("Sonrisa máxima").assertExists()
+        // selección inicial en reposo: sin aviso
+        assertTrue(compose.onAllNodesWithText("compara expresiones distintas", substring = true).fetchSemanticsNodes().isEmpty())
+        // con todas las expresiones, añadir la de la sonrisa → aviso
+        compose.onNodeWithText("Todas las expresiones").performClick()
+        compose.waitForIdle()
+        compose.onAllNodes(hasContentDescription("Labios", substring = true) and hasClickLabel())[0].performClick()
+        compose.waitForIdle()
+        waitText("compara expresiones distintas", substring = true)
+    }
+
     @Test
     fun compareNPhotosModesAndSelectionStress() {
         setContent { CompareScreen(exp.id, Zone.LIPS, onBack = {}, initialSelection = photos.map { it.displayName }) }

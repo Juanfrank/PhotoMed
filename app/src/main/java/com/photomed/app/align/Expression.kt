@@ -87,6 +87,25 @@ data class Expression(val eyes: Float, val mouthOpen: Float, val mouthWidth: Flo
             if (cur.brows > BROWS_MAX) add("Expresión: relajar las cejas")
         }
 
+        /**
+         * Con una expresión pedida (arrugas dinámicas): si los puntos permiten medirla, si se alcanza
+         * (cejas arriba, sonrisa máxima, ojos apretados, labios fruncidos); el resto de gestos (ceño,
+         * nariz, mentón, cuello) no se miden con fiabilidad con los puntos y no se pide nada.
+         */
+        fun target(e: com.photomed.app.data.FacialExpression, cur: Expression): List<String> = buildList {
+            when (e) {
+                com.photomed.app.data.FacialExpression.SURPRISE -> if (cur.brows < BROWS_MAX) add("Expresión: subir más las cejas")
+                com.photomed.app.data.FacialExpression.SMILE -> if (cur.mouthWidth < WIDTH_MAX && cur.smileLift < LIFT_MAX) add("Expresión: sonreír al máximo")
+                com.photomed.app.data.FacialExpression.SQUINT -> if (cur.eyes > EYES_MIN) add("Expresión: apretar los ojos")
+                com.photomed.app.data.FacialExpression.PUCKER -> if (cur.mouthWidth > PUCKER_MAX) add("Expresión: fruncir más los labios")
+                else -> {}
+            }
+            // salvo con los ojos apretados, los ojos abiertos
+            if (e != com.photomed.app.data.FacialExpression.SQUINT && cur.eyes < EYES_MIN * 0.6f) add("Expresión: abrir los ojos")
+        }
+        /** Labios fruncidos: la boca se estrecha claramente (ancho / interpupilar). */
+        const val PUCKER_MAX = 0.62f
+
         /** Solo se evalúa casi de frente (en perfil los rasgos del lado lejano no son fiables). */
         fun usable(yaw: Float?) = yaw == null || abs(yaw) < 30f
     }

@@ -211,7 +211,9 @@ fun ZoneGalleryScreen(
                 }
                 items(dayPhotos, key = { it.key }) { photo ->
                     val isSel = photo.key in selection
-                    val desc = "Fotografía del ${formatDateTime(photo.takenAt)}"
+                    val ex = com.photomed.app.data.FacialExpression.ofFileName(photo.displayName)
+                    val desc = "Fotografía del ${formatDateTime(photo.takenAt)}" +
+                        (if (ex != com.photomed.app.data.FacialExpression.NEUTRAL) ", ${ex.label}" else "")
                     Box(
                         Modifier.fillMaxWidth().aspectRatio(3f / 4f).clip(MaterialTheme.shapes.small)
                             .combinedClickable(
@@ -227,6 +229,11 @@ fun ZoneGalleryScreen(
                     ) {
                         AsyncImage(com.photomed.app.ui.photoModel(LocalContext.current, photo.uri), desc, contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize().then(if (isSel) Modifier.padding(10.dp).clip(MaterialTheme.shapes.small) else Modifier))
+                        // expresión de la foto (arrugas dinámicas)
+                        if (ex != com.photomed.app.data.FacialExpression.NEUTRAL) Text(ex.label.substringBefore(" ("),
+                            color = Color.White, style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
+                                .background(Color(0xAA000000), MaterialTheme.shapes.extraSmall).padding(horizontal = 4.dp, vertical = 1.dp))
                         if (selecting) {
                             Icon(
                                 if (isSel) Icons.Filled.CheckCircle else Icons.Outlined.Circle, null,

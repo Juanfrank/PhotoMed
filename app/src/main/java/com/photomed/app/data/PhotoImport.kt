@@ -17,7 +17,9 @@ import java.util.Locale
 import kotlin.math.abs
 
 /** Foto elegida para importar: fecha (EXIF o la de importación) y ángulo (zona) asignado. */
-data class ImportItem(val uri: Uri, val takenAt: Long, val dateFromPhoto: Boolean, val zone: Zone?, val suggested: Boolean = false)
+data class ImportItem(val uri: Uri, val takenAt: Long, val dateFromPhoto: Boolean, val zone: Zone?, val suggested: Boolean = false,
+                      /** Expresión facial (arrugas dinámicas); reposo por defecto. */
+                      val expression: FacialExpression = FacialExpression.NEUTRAL)
 
 /**
  * Importación de fotos (de la galería, de otra cámara, de otro programa) a un expediente: cada foto
@@ -121,7 +123,9 @@ object PhotoImport {
                 withContext(Dispatchers.IO) {
                     f.outputStream().use { o -> bmp.compress(Bitmap.CompressFormat.JPEG, 95, o) }
                     out += repo.savePhoto(exp, zone, f, takenAt = t,
-                        conditions = mapOf("Source" to "importada", "DateSource" to if (it.dateFromPhoto) "EXIF" else "importación") +
+                        variant = FacialExpression.variantTag(it.expression.takeIf { e -> zone.guide in e.guides } ?: FacialExpression.NEUTRAL),
+                        conditions = mapOf("Source" to "importada", "DateSource" to if (it.dateFromPhoto) "EXIF" else "importación",
+                            "Expression" to it.expression.label) +
                             (hashes[it.uri]?.let { h -> mapOf("SourceHash" to h) } ?: emptyMap()))
                 }
             } finally { f.delete() }

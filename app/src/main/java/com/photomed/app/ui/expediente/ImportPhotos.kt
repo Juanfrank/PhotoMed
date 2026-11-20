@@ -116,10 +116,32 @@ fun ImportPhotosDialog(initial: List<ImportItem>, onDismiss: () -> Unit, onImpor
                                 if (it.suggested) Icon(Icons.Default.AutoFixHigh, "Ángulo sugerido por el giro de la cabeza",
                                     Modifier.padding(start = 4.dp).size(18.dp), tint = MaterialTheme.colorScheme.primary)
                             }
+                            // expresión facial (solo en las zonas que la admiten)
+                            val exps = it.zone?.let { z -> com.photomed.app.data.FacialExpression.forZone(z) }.orEmpty()
+                            if (exps.size > 1) ExpressionPicker(it.expression, exps,
+                                Modifier.semantics { contentDescription = "Expresión de la foto ${i + 1}" }) { e ->
+                                items = items.toMutableList().also { l -> l[i] = l[i].copy(expression = e) }
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+/** Botón con la expresión elegida y un menú con las de la zona. */
+@Composable
+fun ExpressionPicker(value: com.photomed.app.data.FacialExpression, options: List<com.photomed.app.data.FacialExpression>,
+                     modifier: Modifier = Modifier, onPick: (com.photomed.app.data.FacialExpression) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier.padding(top = 4.dp)) {
+        OutlinedButton(onClick = { open = true }) {
+            Text("Expresión: ${value.label}", maxLines = 1)
+            Icon(Icons.Default.ArrowDropDown, null)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { e -> DropdownMenuItem(text = { Text(e.label) }, onClick = { open = false; onPick(e) }) }
         }
     }
 }

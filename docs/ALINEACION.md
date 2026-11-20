@@ -567,3 +567,31 @@ a la cara junto al punto, fuera no). La oclusión (mano, ropa) se comprueba 6 % 
   pupilas, eje por ellas, unidad la interpupilar). Para una foto posterior (misma zona), cada línea
   anterior que no se ha encontrado (a menos de 2,5 % del ancho de la cara) se busca en un pasillo de
   ± 2,5 % alrededor de su posición, con fuerza ≥ 0,012 y contraste ≥ 1,4, y conserva su nombre.
+
+## Expresiones faciales y arrugas dinámicas (2.21; `FacialExpression.kt`)
+
+Las arrugas dinámicas aparecen con la contracción muscular, por eso las escalas validadas se puntúan
+en reposo y en contracción máxima: frente con las cejas elevadas al máximo, ceño con el fruncido
+máximo y patas de gallo con la sonrisa máxima (escalas de Carruthers del tercio superior). El consenso
+de toxina botulínica añade las líneas nasales (*bunny lines*), peribucales, el mentón en empedrado y las
+bandas platismales, cada una con su gesto.
+
+| Expresión | Gesto | Músculo | Capas |
+|---|---|---|---|
+| Reposo | cara relajada | — | todas |
+| Sorpresa | cejas arriba al máximo | frontal | frente |
+| Enojo | fruncir el ceño | corrugador y prócer | ceño |
+| Sonrisa máxima | sonreír mostrando los dientes | orbicular de los ojos, cigomáticos | patas de gallo, surcos |
+| Ojos apretados | cerrar los ojos con fuerza | orbicular de los ojos | patas de gallo |
+| Arrugar la nariz | como ante un mal olor | nasal | ceño, nariz |
+| Fruncir los labios | beso / silbar | orbicular de los labios | labios, surcos |
+| Tristeza | comisuras abajo | depresor del ángulo de la boca | surcos |
+| Mentón tenso | subir el labio inferior | mentoniano | labios |
+| Cuello tenso | dientes inferiores a la vista | platisma | — |
+
+- Nombre de archivo: `<zona>_exp-<etiqueta>_<fecha>.jpg`; sin etiqueta = reposo (compatibilidad).
+- `Expression.target` sustituye a la comprobación de reposo cuando se elige un gesto: pide el gesto
+  hasta que el indicador correspondiente (cejas, ancho y elevación de la sonrisa, apertura de ojos,
+  ancho de boca) pasa su umbral.
+- Fantasma, fotos anteriores del visor, referencia de líneas previas y Comparar usan solo fotos con la
+  misma expresión: comparar reposo contra contracción mezcla arrugas estáticas y dinámicas.

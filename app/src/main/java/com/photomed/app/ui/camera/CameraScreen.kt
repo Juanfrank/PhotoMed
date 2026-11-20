@@ -167,6 +167,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.photomed.app.data.Expediente
 import com.photomed.app.data.Photo
+import com.photomed.app.data.expression
 import com.photomed.app.data.Zone
 import com.photomed.app.ui.LocalRepository
 import com.photomed.app.ui.formatDate
@@ -270,6 +271,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var ghostEdges by remember { mutableStateOf(prefs.getBoolean("ghost_edges", false)) }
     // Modo individual de extremidades (manos, pies, piernas): lado recordado por zona
     var limbSide by remember(zone) { mutableStateOf(LimbSide.ofTag(prefs.getString("limb_side_${zone.id}", null))) }
+    // Expresión facial de la toma (arrugas dinámicas): reposo por defecto en cada zona
+    val expressions = remember(zone) { com.photomed.app.data.FacialExpression.forZone(zone) }
+    var expression by remember(zone) { mutableStateOf(com.photomed.app.data.FacialExpression.NEUTRAL) }
     var threshold by remember { mutableFloatStateOf(prefs.getFloat("match_threshold_v2", LiveMatch.DEFAULT_THRESHOLD)) }
     var showSettings by remember { mutableStateOf(false) }
     var mirrorOn by remember { mutableStateOf(prefs.getBoolean("mirror_front", true)) }
@@ -312,6 +316,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     val matchingEnabled = liveMatch
     val referenceMode = showGhost && ghost != null
     matcher.useReference = referenceMode
+    matcher.expression = expression
     val matchingFlag = remember { AtomicBoolean(false) }
     matchingFlag.set(matchingEnabled && psPattern == null)
 
@@ -427,7 +432,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         }
         exp = e; photos = list
         if (ghost == null || photos.none { it.key == ghost?.key })
-            ghost = photos.lastOrNull { LimbSide.ofFileName(it.displayName, zone) == limbSide } ?: photos.lastOrNull()
+            ghost = photos.lastOrNull { LimbSide.ofFileName(it.displayName, zone) == limbSide && it.expression == expression }
+                ?: photos.lastOrNull { it.expression == expression } ?: photos.lastOrNull()
     }
 
     val previewView = remember {
@@ -531,6 +537,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         // motor que dio los puntos: MediaPipe, o ML Kit si MediaPipe no estuvo disponible
         put("Engine", if (matcher.detectorUnavailable) "ML Kit (respaldo)" else engine.label)
         if (zone.hasLimbSides) put("Side", limbSide.label)
+        put("Expression", expression.label)
         put("Zoom", "%.2f".format(java.util.Locale.US, zoomRatio))
         live?.let { f ->
             f.eval.pointFraction?.let { put("MatchPercent", "%.0f".format(java.util.Locale.US, it * 100)) }
@@ -606,7 +613,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             if (frames == null) { capturing = false; snackbar.showSnackbar("Error al capturar"); return@launch }
             val conds = if (depthMm != null) conditions + ("DepthSensorCm" to "%.1f".format(java.util.Locale.US, depthMm / 10)) else conditions
             AppScope.launch {
-                val saved = runCatching { repo.savePhoto(e, zone, file, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conds) }
+                val saved = runCatching { repo.savePhoto(e, zone, file, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conds,
+                    variant = com.photomed.app.data.FacialExpression.variantTag(expression)) }
                     .also { file.delete() }
                 scope.launch {
                     capturing = false
@@ -672,7 +680,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             AppScope.launch {
                 val result = runCatching {
                     repo.savePhoto(e, zone, best, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conds,
-                        variant = limbSide.tag.takeIf { zone.hasLimbSides })
+                        variant = listOfNotNull(limbSide.tag.takeIf { zone.hasLimbSides },
+                            com.photomed.app.data.FacialExpression.variantTag(expression)).joinToString("_").ifEmpty { null })
                 }.also { best.delete() }
                 if (depthMm != null && focal != null) result.getOrNull()?.let { ReliefCapture.saveDepthScale(context, it.uri, depthMm, focal, zoomNow) }
                 scope.launch {
@@ -979,6 +988,33 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 onZoom = { setZoom(it) },
                 onResumeAssist = { manualZoom = false; zoomCtl.reset(); zoomTouchedAt = System.currentTimeMillis() },
             )
+        }
+
+        // Expresión facial (arrugas dinámicas): reposo o contracción máxima de cada grupo muscular
+        if (expressions.size > 1) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Md3Spacing.s2),
+                horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Expresión", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                expressions.forEach { ex ->
+                    androidx.compose.material3.FilterChip(
+                        selected = expression == ex,
+                        onClick = {
+                            expression = ex
+                            // referencia superpuesta: la última foto con la misma expresión
+                            photos.lastOrNull { it.expression == ex }?.let { ghost = it }
+                        },
+                        label = { Text(ex.label) },
+                    )
+                }
+            }
+            if (expression != com.photomed.app.data.FacialExpression.NEUTRAL) Text(
+                "${expression.instruction} · ${expression.muscle}",
+                color = Color(0xFFFFD54F), style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.s3, vertical = 2.dp)
+                    .semantics { contentDescription = "Instrucción: ${expression.instruction}" })
         }
 
         // Modo individual de extremidades: ambas o una sola (misma zona)

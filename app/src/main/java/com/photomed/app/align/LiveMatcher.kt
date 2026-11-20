@@ -156,7 +156,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val cur = detected(frame, smooth)
         val light = if (spec.detector == Detector.FACE && cur.points.isNotEmpty())
             Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) else null
-        var eval = withDiagnostic(Standardization.evaluate(zone, cur, light), cur)
+        var eval = withDiagnostic(Standardization.evaluate(zone, cur, light, expression), cur)
         // Perfil sin rostro detectado: si la silueta muestra un perfil hacia el lado de la vista
         // (nariz y mentón en el borde anterior), se acepta como perfil
         if (isProfile && cur.points.size < LiveDecision.MIN_POINTS) {
@@ -180,6 +180,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
 
     /** false: ignorar la referencia (superposición apagada) y estandarizar. */
     @Volatile var useReference: Boolean = true
+    /** Expresión pedida (arrugas dinámicas): se comprueba en lugar de la expresión neutra. */
+    @Volatile var expression: com.photomed.app.data.FacialExpression = com.photomed.app.data.FacialExpression.NEUTRAL
 
     /** Detección del cuadro; en vivo, suavizada en el tiempo (One-Euro) para que la guía y las indicaciones no tiemblen. */
     private fun detected(frame: Bitmap, smooth: Boolean): Detection {

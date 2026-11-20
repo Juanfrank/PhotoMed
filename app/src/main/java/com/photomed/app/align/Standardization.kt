@@ -67,7 +67,9 @@ object Standardization {
     /** Luminancia media (0..1) de las mejillas izquierda y derecha de la imagen. */
     data class Lighting(val leftCheek: Float, val rightCheek: Float, val face: Float)
 
-    fun evaluate(zone: Zone, det: Detection, lighting: Lighting?): MatchEval {
+    fun evaluate(zone: Zone, det: Detection, lighting: Lighting?,
+                 /** Expresión pedida (arrugas dinámicas): sustituye a la expresión neutra. */
+                 expression: com.photomed.app.data.FacialExpression = com.photomed.app.data.FacialExpression.NEUTRAL): MatchEval {
         val t = target(zone)
         // Zonas sin detector (cuero cabelludo, modo libre): sin referencia no hay nada que evaluar
         // en la imagen; las indicaciones (p. ej. cámara cenital) las añade la cámara.
@@ -108,7 +110,10 @@ object Standardization {
         }
         // Expresión neutra en las vistas faciales completas; ojos abiertos siempre
         if (ZoneAlignment.of(zone).detector == Detector.FACE && Expression.usable(det.yaw)) {
-            Expression.measure(det.points)?.let { ex -> Expression.neutral(zone, ex).forEach { hints += it; off += 0.8f } }
+            Expression.measure(det.points)?.let { ex ->
+                val h = if (expression == com.photomed.app.data.FacialExpression.NEUTRAL) Expression.neutral(zone, ex) else Expression.target(expression, ex)
+                h.forEach { hints += it; off += 0.8f }
+            }
         }
         det.gaze?.let { g ->
             if (kotlin.math.abs(g.x) > Gaze.TOL_X * 1.2f || kotlin.math.abs(g.y) > Gaze.TOL_Y * 1.2f) {

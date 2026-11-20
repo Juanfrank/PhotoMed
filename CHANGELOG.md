@@ -2,6 +2,21 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.21 — 20 de noviembre de 2026
+
+- **Fotos por expresión facial (arrugas dinámicas)**: en la cámara, una fila *Expresión* elige el
+  gesto de la toma con su instrucción y el músculo que lo produce: reposo, sorpresa (frente, frontal),
+  enojo (ceño, corrugador y prócer), sonrisa máxima (patas de gallo y surcos), ojos apretados, arrugar
+  la nariz (líneas nasales), fruncir los labios (código de barras), tristeza (comisuras), mentón tenso
+  (mentoniano) y cuello tenso (bandas platismales). Solo se ofrecen las que tienen sentido en la zona.
+- La comprobación en vivo pide el gesto elegido (cejas más arriba, sonreír más, apretar los ojos…) en
+  lugar de pedir relajar la cara, y la foto fantasma es la última con la misma expresión.
+- La expresión va en el nombre del archivo (`_exp-sonrisa_`) y en los datos de la foto; las fotos en
+  reposo siguen igual. Galería con una etiqueta por expresión, visor con la expresión en el título.
+- **Comparar** empieza con las fotos en reposo, ofrece filtrar por expresión y avisa si la secuencia
+  mezcla expresiones distintas; la referencia de fotos anteriores solo usa la misma expresión.
+- **Importar** permite elegir la expresión de cada foto.
+
 ## 2.20.1 — 20 de noviembre de 2026
 
 - **Corrección**: el botón de eliminar un surco quedaba fuera de la pantalla (al final de una fila más
