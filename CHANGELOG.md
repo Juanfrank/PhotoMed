@@ -2,6 +2,15 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.19.2 — 20 de noviembre de 2026
+
+- **Quijada real**: el contorno lateral e inferior sigue ahora el borde de la cara segmentada (piel
+  del rostro, que incluye barba y bigote), con voto de vecinos para no seguir pelos sueltos y la
+  transición más cercana a la malla; el ajuste por color queda de respaldo. Bajo el mentón, si la
+  segmentación baja más de 2,5 % del ancho de la cara (cuello sin barba), se usa el borde de sombra.
+  En el retrato marcado, el contorno va sobre el borde de la barba en ambos lados (≤ 1 % del borde
+  medido a mano).
+
 ## 2.19.1 — 20 de noviembre de 2026
 
 - **Corrección del contorno lateral** (no se ajustaba al borde de la cara): cuando la malla cae fuera

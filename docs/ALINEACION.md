@@ -547,3 +547,8 @@ delante: no se mueve; mediana de 5 y media de 3. `jawContourStaysOnTheJaw`: desp
 
 Números de las líneas: a un lado de su línea (normal, 1,8–3 radios), sin tocar ningún trazo visible ni
 otro número, con una guía fina hasta la línea.
+
+**2.19.2**: primero el borde de la región de la cara segmentada (piel del rostro; bajo la nariz también
+pelo), con voto 3 × 3, la transición dentro → fuera más cercana a la malla en −8 % … +5 %; bajo el mentón
+solo si no baja más de 2,5 % (si no, sombra). Después, de respaldo, el borde de color (dentro parecido
+a la cara junto al punto, fuera no). La oclusión (mano, ropa) se comprueba 6 % hacia dentro.

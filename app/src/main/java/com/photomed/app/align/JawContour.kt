@@ -35,6 +35,7 @@ object JawContour {
     fun refine(mesh: Map<String, Pt>, snapped: Map<String, Pt>, lum: GrayImage, labels: FaceLabels?, hair: FacialHair.Result?,
                lab: LabImage? = null): Map<String, Pt> {
         val oval = (0 until 36).map { mesh["oval_$it"] ?: return snapped }
+        val noseY = mesh["nose_bottom_1"]?.y ?: (oval.minOf { it.y } + (oval.maxOf { it.y } - oval.minOf { it.y }) * 0.65f)
         val w = lum.width.toFloat()
         val faceW = oval.maxOf { it.x } - oval.minOf { it.x }
         val eyeY = listOfNotNull(mesh[Landmarks.EYE_L], mesh[Landmarks.EYE_R]).map { it.y }.average().toFloat()
@@ -69,6 +70,11 @@ object JawContour {
                 c == FaceLabels.CLOTHES || c == FaceLabels.OTHER } == true
             if (occl) { offs[i] = Float.NaN; continue }
             val chin = n.y > 0.75f   // bajo el mentón: sombra, poco hacia fuera
+            // 1) borde de la región de la cara segmentada (piel del rostro, que incluye barba y bigote; con
+            //    voto 3 × 3 para no seguir pelos sueltos): la transición dentro → fuera más cercana a la malla.
+            //    Bajo el mentón, solo si no baja más de 2,5 % (si no, es el cuello sin barba: se usa la sombra)
+            val segD = labels?.let { l -> segEdge(l, o, n, faceW, noseY) }
+            if (segD != null && (!(n.y > 0.6f) || segD <= 0.025f * faceW)) { offs[i] = segD; continue }
             val dMin = -IN * faceW; val dMax = (if (chin) 0.02f else OUT) * faceW
             val h = 2.5f * step * k
             // color de la propia cara junto a este punto (10–14 % hacia dentro: piel o barba)
@@ -117,5 +123,32 @@ object JawContour {
             out["oval_$i"] = Pt((s0.x * 2 + r.x) / 3, (s0.y * 2 + r.y) / 3)
         }
         return out
+    }
+
+    /**
+     * Desplazamiento (unidades del ancho, por la normal [n]) del borde de la cara segmentada más cercano a
+     * [o] entre −[IN] y +[OUT] del ancho de la cara; null si no hay transición. Dentro = piel del rostro o,
+     * bajo la nariz, pelo (barba) — con voto de 3 × 3 vecinos.
+     */
+    fun segEdge(l: FaceLabels, o: Pt, n: Pt, faceW: Float, noseY: Float): Float? {
+        val w = l.width.toFloat()
+        fun inside(q: Pt): Boolean {
+            var c = 0
+            for (dy in -1..1) for (dx in -1..1) {
+                val v = l[(q.x * w).roundToInt() + dx, (q.y * w).roundToInt() + dy]
+                if (v == FaceLabels.FACE_SKIN || (v == FaceLabels.HAIR && q.y > noseY)) c++
+            }
+            return c >= 5
+        }
+        val step = 1f / w
+        var best: Float? = null
+        var d = -IN * faceW
+        var prev = inside(Pt(o.x + n.x * d, o.y + n.y * d))
+        while (d <= OUT * faceW) {
+            val cur = inside(Pt(o.x + n.x * d, o.y + n.y * d))
+            if (prev && !cur && (best == null || kotlin.math.abs(d) < kotlin.math.abs(best))) best = d - step / 2
+            prev = cur; d += step
+        }
+        return best
     }
 }

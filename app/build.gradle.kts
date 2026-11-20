@@ -15,8 +15,8 @@ android {
         applicationId = "com.photomed.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 17
-        versionName = "2.19.1"
+        versionCode = 18
+        versionName = "2.19.2"
     }
 
     // ML Kit incluye bibliotecas nativas por arquitectura: un APK por ABI para instalación directa
