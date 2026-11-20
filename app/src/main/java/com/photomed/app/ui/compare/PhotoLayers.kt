@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -65,8 +66,12 @@ fun rememberAnnotLayers(): MutableState<Set<AnnotLayer>> {
 
 /** Fila de interruptores de las capas (contorno, línea del pelo, ojos, nariz, labios, surcos). */
 @Composable
-fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, modifier: Modifier = Modifier) {
+fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, modifier: Modifier = Modifier,
+               /** Si se da, primer chip «Medidas» (tabla de longitud, ancho, profundidad y grado). */
+               onMetrics: (() -> Unit)? = null) {
     Row(modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (onMetrics != null) androidx.compose.material3.AssistChip(onClick = onMetrics, label = { Text("Medidas") },
+            leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.TableChart, null, Modifier.size(18.dp)) })
         AnnotLayer.entries.forEach { l ->
             val on = l in layers
             FilterChip(

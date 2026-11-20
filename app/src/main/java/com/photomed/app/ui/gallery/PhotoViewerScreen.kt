@@ -88,6 +88,9 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     var editing by remember { mutableStateOf(false) }
     var cropping by remember { mutableStateOf(false) }
     var editVersion by remember { mutableIntStateOf(0) }
+    // línea tocada (ficha de medidas) y tabla de medidas
+    var selected by remember { mutableStateOf<com.photomed.app.align.AnnotLine?>(null) }
+    var metricsSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(reload) {
         photos = withContext(Dispatchers.IO) { repo.getExpediente(expId)?.let { repo.photos(it, zone) }.orEmpty() }
@@ -144,12 +147,17 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
         Box(Modifier.fillMaxSize().padding(padding)) {
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize().background(Color.Black), key = { list[it].key },
                 userScrollEnabled = !cropping) { page ->
-                PhotoPage(list[page], zone, if (showLayers) layersState.value else emptySet(), editVersion, Modifier.fillMaxSize())
+                PhotoPage(list[page], zone, if (showLayers) layersState.value else emptySet(), editVersion, Modifier.fillMaxSize(),
+                    selected = selected, onSelect = { selected = it })
             }
             androidx.compose.foundation.layout.Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .background(Color.Black.copy(alpha = 0.55f))) {
+                selected?.takeIf { showLayers && it.layer in layersState.value }?.let { l ->
+                    com.photomed.app.ui.compare.MetricsCard(l, onTable = { metricsSheet = true }, onClose = { selected = null },
+                        modifier = Modifier.fillMaxWidth().padding(8.dp))
+                }
                 if (showLayers) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
-                    Modifier.fillMaxWidth().padding(vertical = 4.dp))
+                    Modifier.fillMaxWidth().padding(vertical = 4.dp), onMetrics = { metricsSheet = true })
                 if (editing) {
                     // la edición se lee al pulsar (no la de la última composición) para encadenar giro, espejo…
                     fun now() = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
@@ -181,6 +189,13 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 com.photomed.app.align.PhotoEdits.set(context, photo.uri.toString(), e.copy(crop = r)); editVersion++; cropping = false
             }
         }
+    }
+
+    LaunchedEffect(pager.currentPage) { selected = null }
+    if (metricsSheet) {
+        val e = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
+        val lines = com.photomed.app.align.PhotoAnnotator.cached("full|${current.uri}|${e.hashCode()}").orEmpty()
+        com.photomed.app.ui.compare.MetricsSheet(listOf(formatDateTime(current.takenAt) to lines), layersState.value) { metricsSheet = false }
     }
 
     if (confirmDelete) {
@@ -241,7 +256,8 @@ private fun EditButton(icon: androidx.compose.ui.graphics.vector.ImageVector, la
  * (pellizco, doble toque) y las capas de anotación visibles en el mismo sistema de coordenadas.
  */
 @Composable
-private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.align.AnnotLayer>, version: Int, modifier: Modifier) {
+private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.align.AnnotLayer>, version: Int, modifier: Modifier,
+                      selected: com.photomed.app.align.AnnotLine? = null, onSelect: (com.photomed.app.align.AnnotLine?) -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val edit = remember(photo.uri, version) { com.photomed.app.align.PhotoEdits.of(context, photo.uri.toString()) }
     val img by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, photo.uri, edit) {
@@ -255,6 +271,10 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                 .annotate(com.photomed.app.align.ImageOps.loadFull(context, photo.uri, 1080, edit), zone)
         }.getOrNull()?.also { com.photomed.app.align.PhotoAnnotator.put(key, it) }
     }
+    val imgState = androidx.compose.runtime.rememberUpdatedState(img)
+    val annotsState = androidx.compose.runtime.rememberUpdatedState(annots)
+    val layersState = androidx.compose.runtime.rememberUpdatedState(layers)
+    val onSelectState = androidx.compose.runtime.rememberUpdatedState(onSelect)
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     val b = img
@@ -265,7 +285,23 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                 offset = if (scale == 1f) androidx.compose.ui.geometry.Offset.Zero else offset + pan
             }
         }
-        .pointerInput(Unit) { detectTapGestures(onDoubleTap = { scale = 1f; offset = androidx.compose.ui.geometry.Offset.Zero }) }
+        .pointerInput(Unit) {
+            detectTapGestures(
+                onDoubleTap = { scale = 1f; offset = androidx.compose.ui.geometry.Offset.Zero },
+                onTap = { s ->
+                    // toque → punto de la foto (deshace zoom y desplazamiento) → línea con medidas más cercana
+                    val bb = imgState.value ?: return@detectTapGestures
+                    val a = annotsState.value ?: return@detectTapGestures
+                    val sw = size.width.toFloat(); val sh = size.height.toFloat()
+                    val ia = bb.width / bb.height.toFloat()
+                    val w = minOf(sw, sh * ia); val h = w / ia
+                    val cx = sw / 2; val cy = sh / 2
+                    val px = cx + (s.x - cx - offset.x) / scale; val py = cy + (s.y - cy - offset.y) / scale
+                    val q = com.photomed.app.align.Pt((px - (sw - w) / 2) / w, (py - (sh - h) / 2) / w)
+                    onSelectState.value(com.photomed.app.ui.compare.hitLine(a, layersState.value, q, 28.dp.toPx() / (w * scale)))
+                },
+            )
+        }
         .semantics { contentDescription = "Fotografía ${photo.zone.label}, ${formatDateTime(photo.takenAt)}" },
         contentAlignment = Alignment.Center) {
         if (b == null) CircularProgressIndicator()
@@ -279,7 +315,16 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                 dstSize = androidx.compose.ui.unit.IntSize(w.toInt(), h.toInt()), filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium)
             annots?.let { a ->
                 val k = (w / 360.dp.toPx()).coerceIn(0.35f, 1.4f) / scale.coerceAtLeast(1f).let { kotlin.math.sqrt(it) }
-                drawAnnotations(a, layers, k) { p -> androidx.compose.ui.geometry.Offset(left + p.x * w, top + p.y * w) }
+                fun map(p: com.photomed.app.align.Pt) = androidx.compose.ui.geometry.Offset(left + p.x * w, top + p.y * w)
+                // línea tocada: resalte blanco debajo
+                selected?.takeIf { it.layer in layers }?.let { sl ->
+                    val path = androidx.compose.ui.graphics.Path()
+                    sl.points.forEachIndexed { i, q -> val o = map(q); if (i == 0) path.moveTo(o.x, o.y) else path.lineTo(o.x, o.y) }
+                    if (sl.closed) path.close()
+                    drawPath(path, Color.White.copy(alpha = 0.85f), style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = 7.dp.toPx() * k, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                }
+                drawAnnotations(a, layers, k) { p -> map(p) }
             }
         }
     }

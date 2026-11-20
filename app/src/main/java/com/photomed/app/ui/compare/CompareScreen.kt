@@ -178,6 +178,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     // Vista de la comparación: capas de anotación, giro (pasos de 90°), espejo y recorte manual
     val layersState = rememberAnnotLayers()
     var showLayers by remember { mutableStateOf(layersState.value.isNotEmpty()) }
+    var metricsSheet by remember { mutableStateOf(false) }
     var viewRot by remember { mutableStateOf(0) }
     var viewMirror by remember { mutableStateOf(false) }
     /** Recorte elegido a mano (rectángulo 3:4 sobre la referencia); tiene prioridad sobre el automático. */
@@ -411,7 +412,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 }
             }
 
-            if (showLayers) LayerChips(layersState.value, { layersState.value = it }, Modifier.fillMaxWidth().padding(top = 4.dp))
+            if (showLayers) LayerChips(layersState.value, { layersState.value = it }, Modifier.fillMaxWidth().padding(top = 4.dp),
+                onMetrics = { metricsSheet = true })
+            if (metricsSheet && seq != null) {
+                val stamps = stampLabels(seq.map { it.takenAt })
+                MetricsSheet(seq.mapIndexed { i, p -> stamps[i] to annots[p.key].orEmpty() }, layersState.value) { metricsSheet = false }
+            }
             // Área de comparación
             androidx.compose.runtime.CompositionLocalProvider(LocalCompareView provides view) {
             Box(

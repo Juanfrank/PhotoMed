@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
@@ -252,7 +253,8 @@ class UsageFlowsTest {
         assertTrue(com.photomed.app.align.PhotoEdits.of(ctx, photos[0].uri.toString()).isIdentity)
         // capas: los interruptores aparecen y se recuerdan
         compose.onNodeWithContentDescription("Capas", substring = true).performClick()
-        compose.onNodeWithText("Surcos").performClick()
+        compose.onNodeWithText("Surcos").performScrollTo().performClick()
+        compose.onNodeWithText("Medidas").assertExists()
         compose.waitForIdle()
         assertTrue(ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!.contains("FOLDS"))
     }

@@ -15,7 +15,9 @@ enum class AnnotLayer(val label: String) {
 /** Una línea de anotación (x del ancho, y en unidades del ancho). [estimated]: posición estimada, no medida. */
 data class AnnotLine(val layer: AnnotLayer, val points: List<Pt>, val closed: Boolean, val estimated: Boolean = false,
                      /** Zona (relleno translúcido) en lugar de solo trazo, p. ej. ojeras. */
-                     val filled: Boolean = false)
+                     val filled: Boolean = false,
+                     /** Medidas orientativas (longitud, ancho, profundidad, grado; color en ojeras). */
+                     val metrics: LineMetrics? = null)
 
 /**
  * Líneas estéticas a partir de los puntos del rostro (iguales con ML Kit y MediaPipe), la
@@ -128,7 +130,7 @@ object FaceAnnotations {
      * contorno de las alas) y labios con su topología real; surcos detectados en la imagen
      * ([RidgeTracker]) dentro de pasillos definidos por la malla, solo si se encuentran.
      */
-    fun fromMesh(mesh: List<Pt>, labels: FaceLabels?, lum: GrayImage?): List<AnnotLine> {
+    fun fromMesh(mesh: List<Pt>, labels: FaceLabels?, lum: GrayImage?, lab: LabImage? = null): List<AnnotLine> {
         if (mesh.size < 468) return face(keysFromMesh(mesh), labels, lum)
         val keys = FaceKeys.canonical(keysFromMesh(mesh))
         val out = ArrayList<AnnotLine>()
@@ -144,27 +146,56 @@ object FaceAnnotations {
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_ALA_L).toTypedArray(), perSeg = 4), false)
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_TIP).toTypedArray(), perSeg = 6), false)
         out += AnnotLine(AnnotLayer.LIPS, chain(LIPS_OUTER), true); out += AnnotLine(AnnotLayer.LIPS, chain(LIPS_INNER), true)
-        if (lum != null) out += folds(mesh, lum, labels)
+        if (lum != null) out += folds(mesh, lum, labels, lab)
         return out
     }
 
-    /** Surcos detectados en la imagen (solo los encontrados), con el ancho del pasillo según la cara. */
-    fun folds(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels? = null): List<AnnotLine> {
+    /** Surcos detectados en la imagen (solo los encontrados), con el ancho del pasillo según la cara y sus medidas. */
+    fun folds(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels? = null, lab: LabImage? = null): List<AnnotLine> {
         val faceW = dist(mesh[234], mesh[454]).coerceAtLeast(1e-3f)
         val skin = labels?.let { l -> { q: Pt -> l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()] == FaceLabels.FACE_SKIN } }
-        val folds = FOLD_CORRIDORS.mapNotNull { (name, idx) ->
+        val sc = LineMeasure.scale(mesh)
+        val folds = FOLD_CORRIDORS.mapIndexedNotNull { i, (name, idx) ->
             RidgeTracker.track(lum, idx.map { mesh[it] }, corridorHalf(name) * faceW, skin = skin,
-                anchorStart = name == "nasogeniano")?.let { AnnotLine(AnnotLayer.FOLDS, it.points, false) }
+                anchorStart = name == "nasogeniano")?.let { r ->
+                val label = "${name.replaceFirstChar { it.uppercase() }} ${if (i % 2 == 0) "derecho" else "izquierdo"}"
+                AnnotLine(AnnotLayer.FOLDS, r.points, false,
+                    metrics = sc?.let { LineMeasure.line(label, r.points, lum, it, halfMm = if (name == "nasogeniano") 5f else 4f) })
+            }
         }
-        return folds + wrinkles(mesh, lum, labels, faceW)
+        return folds + wrinkles(mesh, lum, labels, faceW, lab)
+    }
+
+    private class Cand(val res: RidgeTracker.Result, val u0: Float, val u1: Float, val v: Float)
+
+    /**
+     * Supresión de no máximos: de los candidatos (ordenados por intensidad × longitud) se conservan los
+     * que no se solapan con uno ya elegido (misma posición transversal ±[sep] y solape longitudinal).
+     */
+    private fun nms(c: List<Cand>, sep: Float, max: Int): List<Cand> {
+        val kept = ArrayList<Cand>()
+        for (x in c.sortedByDescending { it.res.strength * (it.u1 - it.u0) }) {
+            val clash = kept.any { k ->
+                val ov = minOf(k.u1, x.u1) - maxOf(k.u0, x.u0)
+                kotlin.math.abs(k.v - x.v) < sep && ov > 0.3f * minOf(k.u1 - k.u0, x.u1 - x.u0)
+            }
+            if (!clash) kept += x
+            if (kept.size >= max) break
+        }
+        return kept
     }
 
     /**
-     * Arrugas de la frente (horizontales), del ceño (verticales entre las cejas), patas de gallo
-     * (rayos desde el canto externo) y ojeras (zona infraorbitaria más oscura que la mejilla).
+     * Arrugas de la frente (horizontales, siguiendo el arco de las cejas, enteras o por mitades), del
+     * ceño (verticales entre las cejas en abanico de posiciones e inclinaciones, y horizontales en la
+     * raíz nasal), patas de gallo (abanico de rayos desde el canto externo) y ojeras (zona
+     * infraorbitaria más oscura que la mejilla). Candidatos múltiples con supresión de no máximos.
      */
-    fun wrinkles(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels?, faceW: Float): List<AnnotLine> {
+    fun wrinkles(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels?, faceW: Float, lab: LabImage? = null): List<AnnotLine> {
         val out = ArrayList<AnnotLine>()
+        val sc = LineMeasure.scale(mesh)
+        fun withMetrics(layer: AnnotLayer, name: String, r: RidgeTracker.Result) =
+            AnnotLine(layer, r.points, false, metrics = sc?.let { LineMeasure.line(name, r.points, lum, it, halfMm = 2f) })
         val skin = labels?.let { l -> { q: Pt -> l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()] == FaceLabels.FACE_SKIN } }
         val eR = mesh[468].takeIf { mesh.size > 473 } ?: mesh[159]; val eL = mesh[473].takeIf { mesh.size > 473 } ?: mesh[386]
         val ipd = dist(eR, eL).coerceAtLeast(1e-4f)
@@ -173,55 +204,112 @@ object FaceAnnotations {
         fun along(p: Pt, a: Float, b: Float) = Pt(p.x + ex.x * a + up.x * b, p.y + ex.y * a + up.y * b)
         fun proj(p: Pt, o: Pt) = Pair((p.x - o.x) * ex.x + (p.y - o.y) * ex.y, (p.x - o.x) * up.x + (p.y - o.y) * up.y)
         val mid = Pt((eR.x + eL.x) / 2, (eR.y + eL.y) / 2)
-        // frente: franjas horizontales entre las cejas y la línea del pelo (o el borde superior del óvalo)
+        fun uv(r: RidgeTracker.Result, vertical: Boolean): Cand {
+            val q = r.points.map { proj(it, mid) }
+            val u = q.map { if (vertical) it.second else it.first }; val v = q.map { if (vertical) it.first else it.second }
+            return Cand(r, u.min(), u.max(), v.average().toFloat())
+        }
+        // frente: franjas que siguen el arco de las cejas (que se aplana hacia arriba), enteras o por mitades
         run {
-            val browTop = intArrayOf(70, 63, 105, 66, 107, 336, 296, 334, 293, 300).maxOf { proj(mesh[it], mid).second }
-            // hasta el borde superior del rostro (la línea del pelo puede caer baja con flequillo o canas)
-            val top = proj(mesh[10], mid).second
-            val lo = browTop + 0.035f * faceW; val hi = top - 0.015f * faceW
-            val xl = proj(mesh[70], mid).first + 0.02f * faceW; val xr = proj(mesh[300], mid).first - 0.02f * faceW
+            val browIdx = intArrayOf(70, 63, 105, 66, 107, 336, 296, 334, 293, 300)
+            val brow = browIdx.map { proj(mesh[it], mid) }.sortedBy { it.first }
+            fun browAt(x: Float): Float {
+                if (x <= brow.first().first) return brow.first().second
+                for (i in 1 until brow.size) if (x <= brow[i].first) {
+                    val a = brow[i - 1]; val b = brow[i]; val t = (x - a.first) / (b.first - a.first).coerceAtLeast(1e-6f)
+                    return a.second + (b.second - a.second) * t
+                }
+                return brow.last().second
+            }
+            val browTop = brow.maxOf { it.second }
+            // borde superior: la malla acaba a media frente; se sube por la piel (segmentación) hasta el
+            // pelo, o un margen fijo sin segmentación
+            var top = proj(mesh[10], mid).second
+            if (skin != null) {
+                val x10 = proj(mesh[10], mid).first
+                var y = top
+                while (y < top + 0.3f * faceW && listOf(-0.12f, 0f, 0.12f).count { skin(along(mid, x10 + it * faceW, y + 0.01f * faceW)) } >= 2) y += 0.005f * faceW
+                top = y
+            } else top += 0.05f * faceW
+            val lo = browTop + 0.03f * faceW; val hi = top - 0.03f * faceW
+            val xl = proj(mesh[70], mid).first + 0.01f * faceW; val xr = proj(mesh[300], mid).first - 0.01f * faceW
             val step = 0.03f * faceW
             if (hi - lo > step && xr - xl > 0.2f * faceW) {
-                val found = ArrayList<Pair<Float, RidgeTracker.Result>>()
-                var y = lo
-                while (y <= hi) {
-                    val axis = listOf(along(mid, xl, y), along(mid, (xl + xr) / 2, y), along(mid, xr, y))
-                    RidgeTracker.track(lum, axis, step * 0.6f, stations = 30, offsets = 8, minStrength = 0.016f, minContrast = 1.8f, skin = skin)
-                        ?.let { found += y to it }
-                    y += step * 0.5f
+                val cands = ArrayList<Cand>()
+                val xm = (xl + xr) / 2
+                for (seg in listOf(xl to xr, xl to xm + 0.04f * faceW, xm - 0.04f * faceW to xr)) {
+                    var y = lo
+                    while (y <= hi) {
+                        // arco de las cejas atenuado con la altura
+                        val bend = (1f - (y - lo) / (hi - lo)).coerceIn(0f, 1f) * 0.7f
+                        val axis = (0..6).map { j ->
+                            val x = seg.first + (seg.second - seg.first) * j / 6f
+                            along(mid, x, y + (browAt(x) - browTop) * bend)
+                        }
+                        RidgeTracker.track(lum, axis, step * 0.55f, stations = 28, offsets = 8, minStrength = 0.016f, minContrast = 1.8f, skin = skin)
+                            ?.let { cands += uv(it, vertical = false) }
+                        y += step * 0.4f
+                    }
                 }
-                val kept = ArrayList<Pair<Float, RidgeTracker.Result>>()
-                for (f in found.sortedByDescending { it.second.strength }) {
-                    val fy = f.second.points.map { proj(it, mid).second }.average().toFloat()
-                    if (kept.none { k -> kotlin.math.abs(k.second.points.map { proj(it, mid).second }.average().toFloat() - fy) < step * 0.8f }) kept += f
+                nms(cands, step * 0.7f, 8).sortedByDescending { it.v }.forEachIndexed { i, c ->
+                    out += withMetrics(AnnotLayer.FOREHEAD, "Frente, línea ${i + 1}", c.res)
                 }
-                kept.take(6).forEach { out += AnnotLine(AnnotLayer.FOREHEAD, it.second.points, false) }
             }
         }
-        // ceño: líneas verticales junto a la cabeza de cada ceja
+        // ceño: verticales (corrugador, "líneas del 11") en abanico de posiciones e inclinaciones entre
+        // las cabezas de las cejas, y horizontales en la raíz nasal (prócer)
         run {
-            val hR = mesh[107]; val hL = mesh[336]
+            val hR = proj(mesh[107], mid); val hL = proj(mesh[336], mid)
             val base = proj(mesh[168], mid).second
-            val topY = maxOf(proj(hR, mid).second, proj(hL, mid).second) + 0.09f * faceW
-            for (t in floatArrayOf(0.28f, 0.72f)) {
-                val x = proj(hR, mid).first + (proj(hL, mid).first - proj(hR, mid).first) * t
-                val axis = listOf(along(mid, x, base), along(mid, x, (base + topY) / 2), along(mid, x, topY))
-                RidgeTracker.track(lum, axis, 0.028f * faceW, stations = 20, offsets = 8, minStrength = 0.025f, minContrast = 2.0f, skin = skin)
-                    ?.let { out += AnnotLine(AnnotLayer.GLABELLA, it.points, false) }
+            val topY = maxOf(hR.second, hL.second) + 0.08f * faceW
+            val len = topY - base
+            val cands = ArrayList<Cand>()
+            for (t in floatArrayOf(0.12f, 0.26f, 0.4f, 0.6f, 0.74f, 0.88f)) for (deg in floatArrayOf(-14f, 0f, 14f)) {
+                val x = hR.first + (hL.first - hR.first) * t
+                val tilt = kotlin.math.tan(Math.toRadians(deg.toDouble())).toFloat() * len / 2
+                val axis = listOf(along(mid, x - tilt, base), along(mid, x, (base + topY) / 2), along(mid, x + tilt, topY))
+                RidgeTracker.track(lum, axis, 0.02f * faceW, stations = 22, offsets = 6, minStrength = 0.022f, minContrast = 2.0f, skin = skin)
+                    ?.let { cands += uv(it, vertical = true) }
             }
+            nms(cands, 0.045f * faceW, 4).sortedBy { it.v }.forEachIndexed { i, c ->
+                out += withMetrics(AnnotLayer.GLABELLA, "Ceño, vertical ${i + 1}", c.res)
+            }
+            // raíz nasal: horizontales del prócer
+            val yN = proj(mesh[168], mid).second; val y6 = proj(mesh[6], mid).second
+            val half = (hL.first - hR.first) * 0.32f
+            val hc = ArrayList<Cand>()
+            for (f in floatArrayOf(-0.2f, 0.15f, 0.5f)) {
+                val y = yN + (y6 - yN) * f
+                val axis = listOf(along(mid, -half, y), along(mid, 0f, y), along(mid, half, y))
+                RidgeTracker.track(lum, axis, 0.015f * faceW, stations = 16, offsets = 5, minStrength = 0.025f, minContrast = 2.2f, skin = skin)
+                    ?.let { hc += uv(it, vertical = false) }
+            }
+            nms(hc, 0.03f * faceW, 1).forEach { out += withMetrics(AnnotLayer.GLABELLA, "Ceño, raíz nasal", it.res) }
         }
-        // patas de gallo: rayos desde el canto externo hacia la sien
-        for ((canthus, center) in listOf(mesh[33] to Pt((mesh[33].x + mesh[133].x) / 2, (mesh[33].y + mesh[133].y) / 2),
-                                         mesh[263] to Pt((mesh[263].x + mesh[362].x) / 2, (mesh[263].y + mesh[362].y) / 2))) {
+        // patas de gallo: abanico de rayos desde el canto externo hacia la sien, fuera de las cejas
+        val brows = listOf(BROW_R, BROW_L).map { b -> b.map { mesh[it] }.let { pts -> val c = Pt(pts.map { it.x }.average().toFloat(), pts.map { it.y }.average().toFloat())
+            pts.map { Pt(c.x + (it.x - c.x) * 1.25f, c.y + (it.y - c.y) * 1.6f) } } }
+        val skinNoBrow = { q: Pt -> (skin?.invoke(q) ?: true) && brows.none { inside(q, it) } }
+        for ((side, pair) in listOf("derecha" to (mesh[33] to mid(mesh[33], mesh[133])), "izquierda" to (mesh[263] to mid(mesh[263], mesh[362])))) {
+            val (canthus, center) = pair
             val ox = canthus.x - center.x; val oy = canthus.y - center.y; val on = hypot(ox, oy).coerceAtLeast(1e-5f)
             val dx = ox / on; val dy = oy / on
-            for (deg in floatArrayOf(-38f, -14f, 10f, 34f)) {
+            val cands = ArrayList<Cand>()
+            for (deg in -50..50 step 10) {
                 val a = Math.toRadians(deg.toDouble()); val s = if (dx > 0) 1f else -1f
                 val rx = (dx * kotlin.math.cos(a) - dy * kotlin.math.sin(a) * s).toFloat(); val ry = (dx * kotlin.math.sin(a) * s + dy * kotlin.math.cos(a)).toFloat()
-                val p0 = Pt(canthus.x + rx * 0.05f * faceW, canthus.y + ry * 0.05f * faceW)
-                val p1 = Pt(canthus.x + rx * 0.17f * faceW, canthus.y + ry * 0.17f * faceW)
-                RidgeTracker.track(lum, listOf(p0, Pt((p0.x + p1.x) / 2, (p0.y + p1.y) / 2), p1), 0.02f * faceW, stations = 16, offsets = 6,
-                    minStrength = 0.022f, minContrast = 2.0f, skin = skin)?.let { out += AnnotLine(AnnotLayer.CROWS_FEET, it.points, false) }
+                val p0 = Pt(canthus.x + rx * 0.035f * faceW, canthus.y + ry * 0.035f * faceW)
+                val p1 = Pt(canthus.x + rx * 0.16f * faceW, canthus.y + ry * 0.16f * faceW)
+                RidgeTracker.track(lum, listOf(p0, Pt((p0.x + p1.x) / 2, (p0.y + p1.y) / 2), p1), 0.016f * faceW, stations = 18, offsets = 5,
+                    minStrength = 0.018f, minContrast = 1.9f, skin = skinNoBrow)?.let { r ->
+                    // coordenadas del rayo: u a lo largo, v = ángulo (en unidades de la cara para la separación)
+                    val dd = r.points.map { hypot(it.x - canthus.x, it.y - canthus.y) }
+                    cands += Cand(r, dd.min(), dd.max(), deg / 60f * faceW * 0.1f)
+                }
+            }
+            // rayos separados al menos ~13° entre sí
+            nms(cands, 0.022f * faceW, 4).sortedBy { it.v }.forEachIndexed { i, c ->
+                out += withMetrics(AnnotLayer.CROWS_FEET, "Pata de gallo $side ${i + 1}", c.res)
             }
         }
         // ojeras: entre el párpado inferior y el surco palpebromalar, si es más oscura que la mejilla
@@ -235,9 +323,29 @@ object FaceAnnotations {
             val region = meanLum(lum, poly) ?: continue
             val cheek = meanLumDisc(lum, mesh[cheeks[i]], 0.035f * faceW) ?: continue
             // zona infraorbitaria al menos un 12 % más oscura que la mejilla (sombra o pigmento)
-            if (region < cheek * 0.88f) out += AnnotLine(AnnotLayer.DARK_CIRCLES, poly, true, filled = true)
+            if (region < cheek * 0.88f) {
+                val name = "Ojera ${if (i == 0) "derecha" else "izquierda"}"
+                val m = if (lab != null && sc != null) {
+                    val rl = LineMeasure.meanLab(lab, poly); val cl = LineMeasure.meanLabDisc(lab, mesh[cheeks[i]], 0.035f * faceW)
+                    if (rl != null && cl != null) LineMeasure.darkCircle(name, rl, cl, LineMeasure.area(poly), sc) else null
+                } else null
+                out += AnnotLine(AnnotLayer.DARK_CIRCLES, poly, true, filled = true,
+                    metrics = m ?: sc?.let { LineMetrics(name, areaMm2 = LineMeasure.area(poly) * it.first * it.first,
+                        deltaL = LineMeasure.lstar(cheek) - LineMeasure.lstar(region), scale = it.second) })
+            }
         }
         return out
+    }
+
+    private fun mid(a: Pt, b: Pt) = Pt((a.x + b.x) / 2, (a.y + b.y) / 2)
+
+    private fun inside(q: Pt, poly: List<Pt>): Boolean {
+        var c = false; var j = poly.size - 1
+        for (i in poly.indices) {
+            if ((poly[i].y > q.y) != (poly[j].y > q.y) && q.x < (poly[j].x - poly[i].x) * (q.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x) c = !c
+            j = i
+        }
+        return c
     }
 
     /** Luminancia media dentro de un polígono (píxeles de [lum]). */
@@ -358,7 +466,7 @@ class PhotoAnnotator(private val context: Context) {
             val mesh = runCatching { MediaPipeFace(context).use { it.mesh(bmp) } }.getOrNull()
             if (mesh != null && mesh.size >= 468) {
                 val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(bmp) }
-                return@withContext FaceAnnotations.fromMesh(mesh, labels, lumOf(bmp))
+                return@withContext FaceAnnotations.fromMesh(mesh, labels, lumOf(bmp), labOf(bmp))
             }
             val pts = LandmarkDetector(stream = false, context, FaceEngine.get(context)).use { it.detect(Detector.FACE, bmp) }
             if (pts.size >= LiveDecision.MIN_POINTS) {
@@ -377,6 +485,13 @@ class PhotoAnnotator(private val context: Context) {
         val s = Bitmap.createScaledBitmap(bmp, w, h, true)
         val px = IntArray(w * h).also { s.getPixels(it, 0, w, 0, 0, w, h) }
         return GrayImage(w, h, FloatArray(px.size) { i -> val c = px[i]; (0.299f * ((c shr 16) and 0xFF) + 0.587f * ((c shr 8) and 0xFF) + 0.114f * (c and 0xFF)) / 255f })
+    }
+
+    /** Color CIE L*a*b* (≤ 480 px de ancho), para medir las ojeras. */
+    private fun labOf(bmp: Bitmap): LabImage {
+        val w = minOf(bmp.width, 480); val h = (bmp.height * w / bmp.width.toFloat()).roundToInt()
+        val s = Bitmap.createScaledBitmap(bmp, w, h, true)
+        return LabImage.fromArgb(IntArray(w * h).also { s.getPixels(it, 0, w, 0, 0, w, h) }, w, h)
     }
 
     companion object {

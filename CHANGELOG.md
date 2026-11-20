@@ -2,6 +2,19 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.13 — 20 de noviembre de 2026
+
+- **Medidas de cada línea**: toque una línea (surco, frente, ceño, patas de gallo) u ojera en el
+  visor para ver su ficha; el chip **Medidas** abre la tabla. En Comparar, una columna por foto y
+  la diferencia.
+  - Longitud y ancho en mm (escala por el diámetro del iris), contraste ΔL*, profundidad estimada
+    por el sombreado y grado orientativo 0–5 al estilo de Lemperle.
+  - Ojeras: área, ΔL*, ΔE*ab e ITA° frente a la mejilla, y tipo probable (vascular, pigmentaria o
+    estructural).
+- **Detectores mejorados**: líneas de la frente que siguen el arco de las cejas hasta la línea del
+  pelo (enteras o por mitades); ceño en abanico (verticales e inclinadas, y horizontales de la raíz
+  nasal); patas de gallo con 11 rayos, fuera de las cejas, con supresión de duplicados.
+
 ## 2.12 — 20 de noviembre de 2026
 
 - **Alineación y validación con ojos, cejas, nariz y labios** (malla completa de MediaPipe): más

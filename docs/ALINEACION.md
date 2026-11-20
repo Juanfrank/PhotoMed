@@ -431,7 +431,40 @@ mantienen la guía estándar.
   la coincidencia por rasgo = 1 − RMS/(0,10 × interpupilar), con aviso por debajo del 60 %.
 - **Nasogeniano**: pasillo 129-203-206-186-57 (y 358-423-426-410-287), anclado en el pliegue
   alar-facial (definición anatómica: del ala nasal a un punto lateral a la comisura oral).
-- **Frente**: franjas horizontales entre las cejas y el borde superior del rostro, supresión de
-  duplicados, hasta 6 líneas. **Ceño**: dos pasillos verticales junto a la cabeza de las cejas.
-  **Patas de gallo**: 4 rayos desde el canto externo (−38° a +34°). **Ojeras**: zona entre el
+- **Frente** (mejorado en 2.13): franjas que siguen el arco de las cejas (aplanándose hacia arriba),
+  enteras y por mitades, desde las cejas hasta la línea del pelo según la segmentación (la malla
+  acaba a media frente); supresión de no máximos (posición vertical y solape horizontal), hasta 8.
+  **Ceño**: abanico de 6 posiciones × 3 inclinaciones (±14°) entre las cabezas de las cejas
+  (verticales del corrugador, hasta 4) y horizontales del prócer en la raíz nasal.
+  **Patas de gallo**: 11 rayos (−50° a +50°, cada 10°) desde el canto externo, fuera de las cejas,
+  con supresión de no máximos (≥ ~13° entre rayos, hasta 4 por lado). **Ojeras**: zona entre el
   párpado inferior y el surco palpebromalar, si es ≥ 12 % más oscura que la mejilla.
+
+## Medidas de líneas, surcos y ojeras (`LineMetrics.kt`)
+
+Al tocar una línea en el visor se muestra su ficha; el chip **Medidas** abre la tabla (en Comparar,
+una columna por foto y la diferencia entre la última y la primera). Todas son orientativas.
+
+- **Escala en mm**: diámetro horizontal visible del iris (MediaPipe 469–471 / 474–476, el mayor)
+  = 11,7 mm. El HVID adulto cae en 10–13 mm y, con un valor fijo, Pirayesh et al. (2023) midieron
+  distancias faciales con un error medio del 2,9 % (horizontal) y 4,3 % (vertical). Si la
+  proporción iris / interpupilar no es plausible (0,14–0,25), interpupilar = 63 mm.
+- **Longitud**: longitud proyectada del trazado (no corrige la curvatura de la mejilla).
+- **Perfil transversal** en cada punto (±5 mm nasogeniano, ±4 mm marioneta y valle lagrimal,
+  ±2 mm arrugas finas), en L* CIE: piel de referencia = media de los hombros; fondo = mínimo.
+  **Ancho** = anchura a media caída (FWHM), mediana a lo largo del trazado. **ΔL*** = caída.
+- **Profundidad** (forma a partir del sombreado, 1D): con luz frontal sobre piel lambertiana,
+  ρ = Y/Y_piel = cos θ, pendiente tan θ = √(1/ρ² − 1); se integra desde el borde del valle hasta
+  el fondo en cada pared (respecto a la piel de su lado) y se promedian. La caída de luz real incluye
+  sombra proyectada, interreflexiones y pigmento, así que se atenúa con una ganancia global de 0,25,
+  ajustada para que las medianas en los 18 retratos queden en órdenes de magnitud plausibles
+  (arrugas finas ~0,4 mm, nasogeniano ~1,2 mm). En la prueba sintética (surco en V de 3 × 1 mm) la
+  integración sin ganancia recupera 1 mm ± 0,3. No hay validación frente a perfilometría.
+- **Grado 0–5** al estilo de Lemperle (0 sin arruga … 5 muy profunda) desde la profundidad
+  estimada: < 0,10 / 0,25 / 0,50 / 0,90 / 1,50 mm → 0–4; mayor → 5. Umbrales propios de la app.
+- **Ojeras**: color medio L*a*b* (D65) de la zona y de un disco en la mejilla: área (cm²), ΔL*,
+  ΔE*ab, ITA° = atan((L* − 50)/b*) de ambas y tipo probable: vascular (b* baja o a* sube sin
+  b*), pigmentaria (diferencia de tono con b* que no baja) o estructural / sombra.
+
+Rangos en los 18 retratos (mediana): nasogeniano 1,2 mm (grado 4), valle lagrimal 0,9 mm,
+marioneta 0,8 mm, ceño 0,5 mm, frente 0,4 mm, patas de gallo 0,4 mm; rostro joven: sin arrugas.

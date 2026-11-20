@@ -54,7 +54,19 @@ class NewFacesAnnotTest {
             val small = Bitmap.createScaledBitmap(img, sw, sh, true)
             val px = IntArray(sw * sh).also { small.getPixels(it, 0, sw, 0, 0, sw, sh) }
             val lum = GrayImage(sw, sh, FloatArray(px.size) { i -> val c = px[i]; (0.299f * Color.red(c) + 0.587f * Color.green(c) + 0.114f * Color.blue(c)) / 255f })
-            val lines = FaceAnnotations.fromMesh(mesh, labels, lum)
+            val lab = com.photomed.app.align.LabImage.fromArgb(px, sw, sh)
+            val lines = FaceAnnotations.fromMesh(mesh, labels, lum, lab)
+            report.append(k).append('\n')
+            lines.mapNotNull { it.metrics }.forEach { m -> report.append("   ").append(m).append('\n') }
+            // líneas con medidas (para las imágenes de ejemplo)
+            val ja = org.json.JSONArray()
+            lines.filter { it.metrics != null }.forEach { l -> val m = l.metrics!!
+                ja.put(JSONObject().put("layer", l.layer.name).put("name", m.name).put("filled", l.filled)
+                    .put("pts", org.json.JSONArray(l.points.map { org.json.JSONArray(listOf(it.x.toDouble(), it.y.toDouble())) }))
+                    .put("len", m.lengthMm?.toDouble()).put("width", m.widthMm?.toDouble()).put("depth", m.depthMm?.toDouble())
+                    .put("dl", m.contrastL?.toDouble()).put("grade", m.grade).put("area", m.areaMm2?.toDouble()).put("dL", m.deltaL?.toDouble())
+                    .put("dE", m.deltaE?.toDouble()).put("ita", m.ita?.toDouble()).put("itaRef", m.itaRef?.toDouble()).put("type", m.type)) }
+            File("build/reports/new_faces").mkdirs(); File("build/reports/new_faces/$k.json").writeText(ja.toString())
             faces++
             val folds = lines.filter { it.layer == AnnotLayer.FOLDS }
             // nasogenianos: surcos cuyo inicio está junto al ala de la nariz
