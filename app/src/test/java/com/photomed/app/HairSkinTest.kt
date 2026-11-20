@@ -132,7 +132,9 @@ class HairSkinTest {
                 c.drawPath(path, paint)
             }
             File(dir, "$k.png").outputStream().use { img.compress(Bitmap.CompressFormat.PNG, 90, it) }
-            assertTrue(k, com.photomed.app.align.AnnotLayer.entries.all { layer -> lines.any { it.layer == layer } || layer == com.photomed.app.align.AnnotLayer.HAIRLINE })
+            // capas del método de respaldo (sin malla): contorno, ojos, nariz, labios y surcos
+            assertTrue(k, listOf(com.photomed.app.align.AnnotLayer.CONTOUR, com.photomed.app.align.AnnotLayer.EYES, com.photomed.app.align.AnnotLayer.NOSE,
+                com.photomed.app.align.AnnotLayer.LIPS, com.photomed.app.align.AnnotLayer.FOLDS).all { layer -> lines.any { it.layer == layer } })
         }
         assumeTrue(n > 0)
         println("ANOTACIONES: $n rostros · surcos ajustados al valle de sombra $refined de $folds")

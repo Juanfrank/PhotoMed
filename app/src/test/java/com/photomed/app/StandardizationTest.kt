@@ -29,7 +29,7 @@ class StandardizationTest {
     @Test
     fun meshMappingAndPoseFromMatrix() {
         val pts = FaceMeshMap.toKeys({ i -> i / 1000f to i / 2000f }, 478, 360, 480)
-        assertEquals(36 + 20 + 32 + 38 + 5 + 5, pts.size)
+        assertEquals(36 + 20 + 32 + 38 + 5 + 5 + com.photomed.app.align.Landmarks.MESH_FEATURES.size, pts.size)   // + rasgos de la malla
         assertEquals(0.152f, pts["oval_18"]!!.x, 1e-6f)            // índice 152 = mentón
         assertEquals(0.076f * 480 / 360, pts["oval_18"]!!.y, 1e-6f) // normalizado por el ancho
         assertEquals(0.473f, pts["eye_l"]!!.x, 1e-6f)              // iris izquierdo
