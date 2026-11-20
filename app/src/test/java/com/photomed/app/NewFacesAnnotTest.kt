@@ -102,4 +102,62 @@ class NewFacesAnnotTest {
         org.junit.Assert.assertTrue(withNaso >= faces * 0.6)
         org.junit.Assert.assertTrue(youngFolds in 0..2)
     }
+
+    /**
+     * Cara pequeña en el encuadre (como una foto frontal con pelo, cuello y margen): cada retrato se
+     * coloca, a su resolución, en un lienzo 2,6 veces más ancho (cara ≈ 35 % del ancho). Analizada
+     * entera a 480 px se perdían las arrugas finas; con el recorte de la cara ([FaceCrop]) se
+     * recuperan casi todas las del retrato ajustado.
+     */
+    @Test
+    fun wrinklesFoundWhenFaceIsSmallInFrame() {
+        val json = javaClass.getResourceAsStream("/stock/new/mesh.json")?.bufferedReader()?.readText()
+        assumeTrue("sin retratos nuevos", json != null)
+        val o = JSONObject(json!!)
+        val wr = setOf(AnnotLayer.FOREHEAD, AnnotLayer.GLABELLA, AnnotLayer.CROWS_FEET, AnnotLayer.FOLDS)
+        var tight = 0; var oldSmall = 0; var newSmall = 0; var measured = 0; var newLines = 0
+        for (k in o.keys().asSequence().sorted()) {
+            val arr = o.getJSONArray(k)
+            val mesh = (0 until arr.length()).map { i -> arr.getJSONArray(i).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1).toFloat()) } }
+            // retrato a ≤ 800 px de ancho (la cara sigue a ≥ 400 px): lienzos menores, menos memoria
+            val img0 = javaClass.getResourceAsStream("/stock/new/$k.jpg")?.let { BitmapFactory.decodeStream(it) } ?: continue
+            val img = if (img0.width <= 800) img0 else Bitmap.createScaledBitmap(img0, 800, img0.height * 800 / img0.width, true).also { img0.recycle() }
+            val labBmp = javaClass.getResourceAsStream("/stock/new/${k}_labels.png")?.let { BitmapFactory.decodeStream(it) } ?: continue
+            val lpx = IntArray(labBmp.width * labBmp.height).also { labBmp.getPixels(it, 0, labBmp.width, 0, 0, labBmp.width, labBmp.height) }
+            fun labAt(nx: Float, ny: Float): Byte { // en unidades del ancho del retrato
+                val x = (nx * labBmp.width).toInt(); val y = (ny * labBmp.width).toInt()
+                return if (x in 0 until labBmp.width && y in 0 until labBmp.height) Color.red(lpx[y * labBmp.width + x]).toByte() else 0
+            }
+            val W = img.width; val H = img.height
+            // 1) retrato ajustado (referencia), como en annotateNewRealFaces
+            fun lum480(b: Bitmap): GrayImage { val sw = 480; val sh = b.height * sw / b.width
+                val sm = Bitmap.createScaledBitmap(b, sw, sh, true); val px = IntArray(sw * sh).also { sm.getPixels(it, 0, sw, 0, 0, sw, sh) }
+                return GrayImage(sw, sh, FloatArray(px.size) { i -> val c = px[i]; (0.299f * Color.red(c) + 0.587f * Color.green(c) + 0.114f * Color.blue(c)) / 255f }) }
+            val labelsTight = FaceLabels(labBmp.width, labBmp.height, ByteArray(lpx.size) { Color.red(lpx[it]).toByte() })
+            tight += FaceAnnotations.fromMesh(mesh, labelsTight, lum480(img)).count { it.layer in wr }
+            // 2) cara pequeña en un lienzo mayor (misma resolución de la cara)
+            val W2 = (W * 2.6f).toInt(); val H2 = (H * 1.9f).toInt(); val padX = (W2 - W) / 2; val padY = (H2 - H) / 3
+            val big = Bitmap.createBitmap(W2, H2, Bitmap.Config.ARGB_8888)
+            Canvas(big).apply { drawColor(Color.rgb(90, 95, 100)); drawBitmap(img, padX.toFloat(), padY.toFloat(), null) }
+            val meshBig = mesh.map { Pt((it.x * W + padX) / W2, (it.y * W + padY) / W2) }
+            fun labelsGrid(gw: Int, gh: Int, toPhotoPx: (Int, Int) -> Pair<Float, Float>) = FaceLabels(gw, gh, ByteArray(gw * gh) { i ->
+                val (px, py) = toPhotoPx(i % gw, i / gw); labAt((px - padX) / W, (py - padY) / W) })
+            // análisis anterior: foto entera a 480 px
+            val l480 = lum480(big)
+            val labOld = labelsGrid(480, l480.height) { x, y -> x * W2 / 480f to y * W2 / 480f }
+            oldSmall += FaceAnnotations.fromMesh(meshBig, labOld, l480).count { it.layer in wr }
+            // análisis nuevo: recorte de la cara
+            val lines = com.photomed.app.align.FaceCrop.annotate(meshBig, big, { b, c ->
+                labelsGrid(b.width, b.height) { x, y -> c.x0 + x / c.scale to c.y0 + y / c.scale } })
+            val w = lines.filter { it.layer in wr }
+            newSmall += w.size; newLines += w.size; measured += w.count { it.metrics?.lengthMm != null }
+            // las líneas vuelven a la foto completa: dentro de la cara
+            for (l in w) for (q in l.points) org.junit.Assert.assertTrue(q.x in meshBig.minOf { it.x } - 0.05f..meshBig.maxOf { it.x } + 0.05f)
+            big.recycle(); img.recycle(); labBmp.recycle()
+        }
+        println("CARA PEQUEÑA: retrato ajustado $tight líneas; cara pequeña antes $oldSmall, ahora $newSmall ($measured con medidas)")
+        org.junit.Assert.assertTrue("se pierden arrugas con la cara pequeña: $newSmall de $tight", newSmall >= tight * 0.7)
+        org.junit.Assert.assertTrue(newSmall > oldSmall)
+        org.junit.Assert.assertEquals(newLines, measured)
+    }
 }

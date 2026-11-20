@@ -91,6 +91,9 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     // línea tocada (ficha de medidas) y tabla de medidas
     var selected by remember { mutableStateOf<com.photomed.app.align.AnnotLine?>(null) }
     var metricsSheet by remember { mutableStateOf(false) }
+    // líneas analizadas de cada foto (para la tabla) y motivo si no hay medidas
+    val annotsByUri = remember { androidx.compose.runtime.mutableStateMapOf<String, List<com.photomed.app.align.AnnotLine>>() }
+    val notesByUri = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
 
     LaunchedEffect(reload) {
         photos = withContext(Dispatchers.IO) { repo.getExpediente(expId)?.let { repo.photos(it, zone) }.orEmpty() }
@@ -148,7 +151,19 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize().background(Color.Black), key = { list[it].key },
                 userScrollEnabled = !cropping) { page ->
                 PhotoPage(list[page], zone, if (showLayers) layersState.value else emptySet(), editVersion, Modifier.fillMaxSize(),
-                    selected = selected, onSelect = { selected = it })
+                    selected = selected, analyze = showLayers,
+                    onSelect = { hit ->
+                        selected = hit
+                        // toque sin línea medida y ninguna capa de arrugas visible: cómo verlas
+                        val visibleMeasured = annotsByUri[list[page].uri.toString()].orEmpty().any { it.metrics != null && it.layer in layersState.value }
+                        if (hit == null && !visibleMeasured) scope.launch {
+                            snackbar.showSnackbar("Active Surcos, Frente, Ceño, Patas de gallo u Ojeras y toque una línea, o abra «Medidas»")
+                        }
+                    },
+                    onAnalyzed = { lines, note ->
+                        annotsByUri[list[page].uri.toString()] = lines
+                        if (note != null) notesByUri[list[page].uri.toString()] = note else notesByUri.remove(list[page].uri.toString())
+                    })
             }
             androidx.compose.foundation.layout.Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .background(Color.Black.copy(alpha = 0.55f))) {
@@ -193,9 +208,11 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
 
     LaunchedEffect(pager.currentPage) { selected = null }
     if (metricsSheet) {
-        val e = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
-        val lines = com.photomed.app.align.PhotoAnnotator.cached("full|${current.uri}|${e.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, current.uri.toString())}").orEmpty()
-        com.photomed.app.ui.compare.MetricsSheet(listOf(formatDateTime(current.takenAt) to lines), layersState.value) { metricsSheet = false }
+        val u = current.uri.toString()
+        val lines = annotsByUri[u]
+        com.photomed.app.ui.compare.MetricsSheet(listOf(formatDateTime(current.takenAt) to lines.orEmpty()), layersState.value,
+            onDismiss = { metricsSheet = false }, loading = lines == null, note = notesByUri[u],
+            onShowLayers = { layersState.value = it })
     }
 
     if (confirmDelete) {
@@ -257,20 +274,29 @@ private fun EditButton(icon: androidx.compose.ui.graphics.vector.ImageVector, la
  */
 @Composable
 private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.align.AnnotLayer>, version: Int, modifier: Modifier,
-                      selected: com.photomed.app.align.AnnotLine? = null, onSelect: (com.photomed.app.align.AnnotLine?) -> Unit = {}) {
+                      selected: com.photomed.app.align.AnnotLine? = null, onSelect: (com.photomed.app.align.AnnotLine?) -> Unit = {},
+                      /** Analizar la foto (panel de capas abierto), aunque no haya capas encendidas: la tabla lo necesita. */
+                      analyze: Boolean = layers.isNotEmpty(),
+                      onAnalyzed: (List<com.photomed.app.align.AnnotLine>, String?) -> Unit = { _, _ -> }) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val edit = remember(photo.uri, version) { com.photomed.app.align.PhotoEdits.of(context, photo.uri.toString()) }
     val img by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, photo.uri, edit) {
         value = runCatching { com.photomed.app.align.ImageOps.loadFull(context, photo.uri, 2048, edit).asImageBitmap() }.getOrNull()
     }
-    val annots by androidx.compose.runtime.produceState<List<com.photomed.app.align.AnnotLine>?>(null, photo.uri, edit, layers.isNotEmpty()) {
-        if (layers.isEmpty()) return@produceState
+    val annots by androidx.compose.runtime.produceState<List<com.photomed.app.align.AnnotLine>?>(null, photo.uri, edit, analyze) {
+        if (!analyze) return@produceState
         val key = "full|${photo.uri}|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, photo.uri.toString())}"
-        value = com.photomed.app.align.PhotoAnnotator.cached(key) ?: runCatching {
+        val hit = com.photomed.app.align.PhotoAnnotator.cached(key)
+        value = hit ?: runCatching {
             com.photomed.app.align.PhotoAnnotator(context.applicationContext)
-                .annotate(com.photomed.app.align.ImageOps.loadFull(context, photo.uri, 1080, edit), zone,
-                    com.photomed.app.align.PhotoAnnotator.extrasFor(context, photo.uri, 1080, crop34 = false))
-        }.getOrNull()?.also { com.photomed.app.align.PhotoAnnotator.put(key, it) }
+                .analyze(com.photomed.app.align.ImageOps.loadFull(context, photo.uri, 1600, edit), zone,
+                    com.photomed.app.align.PhotoAnnotator.extrasFor(context, photo.uri, 1600, crop34 = false))
+        }.getOrNull()?.let { (lines, note) ->
+            com.photomed.app.align.PhotoAnnotator.put(key, lines); com.photomed.app.align.PhotoAnnotator.putNote(key, note); lines
+        } ?: emptyList<com.photomed.app.align.AnnotLine>().also {
+            com.photomed.app.align.PhotoAnnotator.putNote(key, "No se pudo analizar la foto.")
+        }
+        onAnalyzed(value.orEmpty(), com.photomed.app.align.PhotoAnnotator.note(key))
     }
     val imgState = androidx.compose.runtime.rememberUpdatedState(img)
     val annotsState = androidx.compose.runtime.rememberUpdatedState(annots)

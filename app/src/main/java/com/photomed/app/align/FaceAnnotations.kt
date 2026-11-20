@@ -464,26 +464,125 @@ object FaceAnnotations {
     }
 }
 
+/**
+ * Análisis de la cara a resolución fija: las arrugas finas (1–2 mm) solo se ven si la cara mide unos
+ * [FACE_PX] px de ancho en la imagen analizada. La foto completa (con pelo, cuello y margen) a 480 px
+ * deja la cara en 150–250 px y las arrugas por debajo de 1–2 px: no se detectaban. Se recorta la cara
+ * (con la frente hasta el pelo) de la foto a su resolución, se analiza a esa escala y las líneas
+ * vuelven a las coordenadas de la foto.
+ */
+object FaceCrop {
+    const val FACE_PX = 400f
+    const val MAX_SIDE = 1400
+
+    /** Recorte en px de la foto ([x0], [y0], ancho, alto) y escala de salida (px de salida por px de la foto). */
+    class Crop(val x0: Float, val y0: Float, val w: Float, val h: Float, val scale: Float, val srcW: Int) {
+        val outW: Int get() = (w * scale).roundToInt().coerceAtLeast(16)
+        val outH: Int get() = (h * scale).roundToInt().coerceAtLeast(16)
+        /** Punto de la foto (unidades de su ancho) → recorte (unidades del ancho del recorte). */
+        fun toCrop(p: Pt) = Pt((p.x * srcW - x0) / w, (p.y * srcW - y0) / w)
+        fun toPhoto(p: Pt) = Pt((p.x * w + x0) / srcW, (p.y * w + y0) / srcW)
+    }
+
+    fun crop(mesh: List<Pt>, srcW: Int, srcH: Int): Crop {
+        val faceW = hypot(mesh[234].x - mesh[454].x, mesh[234].y - mesh[454].y) * srcW
+        val xs = mesh.map { it.x * srcW }; val ys = mesh.map { it.y * srcW }
+        val x0 = (xs.min() - 0.2f * faceW).coerceAtLeast(0f); val x1 = (xs.max() + 0.2f * faceW).coerceAtMost(srcW.toFloat())
+        val y0 = (ys.min() - 0.55f * faceW).coerceAtLeast(0f); val y1 = (ys.max() + 0.08f * faceW).coerceAtMost(srcH.toFloat())
+        var s = (FACE_PX / faceW.coerceAtLeast(1f)).coerceAtMost(2f)
+        val big = maxOf(x1 - x0, y1 - y0) * s
+        if (big > MAX_SIDE) s *= MAX_SIDE / big
+        return Crop(x0, y0, x1 - x0, y1 - y0, s, srcW)
+    }
+
+    fun bitmap(src: Bitmap, c: Crop): Bitmap {
+        val m = android.graphics.Matrix().apply { postScale(c.scale, c.scale) }
+        val x = c.x0.toInt().coerceIn(0, src.width - 1); val y = c.y0.toInt().coerceIn(0, src.height - 1)
+        val w = c.w.toInt().coerceIn(1, src.width - x); val h = c.h.toInt().coerceIn(1, src.height - y)
+        return Bitmap.createBitmap(src, x, y, w, h, m, true)
+    }
+
+    /** Luminancia (0..1) de un mapa de bits sin reescalar. */
+    fun lum(b: Bitmap): GrayImage {
+        val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
+        return GrayImage(b.width, b.height, FloatArray(px.size) { i -> val c = px[i]; (0.299f * ((c shr 16) and 0xFF) + 0.587f * ((c shr 8) and 0xFF) + 0.114f * (c and 0xFF)) / 255f })
+    }
+
+    /** Relieve (en coordenadas de la foto) muestreado en el recorte. */
+    fun relief(r: GrayImage, c: Crop, outW: Int, outH: Int): GrayImage {
+        val k = r.width / c.srcW.toFloat()
+        return GrayImage(outW, outH, FloatArray(outW * outH) { i ->
+            val u = i % outW; val v = i / outW
+            r.sample((c.x0 + (u + 0.5f) / c.scale) * k, (c.y0 + (v + 0.5f) / c.scale) * k)
+        })
+    }
+
+    /**
+     * Líneas de la cara de [src] (malla [mesh] en unidades de su ancho), analizadas en el recorte.
+     * [labelsOf]: segmentación pelo / piel del recorte.
+     */
+    fun annotate(mesh: List<Pt>, src: Bitmap, labelsOf: (Bitmap, Crop) -> FaceLabels?, extras: MeasureExtras? = null): List<AnnotLine> {
+        val c = crop(mesh, src.width, src.height)
+        val b = bitmap(src, c)
+        val m = mesh.map { c.toCrop(it) }
+        val labels = runCatching { labelsOf(b, c) }.getOrNull()
+        val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
+        val ex = extras?.let { e -> MeasureExtras(e.relief?.let { relief(it, c, b.width, b.height) }, e.meta) }
+        val lines = FaceAnnotations.fromMesh(m, labels, lum(b), LabImage.fromArgb(px, b.width, b.height), ex)
+        if (b !== src) b.recycle()
+        return lines.map { l -> l.copy(points = l.points.map { c.toPhoto(it) }) }
+    }
+}
+
 /** Analiza una foto (ya editada y en su encuadre) y devuelve sus líneas; con caché por clave. */
 class PhotoAnnotator(private val context: Context) {
-    suspend fun annotate(bmp: Bitmap, zone: Zone, extras: MeasureExtras? = null): List<AnnotLine> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+    suspend fun annotate(bmp: Bitmap, zone: Zone, extras: MeasureExtras? = null): List<AnnotLine> = analyze(bmp, zone, extras).first
+
+    /**
+     * Líneas y, si no hay arrugas medibles, el motivo para el usuario (rostro no detectado entero,
+     * zona corporal…).
+     */
+    suspend fun analyze(bmp: Bitmap, zone: Zone, extras: MeasureExtras? = null): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val spec = ZoneAlignment.of(zone)
         if (spec.detector == Detector.FACE) {
-            // malla completa de MediaPipe (nariz, labios, ojos y pasillos de los surcos con su topología real)
-            val mesh = runCatching { MediaPipeFace(context).use { it.mesh(bmp) } }.getOrNull()
+            // malla completa de MediaPipe (nariz, labios, ojos y pasillos de los surcos con su topología real);
+            // en primeros planos (frente, ojos) la cara no cabe entera y el detector falla: se reintenta con
+            // la foto dentro de un marco más amplio
+            val mesh = runCatching { MediaPipeFace(context).use { mp -> mp.mesh(bmp) ?: meshPadded(mp, bmp) } }.getOrNull()
             if (mesh != null && mesh.size >= 468) {
-                val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(bmp) }
-                return@withContext FaceAnnotations.fromMesh(mesh, labels, lumOf(bmp), labOf(bmp), extras)
+                // análisis en el recorte de la cara a resolución fija (ver FaceCrop)
+                val seg = HairSkinSegmenter.createOrNull(context)
+                val lines = try {
+                    FaceCrop.annotate(mesh, bmp, { b, _ -> seg?.labels(b) }, extras)
+                } finally { seg?.close() }
+                val note = if (lines.none { it.metrics != null }) "No se encontraron arrugas ni surcos medibles en esta foto (piel lisa, " +
+                    "poca resolución de la cara o luz muy plana)." else null
+                return@withContext lines to note
             }
             val pts = LandmarkDetector(stream = false, context, FaceEngine.get(context)).use { it.detect(Detector.FACE, bmp) }
+            val why = "No se detectó la cara entera, así que no se pueden medir arrugas. En primeros planos " +
+                "(frente, ojos) use la foto frontal u oblicua del mismo día."
             if (pts.size >= LiveDecision.MIN_POINTS) {
                 val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(bmp) }
                 val lum = lumOf(bmp)
-                return@withContext FaceAnnotations.face(pts, labels, lum)
+                return@withContext FaceAnnotations.face(pts, labels, lum) to why
             }
+            return@withContext emptyList<AnnotLine>() to why
         }
-        val mask = BodyRegion.of(zone, bmp) { b -> SubjectSegmenter().use { it.segment(b) } } ?: return@withContext emptyList()
-        FaceAnnotations.body(mask)
+        val mask = BodyRegion.of(zone, bmp) { b -> SubjectSegmenter().use { it.segment(b) } }
+        (mask?.let { FaceAnnotations.body(it) } ?: emptyList()) to "Las medidas de arrugas y surcos son solo para zonas del rostro."
+    }
+
+    /** Malla con la foto centrada en un lienzo 1,8 veces mayor (la cara cabe entera en el detector). */
+    private fun meshPadded(mp: MediaPipeFace, bmp: Bitmap): List<Pt>? {
+        val f = 1.8f
+        val w = (bmp.width * f).roundToInt(); val h = (bmp.height * f).roundToInt()
+        val ox = (w - bmp.width) / 2f; val oy = (h - bmp.height) / 2f
+        val big = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        android.graphics.Canvas(big).apply { drawColor(android.graphics.Color.rgb(128, 128, 128)); drawBitmap(bmp, ox, oy, null) }
+        val m = mp.mesh(big)
+        big.recycle()
+        return m?.map { Pt((it.x * w - ox) / bmp.width, (it.y * w - oy) / bmp.width) }
     }
 
     /** Luminancia (0..1) sin estandarizar, para buscar valles de sombra. */
@@ -492,13 +591,6 @@ class PhotoAnnotator(private val context: Context) {
         val s = Bitmap.createScaledBitmap(bmp, w, h, true)
         val px = IntArray(w * h).also { s.getPixels(it, 0, w, 0, 0, w, h) }
         return GrayImage(w, h, FloatArray(px.size) { i -> val c = px[i]; (0.299f * ((c shr 16) and 0xFF) + 0.587f * ((c shr 8) and 0xFF) + 0.114f * (c and 0xFF)) / 255f })
-    }
-
-    /** Color CIE L*a*b* (≤ 480 px de ancho), para medir las ojeras. */
-    private fun labOf(bmp: Bitmap): LabImage {
-        val w = minOf(bmp.width, 480); val h = (bmp.height * w / bmp.width.toFloat()).roundToInt()
-        val s = Bitmap.createScaledBitmap(bmp, w, h, true)
-        return LabImage.fromArgb(IntArray(w * h).also { s.getPixels(it, 0, w, 0, 0, w, h) }, w, h)
     }
 
     companion object {
@@ -518,6 +610,9 @@ class PhotoAnnotator(private val context: Context) {
         private val cache = object : LinkedHashMap<String, List<AnnotLine>>(16, 0.75f, true) {
             override fun removeEldestEntry(e: MutableMap.MutableEntry<String, List<AnnotLine>>) = size > 40
         }
+        private val notes = HashMap<String, String?>()
+        fun note(key: String): String? = synchronized(cache) { notes[key] }
+        fun putNote(key: String, n: String?) = synchronized(cache) { notes[key] = n }
         fun cached(key: String): List<AnnotLine>? = synchronized(cache) { cache[key] }
         fun put(key: String, v: List<AnnotLine>) = synchronized(cache) { cache[key] = v }
     }

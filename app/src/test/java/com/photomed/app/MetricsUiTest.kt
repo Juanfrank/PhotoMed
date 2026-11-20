@@ -50,7 +50,7 @@ class MetricsUiTest {
             MetricsSheet(listOf(
                 "1 ene 2026" to listOf(line("Nasogeniano derecho", 32f, 1.40f, 4), ojera),
                 "1 abr 2026" to listOf(line("Nasogeniano derecho", 30f, 0.90f, 3)),
-            ), setOf(AnnotLayer.FOLDS, AnnotLayer.DARK_CIRCLES)) {}
+            ), setOf(AnnotLayer.FOLDS, AnnotLayer.DARK_CIRCLES), onDismiss = {})
         } }
         compose.waitForIdle()
         compose.onNodeWithText("Medidas de líneas y surcos").assertIsDisplayed()

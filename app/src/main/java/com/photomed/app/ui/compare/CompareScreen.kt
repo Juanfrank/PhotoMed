@@ -387,7 +387,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         // anotaciones (contorno, línea del pelo, rasgos, surcos) de cada foto, en su foto corregida
         val layers = if (showLayers) layersState.value else emptySet()
         val annots: Map<String, List<com.photomed.app.align.AnnotLine>> = seq?.mapNotNull { p ->
-            key("a" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, layers.isNotEmpty()).value }?.let { p.key to it }
+            // con el panel de capas abierto se analizan las fotos aunque no haya capas encendidas (la tabla de medidas lo necesita)
+            key("a" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, showLayers).value }?.let { p.key to it }
         }?.toMap().orEmpty()
         val view = CompareView(viewRot, viewMirror, layers, models.mapNotNull { (k, m) -> annots[k]?.let { m to it } }.toMap())
         if (all != null && photos.size < 2) {
@@ -416,7 +417,10 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 onMetrics = { metricsSheet = true })
             if (metricsSheet && seq != null) {
                 val stamps = stampLabels(seq.map { it.takenAt })
-                MetricsSheet(seq.mapIndexed { i, p -> stamps[i] to annots[p.key].orEmpty() }, layersState.value) { metricsSheet = false }
+                MetricsSheet(seq.mapIndexed { i, p -> stamps[i] to annots[p.key].orEmpty() }, layersState.value,
+                    onDismiss = { metricsSheet = false }, loading = seq.any { annots[it.key] == null },
+                    note = seq.firstNotNullOfOrNull { photoAnnotationNote(context, it.uri) },
+                    onShowLayers = { layersState.value = it })
             }
             // Área de comparación
             androidx.compose.runtime.CompositionLocalProvider(LocalCompareView provides view) {

@@ -88,6 +88,12 @@ fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, mod
  * Anotaciones de una foto en su encuadre 3:4 (con su edición guardada), llevadas a la foto corregida
  * en perspectiva [phiDeg] (como se muestra en Comparar). null mientras se calculan.
  */
+/** Motivo (si lo hay) por el que la foto no tiene medidas, tras analizarla. */
+fun photoAnnotationNote(context: Context, uri: Uri): String? {
+    val edit = PhotoEdits.of(context, uri.toString())
+    return PhotoAnnotator.note("34|$uri|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, uri.toString())}")
+}
+
 @Composable
 fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boolean): State<List<AnnotLine>?> {
     val context = LocalContext.current
@@ -96,9 +102,10 @@ fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boole
         if (!enabled) { value = null; return@produceState }
         val key = "34|$uri|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, uri.toString())}"
         val base = PhotoAnnotator.cached(key) ?: runCatching {
-            PhotoAnnotator(context.applicationContext).annotate(ImageOps.load34(context, uri, 720), zone,
-                PhotoAnnotator.extrasFor(context, uri, 720, crop34 = true))
-        }.getOrNull()?.also { PhotoAnnotator.put(key, it) }
+            PhotoAnnotator(context.applicationContext).analyze(ImageOps.load34(context, uri, 1080), zone,
+                PhotoAnnotator.extrasFor(context, uri, 1080, crop34 = true))
+        }.getOrNull()?.let { (lines, note) -> PhotoAnnotator.put(key, lines); PhotoAnnotator.putNote(key, note); lines }
+            ?: emptyList<AnnotLine>().also { PhotoAnnotator.putNote(key, "No se pudo analizar la foto.") }
         value = base?.map { l -> if (phiDeg == 0f) l else l.copy(points = l.points.map { Perspective.mapPt(it, phiDeg) }) }
     }
 }

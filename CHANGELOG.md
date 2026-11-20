@@ -2,6 +2,18 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.15.3 — 20 de noviembre de 2026
+
+- **Corrección: no se mostraban las medidas de las arrugas.** Las capas de arrugas vienen apagadas
+  y la foto solo se analizaba con alguna capa encendida, así que *Medidas* salía vacía. Ahora, con el
+  panel de capas abierto, la foto se analiza siempre; la tabla lista todas las líneas medidas (estén
+  o no visibles), indica «Analizando…» mientras calcula, ofrece *Mostrar en la foto* y, si no hay
+  medidas, explica por qué.
+- **Más arrugas detectadas en fotos con la cara pequeña**: se analiza un recorte de la cara a
+  resolución fija (≈ 400 px de ancho de cara) en vez de la foto entera a 480 px.
+- **Primeros planos** (frente, ojos): si la cara no se detecta entera, se reintenta dentro de un
+  marco más amplio.
+
 ## 2.15.2 — 20 de noviembre de 2026
 
 - **Corrección**: la página de importación ya no es una ventana de diálogo aparte (en algunos

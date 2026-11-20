@@ -147,20 +147,36 @@ private fun fmt(i: Int, v: Float?, area: Boolean) = when {
  * entre la última y la primera.
  */
 @Composable
-fun MetricsSheet(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>, onDismiss: () -> Unit) {
+fun MetricsSheet(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>, onDismiss: () -> Unit,
+                 /** Aún se están analizando las fotos. */
+                 loading: Boolean = false,
+                 /** Motivo si no hay medidas (cara no detectada entera, zona corporal…). */
+                 note: String? = null,
+                 /** Encender en la foto las capas de las líneas medidas que están ocultas. */
+                 onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null) {
     SafeBottomSheet(onDismiss = onDismiss) {
         Column(Modifier.padding(horizontal = 16.dp).heightIn(max = 640.dp).verticalScroll(rememberScrollState())) {
             Text("Medidas de líneas y surcos", style = MaterialTheme.typography.titleLarge)
+            // todas las líneas medidas, estén o no visibles sus capas en la foto
             val byName = LinkedHashMap<String, Pair<AnnotLayer, MutableList<LineMetrics?>>>()
             columns.forEachIndexed { ci, (_, lines) ->
-                lines.filter { it.metrics != null && it.layer in layers }.forEach { l ->
+                lines.filter { it.metrics != null }.forEach { l ->
                     val e = byName.getOrPut(l.metrics!!.name) { l.layer to MutableList(columns.size) { null } }
                     e.second[ci] = l.metrics
                 }
             }
             if (byName.isEmpty()) {
-                Text("No hay líneas medidas en las capas visibles. Active Surcos, Frente, Ceño, Patas de gallo u Ojeras.",
+                if (loading) Row(Modifier.padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.CircularProgressIndicator(Modifier.size(22.dp))
+                    Text("Analizando la foto…", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 12.dp))
+                } else Text(note ?: "No se encontraron arrugas ni surcos medibles.",
                     style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 16.dp))
+            }
+            val hidden = byName.values.map { it.first }.toSet() - layers
+            if (hidden.isNotEmpty() && onShowLayers != null) {
+                TextButton(onClick = { onShowLayers(layers + hidden) }) {
+                    Text("Mostrar en la foto: " + hidden.sortedBy { it.ordinal }.joinToString(", ") { it.label })
+                }
             }
             val ordered = byName.entries.sortedWith(compareBy({ it.value.first.ordinal }, { it.key }))
             val single = columns.size == 1

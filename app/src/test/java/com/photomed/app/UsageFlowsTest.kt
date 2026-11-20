@@ -22,6 +22,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
 import androidx.test.core.app.ApplicationProvider
 import com.photomed.app.align.AlignOptions
 import com.photomed.app.data.Expediente
@@ -255,6 +256,67 @@ class UsageFlowsTest {
         compose.onNodeWithContentDescription("Capas", substring = true).performClick()
         compose.onNodeWithText("Surcos").performScrollTo().performClick()
         compose.onNodeWithText("Medidas").assertExists()
+        compose.waitForIdle()
+        assertTrue(ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!.contains("FOLDS"))
+    }
+
+    /**
+     * Medidas de las arrugas en el visor: con las capas de arrugas activadas, tocar una línea abre su
+     * ficha y el chip «Medidas» abre la tabla. (Las líneas se ponen en la caché del analizador: en las
+     * pruebas no hay MediaPipe.)
+     */
+    @Test
+    fun viewerShowsWrinkleMeasurementsOnTapAndTable() {
+        com.photomed.app.align.PhotoEdits.clearCache()
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).edit().putString("annot_layers", "FOREHEAD,FOLDS").commit()
+        val p = photos[0]
+        val edit = com.photomed.app.align.PhotoEdits.of(ctx, p.uri.toString())
+        val forehead = com.photomed.app.align.AnnotLine(com.photomed.app.align.AnnotLayer.FOREHEAD,
+            (0..10).map { com.photomed.app.align.Pt(0.1f + it * 0.08f, 0.5f) }, false,
+            metrics = com.photomed.app.align.LineMetrics("Frente, línea 1", lengthMm = 42f, widthMm = 1.2f, contrastL = 8f, depthMm = 0.31f, grade = 2))
+        val key = "full|${p.uri}|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(ctx, p.uri.toString())}"
+        com.photomed.app.align.PhotoAnnotator.put(key, listOf(forehead))
+        setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
+        waitText("Medidas")
+        // toque sobre la línea: centro de la foto ajustada a la página (y = 0,5 × ancho de la foto)
+        val page = compose.onNodeWithContentDescription("Fotografía", substring = true).fetchSemanticsNode().boundsInRoot
+        val ia = 30f / 40f
+        val w = minOf(page.width, page.height * ia); val h = w / ia
+        val x = page.left + (page.width - w) / 2 + 0.5f * w; val y = page.top + (page.height - h) / 2 + 0.5f * w
+        compose.onNodeWithContentDescription("Fotografía", substring = true).performTouchInput {
+            click(androidx.compose.ui.geometry.Offset(x - page.left, y - page.top))
+        }
+        waitText("Frente, línea 1")
+        compose.onNodeWithText("0.31 mm").assertExists()
+        compose.onNodeWithText("Tabla de medidas").performClick()
+        waitText("Medidas de líneas y surcos")
+        assertTrue(compose.onAllNodesWithText("Frente, línea 1", substring = true).fetchSemanticsNodes().size >= 2) // ficha y tabla
+    }
+
+    /**
+     * Con las capas de arrugas apagadas (por defecto), abrir «Capas» y «Medidas» muestra igualmente
+     * las medidas y ofrece mostrarlas en la foto. (Antes la tabla salía siempre vacía: no se
+     * analizaba la foto sin capas encendidas y solo se listaban las capas visibles.)
+     */
+    @Test
+    fun measurementsTableWorksWithWrinkleLayersOff() {
+        com.photomed.app.align.PhotoEdits.clearCache()
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val p = photos[1]
+        val edit = com.photomed.app.align.PhotoEdits.of(ctx, p.uri.toString())
+        val fold = com.photomed.app.align.AnnotLine(com.photomed.app.align.AnnotLayer.FOLDS,
+            (0..10).map { com.photomed.app.align.Pt(0.3f, 0.3f + it * 0.03f) }, false,
+            metrics = com.photomed.app.align.LineMetrics("Nasogeniano derecho", lengthMm = 31f, widthMm = 3f, contrastL = 18f, depthMm = 1.2f, grade = 4))
+        val key = "full|${p.uri}|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(ctx, p.uri.toString())}"
+        com.photomed.app.align.PhotoAnnotator.put(key, listOf(fold))
+        setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Capas", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Capas", substring = true).performClick()
+        waitText("Medidas")
+        compose.onNodeWithText("Medidas").performClick()
+        waitText("Nasogeniano derecho")
+        compose.onNodeWithText("Mostrar en la foto: Surcos").performClick()
         compose.waitForIdle()
         assertTrue(ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!.contains("FOLDS"))
     }
