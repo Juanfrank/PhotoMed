@@ -1,4 +1,4 @@
-# Licencia comercial de PhotoMed
+# Licencia comercial de PhotoMed (de pago)
 
 **Versión:** 1.0 · **Vigente desde:** 19 de noviembre de 2026
 **Titular:** Juan Medina — juanfrank11@gmail.com
@@ -8,29 +8,51 @@ Copyright © 2026 Juan Medina. **Todos los derechos reservados.**
 ## 1. Objeto
 
 PhotoMed (el código fuente, la aplicación compilada, sus guías, textos, logotipos y documentación,
-en adelante "el Software") es software propietario de uso comercial. Esta licencia sustituye a la
-licencia MIT con la que se publicaron las versiones anteriores a la 2.11.
+en adelante "el Software") es software propietario que se licencia **de forma onerosa (de pago)**.
+Esta licencia sustituye a la licencia MIT con la que se publicaron las versiones anteriores a la 2.11.
 
-## 2. Uso sujeto a licencia
+## 2. Licencias de pago
 
-Salvo lo previsto en la sección 3, **nadie puede usar, copiar, instalar, modificar, distribuir,
-sublicenciar, vender ni explotar comercialmente el Software sin una licencia escrita del titular**.
-Las licencias comerciales (por usuario, por clínica o institucionales) se conceden caso por caso;
-solicítelas en juanfrank11@gmail.com.
+PhotoMed **no es gratuito**. Usar, copiar, instalar, modificar, distribuir, sublicenciar, vender o
+explotar comercialmente el Software requiere una **licencia de pago** emitida por escrito por el
+titular (orden de compra, factura o contrato). Sin licencia vigente no hay derecho de uso.
 
-## 3. Concesión expresa a ProntoCare
+### 2.1 Modalidades
+
+| Modalidad | Para quién | Alcance |
+|---|---|---|
+| **Profesional** | Un profesional de la salud o de la estética médica | 1 usuario, hasta 2 dispositivos |
+| **Clínica** | Un centro o consultorio | Usuarios y dispositivos de una sede, según el número contratado |
+| **Institucional / red** | Grupos, redes de clínicas, aseguradoras y empresas de servicios de salud | Varias sedes y usuarios; condiciones por contrato |
+
+### 2.2 Precio y forma de pago
+
+- Cada modalidad se contrata como **suscripción** (mensual o anual, renovable) o, a elección del
+  titular, como **licencia perpetua de la versión adquirida** con una cuota anual opcional de
+  actualizaciones y soporte.
+- Los precios son los de la **tarifa vigente** del titular o los fijados en la orden de compra o el
+  contrato, más los impuestos aplicables.
+- El pago es por adelantado. Si una suscripción no se renueva o no se paga, la licencia se suspende
+  al final del periodo pagado; las fotografías y los datos del usuario siguen siendo suyos y
+  permanecen en sus dispositivos.
+- Salvo que la ley disponga otra cosa, los importes pagados no son reembolsables.
+- Licencias y presupuestos: juanfrank11@gmail.com.
+
+## 3. Licencia expresa a ProntoCare
 
 El titular concede expresamente a **ProntoCare**, a sus empresas afiliadas y al personal,
-profesionales y contratistas que actúen en su nombre, una licencia **no exclusiva, mundial,
-gratuita y sin plazo** para:
+profesionales y contratistas que actúen en su nombre, una **licencia institucional** no exclusiva y
+mundial para:
 
-1. usar, instalar y ejecutar el Software en cualquier número de dispositivos, **incluido el uso
-   comercial** y la prestación de servicios de salud y estética médica a terceros;
+1. usar, instalar y ejecutar el Software en sus dispositivos, **incluido el uso comercial** y la
+   prestación de servicios de salud y estética médica a terceros;
 2. reproducir y distribuir el Software a su personal y a los profesionales de su red para esos fines;
 3. adaptar o modificar el Software para sus propias necesidades.
 
-ProntoCare no puede vender, sublicenciar ni ceder el Software o esta licencia a terceros ajenos a
-su organización sin autorización escrita del titular, ni retirar los avisos de autoría.
+Esta licencia es **onerosa (de pago)**: su precio, número de usuarios o sedes, duración y forma de
+pago son los del acuerdo comercial entre ProntoCare y el titular. ProntoCare no puede vender,
+sublicenciar ni ceder el Software o esta licencia a terceros ajenos a su organización sin
+autorización escrita del titular, ni retirar los avisos de autoría.
 
 ## 4. Restricciones generales
 

@@ -69,7 +69,7 @@ const val AUTHOR_EMAIL = "juanfrank11@gmail.com"
 enum class LegalDoc(val title: String, val asset: String) {
     PRIVACY("Política de privacidad", "legal/PRIVACY.md"),
     TERMS("Términos y condiciones", "legal/TERMS.md"),
-    LICENSE("Licencia comercial", "legal/LICENSE.md"),
+    LICENSE("Licencia comercial (de pago)", "legal/LICENSE.md"),
     CHANGELOG("Novedades (registro de cambios)", "legal/CHANGELOG.md"),
 }
 
@@ -87,7 +87,7 @@ fun AboutScreen(onBack: () -> Unit, onDoc: (LegalDoc) -> Unit) {
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
             Column(Modifier.fillMaxWidth().padding(Md3Spacing.s6), horizontalAlignment = Alignment.CenterHorizontally) {
-                Avatar("Photo Med", 72.dp)
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.photomed.app.R.drawable.logo_app), "Logo de PhotoMed", Modifier.size(72.dp))
                 Spacer(Modifier.size(Md3Spacing.s4))
                 Text("PhotoMed", style = MaterialTheme.typography.headlineSmall)
                 Text("Versión ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium,
@@ -193,7 +193,7 @@ fun TermsGate(onAccept: () -> Unit) {
                 .verticalScroll(rememberScrollState()).padding(Md3Spacing.s6),
             verticalArrangement = Arrangement.spacedBy(Md3Spacing.s4),
         ) {
-            Avatar("Photo Med", 64.dp)
+            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.photomed.app.R.drawable.logo_app), "Logo de PhotoMed", Modifier.size(64.dp))
             Text("Bienvenido a PhotoMed", style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.semantics { heading() })
             Text(

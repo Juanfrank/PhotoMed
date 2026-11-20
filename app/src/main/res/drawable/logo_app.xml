@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Logo PhotoMed completo (propuesta C · Cámara clínica). Fuente: art/logo/logo.svg -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="96dp" android:height="96dp" android:viewportWidth="1024" android:viewportHeight="1024">
+  <path android:pathData="M232,0 H792 A232,232 0 0 1 1024,232 V792 A232,232 0 0 1 792,1024 H232 A232,232 0 0 1 0,792 V232 A232,232 0 0 1 232,0 Z">
+    <aapt:attr name="android:fillColor">
+      <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="1024" android:endY="1024"
+          android:startColor="#14B8A6" android:endColor="#0369A1"/>
+    </aapt:attr>
+  </path>
+    <!-- estetoscopio (visor de la cámara) -->
+    <path android:pathData="M392,150 C392,270 430,318 512,340 M632,150 C632,270 594,318 512,340 M512,340 L512,372"
+        android:strokeColor="#FFFFFF" android:strokeWidth="42" android:strokeLineCap="round"/>
+    <path android:pathData="M364,138 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0 Z" android:fillColor="#FFFFFF"/>
+    <path android:pathData="M604,138 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0 Z" android:fillColor="#FFFFFF"/>
+    <!-- cuerpo de la cámara -->
+    <path android:pathData="M280,372 H744 A112,112 0 0 1 856,484 V724 A112,112 0 0 1 744,836 H280 A112,112 0 0 1 168,724 V484 A112,112 0 0 1 280,372 Z" android:fillColor="#FFFFFF"/>
+    <!-- objetivo -->
+    <path android:pathData="M340,604 a172,172 0 1,0 344,0 a172,172 0 1,0 -344,0 Z" android:fillColor="#0F766E"/>
+    <path android:pathData="M378,604 a134,134 0 1,0 268,0 a134,134 0 1,0 -268,0 Z" android:fillColor="#0B2545"/>
+    <path android:pathData="M416,604 a96,96 0 1,0 192,0 a96,96 0 1,0 -192,0 Z" android:strokeColor="#5EEAD4" android:strokeWidth="10"/>
+    <path android:pathData="M464,604 a48,48 0 1,0 96,0 a48,48 0 1,0 -96,0 Z" android:fillColor="#020617"/>
+    <path android:pathData="M438,540 A100,100 0 0 1 500,506" android:strokeColor="#CCFFFFFF" android:strokeWidth="14" android:strokeLineCap="round"/>
+    <!-- flash con cruz médica -->
+    <path android:pathData="M744,424 H748 A8,8 0 0 1 756,432 V476 A8,8 0 0 1 748,484 H744 A8,8 0 0 1 736,476 V432 A8,8 0 0 1 744,424 Z" android:fillColor="#0EA5E9"/>
+    <path android:pathData="M724,444 H768 A8,8 0 0 1 776,452 V456 A8,8 0 0 1 768,464 H724 A8,8 0 0 1 716,456 V452 A8,8 0 0 1 724,444 Z" android:fillColor="#0EA5E9"/>
+</vector>

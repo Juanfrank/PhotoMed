@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icono temático (monocromo) del logo PhotoMed. Fuente: art/logo/logo.svg (propuesta C · Cámara clínica) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+  <group android:translateX="8.944" android:translateY="11.232" android:scaleX="0.088" android:scaleY="0.088">
+    <path android:pathData="M392,150 C392,270 430,318 512,340 M632,150 C632,270 594,318 512,340 M512,340 L512,372"
+        android:strokeColor="#FFFFFFFF" android:strokeWidth="42" android:strokeLineCap="round"/>
+    <path android:pathData="M364,138 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0 Z" android:fillColor="#FFFFFFFF"/>
+    <path android:pathData="M604,138 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0 Z" android:fillColor="#FFFFFFFF"/>
+    <!-- cuerpo con el objetivo calado (monocromo: forma por transparencia) -->
+    <path android:fillType="evenOdd" android:fillColor="#FFFFFFFF"
+        android:pathData="M280,372 H744 A112,112 0 0 1 856,484 V724 A112,112 0 0 1 744,836 H280 A112,112 0 0 1 168,724 V484 A112,112 0 0 1 280,372 Z M362,604 a150,150 0 1,0 300,0 a150,150 0 1,0 -300,0 Z"/>
+    <path android:pathData="M416,604 a96,96 0 1,0 192,0 a96,96 0 1,0 -192,0 Z" android:strokeColor="#FFFFFFFF" android:strokeWidth="22"/>
+    <path android:pathData="M472,604 a40,40 0 1,0 80,0 a40,40 0 1,0 -80,0 Z" android:fillColor="#FFFFFFFF"/>
+  </group>
+</vector>

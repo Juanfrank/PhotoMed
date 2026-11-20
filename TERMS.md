@@ -8,8 +8,9 @@ Al instalar o usar PhotoMed usted acepta estos términos. Si no está de acuerdo
 ## 1. Objeto
 
 PhotoMed es una herramienta de software para la **toma estandarizada, organización y comparación
-de fotografías clínicas** en estética médica. Es software propietario de uso comercial, sujeto a la
-**Licencia comercial de PhotoMed** (ver “Licencia”), que concede expresamente su uso a ProntoCare.
+de fotografías clínicas** en estética médica. Es software propietario **de pago**: su uso requiere una licencia
+(profesional, de clínica o institucional) según la **Licencia comercial de PhotoMed** (ver
+“Licencia”), que concede expresamente una licencia institucional a ProntoCare.
 
 ## 2. Usuarios
 

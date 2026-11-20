@@ -112,6 +112,12 @@ class CameraAssistScreenshotTest {
                             Image(painterResource(R.drawable.ic_launcher_background), null, Modifier.fillMaxSize())
                             Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.fillMaxSize())
                         }
+                        // icono temático (monocromo) sobre un color de sistema
+                        Box(Modifier.size(64.dp).clip(CircleShape).background(Color(0xFF3B4A5C))) {
+                            Image(painterResource(R.drawable.ic_launcher_monochrome), null, Modifier.fillMaxSize(),
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color(0xFFCFE6FF)))
+                        }
+                        Image(painterResource(R.drawable.logo_app), null, Modifier.size(64.dp))
                     }
                 }
             }
