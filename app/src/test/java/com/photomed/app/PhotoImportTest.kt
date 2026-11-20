@@ -103,6 +103,34 @@ class PhotoImportTest {
         assertEquals(listOf(Zone.LIPS, Zone.LIPS), result!!.map { it.zone })
     }
 
+    /**
+     * El botón de importar no puede quedar bajo los botones de navegación del teléfono: con una barra
+     * de navegación (insets) en la ventana del diálogo, el botón queda entero por encima de ella.
+     */
+    @Test fun importButtonStaysAboveSystemNavigationBar() {
+        val items = listOf(ImportItem(Uri.parse("content://a/1"), 1_700_000_000_000L, true, Zone.FACE_FRONTAL))
+        compose.setContent { PhotoMedTheme(darkTheme = false) { ImportPhotosDialog(items, {}) {} } }
+        compose.waitForIdle()
+        val dialog = org.robolectric.shadows.ShadowDialog.getLatestDialog()!!
+        val decor = dialog.window!!.decorView
+        val navPx = 150; val statusPx = 80
+        val insets = androidx.core.view.WindowInsetsCompat.Builder()
+            .setInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars(), androidx.core.graphics.Insets.of(0, 0, 0, navPx))
+            .setInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars(), androidx.core.graphics.Insets.of(0, statusPx, 0, 0))
+            .build()
+        compose.runOnUiThread { androidx.core.view.ViewCompat.dispatchApplyWindowInsets(decor, insets) }
+        compose.waitForIdle()
+        val button = compose.onNodeWithText("Importar al expediente").fetchSemanticsNode().boundsInWindow
+        val windowH = decor.height
+        println("BOTÓN: ${button.top}–${button.bottom} px; ventana $windowH px; barra de navegación desde ${windowH - navPx} px")
+        assertTrue("ventana del diálogo sin tamaño", windowH > 0)
+        assertTrue("el botón (abajo en ${button.bottom}) queda bajo la barra de navegación (desde ${windowH - navPx})",
+            button.bottom <= windowH - navPx)
+        // y el título, bajo la barra de estado
+        val title = compose.onNodeWithText("Importar 1 foto").fetchSemanticsNode().boundsInWindow
+        assertTrue("título bajo la barra de estado", title.top >= statusPx)
+    }
+
     /** Guía girada 90°: "fit" la deja entera dentro del 3:4; "fill34" cubre el 3:4 como la referencia girada. */
     @Test fun rotatedGuideKeepsItsProportions() {
         compose.setContent {

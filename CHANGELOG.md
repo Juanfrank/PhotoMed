@@ -2,6 +2,12 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.15.1 — 20 de noviembre de 2026
+
+- **Corrección**: el botón *Importar al expediente* quedaba bajo los botones de navegación del
+  teléfono; ahora se aparta de ellos (y el título, de la barra de estado). Prueba automática que lo
+  comprueba con una barra de navegación simulada.
+
 ## 2.15 — 20 de noviembre de 2026
 
 - **Importar fotos a un expediente** (menú ⋮ del expediente → *Importar fotos*): se eligen varias

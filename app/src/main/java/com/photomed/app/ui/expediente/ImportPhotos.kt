@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -57,7 +60,9 @@ import com.photomed.app.ui.formatDateTime
 @Composable
 fun ImportPhotosDialog(initial: List<ImportItem>, onDismiss: () -> Unit, onImport: (List<ImportItem>) -> Unit) {
     var items by remember(initial) { mutableStateOf(initial) }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    // pantalla completa de borde a borde: la ventana no reserva las barras del sistema y cada barra
+    // de la app se aparta de ellas (la de abajo, de los botones de navegación del teléfono)
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -67,7 +72,7 @@ fun ImportPhotosDialog(initial: List<ImportItem>, onDismiss: () -> Unit, onImpor
             },
             bottomBar = {
                 val missing = items.count { it.zone == null }
-                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                Column(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(16.dp)) {
                     if (missing > 0) Text("Elija el ángulo de ${if (missing == 1) "1 foto" else "$missing fotos"}.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.height(6.dp))
