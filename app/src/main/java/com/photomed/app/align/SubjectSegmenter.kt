@@ -19,7 +19,7 @@ class SubjectSegmenter : Closeable {
     )
 
     fun segment(bmp: Bitmap): Mask? = try {
-        val r = Tasks.await(client.process(InputImage.fromBitmap(bmp, 0)))
+        val r = Tasks.await(client.process(InputImage.fromBitmap(bmp, 0)), ML_KIT_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
         val buf = r.buffer.order(ByteOrder.nativeOrder())
         val w = r.width; val h = r.height
         val m = Mask(w, h)

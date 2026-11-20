@@ -114,7 +114,7 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
     val diagnostic: String? get() = lastError ?: initError ?: if (mediaPipeUnavailable) "MediaPipe desactivado por errores; se usa ML Kit" else null
 
     private fun detectFace(bmp: Bitmap): Detection {
-        val faces = Tasks.await(face.process(InputImage.fromBitmap(bmp, 0)))
+        val faces = Tasks.await(face.process(InputImage.fromBitmap(bmp, 0)), ML_KIT_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
         val f = faces.maxByOrNull { it.boundingBox.width() * it.boundingBox.height() } ?: return Detection.EMPTY
         val w = bmp.width.toFloat()
         val out = mutableMapOf<String, Pt>()
@@ -139,7 +139,7 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
     }
 
     private fun detectPose(bmp: Bitmap): Map<String, Pt> {
-        val p = Tasks.await(pose.process(InputImage.fromBitmap(bmp, 0)))
+        val p = Tasks.await(pose.process(InputImage.fromBitmap(bmp, 0)), ML_KIT_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
         val w = bmp.width.toFloat()
         val out = mutableMapOf<String, Pt>()
         mapOf(
@@ -167,3 +167,9 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
         face.close(); pose.close(); mediaPipe?.close()
     }
 }
+
+/**
+ * Límite de espera de una llamada a ML Kit (s). Sin él, una tarea que no termina bloquea su hilo
+ * para siempre y, con varias, se agotan los hilos de fondo y la app deja de cargar imágenes.
+ */
+const val ML_KIT_TIMEOUT_S = 10L

@@ -70,6 +70,9 @@ class UsageFlowsTest {
 
     @Before
     fun setUp() {
+        // cargador de imágenes nuevo por prueba: el de Coil es único en el proceso y queda ligado al
+        // entorno (hilo principal) de la prueba anterior, con cargas aún en curso
+        coil.Coil.reset()
         com.photomed.app.ui.components.CoachMarks.enabled = false; com.photomed.app.ui.compare.CompareIdle.enabled = false
         val gallery = File(tmp.root, "Pictures/PhotoMed")
         repo = PhotoRepository(File(tmp.root, "private"), FilePhotoStore(gallery),
@@ -78,6 +81,13 @@ class UsageFlowsTest {
         val jpeg = File(tmp.root, "c.jpg").apply { writeBytes(this@UsageFlowsTest.javaClass.getResourceAsStream("/blank.jpg")!!.readBytes()) }
         photos = (0 until 4).map { repo.savePhoto(exp, Zone.LIPS, jpeg, takenAt = 1_763_400_000_000L + it * 30 * day) }
         ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("photomed", Context.MODE_PRIVATE).edit().clear().commit()
+    }
+
+    @org.junit.After
+    fun tearDown() {
+        // cerrar la pantalla (cancela análisis y cargas en curso) antes de la siguiente prueba
+        runCatching { compose.setContent {} ; compose.waitForIdle() }
+        coil.Coil.reset()
     }
 
     private fun setContent(content: @androidx.compose.runtime.Composable () -> Unit) = compose.setContent {

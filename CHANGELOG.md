@@ -11,6 +11,8 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
   cara estuviera completa. Ahora se conservan, y la compilación falla si R8 vuelve a renombrar
   clases de MediaPipe, protobuf o Flogger.
 - El aviso muestra el primer error real (no su repetición).
+- Las llamadas a ML Kit tienen un límite de 10 s: una que no responda ya no bloquea para siempre
+  un hilo de fondo.
 
 ## 2.15.4 — 20 de noviembre de 2026
 
