@@ -403,6 +403,42 @@ class UsageFlowsTest {
         waitText("2/", substring = true)
     }
 
+    /** Línea multipunto: toques añaden puntos; confirmar la guarda; con «Seleccionar» se mueve un punto solo. */
+    @Test
+    fun polylineWithAnglesAndMovablePoints() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val p = photos[0]; val u = p.uri.toString()
+        setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Anotar sobre la foto").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Anotar sobre la foto").performClick()
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Símbolo").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Símbolo").performClick()
+        waitText("Ángulos (multipunto)")
+        compose.onNodeWithText("Ángulos (multipunto)").performScrollTo().performClick()
+        fun o(x: Float, y: Float) = androidx.compose.ui.geometry.Offset(x, y)
+        for (q in listOf(o(-120f, 60f), o(0f, -60f), o(120f, 60f)))
+            compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { click(center + q) }
+        waitText("3 puntos")
+        // quitar el último y volver a ponerlo; arrastrar el segundo lo mueve (no añade otro)
+        compose.onNodeWithContentDescription("Quitar el último punto").performClick()
+        waitText("2 puntos")
+        compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { click(center + o(120f, 60f)) }
+        compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center + o(0f, -60f), center + o(0f, -120f), 300) }
+        waitText("3 puntos")
+        compose.onNodeWithContentDescription("Confirmar la línea").performClick()
+        compose.waitUntil(15_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 1 }
+        val st = com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.single()
+        assertEquals(listOf("symbol", "polyline", 3), listOf(st.kind, st.shape, st.points.size))
+        // el vértice central quedó más arriba que los extremos (se arrastró)
+        assertTrue(st.points[1].y < st.points[0].y - 0.01f)
+        // seleccionar: arrastrar el punto central mueve solo ese punto
+        compose.onNodeWithContentDescription("Seleccionar y mover").performClick()
+        compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center + o(0f, -120f), center + o(0f, -20f), 300) }
+        compose.waitUntil(15_000) { com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.single().points[1].y > st.points[1].y + 0.01f }
+        val after = com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.single()
+        assertEquals(st.points[0], after.points[0]); assertEquals(st.points[2], after.points[2])
+    }
+
     /** Comparar en horizontal: controles a la izquierda y las fotos en la mitad derecha. */
     @Test
     @Config(sdk = [34], qualifiers = "w1200dp-h700dp-land")

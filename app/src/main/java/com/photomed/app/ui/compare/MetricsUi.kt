@@ -83,6 +83,8 @@ fun metricRows(m: LineMetrics): List<Pair<String, String>> =
 
 /** Valor de una medida de rasgo con su unidad (la de la etiqueta tras la coma). */
 fun featureValue(label: String, v: Float): String {
+    if (label == com.photomed.app.align.FeatureMetrics.FACIAL_INDEX)
+        return "${f1(v)} · ${com.photomed.app.align.FeatureMetrics.facialType(v).substringBefore(" (")}"
     val unit = label.substringAfterLast(",", "").trim()
     return when (unit) {
         "mm²" -> String.format(Locale.getDefault(), "%.0f mm²", v)

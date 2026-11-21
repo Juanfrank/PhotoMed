@@ -190,12 +190,14 @@ object FaceAnnotations {
             val m = sc?.let { runCatching { f(it.first, it.second) }.getOrNull() }
             return AnnotLine(layer, pts, closed, metrics = m?.metrics, guides = m?.guides.orEmpty())
         }
+        // línea del pelo antes que el contorno: da el tercio superior de las proporciones faciales
+        val hairPts = labels?.let { runCatching { HairSkin.hairline(it, keys)?.points }.getOrNull() }
         (0 until 36).mapNotNull { p["oval_$it"] }.takeIf { it.size == 36 }?.let {
-            out += feat(AnnotLayer.CONTOUR, it, true) { mm, s -> FeatureMetrics.contourM(mesh, mm, s) }
+            out += feat(AnnotLayer.CONTOUR, it, true) { mm, s -> FeatureMetrics.contourM(mesh, mm, s, hairPts) }
         }
-        labels?.let { HairSkin.hairline(it, keys)?.points?.let { h ->
+        hairPts?.let { h ->
             out += feat(AnnotLayer.HAIRLINE, h, false) { mm, s -> FeatureMetrics.hairlineM(mesh, h, mm, s) }
-        } }
+        }
         fun chain(idx: IntArray) = idx.map { mesh[it] }
         out += feat(AnnotLayer.EYES, chain(EYE_R), true) { mm, s -> FeatureMetrics.eyeM(mesh, true, mm, s) }
         out += feat(AnnotLayer.EYES, chain(EYE_L), true) { mm, s -> FeatureMetrics.eyeM(mesh, false, mm, s) }

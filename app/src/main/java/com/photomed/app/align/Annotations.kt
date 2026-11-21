@@ -29,7 +29,7 @@ data class InkStroke(val color: Int, val width: Float, val points: List<Pt>, val
         const val FREE = "free"; const val SYMBOL = "symbol"
         /** Antiguas «formas» (2.32): se leen como símbolos arrastrados. */
         const val LEGACY_SHAPE = "shape"
-        val SYMBOLS = listOf("dot", "circle", "triangle", "square", "x", "plus", "star", "line", "arrow")
+        val SYMBOLS = listOf("dot", "circle", "triangle", "square", "x", "plus", "star", "line", "arrow", "polyline")
     }
 }
 

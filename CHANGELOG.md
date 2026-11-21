@@ -2,6 +2,20 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.39 — 21 de noviembre de 2026
+
+- **Ángulos (línea multipunto)** en el menú de símbolos: cada toque añade un punto y la línea sigue al
+  siguiente; arrastrar un punto lo mueve; arriba, «Quitar el último punto», «Descartar» y
+  «Confirmar». En cada punto interior se muestra el **ángulo interno** entre un segmento y el
+  siguiente. Ya guardada, con «Seleccionar» se mueve cada punto por separado (los ángulos se
+  recalculan). Se exporta igual que en pantalla.
+- **Proporciones faciales en el contorno**: tres tercios (pelo → cejas → subnasal → mentón, % de la
+  altura, ideal 33 % cada uno; el superior si se ve la línea del pelo), subdivisión del tercio inferior
+  (subnasal → estomion : estomion → mentón, ideal 1 : 2), índice facial aproximado (altura nasion →
+  mentón / ancho facial × 100, con su tipo según Martin–Saller) y, de frente, quintos faciales (ideal
+  20 % cada uno) y ancho mandibular (bigonial aproximado) frente al bicigomático. Cada medida con su
+  segmento punteado.
+
 ## 2.38 — 21 de noviembre de 2026
 
 - **Protocolos de fotos** (ver `docs/PROTOCOLOS.md`): listas ordenadas de tomas que se crean, se

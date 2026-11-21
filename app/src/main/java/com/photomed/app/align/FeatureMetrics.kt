@@ -13,8 +13,11 @@ import kotlin.math.hypot
  * - **cejas**: longitud y altura sobre la pupila (en la vertical de la pupila hasta el borde superior);
  * - **nariz**: ancho alar, ancho del puente (raíz, a la altura de los cantos internos) y del dorso (a
  *   media altura), longitud del dorso (raíz → punta) y alto (entre los ojos → subnasal);
- * - **contorno**: ancho bicigomático aproximado (234 ↔ 454), tercio medio (cejas → subnasal) y
- *   tercio inferior (subnasal → mentón);
+ * - **contorno**: ancho bicigomático aproximado (234 ↔ 454) y proporciones faciales: tercios
+ *   (pelo → cejas → subnasal → mentón, ideal 33 % cada uno), subdivisión del tercio inferior
+ *   (subnasal → estomion : estomion → mentón, ideal 1 : 2), índice facial (nasion → mentón /
+ *   bicigomático × 100, tipo según Martin–Saller) y, de frente, quintos faciales (ideal 20 % cada uno)
+ *   y ancho mandibular (bigonial aproximado) frente al bicigomático;
  * - **línea del pelo**: altura de la frente (cejas → pelo) en líneas rectas perpendiculares a la línea
  *   de los ojos: en el centro, en la vertical de cada pupila (el centro de la ceja lo marca el del ojo)
  *   y en la de cada canto externo (cola), y entradas temporales (cola − centro).
@@ -135,16 +138,77 @@ object FeatureMetrics {
         build("Nariz", scale)
     }
 
-    fun contourM(mesh: List<Pt>, mm: Float, scale: String) = B(mm).run {
+    fun contourM(mesh: List<Pt>, mm: Float, scale: String, hair: List<Pt>? = null) = B(mm).run {
         val a = Axes(mesh)
         dist("Ancho de la cara, mm", "ancho", mesh[234], mesh[454])
         // tercios en la línea media, perpendiculares a la línea de los ojos
         val uc = a.u(mesh[2])
         val vb = vAt(browTop(mesh, a), a.u(a.o)) ?: intArrayOf(107, 336).maxOf { a.v(mesh[it]) }
         val mid = (vb - a.v(mesh[2])) * mm; val low = (a.v(mesh[2]) - a.v(mesh[152])) * mm
+        // tercio superior (línea del pelo → cejas), si se ve la línea del pelo
+        val up = hair?.takeIf { it.size >= 3 }?.let { h -> vAt(h.map { a.u(it) to a.v(it) }.sortedBy { it.first }, uc) }
+            ?.let { vh -> ((vh - vb) * mm).takeIf { it > 0f }?.also { guide("tercio superior", it, a.at(uc, vh), a.at(uc, vb), "Tercio superior (pelo → cejas), mm") } }
+        up?.let { value("Tercio superior (pelo → cejas), mm", it) }
         value("Tercio medio (cejas → subnasal), mm", mid); guide("tercio medio", mid, a.at(uc, vb), mesh[2], "Tercio medio (cejas → subnasal), mm")
         value("Tercio inferior (subnasal → mentón), mm", low); guide("tercio inferior", low, mesh[2], a.at(uc, a.v(mesh[152])), "Tercio inferior (subnasal → mentón), mm")
+        // proporción de los tercios (ideal: un tercio cada uno, 33 %)
+        val total = (up ?: 0f) + mid + low
+        if (up != null && total > 0f) {
+            value("Tercio superior (ideal 33 %), %", up / total * 100f)
+            value("Tercio medio (ideal 33 %), %", mid / total * 100f)
+            value("Tercio inferior (ideal 33 %), %", low / total * 100f)
+        } else if (low > 0f) value("Tercio medio / inferior (ideal 1)", mid / low)
+        // tercio inferior: subnasal → estomion (labio superior) frente a estomion → mentón (ideal 1 : 2)
+        val sto = Pt((mesh[13].x + mesh[14].x) / 2, (mesh[13].y + mesh[14].y) / 2)
+        val snSto = (a.v(mesh[2]) - a.v(sto)) * mm; val stoMe = (a.v(sto) - a.v(mesh[152])) * mm
+        if (snSto > 0f && stoMe > 0f) {
+            value("Subnasal → estomion, mm", snSto); guide("labio sup.", snSto, mesh[2], a.at(uc, a.v(sto)), "Subnasal → estomion, mm")
+            value("Estomion → mentón, mm", stoMe); guide("labio inf. y mentón", stoMe, a.at(uc, a.v(sto)), a.at(uc, a.v(mesh[152])), "Estomion → mentón, mm")
+            value("Estomion → mentón / subnasal → estomion (ideal 2)", stoMe / snSto)
+        }
+        // índice facial (antropometría): altura nasion → mentón / ancho bicigomático × 100
+        val faceW = d(mesh[234], mesh[454]); val faceH = d(mesh[168], mesh[152])
+        if (faceW > 1e-5f) {
+            guide("altura facial", faceH * mm, mesh[168], mesh[152], "Altura facial (nasion → mentón), mm")
+            value("Altura facial (nasion → mentón), mm", faceH * mm)
+            value(FACIAL_INDEX, faceH / faceW * 100f)
+        }
+        // de frente: quintos (ancho de cada ojo, entre los ojos y de cada canto externo al borde) y mandíbula
+        if (frontal(mesh)) {
+            val vEye = (a.v(mesh[33]) + a.v(mesh[263]) + a.v(mesh[133]) + a.v(mesh[362])) / 4
+            val cuts = listOf(mesh[234], mesh[33], mesh[133], mesh[362], mesh[263], mesh[454]).map { a.u(it) }.sorted()
+            val wTot = (cuts.last() - cuts.first()).coerceAtLeast(1e-5f)
+            listOf("Quinto 1 (borde → canto externo)", "Quinto 2 (ojo)", "Quinto 3 (entre los ojos)", "Quinto 4 (ojo)", "Quinto 5 (canto externo → borde)")
+                .forEachIndexed { i, name ->
+                    val w = cuts[i + 1] - cuts[i]
+                    value("$name (ideal 20 %), %", w / wTot * 100f)
+                    guide("quinto ${i + 1}", w * mm, a.at(cuts[i], vEye), a.at(cuts[i + 1], vEye), "$name (ideal 20 %), %")
+                }
+            // ancho mandibular (bigonial aproximado: ángulo de la mandíbula en la malla) frente al bicigomático
+            val big = d(mesh[172], mesh[397])
+            guide("bigonial", big * mm, mesh[172], mesh[397], "Ancho mandibular (bigonial aprox.), mm")
+            value("Ancho mandibular (bigonial aprox.), mm", big * mm)
+            if (faceW > 1e-5f) value("Bigonial / bicigomático, %", big / faceW * 100f)
+        }
         build("Contorno facial", scale)
+    }
+
+    /** ¿Vista de frente? (la punta nasal equidista de los dos bordes de la cara, ± 20 %). */
+    private fun frontal(mesh: List<Pt>): Boolean {
+        val r = d(mesh[1], mesh[234]); val l = d(mesh[1], mesh[454])
+        return minOf(r, l) / maxOf(r, l).coerceAtLeast(1e-6f) >= 0.8f
+    }
+
+    /** Etiqueta del índice facial (el valor se muestra con su tipo, ver [facialType]). */
+    const val FACIAL_INDEX = "Índice facial aprox. (nasion → mentón / ancho facial × 100)"
+
+    /** Tipo facial por el índice facial (clasificación de Martin–Saller, sin distinción por sexo). */
+    fun facialType(i: Float) = when {
+        i < 80f -> "hipereuriprosopo (muy ancho)"
+        i < 85f -> "euriprosopo (ancho)"
+        i < 90f -> "mesoprosopo (medio)"
+        i < 95f -> "leptoprosopo (largo)"
+        else -> "hiperleptoprosopo (muy largo)"
     }
 
     /**

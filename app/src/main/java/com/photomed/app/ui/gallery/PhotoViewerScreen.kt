@@ -50,6 +50,8 @@ import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.PrivacyTip
@@ -140,6 +142,12 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
         onDispose { ctl?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars()) }
     }
     var inkStyle by remember { mutableStateOf(InkStyle()) }
+    /** Línea multipunto en curso (foto editada, unidades del ancho) y alto / ancho de esa foto. */
+    var polyDraft by remember { mutableStateOf<List<com.photomed.app.align.Pt>>(emptyList()) }
+    var polyAspect by remember { mutableStateOf(1f) }
+    val polyMode = inking && inkStyle.tool == InkTool.SYMBOL && inkStyle.symbol == com.photomed.app.align.InkRenderer.POLYLINE
+    // fuera del modo (otra herramienta, otra foto o sin anotar): el borrador se descarta
+    LaunchedEffect(polyMode) { if (!polyMode) polyDraft = emptyList() }
     var inkVersion by remember { mutableIntStateOf(0) }
     val inkUndo = remember { androidx.compose.runtime.mutableStateMapOf<String, List<com.photomed.app.align.InkSet>>() }
     var metricsSheet by remember { mutableStateOf(false) }
@@ -267,6 +275,47 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 true
             }.onFailure { com.photomed.app.CrashLog.write("Guardar una anotación", it) }.getOrDefault(false) }
             if (!ok) snackbar.showSnackbar("No se pudo guardar la anotación")
+            inkVersion++
+        }
+    }
+
+    /** Guarda la línea multipunto [pts] (foto editada, unidades del ancho) como anotación. */
+    fun inkPoly(ph: Photo, pts: List<com.photomed.app.align.Pt>, aE: Float) {
+        if (pts.size < 2) return
+        val u = ph.uri.toString(); val st = inkStyle
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) { runCatching {
+                val e = com.photomed.app.align.PhotoEdits.of(context, u)
+                val old = com.photomed.app.align.Annotations.of(context, u) ?: com.photomed.app.align.InkSet(com.photomed.app.align.TraceMap.baseAspect(e, aE))
+                val fr = com.photomed.app.align.TraceFrame.FULL
+                val orig = com.photomed.app.align.TraceMap.fromView(e, old.baseAspect, fr, pts)
+                val (a, b) = com.photomed.app.align.TraceMap.fromView(e, old.baseAspect, fr, listOf(pts[0], com.photomed.app.align.Pt(pts[0].x + st.width, pts[0].y)))
+                val wOrig = kotlin.math.hypot(b.x - a.x, (b.y - a.y) * old.baseAspect)
+                val next = old.copy(strokes = old.strokes + com.photomed.app.align.InkStroke(st.color, wOrig, orig,
+                    kind = com.photomed.app.align.InkStroke.SYMBOL, shape = com.photomed.app.align.InkRenderer.POLYLINE, size = wOrig * 6f))
+                inkUndo[u] = (inkUndo[u].orEmpty() + old).takeLast(30); com.photomed.app.align.Annotations.save(context, u, next)
+                true
+            }.onFailure { com.photomed.app.CrashLog.write("Guardar una línea multipunto", it) }.getOrDefault(false) }
+            if (!ok) snackbar.showSnackbar("No se pudo guardar la línea")
+            inkVersion++
+        }
+    }
+
+    /** Mueve el punto [vi] de la línea multipunto [idx] a [to] (foto editada, unidades del ancho). */
+    fun inkVertex(ph: Photo, idx: Int, vi: Int, to: com.photomed.app.align.Pt) {
+        val u = ph.uri.toString()
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching {
+                val e = com.photomed.app.align.PhotoEdits.of(context, u)
+                val old = com.photomed.app.align.Annotations.of(context, u) ?: return@runCatching
+                val view = old.inView(e, com.photomed.app.align.TraceFrame.FULL)
+                if (idx !in view.indices || vi !in view[idx].points.indices) return@runCatching
+                val moved = view[idx].points.toMutableList().also { it[vi] = to }
+                val orig = com.photomed.app.align.TraceMap.fromView(e, old.baseAspect, com.photomed.app.align.TraceFrame.FULL, moved)
+                val next = old.copy(strokes = old.strokes.toMutableList().also { it[idx] = it[idx].copy(points = orig) })
+                inkUndo[u] = (inkUndo[u].orEmpty() + old).takeLast(30)
+                com.photomed.app.align.Annotations.save(context, u, next)
+            }.onFailure { com.photomed.app.CrashLog.write("Mover un punto de una línea", it) } }
             inkVersion++
         }
     }
@@ -438,6 +487,9 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     ink = if (inking && page == pager.currentPage) inkStyle else null,
                     onInk = { path, aE -> inkPath(ph, path, aE) },
                     onInkMove = { idx, d -> inkMove(ph, idx, d) },
+                    poly = if (polyMode && page == pager.currentPage) polyDraft else null,
+                    onPoly = { pts, aE -> polyDraft = pts; polyAspect = aE },
+                    onInkVertex = { idx, vi, to -> inkVertex(ph, idx, vi, to) },
                     selected = selected, selectedKey = selectedKey, analyze = showLayers, alpha = annotAlpha.value,
                     focusTick = if (page == pager.currentPage) focusTick else 0,
                     // referencia: fotos anteriores de la misma zona (la más reciente primero)
@@ -476,6 +528,17 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                         }
                     },
                         onDone = { inking = false }, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp))
+                // línea multipunto en curso: confirmar, quitar el último punto o descartar
+                if (polyMode && polyDraft.isNotEmpty()) androidx.compose.foundation.layout.Row(
+                    Modifier.align(Alignment.TopCenter).padding(8.dp).background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                        .padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${polyDraft.size} puntos", color = Color.White, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp))
+                    IconButton(onClick = { polyDraft = polyDraft.dropLast(1) }) {
+                        Icon(Icons.AutoMirrored.Filled.Undo, "Quitar el último punto", tint = Color.White) }
+                    IconButton(onClick = { polyDraft = emptyList() }) { Icon(Icons.Default.Close, "Descartar la línea", tint = Color.White) }
+                    IconButton(onClick = { inkPoly(current, polyDraft, polyAspect); polyDraft = emptyList() }, enabled = polyDraft.size >= 2) {
+                        Icon(Icons.Default.Check, "Confirmar la línea", tint = if (polyDraft.size >= 2) Color(0xFF69F0AE) else Color.Gray) }
+                }
                 // en pantalla completa: botón semitransparente para salir, arriba a la derecha de la foto
                 if (fullscreen) IconButton(onClick = { fullscreen = false },
                     modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.Black.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape)) {
@@ -624,6 +687,12 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                       onInk: (List<com.photomed.app.align.Pt>, Float) -> Unit = { _, _ -> },
                       /** Seleccionar: mover el trazo (índice) un desplazamiento (foto editada, unidades del ancho). */
                       onInkMove: (Int, com.photomed.app.align.Pt) -> Unit = { _, _ -> },
+                      /** Línea multipunto en curso (foto editada, unidades del ancho); null = no se está trazando una. */
+                      poly: List<com.photomed.app.align.Pt>? = null,
+                      /** Nuevos puntos de la línea en curso y alto / ancho de la foto editada. */
+                      onPoly: (List<com.photomed.app.align.Pt>, Float) -> Unit = { _, _ -> },
+                      /** Seleccionar: mover un punto (índice) de una línea multipunto guardada (índice) a una posición. */
+                      onInkVertex: (Int, Int, com.photomed.app.align.Pt) -> Unit = { _, _, _ -> },
                       /** Analizar la foto (panel de capas abierto), aunque no haya capas encendidas: la tabla lo necesita. */
                       analyze: Boolean = layers.isNotEmpty(),
                       /** Opacidad de los trazos y números. */
@@ -774,7 +843,11 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
             // seleccionar: trazo tocado y desplazamiento (unidades del ancho de la foto)
             var picked by remember { mutableIntStateOf(-1) }
             var moveBy by remember { mutableStateOf(com.photomed.app.align.Pt(0f, 0f)) }
+            /** Seleccionar: punto de una línea multipunto que se arrastra (índice del trazo, índice del punto). */
+            var pickedVertex by remember { mutableStateOf<Pair<Int, Int>?>(null) }
             val inkNow = androidx.compose.runtime.rememberUpdatedState(inkLines)
+            val polyNow = androidx.compose.runtime.rememberUpdatedState(poly)
+            fun d(a: com.photomed.app.align.Pt, q: com.photomed.app.align.Pt) = kotlin.math.hypot(a.x - q.x, a.y - q.y)
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()
                 .semantics { contentDescription = "Dibuje sobre la foto" }
                 .pointerInput(b, ink) {
@@ -783,9 +856,43 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                         down.consume()   // un toque al anotar no selecciona líneas
                         val sw = size.width.toFloat(); val sh = size.height.toFloat()
                         fun toPhoto(o: androidx.compose.ui.geometry.Offset) = screenToPhoto(o.x, o.y, sw, sh, b.width, b.height, scale, offset.x, offset.y)
+                        val aE = b.height / b.width.toFloat()
+                        // línea multipunto: un toque añade un punto; arrastrar un punto lo mueve
+                        val draft = polyNow.value
+                        if (ink.tool == InkTool.SYMBOL && draft != null) {
+                            val q0 = toPhoto(down.position)
+                            val tolP = 24.dp.toPx() / (minOf(sw, sh * b.width / b.height.toFloat()) * scale)
+                            val vi = draft.indices.minByOrNull { d(draft[it], q0) }?.takeIf { d(draft[it], q0) < tolP }
+                            var last = q0
+                            drag(down.id) { ch ->
+                                last = toPhoto(ch.position)
+                                if (vi != null) onPoly(draft.toMutableList().also { it[vi] = last }, aE)
+                                ch.consume()
+                            }
+                            if (vi == null) onPoly(draft + last, aE)
+                            return@awaitEachGesture
+                        }
                         if (ink.tool == InkTool.SELECT) {
                             val q0 = toPhoto(down.position)
                             val wImg = minOf(sw, sh * b.width / b.height.toFloat()) * scale
+                            // un punto de una línea multipunto: se mueve solo ese punto
+                            val tolV = 22.dp.toPx() / wImg
+                            var hitV: Pair<Int, Int>? = null; var bestV = tolV
+                            inkNow.value.forEachIndexed { si, st ->
+                                if (st.kind == com.photomed.app.align.InkStroke.SYMBOL && st.shape == com.photomed.app.align.InkRenderer.POLYLINE)
+                                    st.points.forEachIndexed { vi, p -> val dd = d(p, q0); if (dd < bestV) { bestV = dd; hitV = si to vi } }
+                            }
+                            hitV?.let { hv ->
+                                pickedVertex = hv
+                                drag(down.id) { ch -> val q = toPhoto(ch.position); moveBy = com.photomed.app.align.Pt(q.x - q0.x, q.y - q0.y); ch.consume() }
+                                val st = inkNow.value.getOrNull(hv.first)
+                                if (st != null && kotlin.math.hypot(moveBy.x, moveBy.y) > 1e-4f) {
+                                    val p = st.points[hv.second]
+                                    onInkVertex(hv.first, hv.second, com.photomed.app.align.Pt(p.x + moveBy.x, p.y + moveBy.y))
+                                }
+                                pickedVertex = null; moveBy = com.photomed.app.align.Pt(0f, 0f)
+                                return@awaitEachGesture
+                            }
                             picked = com.photomed.app.align.Annotations.hit(inkNow.value, q0, 18.dp.toPx() / wImg)
                             if (picked < 0) return@awaitEachGesture
                             drag(down.id) { ch -> val q = toPhoto(ch.position); moveBy = com.photomed.app.align.Pt(q.x - q0.x, q.y - q0.y); ch.consume() }
@@ -806,7 +913,24 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                 fun toScreen(p: com.photomed.app.align.Pt) = android.graphics.PointF(
                     size.width / 2 + ((size.width - w0) / 2 + p.x * w0 - size.width / 2) * scale + offset.x,
                     size.height / 2 + ((size.height - h0) / 2 + p.y * w0 - size.height / 2) * scale + offset.y)
-                if (ink.tool == InkTool.SELECT && picked in inkLines.indices) {
+                val pv = pickedVertex
+                if (ink.tool == InkTool.SELECT && pv != null && pv.first in inkLines.indices) {
+                    // el punto arrastrado de la línea multipunto (los ángulos se actualizan al moverlo)
+                    val st0 = inkLines[pv.first]
+                    val st = st0.copy(points = st0.points.mapIndexed { i, p -> if (i == pv.second) com.photomed.app.align.Pt(p.x + moveBy.x, p.y + moveBy.y) else p })
+                    drawIntoCanvas { c -> com.photomed.app.align.InkRenderer.draw(c.nativeCanvas, listOf(st), wImg, ::toScreen, density) }
+                    val q = toScreen(st.points[pv.second])
+                    drawCircle(Color.White, 12.dp.toPx(), androidx.compose.ui.geometry.Offset(q.x, q.y), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
+                } else if (ink.tool == InkTool.SYMBOL && poly != null) {
+                    // línea multipunto en curso: segmentos, puntos (con un anillo para tocarlos) y ángulos
+                    if (poly.isNotEmpty()) {
+                        val st = com.photomed.app.align.InkStroke(ink.color, ink.width, poly, kind = com.photomed.app.align.InkStroke.SYMBOL,
+                            shape = com.photomed.app.align.InkRenderer.POLYLINE)
+                        drawIntoCanvas { c -> com.photomed.app.align.InkRenderer.draw(c.nativeCanvas, listOf(st), wImg, ::toScreen, density) }
+                        poly.forEach { p -> val q = toScreen(p)
+                            drawCircle(Color.White.copy(alpha = 0.9f), 11.dp.toPx(), androidx.compose.ui.geometry.Offset(q.x, q.y), style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx())) }
+                    }
+                } else if (ink.tool == InkTool.SELECT && picked in inkLines.indices) {
                     // el trazo elegido, movido, con un recuadro discontinuo
                     val st = inkLines[picked]
                     val mv = { p: com.photomed.app.align.Pt -> toScreen(com.photomed.app.align.Pt(p.x + moveBy.x, p.y + moveBy.y)) }

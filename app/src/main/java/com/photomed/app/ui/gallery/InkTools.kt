@@ -67,7 +67,7 @@ data class InkStyle(val tool: InkTool = InkTool.PEN, val color: Int = INK_COLORS
 val INK_COLORS = listOf(0xFFFF1744, 0xFFFFEA00, 0xFF00E676, 0xFF00B0FF, 0xFF2962FF, 0xFFD500F9, 0xFFFFFFFF, 0xFF000000).map { it.toInt() }
 private val COLOR_NAMES = listOf("rojo", "amarillo", "verde", "celeste", "azul", "violeta", "blanco", "negro")
 val SYMBOL_LABELS = linkedMapOf("dot" to "Punto", "circle" to "Círculo", "triangle" to "Triángulo", "square" to "Cuadrado",
-    "x" to "X", "plus" to "Cruz", "star" to "Estrella", "line" to "Línea", "arrow" to "Flecha")
+    "x" to "X", "plus" to "Cruz", "star" to "Estrella", "line" to "Línea", "arrow" to "Flecha", "polyline" to "Ángulos (multipunto)")
 val SIDE_LABELS = linkedMapOf("auto" to "Auto", "top" to "Arriba", "bottom" to "Abajo", "left" to "Izquierda", "right" to "Derecha")
 
 /**
@@ -109,8 +109,9 @@ fun InkOptions(style: InkStyle, onStyle: (InkStyle) -> Unit, modifier: Modifier 
             }
         Text(when (style.tool) {
             InkTool.PEN -> "Dibuje sobre la foto"
-            InkTool.SYMBOL -> "Toque para un marcador; arrastre para ampliarlo (línea y flecha: de un extremo al otro)"
-            InkTool.SELECT -> "Toque un trazo o símbolo y arrástrelo"
+            InkTool.SYMBOL -> if (style.symbol == "polyline") "Toque para añadir puntos; arrastre un punto para moverlo; confirme o descarte arriba"
+                else "Toque para un marcador; arrastre para ampliarlo (línea y flecha: de un extremo al otro)"
+            InkTool.SELECT -> "Toque un trazo o símbolo y arrástrelo (en las líneas multipunto, arrastre un punto para moverlo solo)"
             InkTool.ERASE_STROKE -> "Pase por encima de un trazo o símbolo para quitarlo"
             InkTool.ERASE_PAINT -> "Pase la goma por donde quiera borrar"
         }, color = Color.LightGray, style = MaterialTheme.typography.labelSmall)

@@ -64,6 +64,7 @@ object InkRenderer {
             return
         }
         val kind = s.shape ?: "dot"
+        if (kind == POLYLINE) { drawPolyline(c, s, pts, p, unit); return }
         if (kind == "line" || kind == "arrow") {
             val a = pts.first()
             val b = if (pts.size >= 2) pts.last() else PointF(a.x + s.size * unit, a.y)   // marcador: corto, horizontal
@@ -93,6 +94,45 @@ object InkRenderer {
                 }
                 close()
             }, p)
+        }
+    }
+
+    const val POLYLINE = "polyline"
+
+    /** Ángulo interno (°, 0–180) en [v] entre los segmentos v→a y v→b (en px: la vista conserva los ángulos). */
+    fun angleAt(a: PointF, v: PointF, b: PointF): Float? {
+        val ax = a.x - v.x; val ay = a.y - v.y; val bx = b.x - v.x; val by = b.y - v.y
+        val na = hypot(ax, ay); val nb = hypot(bx, by)
+        if (na < 1e-3f || nb < 1e-3f) return null
+        val c = ((ax * bx + ay * by) / (na * nb)).coerceIn(-1f, 1f)
+        return Math.toDegrees(kotlin.math.acos(c.toDouble())).toFloat()
+    }
+
+    /**
+     * Línea multipunto: segmentos de punto a punto, cada vértice marcado y, en los interiores, el ángulo
+     * interno entre un segmento y el siguiente (texto dentro del ángulo, sobre su bisectriz).
+     */
+    fun drawPolyline(c: Canvas, s: InkStroke, pts: List<PointF>, p: Paint, unit: Float, textScale: Float = 1f) {
+        if (pts.size >= 2) c.drawPath(Path().apply { moveTo(pts[0].x, pts[0].y); pts.drop(1).forEach { lineTo(it.x, it.y) } }, p)
+        val r = (p.strokeWidth * 1.6f).coerceAtLeast(4f)
+        val dot = Paint(p).apply { style = Paint.Style.FILL; xfermode = null }
+        pts.forEach { c.drawCircle(it.x, it.y, r, dot) }
+        val ts = (14f * textScale).coerceAtLeast(10f)
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = ts; typeface = android.graphics.Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
+        val halo = Paint(fill).apply { color = 0xE6000000.toInt(); style = Paint.Style.STROKE; strokeWidth = ts * 0.2f; strokeJoin = Paint.Join.ROUND }
+        for (i in 1 until pts.size - 1) {
+            val a = pts[i - 1]; val v = pts[i]; val b = pts[i + 1]
+            val ang = angleAt(a, v, b) ?: continue
+            // bisectriz hacia dentro del ángulo
+            val ax = a.x - v.x; val ay = a.y - v.y; val bx = b.x - v.x; val by = b.y - v.y
+            val na = hypot(ax, ay); val nb = hypot(bx, by)
+            var dx = ax / na + bx / nb; var dy = ay / na + by / nb
+            val dn = hypot(dx, dy)
+            if (dn < 1e-3f) { dx = -ay / na; dy = ax / na } else { dx /= dn; dy /= dn }
+            val d = ts * 1.7f + r
+            val x = v.x + dx * d; val y = v.y + dy * d + ts * 0.35f
+            val label = "%.0f°".format(ang)
+            c.drawText(label, x, y, halo); c.drawText(label, x, y, fill)
         }
     }
 
@@ -159,6 +199,7 @@ object InkRenderer {
     fun outline(s: InkStroke): List<Pt> {
         if (s.kind != InkStroke.SYMBOL) return s.points
         val kind = s.shape ?: "dot"
+        if (kind == POLYLINE) return s.points
         if (kind == "line" || kind == "arrow") return if (s.points.size >= 2) listOf(s.points.first(), s.points.last()) else s.points
         if (s.points.size < 2) return s.points   // marcador: un punto con su radio
         val a = s.points.first(); val b = s.points.last()
