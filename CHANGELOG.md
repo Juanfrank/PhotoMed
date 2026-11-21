@@ -2,6 +2,21 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.36 — 21 de noviembre de 2026
+
+- **La tabla de medidas se filtra a lo seleccionado en la foto**: al tocar una línea, la tabla muestra
+  solo esa línea; con la línea ya elegida, tocar uno de sus tramos punteados (ancho alar, largo…) la
+  deja solo con ese tramo. «Ver todas» vuelve a la tabla completa. Lo elegido desde la propia tabla no
+  la filtra.
+- **Deslizar vuelve a funcionar**: el toque para seleccionar una línea se quedaba el gesto y bloqueaba
+  el deslizador de Comparar. Ahora un toque solo cuenta si el dedo no se mueve; el deslizador, el zoom y
+  el paso de una foto a otra reciben el gesto. En el visor, con un dedo y sin zoom se pasa de foto.
+- **Botón de pantalla completa en lugar del de capas** (visor y Comparar). Las capas se eligen siempre
+  con los chips de encima de la foto. En Comparar, pantalla completa también (solo las fotos).
+- **Horizontal y tableta apaisada**: los controles y la tabla en la mitad izquierda y la foto en la
+  derecha, en el visor y en Comparar (antes la foto ocupaba todo el ancho y en Comparar la tabla quedaba
+  debajo).
+
 ## 2.35 — 21 de noviembre de 2026
 
 - **Varios núcleos en el análisis de arrugas y rasgos**: cada candidato a arruga o surco (frente, ceño,

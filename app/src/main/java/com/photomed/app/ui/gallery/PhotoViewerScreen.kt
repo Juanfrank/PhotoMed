@@ -1,5 +1,7 @@
 package com.photomed.app.ui.gallery
 
+import com.photomed.app.ui.components.detectTapPassThrough
+import com.photomed.app.ui.components.detectZoomPanPassThrough
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.semantics.contentDescription
@@ -112,7 +114,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     var info by remember { mutableStateOf<Pair<Photo, PhotoInfo?>?>(null) }
     // capas de anotación y edición no destructiva (giro, espejo, recorte)
     val layersState = com.photomed.app.ui.compare.rememberAnnotLayers()
-    var showLayers by remember { mutableStateOf(layersState.value.isNotEmpty()) }
+    // capas siempre disponibles (se eligen con los chips; el botón de capas dejó sitio a pantalla completa)
+    val showLayers = true
     var editing by remember { mutableStateOf(false) }
     var cropping by remember { mutableStateOf(false) }
     var editVersion by remember { mutableIntStateOf(0) }
@@ -311,9 +314,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     IconButton(onClick = { inking = !inking; if (inking) { tracing = false; viewLayers.value = viewLayers.value.copy(notes = true) } }) {
                         Icon(Icons.Default.Draw, if (inking) "Terminar de anotar" else "Anotar sobre la foto")
                     }
-                    IconButton(onClick = { showLayers = !showLayers }) {
-                        Icon(Icons.Default.Layers, if (showLayers) "Ocultar capas" else "Capas: contorno, línea del pelo, rasgos y surcos")
-                    }
+                    // pantalla completa (las capas se eligen con los chips de encima de la foto)
+                    IconButton(onClick = { fullscreen = true }) { Icon(Icons.Default.Fullscreen, "Pantalla completa") }
                     IconButton(onClick = { editing = !editing }) { Icon(Icons.Default.Crop, if (editing) "Terminar edición" else "Girar, espejo y recorte") }
                     IconButton(onClick = {
                         scope.launch { info = current to withContext(Dispatchers.IO) { repo.readInfo(current) } }
@@ -356,22 +358,6 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
         },
     ) { padding ->
         androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().padding(padding).background(Color.Black)) {
-            // selector de capas (arrugas, rasgos…) encima de la foto
-            if (showLayers && !fullscreen) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
-                Modifier.fillMaxWidth().padding(vertical = 4.dp), onMetrics = { metricsSheet = !metricsSheet },
-                onTrace = { traceTarget = null; tracing = !tracing
-                    if (tracing) scope.launch { snackbar.showSnackbar("Dibuje sobre el surco: una línea por donde se ve, o rodee el área") } },
-                tracing = tracing, viewLayers = viewLayers)
-            if (showLayers && !fullscreen) com.photomed.app.ui.compare.OpacitySlider(annotAlpha.value, { annotAlpha.value = it },
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp), light = true)
-            // análisis en curso: barra de proceso visible
-            val analyzing = showLayers && annotsByUri[current.uri.toString()] == null || traceBusy
-            if (analyzing) androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f).semantics { contentDescription = "Analizando arrugas y rasgos" })
-                Text(if (traceBusy) "Trazando y midiendo el surco…" else "Analizando arrugas y rasgos…", color = Color.White, style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(start = 10.dp))
-            }
             // tabla de medidas: debajo de la foto (vertical) o a su derecha (horizontal / tableta), sin taparla
             @Composable fun metricsPanel(mod: Modifier) {
                 val u = current.uri.toString()
@@ -402,8 +388,48 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     selected = selected, selectedKey = selectedKey,
                     modifier = mod)
             }
-            Row(Modifier.weight(1f).fillMaxWidth()) {
-            Box(Modifier.weight(1f).fillMaxHeight()) {
+            // controles de arriba: capas, opacidad y análisis en curso
+            @Composable fun topControls() {
+            // selector de capas (arrugas, rasgos…) encima de la foto
+            if (showLayers && !fullscreen) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
+                Modifier.fillMaxWidth().padding(vertical = 4.dp), onMetrics = { metricsSheet = !metricsSheet },
+                onTrace = { traceTarget = null; tracing = !tracing
+                    if (tracing) scope.launch { snackbar.showSnackbar("Dibuje sobre el surco: una línea por donde se ve, o rodee el área") } },
+                tracing = tracing, viewLayers = viewLayers)
+            if (showLayers && !fullscreen) com.photomed.app.ui.compare.OpacitySlider(annotAlpha.value, { annotAlpha.value = it },
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp), light = true)
+            // análisis en curso: barra de proceso visible
+            val analyzing = showLayers && annotsByUri[current.uri.toString()] == null || traceBusy
+            if (analyzing) androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f).semantics { contentDescription = "Analizando arrugas y rasgos" })
+                Text(if (traceBusy) "Trazando y midiendo el surco…" else "Analizando arrugas y rasgos…", color = Color.White, style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 10.dp))
+            }
+            }
+            // controles de abajo: anotación y edición
+            @Composable fun bottomControls() {
+            if (inking && !fullscreen) InkOptions(inkStyle, { inkStyle = it }, Modifier.fillMaxWidth().navigationBarsPadding())
+            if (editing) androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))) {
+                // la edición se lee al pulsar (no la de la última composición) para encadenar giro, espejo…
+                fun now() = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
+                val e = remember(current.uri, editVersion) { now() }
+                fun save(n: com.photomed.app.align.ImageEdit) { com.photomed.app.align.PhotoEdits.set(context, current.uri.toString(), n); editVersion++ }
+                androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly) {
+                    EditButton(Icons.Default.RotateRight, "Girar 90°") { save(now().rotated()) }
+                    EditButton(Icons.Default.Flip, "Espejo") { save(now().mirrored()) }
+                    EditButton(Icons.Default.Crop, "Recortar") { cropping = true }
+                    EditButton(Icons.Default.Restore, "Original", enabled = !e.isIdentity) { save(com.photomed.app.align.ImageEdit.NONE) }
+                }
+                Text("La foto original no se modifica; la edición se aplica también en Comparar y al exportar.",
+                    color = Color.LightGray, style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
+            }
+            }
+            // la foto (con su paginador, la barra de anotación y la pantalla completa)
+            @Composable fun photoArea(mod: Modifier) {
+            Box(mod) {
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize().background(Color.Black), key = { list[it].key },
                 userScrollEnabled = !cropping && !tracing && !inking) { page ->
                 val ph = list[page]
@@ -419,8 +445,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     previous = all.filter { it.takenAt < ph.takenAt && it.expression == ph.expression }.sortedByDescending { it.takenAt }.map { it.uri.toString() },
                     userVersion = userVersion, tracing = tracing && page == pager.currentPage,
                     onTracePath = { path -> tracing = false; tracePath(ph, path, traceTarget); traceTarget = null },
-                    onSelect = { hit ->
-                        selected = hit; selectedKey = null
+                    onSelect = { hit, key ->
+                        selected = hit; selectedKey = key
                         // sin ficha flotante: la tabla de medidas se abre en la fila de la línea
                         if (hit != null) metricsSheet = true
                         // toque sin línea medida y ninguna capa de arrugas visible: cómo verlas
@@ -450,34 +476,30 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                         }
                     },
                         onDone = { inking = false }, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp))
-                // pantalla completa: botón semitransparente arriba a la derecha de la foto
-                IconButton(onClick = { fullscreen = !fullscreen },
+                // en pantalla completa: botón semitransparente para salir, arriba a la derecha de la foto
+                if (fullscreen) IconButton(onClick = { fullscreen = false },
                     modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.Black.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape)) {
                     Icon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
                         if (fullscreen) "Salir de pantalla completa" else "Pantalla completa", tint = Color.White.copy(alpha = 0.9f))
                 }
             }
-            if (wide && metricsSheet && showLayers && !fullscreen)
-                metricsPanel(Modifier.width(minOf(440, (conf.screenWidthDp * 0.42f).toInt()).dp).fillMaxHeight())
             }
+            if (fullscreen) photoArea(Modifier.fillMaxSize())
+            else if (wide) Row(Modifier.fillMaxSize()) {
+                // horizontal / tableta apaisada: controles y tabla en la mitad izquierda, la foto en la derecha
+                Column(Modifier.weight(1f).fillMaxHeight().background(Color.Black)) {
+                    topControls()
+                    if (metricsSheet && showLayers) metricsPanel(Modifier.fillMaxWidth().weight(1f))
+                    else androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                    bottomControls()
+                }
+                photoArea(Modifier.weight(1f).fillMaxHeight())
+            } else {
+                topControls()
+                photoArea(Modifier.weight(1f).fillMaxWidth())
             if (!wide && metricsSheet && showLayers && !fullscreen)
                 metricsPanel(Modifier.fillMaxWidth().heightIn(max = (conf.screenHeightDp * 0.45f).dp))
-            if (inking && !fullscreen) InkOptions(inkStyle, { inkStyle = it }, Modifier.fillMaxWidth().navigationBarsPadding())
-            if (editing) androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))) {
-                // la edición se lee al pulsar (no la de la última composición) para encadenar giro, espejo…
-                fun now() = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
-                val e = remember(current.uri, editVersion) { now() }
-                fun save(n: com.photomed.app.align.ImageEdit) { com.photomed.app.align.PhotoEdits.set(context, current.uri.toString(), n); editVersion++ }
-                androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly) {
-                    EditButton(Icons.Default.RotateRight, "Girar 90°") { save(now().rotated()) }
-                    EditButton(Icons.Default.Flip, "Espejo") { save(now().mirrored()) }
-                    EditButton(Icons.Default.Crop, "Recortar") { cropping = true }
-                    EditButton(Icons.Default.Restore, "Original", enabled = !e.isIdentity) { save(com.photomed.app.align.ImageEdit.NONE) }
-                }
-                Text("La foto original no se modifica; la edición se aplica también en Comparar y al exportar.",
-                    color = Color.LightGray, style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
+                bottomControls()
             }
         }
     }
@@ -589,7 +611,7 @@ private fun EditButton(icon: androidx.compose.ui.graphics.vector.ImageVector, la
  */
 @Composable
 private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.align.AnnotLayer>, version: Int, modifier: Modifier,
-                      selected: com.photomed.app.align.AnnotLine? = null, onSelect: (com.photomed.app.align.AnnotLine?) -> Unit = {},
+                      selected: com.photomed.app.align.AnnotLine? = null, onSelect: (com.photomed.app.align.AnnotLine?, String?) -> Unit = { _, _ -> },
                       selectedKey: String? = null,
                       /** Cambia al tocar una fila de la tabla: se desplaza la foto hasta la línea seleccionada. */
                       focusTick: Int = 0,
@@ -668,6 +690,7 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
     val annotsState = androidx.compose.runtime.rememberUpdatedState(annots)
     val layersState = androidx.compose.runtime.rememberUpdatedState(layers)
     val onSelectState = androidx.compose.runtime.rememberUpdatedState(onSelect)
+    val selectedState = androidx.compose.runtime.rememberUpdatedState(selected)
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     var boxSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
@@ -692,22 +715,26 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
     Box(modifier
         .onSizeChanged { boxSize = it }
         .pointerInput(Unit) {
-            detectTransformGestures { _, pan, zoom, _ ->
+            // zoom con dos dedos; con un dedo solo se desplaza si hay zoom (si no, se pasa de foto)
+            detectZoomPanPassThrough({ scale > 1f }) { pan, zoom ->
                 scale = (scale * zoom).coerceIn(1f, 6f)
                 offset = if (scale == 1f) androidx.compose.ui.geometry.Offset.Zero else offset + pan
             }
         }
         .pointerInput(Unit) {
-            detectTapGestures(
+            // toque sin consumir el evento (no bloquea el paso de una foto a otra)
+            detectTapPassThrough(
                 onDoubleTap = { scale = 1f; offset = androidx.compose.ui.geometry.Offset.Zero },
                 onTap = { s ->
                     // toque → punto de la foto (deshace zoom y desplazamiento) → línea con medidas más cercana
-                    val bb = imgState.value ?: return@detectTapGestures
-                    val a = annotsState.value ?: return@detectTapGestures
+                    val bb = imgState.value ?: return@detectTapPassThrough
+                    val a = annotsState.value ?: return@detectTapPassThrough
                     val sw = size.width.toFloat(); val sh = size.height.toFloat()
                     val q = screenToPhoto(s.x, s.y, sw, sh, bb.width, bb.height, scale, offset.x, offset.y)
                     val w = minOf(sw, sh * bb.width / bb.height.toFloat())
-                    onSelectState.value(com.photomed.app.ui.compare.hitLine(a, layersState.value, q, 28.dp.toPx() / (w * scale)))
+                    // con una línea ya seleccionada, tocar uno de sus tramos punteados selecciona ese tramo
+                    val hit = com.photomed.app.ui.compare.hitPick(a, layersState.value, q, 28.dp.toPx() / (w * scale), selectedState.value?.metrics?.name)
+                    onSelectState.value(hit?.first, hit?.second)
                 },
             )
         }

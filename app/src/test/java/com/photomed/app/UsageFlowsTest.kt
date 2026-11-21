@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.performClick
@@ -278,8 +279,7 @@ class UsageFlowsTest {
         assertEquals(1, e.rot); assertTrue(e.mirror)
         compose.onNodeWithContentDescription("Original").performClick()
         assertTrue(com.photomed.app.align.PhotoEdits.of(ctx, photos[0].uri.toString()).isIdentity)
-        // capas: los interruptores aparecen y se recuerdan
-        compose.onNodeWithContentDescription("Capas", substring = true).performClick()
+        // capas: los interruptores están siempre (sin botón de capas) y se recuerdan
         compose.onNodeWithContentDescription("Contorno interno", substring = true).performScrollTo().performClick()
         waitText("Surcos")
         compose.onNodeWithText("Surcos").performClick()
@@ -318,6 +318,8 @@ class UsageFlowsTest {
         waitText("Arrugas y surcos")
         assertTrue(compose.onAllNodesWithText("Tabla de medidas").fetchSemanticsNodes().isEmpty())
         compose.onNode(isSelected() and hasText("Frente, línea 1", substring = true)).assertExists()
+        // selección hecha en la foto: la tabla se filtra a esa línea, con «Ver todas» para volver
+        compose.onNodeWithText("Ver todas (1)").assertExists()
         compose.onNodeWithText("0.31").assertExists()
         // diseño: selector de capas encima de la foto y tabla debajo, sin taparla
         val photoBox = compose.onNodeWithContentDescription("Fotografía", substring = true).fetchSemanticsNode().boundsInRoot
@@ -383,8 +385,40 @@ class UsageFlowsTest {
         waitText("Arrugas y surcos")
         val photoBox = compose.onNodeWithContentDescription("Fotografía", substring = true).fetchSemanticsNode().boundsInRoot
         val table = compose.onNodeWithText("Arrugas y surcos").fetchSemanticsNode().boundsInRoot
-        assertTrue("tabla a la derecha de la foto: $photoBox / $table", table.left >= photoBox.right - 1f)
+        // controles y tabla en la mitad izquierda, la foto en la derecha (sin ampliarla a todo el ancho)
+        assertTrue("tabla a la izquierda de la foto: $photoBox / $table", table.right <= photoBox.left + 1f)
+        assertTrue("la foto ocupa la mitad derecha: $photoBox", photoBox.left >= 1200f * compose.density.density * 0.45f)
         assertTrue("la tabla no empuja la foto hacia arriba", table.top < photoBox.bottom)
+    }
+
+    /** Deslizar entre fotos funciona con las capas activas (el toque para seleccionar no se queda el gesto). */
+    @Test
+    fun swipeBetweenPhotosWithLayersOn() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).edit().putString("annot_layers", "FOREHEAD,FOLDS").commit()
+        val p = photos[0]
+        setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
+        waitText("1/", substring = true)
+        compose.onAllNodesWithContentDescription("Fotografía", substring = true)[0].performTouchInput { swipeLeft() }
+        waitText("2/", substring = true)
+    }
+
+    /** Comparar en horizontal: controles a la izquierda y las fotos en la mitad derecha. */
+    @Test
+    @Config(sdk = [34], qualifiers = "w1200dp-h700dp-land")
+    fun compareLandscapeControlsLeftPhotosRight() {
+        val jpeg = File(tmp.root, "l.jpg").apply { writeBytes(this@UsageFlowsTest.javaClass.getResourceAsStream("/blank.jpg")!!.readBytes()) }
+        val ps = listOf(1L, 2L).map { repo.savePhoto(exp, Zone.FOREHEAD, jpeg, takenAt = it * 86_400_000L * 30) }
+        setContent { CompareScreen(exp.id, Zone.FOREHEAD, onBack = {}, initialSelection = ps.map { it.displayName }) }
+        waitText("Cuadrícula")
+        val modes = compose.onNodeWithText("Cuadrícula").fetchSemanticsNode().boundsInRoot
+        val w = 1200f * compose.density.density
+        assertTrue("controles en la mitad izquierda: $modes", modes.right <= w * 0.55f)
+        runCatching {
+            val img = compose.onRoot().captureToImage().asAndroidBitmap()
+            File("build/reports").mkdirs()
+            File("build/reports/compare_landscape.png").outputStream().use { img.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, it) }
+        }
     }
 
     @Test
@@ -398,8 +432,6 @@ class UsageFlowsTest {
             metrics = com.photomed.app.align.LineMetrics("Nasogeniano derecho", lengthMm = 31f, widthMm = 3f, contrastL = 18f, depthMm = 1.2f, grade = 4))
         com.photomed.app.align.PhotoAnnotator.put(viewerKey(p), listOf(fold))
         setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
-        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Capas", substring = true).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription("Capas", substring = true).performClick()
         waitText("Medidas")
         compose.onNodeWithText("Medidas").performClick()
         waitText("Nasogeniano derecho", substring = true)
@@ -461,7 +493,6 @@ class UsageFlowsTest {
         compose.onNodeWithContentDescription("Salir de pantalla completa").performClick()
         compose.waitForIdle()
         // capas de la vista (en la fila de capas): las anotaciones se pueden ocultar
-        compose.onNodeWithContentDescription("Capas", substring = true).performClick()
         compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Vista", substring = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Vista", substring = true).performScrollTo().performClick()
         waitText("Anotaciones")

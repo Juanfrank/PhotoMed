@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Edit
@@ -124,6 +125,18 @@ fun hitLine(lines: List<AnnotLine>, layers: Set<AnnotLayer>, p: Pt, tol: Float):
         }
     }
     return best
+}
+
+/**
+ * Toque en la foto: si ya hay una línea seleccionada ([selectedName]) y se toca uno de sus tramos
+ * medidos (las guías punteadas), ese tramo; si no, la línea más cercana entera. null: nada cerca.
+ */
+fun hitPick(lines: List<AnnotLine>, layers: Set<AnnotLayer>, p: Pt, tol: Float, selectedName: String?): Pair<AnnotLine, String?>? {
+    lines.firstOrNull { selectedName != null && it.metrics?.name == selectedName }?.let { sel ->
+        sel.guides.filter { it.key.isNotEmpty() }.minByOrNull { segDist(p, it.a, it.b) }
+            ?.takeIf { segDist(p, it.a, it.b) < tol * 0.8f }?.let { return sel to it.key }
+    }
+    return hitLine(lines, layers, p, tol)?.let { it to null }
 }
 
 private fun segDist(p: Pt, a: Pt, b: Pt): Float {
@@ -282,6 +295,12 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
                         traces: TraceActions?, onSelectLine: ((AnnotLine, String?) -> Unit)?, selected: AnnotLine?, selectedKey: String?,
                         widthsFor: (Int, Dp) -> Pair<Dp, Dp>) {
     val selName = selected?.metrics?.name
+    // selección hecha en la foto (punto o tramo): la tabla muestra solo eso, con «Ver todas» para volver;
+    // la hecha desde la propia tabla no la filtra (se seguiría eligiendo entre las filas)
+    var fromTable by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Pair<String?, String?>?>(null) }
+    var showAll by androidx.compose.runtime.remember(selName, selectedKey) { androidx.compose.runtime.mutableStateOf(false) }
+    val filtering = selName != null && fromTable != (selName to selectedKey) && !showAll
+    val onSelectLine: ((AnnotLine, String?) -> Unit)? = onSelectLine?.let { f -> { l: AnnotLine, k: String? -> fromTable = l.metrics?.name to k; f(l, k) } }
     // la fila de la línea seleccionada se trae a la vista (en vertical y en horizontal)
     val bring = androidx.compose.runtime.remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
     androidx.compose.runtime.LaunchedEffect(selName) { if (selName != null) { kotlinx.coroutines.delay(80); runCatching { bring.bringIntoView() } } }
@@ -322,7 +341,13 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
             Text("Mostrar en la foto: " + hidden.sortedBy { it.ordinal }.joinToString(", ") { it.label })
         }
     }
-    val ordered = byName.entries.sortedBy { numbers[it.key] ?: Int.MAX_VALUE }
+    val ordered = byName.entries.sortedBy { numbers[it.key] ?: Int.MAX_VALUE }.filter { !filtering || it.key == selName }
+    if (filtering && byName.containsKey(selName)) Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.FilterAlt, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+        Text("Solo la selección: ${numbers[selName]?.let { "$it  " }.orEmpty()}$selName" + (selectedKey?.let { " · $it" } ?: ""),
+            style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f).padding(start = 6.dp))
+        TextButton(onClick = { showAll = true }) { Text("Ver todas (${byName.size})") }
+    }
     val single = columns.size == 1
     // un desplazamiento horizontal por tabla (compartido, la tabla más estrecha limitaba a las demás)
     val scrolls = List(3) { rememberScrollState() }
@@ -341,6 +366,8 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
                 TableRow(featCells, header = true, firstW = fw, valueW = vw)
                 rows.forEach { (name, v) ->
                     val labels = v.second.firstNotNullOfOrNull { it }?.features?.map { it.first }.orEmpty()
+                        // tramo elegido en la foto: solo su fila
+                        .filter { lab -> !filtering || selectedKey == null || lab.substringBeforeLast(",") == selectedKey }
                     labels.forEachIndexed { i, lab ->
                         val vals = v.second.map { m -> m?.features?.firstOrNull { it.first == lab }?.second }
                         val first = vals.firstOrNull { it != null }; val last = vals.lastOrNull { it != null }

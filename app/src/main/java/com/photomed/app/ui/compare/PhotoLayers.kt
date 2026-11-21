@@ -1,5 +1,7 @@
 package com.photomed.app.ui.compare
 
+import com.photomed.app.ui.components.detectTapPassThrough
+import com.photomed.app.ui.components.detectZoomPanPassThrough
 import androidx.compose.foundation.gestures.detectTapGestures
 import android.content.Context
 import android.net.Uri
@@ -250,15 +252,18 @@ fun PhotoContent(model: Any, transform: Similarity?, annots: List<AnnotLine>?, l
                  numbers: Map<String, Int>? = annots?.let { com.photomed.app.align.MeasureNumbering.of(listOf(it)) },
                  alpha: Float = 0.5f,
                  showImage: Boolean = true, ink: List<com.photomed.app.align.InkStroke> = emptyList(), selected: String? = null,
-                 selectedKey: String? = null, onSelect: ((AnnotLine?) -> Unit)? = null) {
+                 selectedKey: String? = null, onSelect: ((AnnotLine?, String?) -> Unit)? = null) {
+    val selectedNow = androidx.compose.runtime.rememberUpdatedState(selected)
     val annotsNow = androidx.compose.runtime.rememberUpdatedState(annots)
     val layersNow = androidx.compose.runtime.rememberUpdatedState(layers)
     Box(modifier.alignedBy(transform).then(if (onSelect != null && layers.isNotEmpty()) Modifier.pointerInput(Unit) {
         // tocar una línea (también con zoom: las coordenadas ya vienen en la foto) la selecciona
-        detectTapGestures { o ->
-            val a = annotsNow.value ?: return@detectTapGestures
+        // sin consumir el evento: el deslizador, el zoom y el arrastre siguen funcionando
+        detectTapPassThrough { o ->
+            val a = annotsNow.value ?: return@detectTapPassThrough
             val p = Pt(o.x / size.width, o.y / size.width)
-            onSelect(hitLine(a, layersNow.value, p, 24.dp.toPx() / size.width))
+            val hit = hitPick(a, layersNow.value, p, 24.dp.toPx() / size.width, selectedNow.value)
+            onSelect(hit?.first, hit?.second)
         }
     } else Modifier)) {
         // capa 1: imagen
@@ -331,7 +336,7 @@ data class CompareView(
     /** Tramo seleccionado de esa línea (o null). */
     val selectedKey: String? = null,
     /** Tocar una línea en una foto la selecciona (null: toque fuera de las líneas). */
-    val onSelect: ((AnnotLine?) -> Unit)? = null,
+    val onSelect: ((AnnotLine?, String?) -> Unit)? = null,
 ) {
     /** Proporción (ancho/alto) de cada celda: 3:4, o 4:3 con giro de 90° o 270°. */
     val aspect: Float get() = if (rot % 2 == 1) 4f / 3f else 3f / 4f

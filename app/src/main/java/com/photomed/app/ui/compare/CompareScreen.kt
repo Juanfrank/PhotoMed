@@ -1,6 +1,8 @@
 package com.photomed.app.ui.compare
 
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.RotateRight
@@ -187,7 +189,20 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     var gridOrder by remember { mutableStateOf(GridOrder.OLDEST_FIRST) }
     // Vista de la comparación: capas de anotación, giro (pasos de 90°), espejo y recorte manual
     val layersState = rememberAnnotLayers()
-    var showLayers by remember { mutableStateOf(layersState.value.isNotEmpty()) }
+    // capas siempre disponibles (se eligen con los chips; el botón de capas dejó sitio a pantalla completa)
+    val showLayers = true
+    // pantalla completa: solo las fotos (sin barras de la app ni del sistema)
+    var fullscreen by remember { mutableStateOf(false) }
+    val rootView = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.DisposableEffect(fullscreen) {
+        val w = (rootView.context as? android.app.Activity)?.window
+        val ctl = w?.let { androidx.core.view.WindowCompat.getInsetsController(it, rootView) }
+        if (fullscreen) { ctl?.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            ctl?.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars()) }
+        else ctl?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        onDispose { ctl?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars()) }
+    }
+    androidx.activity.compose.BackHandler(enabled = fullscreen) { fullscreen = false }
     var metricsSheet by remember { mutableStateOf(false) }
     // horizontal o tableta apaisada: la tabla de medidas va a la derecha de las fotos
     val conf = androidx.compose.ui.platform.LocalConfiguration.current
@@ -409,7 +424,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     Scaffold(
         topBar = {
             val (_, _, _, seq, _, n) = derive()
-            TopAppBar(
+            if (!fullscreen) TopAppBar(
                 title = {
                     Column {
                         Text(if (n > 2) "Comparar $n fotos" else "Comparar")
@@ -420,9 +435,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
                 actions = {
                     ViewLayersButton(viewLayers)
-                    IconButton(onClick = { showLayers = !showLayers }, enabled = seq != null) {
-                        Icon(Icons.Default.Layers, if (showLayers) "Ocultar capas" else "Capas: contorno, línea del pelo, rasgos y surcos")
-                    }
+                    IconButton(onClick = { fullscreen = true }, enabled = seq != null) { Icon(Icons.Default.Fullscreen, "Pantalla completa") }
                     IconButton(onClick = { reversed = !reversed; resetAlignment() }, enabled = seq != null) {
                         Icon(Icons.Default.SwapHoriz, "Invertir el orden")
                     }
@@ -486,7 +499,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             models.mapNotNull { (k, m) -> annots[k]?.let { m to it } }.toMap(), annotAlpha.value,
             view = viewLayers.value, ink = models.mapNotNull { (k, m) -> inks[k]?.let { m to it } }.toMap(), selected = selLine, selectedKey = selKey,
             // tocar una línea: se selecciona en todas las fotos y la tabla se abre en su fila
-            onSelect = { l -> selLine = l?.metrics?.name; selKey = null; if (l?.metrics != null) metricsSheet = true })
+            onSelect = { l, key -> selLine = l?.metrics?.name; selKey = key; if (l?.metrics != null) metricsSheet = true })
         if (all != null && photos.size < 2) {
             EmptyState(Icons.Default.Compare, "Se necesitan dos fotografías",
                 "Tome al menos dos fotografías de una zona para compararlas.", Modifier.padding(padding))
@@ -497,6 +510,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 while (true) { awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial); lastTouch = System.currentTimeMillis() }
             }
         }) {
+            // controles de arriba: modo, capas, opacidad, avisos y análisis en curso
+            @Composable fun topControls() {
             if (aligning) LinearProgressIndicator(Modifier.fillMaxWidth()) else Spacer(Modifier.height(4.dp))
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact)) {
                 Mode.entries.forEachIndexed { i, m ->
@@ -525,7 +540,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 Text("Analizando ${seq.count { annots[it.key] != null }}/${seq.size}…", style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(start = 10.dp))
             }
-            // Área de comparación
+            }
             // tabla de medidas: debajo de las fotos (vertical) o a su derecha (horizontal / tableta), sin taparlas
             @Composable fun metricsPanel(seq: List<Photo>, mod: Modifier) {
                 // eliminadas y confirmadas de las fotos comparadas (lectura fuera del hilo principal)
@@ -575,10 +590,10 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     },
                     modifier = mod)
             }
-            androidx.compose.runtime.CompositionLocalProvider(LocalCompareView provides view, LocalCellSize provides cellSize) {
-            Row(Modifier.weight(1f).fillMaxWidth()) {
+            // las fotos comparadas (cuadrícula, lado a lado, deslizador o fundido)
+            @Composable fun photosArea(mod: Modifier) {
             Box(
-                Modifier.weight(1f).fillMaxHeight().padding(horizontal = Md3Spacing.marginCompact, vertical = Md3Spacing.s2),
+                mod.padding(horizontal = Md3Spacing.marginCompact, vertical = Md3Spacing.s2),
                 contentAlignment = Alignment.Center,
             ) {
                 if (seq == null) {
@@ -679,9 +694,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     }
                 }
             }
-
             }
-
+            @Composable fun timelineControls() {
             // Línea de tiempo (fundido, o deslizador con más de dos fotos): recorre 1→2→…→N.
             if (seq != null && (mode == Mode.FADE || (mode == Mode.SLIDER && n > 2))) {
                 Column(Modifier.padding(horizontal = Md3Spacing.marginCompact)) {
@@ -702,9 +716,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     }
                 }
             }
-            if (wide && metricsSheet && showLayers && seq != null)
-                metricsPanel(seq, Modifier.width(minOf(440, (conf.screenWidthDp * 0.42f).toInt()).dp).fillMaxHeight())
             }
+            // controles de abajo: asa, alineación, filtros y selección de fotos
+            @Composable fun bottomControls() {
 
             // asa para plegar o desplegar todo lo que hay bajo las fotos (menos la línea de tiempo)
             if (seq != null) Row(
@@ -849,6 +863,37 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             }
             }
             }
+            }
+            }
+            }
+            androidx.compose.runtime.CompositionLocalProvider(LocalCompareView provides view, LocalCellSize provides cellSize) {
+            if (fullscreen) Box(Modifier.fillMaxSize()) {
+                photosArea(Modifier.fillMaxSize())
+                IconButton(onClick = { fullscreen = false },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.Black.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape)) {
+                    Icon(Icons.Default.FullscreenExit, "Salir de pantalla completa", tint = Color.White.copy(alpha = 0.9f))
+                }
+            }
+            else if (wide) Row(Modifier.fillMaxSize()) {
+                // horizontal / tableta apaisada: controles y tabla en la mitad izquierda, las fotos en la derecha
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    if (metricsSheet && showLayers && seq != null) {
+                        topControls()
+                        metricsPanel(seq, Modifier.fillMaxWidth().weight(1f))
+                    } else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        topControls()
+                        bottomControls()
+                    }
+                }
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    photosArea(Modifier.weight(1f).fillMaxWidth())
+                    timelineControls()
+                }
+            } else {
+                topControls()
+                photosArea(Modifier.weight(1f).fillMaxWidth())
+                timelineControls()
+                bottomControls()
             }
             }
         }
