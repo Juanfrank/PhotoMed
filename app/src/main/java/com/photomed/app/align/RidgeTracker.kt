@@ -63,7 +63,8 @@ object RidgeTracker {
         for (s0 in SIGMAS) {
             val s = s0 * scale
             val g = blur(sub, bw, bh, s)
-            for (y in 1 until bh - 1) for (x in 1 until bw - 1) {
+            // cada fila escribe solo sus píxeles: se reparte entre núcleos sin cambiar el resultado
+            Par.rows(bh - 2) { ya, yb -> for (y in ya + 1 until yb + 1) for (x in 1 until bw - 1) {
                 val i = y * bw + x
                 val ixx = g[i + 1] - 2 * g[i] + g[i - 1]
                 val iyy = g[i + bw] - 2 * g[i] + g[i - bw]
@@ -83,7 +84,7 @@ object RidgeTracker {
                     val n = hypot(nx, ny).coerceAtLeast(1e-9f)
                     vx[i] = -ny / n; vy[i] = nx / n
                 }
-            }
+            } }
         }
         fun sample(px: Float, py: Float, tx: Float, ty: Float): Float {
             val xi = (px - x0).roundToInt(); val yi = (py - y0).roundToInt()
@@ -170,12 +171,12 @@ object RidgeTracker {
         val r = (3 * sigma).roundToInt().coerceAtLeast(1)
         val k = FloatArray(2 * r + 1) { exp(-((it - r) * (it - r)) / (2 * sigma * sigma)) }.let { kk -> val s = kk.sum(); FloatArray(kk.size) { kk[it] / s } }
         val tmp = FloatArray(w * h); val out = FloatArray(w * h)
-        for (y in 0 until h) for (x in 0 until w) {
+        Par.rows(h) { ya, yb -> for (y in ya until yb) for (x in 0 until w) {
             var s = 0f; for (j in -r..r) s += k[j + r] * src[y * w + (x + j).coerceIn(0, w - 1)]; tmp[y * w + x] = s
-        }
-        for (y in 0 until h) for (x in 0 until w) {
+        } }
+        Par.rows(h) { ya, yb -> for (y in ya until yb) for (x in 0 until w) {
             var s = 0f; for (j in -r..r) s += k[j + r] * tmp[(y + j).coerceIn(0, h - 1) * w + x]; out[y * w + x] = s
-        }
+        } }
         return out
     }
 }

@@ -216,25 +216,30 @@ object PhotometricStereo {
         val r = (3 * sigma).roundToInt().coerceAtLeast(1)
         val k = FloatArray(2 * r + 1) { exp(-((it - r) * (it - r)) / (2 * sigma * sigma)) }.let { kk -> val s = kk.sum(); FloatArray(kk.size) { kk[it] / s } }
         val tmp = FloatArray(w * h); val out = FloatArray(w * h)
-        for (y in 0 until h) for (x in 0 until w) { var s = 0f; for (j in -r..r) s += k[j + r] * src[y * w + (x + j).coerceIn(0, w - 1)]; tmp[y * w + x] = s }
-        for (y in 0 until h) for (x in 0 until w) { var s = 0f; for (j in -r..r) s += k[j + r] * tmp[(y + j).coerceIn(0, h - 1) * w + x]; out[y * w + x] = s }
+        Par.rows(h) { ya, yb -> for (y in ya until yb) for (x in 0 until w) { var s = 0f; for (j in -r..r) s += k[j + r] * src[y * w + (x + j).coerceIn(0, w - 1)]; tmp[y * w + x] = s } }
+        Par.rows(h) { ya, yb -> for (y in ya until yb) for (x in 0 until w) { var s = 0f; for (j in -r..r) s += k[j + r] * tmp[(y + j).coerceIn(0, h - 1) * w + x]; out[y * w + x] = s } }
         return out
     }
 
     // ---------- FFT ----------
 
     private fun fft2(re: DoubleArray, im: DoubleArray, w: Int, h: Int, inverse: Boolean) {
-        val rr = DoubleArray(w); val ri = DoubleArray(w)
-        for (y in 0 until h) {
-            for (x in 0 until w) { rr[x] = re[y * w + x]; ri[x] = im[y * w + x] }
-            fft(rr, ri, inverse)
-            for (x in 0 until w) { re[y * w + x] = rr[x]; im[y * w + x] = ri[x] }
+        // filas y luego columnas, repartidas entre núcleos (cada tramo con sus propios búferes)
+        Par.rows(h, minRows = 16) { ya, yb ->
+            val rr = DoubleArray(w); val ri = DoubleArray(w)
+            for (y in ya until yb) {
+                for (x in 0 until w) { rr[x] = re[y * w + x]; ri[x] = im[y * w + x] }
+                fft(rr, ri, inverse)
+                for (x in 0 until w) { re[y * w + x] = rr[x]; im[y * w + x] = ri[x] }
+            }
         }
-        val cr = DoubleArray(h); val ci = DoubleArray(h)
-        for (x in 0 until w) {
-            for (y in 0 until h) { cr[y] = re[y * w + x]; ci[y] = im[y * w + x] }
-            fft(cr, ci, inverse)
-            for (y in 0 until h) { re[y * w + x] = cr[y]; im[y * w + x] = ci[y] }
+        Par.rows(w, minRows = 16) { xa, xb ->
+            val cr = DoubleArray(h); val ci = DoubleArray(h)
+            for (x in xa until xb) {
+                for (y in 0 until h) { cr[y] = re[y * w + x]; ci[y] = im[y * w + x] }
+                fft(cr, ci, inverse)
+                for (y in 0 until h) { re[y * w + x] = cr[y]; im[y * w + x] = ci[y] }
+            }
         }
     }
 

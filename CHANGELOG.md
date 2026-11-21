@@ -2,6 +2,19 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.35 — 21 de noviembre de 2026
+
+- **Varios núcleos en el análisis de arrugas y rasgos**: cada candidato a arruga o surco (frente, ceño,
+  raíz nasal, patas de gallo, surcos, búsqueda en una zona elegida) se rastrea en un núcleo distinto, y
+  los filtros de imagen (desenfoque, Hessiano, color Lab, limpieza de máscaras, FFT del relieve) se
+  reparten por filas. Se deja un núcleo libre para la interfaz. El resultado es idéntico al de un solo
+  núcleo (comprobado con 18 retratos: mismas líneas y medidas). En la prueba (3 núcleos de cálculo),
+  de 869 a 342 ms por cara; en un teléfono de 8 núcleos, más.
+- **Varias fotos a la vez**: los modelos nativos (malla facial, ML Kit, segmentación) siguen de uno en
+  uno, pero solo mientras se usan; el cálculo de las arrugas queda fuera de esa espera, así que en
+  Comparar una foto calcula sus arrugas mientras la siguiente pasa por los modelos.
+- La barba y el bigote se detectan una sola vez por foto (antes tres).
+
 ## 2.34 — 21 de noviembre de 2026
 
 - **La expresión pedida es condición para capturar.** Con sonrisa, cejas arriba, ojos apretados,

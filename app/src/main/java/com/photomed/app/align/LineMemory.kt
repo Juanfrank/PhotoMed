@@ -191,7 +191,8 @@ object RegionTrace {
         val c = toC((x0 + x1) / 2, (y0 + y1) / 2)
         val halfW = (x1 - x0) / 2 * sc / cwF; val halfH = (y1 - y0) / 2 * sc / cwF
         var best: RidgeTracker.Result? = null; var bestScore = 0f
-        for (k in 0 until 12) {
+        // 12 direcciones, una por núcleo; se elige como en serie (la primera con la mejor puntuación)
+        Par.map((0 until 12).toList()) { k -> run dirOne@{
             val a = Math.toRadians(k * 15.0)
             val dx = kotlin.math.cos(a).toFloat(); val dy = kotlin.math.sin(a).toFloat()
             // semilongitud dentro del rectángulo en esa dirección y semiancho del pasillo perpendicular
@@ -199,14 +200,17 @@ object RegionTrace {
                 if (kotlin.math.abs(dy) > 1e-3f) halfH / kotlin.math.abs(dy) else Float.MAX_VALUE)
             val across = minOf(if (kotlin.math.abs(dy) > 1e-3f) halfW / kotlin.math.abs(dy) else Float.MAX_VALUE,
                 if (kotlin.math.abs(dx) > 1e-3f) halfH / kotlin.math.abs(dx) else Float.MAX_VALUE).coerceAtMost(len)
-            if (len < 3f / cwF) continue
+            if (len < 3f / cwF) return@dirOne null
             val axis = listOf(Pt(c.x - dx * len, c.y - dy * len), c, Pt(c.x + dx * len, c.y + dy * len))
             // resolución lateral fina (~2,5 px por posición): con un pasillo tan ancho como la zona, pocas
             // posiciones permitían saltos laterales grandes de una estación a otra
             val acrossPx = across * cwF
             val r = RidgeTracker.track(lum, axis, across.coerceAtLeast(2f / cwF), stations = 30,
                 offsets = (acrossPx / 2.5f).toInt().coerceIn(8, 40),
-                minStrength = MIN_STRENGTH, minContrast = MIN_CONTRAST) ?: continue
+                minStrength = MIN_STRENGTH, minContrast = MIN_CONTRAST) ?: return@dirOne null
+            r
+        } }.forEach { r ->
+            if (r == null) return@forEach
             val score = r.strength * LineMeasure.length(r.points)
             if (score > bestScore) { bestScore = score; best = r }
         }

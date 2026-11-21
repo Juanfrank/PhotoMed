@@ -99,22 +99,23 @@ object FacialHair {
 
     private fun box(src: FloatArray, w: Int, h: Int, r: Int): FloatArray {
         val tmp = FloatArray(w * h); val out = FloatArray(w * h)
-        for (y in 0 until h) { var s = 0f; var c = 0
+        // filas y luego columnas, cada pasada repartida entre núcleos
+        Par.rows(h) { ya, yb -> for (y in ya until yb) { var s = 0f; var c = 0
             for (x in -r..r) if (x in 0 until w) { s += src[y * w + x]; c++ }
             for (x in 0 until w) {
                 tmp[y * w + x] = s / c
                 val xo = x - r; val xi = x + r + 1
                 if (xo >= 0) { s -= src[y * w + xo]; c-- }
                 if (xi < w) { s += src[y * w + xi]; c++ }
-            } }
-        for (x in 0 until w) { var s = 0f; var c = 0
+            } } }
+        Par.rows(w) { xa, xb -> for (x in xa until xb) { var s = 0f; var c = 0
             for (y in -r..r) if (y in 0 until h) { s += tmp[y * w + x]; c++ }
             for (y in 0 until h) {
                 out[y * w + x] = s / c
                 val yo = y - r; val yi = y + r + 1
                 if (yo >= 0) { s -= tmp[yo * w + x]; c-- }
                 if (yi < h) { s += tmp[yi * w + x]; c++ }
-            } }
+            } } }
         return out
     }
 

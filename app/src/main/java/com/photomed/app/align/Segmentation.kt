@@ -119,16 +119,16 @@ object MaskOps {
         // separable (cuadrado), suficiente para limpieza
         val w = m.width; val h = m.height
         val tmp = BooleanArray(w * h); val out = Mask(w, h)
-        for (y in 0 until h) for (x in 0 until w) {
+        Par.rows(h) { ya, yb -> for (y in ya until yb) for (x in 0 until w) {
             var v = !dil
             for (k in -r..r) { val xx = x + k; val b = xx in 0 until w && m.data[y * w + xx]; if (dil && b) { v = true; break }; if (!dil && !b) { v = false; break } }
             tmp[y * w + x] = v
-        }
-        for (y in 0 until h) for (x in 0 until w) {
+        } }
+        Par.rows(h) { ya, yb -> for (y in ya until yb) for (x in 0 until w) {
             var v = !dil
             for (k in -r..r) { val yy = y + k; val b = yy in 0 until h && tmp[yy * w + x]; if (dil && b) { v = true; break }; if (!dil && !b) { v = false; break } }
             out.data[y * w + x] = v
-        }
+        } }
         return out
     }
 

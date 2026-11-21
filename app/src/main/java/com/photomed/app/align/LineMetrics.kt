@@ -51,10 +51,11 @@ class LabImage(val width: Int, val height: Int, val l: FloatArray, val a: FloatA
     companion object {
         fun fromArgb(px: IntArray, w: Int, h: Int): LabImage {
             val l = FloatArray(px.size); val a = FloatArray(px.size); val b = FloatArray(px.size)
-            for (i in px.indices) {
+            // por filas en varios núcleos (cada píxel es independiente)
+            Par.rows(h) { ya, yb -> for (i in ya * w until minOf(yb * w, px.size)) {
                 val lab = LineMeasure.srgbToLab(px[i])
                 l[i] = lab[0]; a[i] = lab[1]; b[i] = lab[2]
-            }
+            } }
             return LabImage(w, h, l, a, b)
         }
     }
