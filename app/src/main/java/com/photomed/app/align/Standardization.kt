@@ -2,7 +2,6 @@ package com.photomed.app.align
 
 import com.photomed.app.data.GuideType
 import com.photomed.app.data.Zone
-import com.photomed.app.i18n.tr
 import com.photomed.app.i18n.trn
 import kotlin.math.abs
 
@@ -45,8 +44,8 @@ object Standardization {
         val (t, tol) = cameraDownTarget(zone) ?: return null
         val d = t - downDeg
         return when {
-            d > tol -> HintText.es(HintText.CAMERA_DOWN, d)
-            d < -tol -> HintText.es(HintText.CAMERA_UP, -d)
+            d > tol -> "Cámara: apuntar más abajo %.0f°".format(d)
+            d < -tol -> "Cámara: apuntar más arriba %.0f°".format(-d)
             else -> null
         }
     }
@@ -69,6 +68,10 @@ object Standardization {
     /** Luminancia media (0..1) de las mejillas izquierda y derecha de la imagen. */
     data class Lighting(val leftCheek: Float, val rightCheek: Float, val face: Float)
 
+    /**
+     * Las indicaciones quedan en español (HintCues las analiza por su texto); se traducen al
+     * mostrarlas (`ui.camera.HintText.display`).
+     */
     fun evaluate(zone: Zone, det: Detection, lighting: Lighting?,
                  /** Expresión pedida (arrugas dinámicas): sustituye a la expresión neutra. */
                  expression: com.photomed.app.data.FacialExpression = com.photomed.app.data.FacialExpression.NEUTRAL): MatchEval {
@@ -87,25 +90,25 @@ object Standardization {
             val side = facingSide(det.points) ?: 0f
             val sideSign = if (side > 0.08f) 1 else if (side < -0.08f) -1 else 0
             if (t.minYaw != null) {
-                if (yawAbs < t.minYaw) { hints += HintText.es(HintText.TO_PROFILE, t.minYaw - yawAbs); off += 1f }
+                if (yawAbs < t.minYaw) { hints += "Cabeza: girar hasta el perfil (faltan %.0f°)".format(t.minYaw - yawAbs); off += 1f }
             } else if (t.yaw == 0f) {
                 if (yawAbs > t.yawTol) {
-                    hints += HintText.es(if (sideSign > 0) HintText.TURN_LEFT else HintText.TURN_RIGHT, yawAbs)
+                    hints += (if (sideSign > 0) "Cabeza: girar a la izquierda %.0f°" else "Cabeza: girar a la derecha %.0f°").format(yawAbs)
                     off += yawAbs / t.yawTol
                 }
             } else {
                 val wrongSide = sideSign != 0 && sideSign != t.side
                 val err = if (wrongSide) yawAbs + t.yaw!! else yawAbs - t.yaw!!
                 if (wrongSide) hints += if (t.side > 0) trn("Cara: mirar a la derecha de la imagen") else trn("Cara: mirar a la izquierda de la imagen")
-                else if (abs(err) > t.yawTol) hints += HintText.es(if (err < 0) HintText.TURN_MORE else HintText.TURN_LESS, yawAbs)
+                else if (abs(err) > t.yawTol) hints += if (err < 0) "Cabeza: girar más (%.0f° de 45°)".format(yawAbs) else "Cabeza: girar menos (%.0f° de 45°)".format(yawAbs)
                 off += abs(err) / t.yawTol
             }
-            det.pitch?.let { if (abs(it) > PITCH_TOL) { hints += HintText.es(if (it > 0) HintText.CHIN_DOWN_FH else HintText.CHIN_UP_FH, abs(it)); off += abs(it) / PITCH_TOL } }
+            det.pitch?.let { if (abs(it) > PITCH_TOL) { hints += (if (it > 0) "Barbilla: bajar %.0f° (Frankfort)" else "Barbilla: subir %.0f° (Frankfort)").format(abs(it)); off += abs(it) / PITCH_TOL } }
             // Inclinación: línea entre los ojos en la imagen (de frente u oblicuo); Euler Z si no hay ojos.
             val roll = (if (yawAbs < 30f) HeadRoll.of(det.points)?.first else null) ?: det.roll
             roll?.let {
                 if (abs(it) > ROLL_TOL) {
-                    hints += HintText.es(if (it > 0) HintText.ROLL_RIGHT else HintText.ROLL_LEFT, abs(it))
+                    hints += (if (it > 0) "Cabeza: enderezar %.0f° (inclinada a la derecha)" else "Cabeza: enderezar %.0f° (inclinada a la izquierda)").format(abs(it))
                     off += abs(it) / ROLL_TOL
                 }
             }
@@ -162,81 +165,5 @@ object Standardization {
         val leftImg = if (r.x < l.x) cheek(r, ovalR) else cheek(l, ovalL)
         val rightImg = if (r.x < l.x) cheek(l, ovalL) else cheek(r, ovalR)
         return Lighting(lum(leftImg, 0.03f), lum(rightImg, 0.03f), lum(Pt((l.x + r.x) / 2, (l.y + nose.y) / 2), 0.05f))
-    }
-}
-
-/**
- * Indicaciones de la toma (pose, mirada, luz, cámara…). Se generan en español porque otro código las
- * analiza por su texto (iconos de `HintCues`, filtros de la cámara); se traducen solo al mostrarlas
- * con [display]. Las que llevan números se crean con [es] a partir de una plantilla de [TEMPLATES]
- * (mismo resultado que `"…".format(…)`); las fijas se marcan con trn donde se crean.
- */
-object HintText {
-    val CAMERA_DOWN = trn("Cámara: apuntar más abajo %1\$.0f°")
-    val CAMERA_UP = trn("Cámara: apuntar más arriba %1\$.0f°")
-    val TO_PROFILE = trn("Cabeza: girar hasta el perfil (faltan %1\$.0f°)")
-    val TURN_LEFT = trn("Cabeza: girar a la izquierda %1\$.0f°")
-    val TURN_RIGHT = trn("Cabeza: girar a la derecha %1\$.0f°")
-    val TURN_MORE = trn("Cabeza: girar más (%1\$.0f° de 45°)")
-    val TURN_LESS = trn("Cabeza: girar menos (%1\$.0f° de 45°)")
-    val CHIN_DOWN_FH = trn("Barbilla: bajar %1\$.0f° (Frankfort)")
-    val CHIN_UP_FH = trn("Barbilla: subir %1\$.0f° (Frankfort)")
-    val ROLL_RIGHT = trn("Cabeza: enderezar %1\$.0f° (inclinada a la derecha)")
-    val ROLL_LEFT = trn("Cabeza: enderezar %1\$.0f° (inclinada a la izquierda)")
-    val YAW_FIX = trn("Cabeza: corregir giro %1\$.0f°")
-    val CHIN_DOWN = trn("Barbilla: bajar %1\$.0f°")
-    val CHIN_UP = trn("Barbilla: subir %1\$.0f°")
-    val EXPRESSION = trn("Expresión: %1\$s")
-    val DETECTOR_HAIR = trn("Detector (pelo y piel): %1\$s")
-    val DETECTOR = trn("Detector (%1\$s): %2\$s")
-
-    /** Plantillas con datos, para reconocerlas al mostrar (las más específicas primero). */
-    private val TEMPLATES = listOf(CAMERA_DOWN, CAMERA_UP, TO_PROFILE, TURN_LEFT, TURN_RIGHT, TURN_MORE, TURN_LESS,
-        CHIN_DOWN_FH, CHIN_UP_FH, ROLL_RIGHT, ROLL_LEFT, YAW_FIX, CHIN_DOWN, CHIN_UP, EXPRESSION, DETECTOR_HAIR, DETECTOR)
-
-    /** Indicación en español con datos (formato del idioma por defecto, igual que `"…".format`). */
-    fun es(template: String, vararg args: Any?): String = String.format(template, *args)
-
-    private val FMT = Regex("%(\\d+)\\$[-#+ 0,(]*\\d*(?:\\.\\d+)?([sdf])|%%")
-
-    private class Tpl(val template: String, val regex: Regex, val kinds: List<Pair<Int, Char>>)
-
-    private val patterns: List<Tpl> by lazy {
-        TEMPLATES.map { t ->
-            val sb = StringBuilder(); val kinds = ArrayList<Pair<Int, Char>>(); var last = 0
-            for (m in FMT.findAll(t)) {
-                if (m.range.first > last) sb.append(Regex.escape(t.substring(last, m.range.first)))
-                if (m.value == "%%") sb.append(Regex.escape("%"))
-                else {
-                    val kind = m.groupValues[2][0]
-                    kinds += m.groupValues[1].toInt() to kind
-                    sb.append(if (kind == 's') "(.+?)" else "([-+]?\\d+(?:[.,]\\d+)?)")
-                }
-                last = m.range.last + 1
-            }
-            if (last < t.length) sb.append(Regex.escape(t.substring(last)))
-            Tpl(t, Regex(sb.toString()), kinds)
-        }
-    }
-
-    /**
-     * Texto de una indicación (en español, tal como se generó) en el idioma de la interfaz: las de
-     * [TEMPLATES] se reconocen y se formatean con sus datos; las demás se traducen tal cual.
-     */
-    fun display(hint: String): String {
-        for (p in patterns) {
-            val m = p.regex.matchEntire(hint) ?: continue
-            val args = arrayOfNulls<Any?>(p.kinds.maxOf { it.first })
-            p.kinds.forEachIndexed { i, (pos, kind) ->
-                val v = m.groupValues[i + 1]
-                args[pos - 1] = when (kind) {
-                    's' -> tr(v)
-                    'd' -> v.toLongOrNull() ?: return tr(hint)
-                    else -> v.replace(',', '.').toDoubleOrNull() ?: return tr(hint)
-                }
-            }
-            return tr(p.template, *args)
-        }
-        return tr(hint)
     }
 }

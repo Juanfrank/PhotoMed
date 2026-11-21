@@ -3,6 +3,7 @@ package com.photomed.app.ui.compare
 import com.photomed.app.i18n.trn
 import com.photomed.app.i18n.tr
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.heightIn
@@ -78,6 +79,8 @@ data class ExportChoice(
     val anonymize: Boolean = true,
     /** Capas que lleva la imagen exportada. */
     val view: ViewLayers = ViewLayers(),
+    /** Logo de los Ajustes y su posición (null: sin logo). */
+    val watermark: com.photomed.app.export.Watermark.Mark? = null,
 )
 
 /**
@@ -108,6 +111,11 @@ fun ExportSheet(
     var holdS by remember { mutableStateOf(1.2f) }
     var transS by remember { mutableStateOf(0.7f) }
     var anonymize by remember { mutableStateOf(true) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    // logo adjunto en los Ajustes: la posición se elige aquí y se recuerda
+    val logo = remember { com.photomed.app.export.Watermark.logo(ctx) }
+    var logoPos by remember { mutableStateOf(com.photomed.app.export.Watermark.position(ctx)) }
+    val mark = logo?.takeIf { logoPos != com.photomed.app.export.Watermark.Position.NONE }?.let { com.photomed.app.export.Watermark.Mark(it, logoPos) }
     var view by remember { mutableStateOf(initialView) }
     var progress by remember { mutableStateOf<Float?>(null) }
     val timing = CompareExport.GifTiming((holdS * 1000).roundToInt(), (transS * 1000).roundToInt())
@@ -117,7 +125,7 @@ fun ExportSheet(
         progress = 0f
         scope.launch {
             val msg = runCatching {
-                onExport(ExportChoice(kind, gifMode, timing, anonymize, view), toGallery) { i, n -> progress = if (n > 0) i / n.toFloat() else 1f }
+                onExport(ExportChoice(kind, gifMode, timing, anonymize, view, mark), toGallery) { i, n -> progress = if (n > 0) i / n.toFloat() else 1f }
             }.getOrElse { tr("No se pudo exportar: %1\$s", it.message ?: it.javaClass.simpleName) }
             progress = null
             msg?.let(onMessage)
@@ -189,8 +197,18 @@ fun ExportSheet(
                 value = null
                 value = runCatching { loadPreview(view) }.getOrDefault(emptyList())
             }
+            if (logo != null) {
+                Text(tr("Logo"), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.photomed.app.export.Watermark.Position.entries.forEach { p ->
+                        androidx.compose.material3.FilterChip(selected = logoPos == p, onClick = {
+                            logoPos = p; com.photomed.app.export.Watermark.setPosition(ctx, p)
+                        }, label = { Text(p.label) })
+                    }
+                }
+            }
             Box(Modifier.fillMaxWidth().height(272.dp), contentAlignment = Alignment.Center) {
-                ExportPreview(kind, previewImgs, gifMode, timing, Modifier.padding(vertical = 4.dp))
+                ExportPreview(kind, previewImgs, gifMode, timing, Modifier.padding(vertical = 4.dp), mark)
             }
             if (kind.animated) Text(tr("Se reproduce de ida y vuelta: al repetirse en bucle no se nota el salto.") +
                 (if (kind == ExportKind.MP4) " " + tr("El vídeo dura un ciclo; la galería o el chat lo repiten.") else ""),
@@ -224,17 +242,18 @@ fun ExportSheet(
  */
 @Composable
 fun ExportPreview(kind: ExportKind, images: List<Pair<android.graphics.Bitmap, String>>?, mode: CompareExport.GifMode,
-                  timing: CompareExport.GifTiming, modifier: Modifier = Modifier) {
-    if (kind.animated) { GifPreview(images, mode, timing, modifier); return }
+                  timing: CompareExport.GifTiming, modifier: Modifier = Modifier,
+                  mark: com.photomed.app.export.Watermark.Mark? = null) {
+    if (kind.animated) { GifPreview(images, mode, timing, modifier, mark); return }
     // fotos sueltas: la primera; cuadrícula y lado a lado: la composición tal como se exporta
-    val bmp = androidx.compose.runtime.remember(images, kind) {
+    val bmp = androidx.compose.runtime.remember(images, kind, mark?.position) {
         val imgs = images ?: return@remember null
         if (imgs.isEmpty()) return@remember null
-        when (kind) {
+        com.photomed.app.export.Watermark.apply(when (kind) {
             ExportKind.INDIVIDUAL -> imgs.first().first
             ExportKind.GRID -> CompareExport.composite(imgs, cellW = 300)
             else -> CompareExport.composite(imgs, cellW = 300, cols0 = imgs.size)
-        }
+        }, mark)
     }
     Box(modifier.heightIn(max = 260.dp).widthIn(max = 320.dp).clip(MaterialTheme.shapes.small)
         .background(androidx.compose.ui.graphics.Color.Black)
@@ -250,7 +269,8 @@ fun ExportPreview(kind: ExportKind, images: List<Pair<android.graphics.Bitmap, S
 
 @Composable
 fun GifPreview(images: List<Pair<android.graphics.Bitmap, String>>?, mode: CompareExport.GifMode,
-               timing: CompareExport.GifTiming, modifier: Modifier = Modifier) {
+               timing: CompareExport.GifTiming, modifier: Modifier = Modifier,
+               mark: com.photomed.app.export.Watermark.Mark? = null) {
     var timeMs by remember { mutableStateOf(0L) }
     androidx.compose.runtime.LaunchedEffect(mode, timing) {
         timeMs = 0L
@@ -269,6 +289,7 @@ fun GifPreview(images: List<Pair<android.graphics.Bitmap, String>>?, mode: Compa
                 val (a, la) = imgs[i]; val (b, lb) = imgs[(i + 1) % imgs.size]
                 drawIntoCanvas { c ->
                     CompareExport.drawGifFrame(c.nativeCanvas, size.width.toInt(), size.height.toInt(), a, b, la, lb, t, mode)
+                    com.photomed.app.export.Watermark.draw(c.nativeCanvas, size.width.toInt(), size.height.toInt(), mark)
                 }
             }
         }

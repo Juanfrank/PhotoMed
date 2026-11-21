@@ -4,6 +4,7 @@ package com.photomed.app.ui.compare
 
 import com.photomed.app.i18n.trn
 import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trData
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -84,7 +85,7 @@ fun metricRows(m: LineMetrics): List<Pair<String, String>> =
         trn("Contraste ΔL*") to f1(m.contrastL),
         trn("Grado orientativo (0–5)") to (m.grade?.let { "$it · ${gradeLabel(it)}" } ?: "—"),
         trn("Escala") to scaleLabel(m.scale),
-    ) + listOfNotNull(m.note?.let { trn("Nota") to it })
+    ) + listOfNotNull(m.note?.let { trn("Nota") to trData(it) })
 
 /** Valor de una medida de rasgo con su unidad (la de la etiqueta tras la coma). */
 fun featureValue(label: String, v: Float): String {
@@ -179,7 +180,7 @@ fun MetricsCard(line: AnnotLine, onTable: () -> Unit, onClose: () -> Unit, modif
         Column(Modifier.padding(start = 16.dp, end = 4.dp, bottom = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Canvas(Modifier.size(10.dp)) { drawCircle(com.photomed.app.ui.camera.lineColor(line)) }
-                Text((number?.let { "$it · " } ?: "") + m.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 8.dp).weight(1f))
+                Text((number?.let { "$it · " } ?: "") + trData(m.name), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 8.dp).weight(1f))
                 IconButton(onClick = onClose) { Icon(Icons.Default.Close, tr("Cerrar")) }
             }
             // la muestra del trazo de cada tramo va delante de su medida (sin leyenda aparte)
@@ -193,7 +194,7 @@ fun MetricsCard(line: AnnotLine, onTable: () -> Unit, onClose: () -> Unit, modif
                         else Spacer(Modifier.width(30.dp))
                         Spacer(Modifier.width(8.dp))
                     }
-                    Text(tr(label), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    Text(trData(label), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
                     Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
@@ -359,7 +360,7 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
     val single = columns.size == 1
     // un desplazamiento horizontal por tabla (compartido, la tabla más estrecha limitaba a las demás)
     val scrolls = List(3) { rememberScrollState() }
-    fun label(name: String, v: Pair<AnnotLine, List<LineMetrics?>>) = "${numbers[name] ?: ""}  $name" + if (v.second.any { it?.note != null }) " ✱" else ""
+    fun label(name: String, v: Pair<AnnotLine, List<LineMetrics?>>) = "${numbers[name] ?: ""}  ${trData(name)}" + if (v.second.any { it?.note != null }) " ✱" else ""
     for (group in 0..2) {
         val rows = ordered.filter { e -> e.value.second.firstNotNullOfOrNull { it }?.let { com.photomed.app.align.MeasureNumbering.group(it) } == group }
         if (rows.isEmpty()) continue

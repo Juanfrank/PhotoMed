@@ -5,5 +5,11 @@
   "Abajo a la izquierda": "Bottom left",
   "Abajo a la derecha": "Bottom right",
   "No se pudo leer la imagen": "Could not read the image",
-  "El archivo no es una imagen": "The file is not an image"
+  "El archivo no es una imagen": "The file is not an image",
+  "Logo": "Logo",
+  "Logo para exportar": "Logo for exports",
+  "Se añade a las fotos, cuadrículas, GIF y vídeos exportados. La esquina se elige al exportar.": "Added to exported photos, grids, GIFs and videos. The corner is chosen when exporting.",
+  "Adjuntar logo": "Attach logo",
+  "Cambiar": "Change",
+  "Quitar": "Remove"
 }

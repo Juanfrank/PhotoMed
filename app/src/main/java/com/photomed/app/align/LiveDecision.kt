@@ -48,7 +48,7 @@ object LiveDecision {
         // expresión pedida (sorpresa, enojo, sonrisa…): obligatoria para el disparo automático
         val exprOk = spec.detector != Detector.FACE || Expression.meets(expression, cur.points, cur.yaw)
         val targetHints = if (exprOk || spec.detector != Detector.FACE) emptyList()
-            else Expression.measure(cur.points)?.let { Expression.target(expression, it) }.orEmpty().ifEmpty { listOf(HintText.es(HintText.EXPRESSION, expression.instruction)) }
+            else Expression.measure(cur.points)?.let { Expression.target(expression, it) }.orEmpty().ifEmpty { listOf("Expresión: ${expression.instruction}") }
         val allExpr = (exprHints + targetHints).distinct()
         val e = (if (allExpr.isEmpty()) e0 else e0.copy(
             status = if (e0.status == MatchStatus.MATCH) MatchStatus.CLOSE else e0.status, hints = e0.hints + allExpr)).copy(expressionOk = exprOk)

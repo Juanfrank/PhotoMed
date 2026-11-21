@@ -146,7 +146,7 @@ object ReliefCapture {
                     distanceMm = r.distanceMm, distanceSource = r.distanceSource,
                     signalRatio = r.signalRatio, validFraction = r.validFraction))
                 tr("Relieve guardado (%1\$s cm, %2\$s)", "%.0f".format(r.distanceMm / 10),
-                    if (r.distanceSource == "sensor de profundidad") tr("sensor de profundidad") else r.distanceSource)
+                    com.photomed.app.i18n.trData(r.distanceSource))
             }
         } }
 

@@ -117,6 +117,11 @@ dependencies {
 val copyLegalDocs by tasks.registering(Copy::class) {
     from(rootProject.file("PRIVACY.md"), rootProject.file("TERMS.md"), rootProject.file("CHANGELOG.md"))
     from(rootProject.file("LICENSE")) { rename { "LICENSE.md" } }
+    // traducciones (docs/legal/<idioma>/): legal/<idioma>/…
+    from(rootProject.file("docs/legal")) {
+        include("*/PRIVACY.md", "*/TERMS.md", "*/LICENSE")
+        rename("LICENSE", "LICENSE.md")
+    }
     into(layout.buildDirectory.dir("generated/legal/legal"))
 }
 android.sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/legal"))

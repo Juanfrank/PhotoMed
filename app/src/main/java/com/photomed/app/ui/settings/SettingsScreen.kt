@@ -1,5 +1,8 @@
 package com.photomed.app.ui.settings
 
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
 import androidx.compose.foundation.selection.selectable
 import kotlinx.coroutines.launch
 import androidx.compose.material3.MaterialTheme
@@ -136,6 +139,10 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
             }
             HorizontalDivider()
+            // logo oficial para las imágenes exportadas (la posición se elige al exportar)
+            SectionHeader(tr("Logo para exportar"), Modifier.padding(horizontal = Md3Spacing.s6))
+            WatermarkSetting()
+            HorizontalDivider()
             SectionHeader(tr("Ayudas"), Modifier.padding(horizontal = Md3Spacing.s6))
             ListItem(
                 headlineContent = { Text(tr("Mostrar las ayudas de primera vez otra vez")) },
@@ -173,4 +180,49 @@ private fun Context.findActivity(): android.app.Activity? {
     var c: Context? = this
     while (c is android.content.ContextWrapper) { if (c is android.app.Activity) return c; c = c.baseContext }
     return null
+}
+
+/** Adjuntar, cambiar o quitar el logo de las exportaciones (PNG con transparencia recomendado). */
+@Composable
+private fun WatermarkSetting() {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var version by remember { mutableStateOf(0) }
+    val logo = remember(version) { com.photomed.app.export.Watermark.logo(context) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) scope.launch {
+            error = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { com.photomed.app.export.Watermark.set(context, uri) }.exceptionOrNull()?.message
+            }
+            version++
+        }
+    }
+    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.s6, vertical = 8.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        androidx.compose.foundation.layout.Box(Modifier.size(width = 96.dp, height = 56.dp)
+            .background(androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHighest,
+                androidx.compose.material3.MaterialTheme.shapes.small),
+            contentAlignment = androidx.compose.ui.Alignment.Center) {
+            if (logo != null) androidx.compose.foundation.Image(logo.asImageBitmap(), tr("Logo para exportar"),
+                Modifier.padding(4.dp).fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+            else Text(tr("Sin logo"), style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
+        }
+        androidx.compose.foundation.layout.Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(tr("Se añade a las fotos, cuadrículas, GIF y vídeos exportados. La esquina se elige al exportar."),
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+            error?.let { Text(it, color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall) }
+            androidx.compose.foundation.layout.Row {
+                androidx.compose.material3.TextButton(onClick = { picker.launch("image/*") }) {
+                    Text(if (logo == null) tr("Adjuntar logo") else tr("Cambiar"))
+                }
+                if (logo != null) androidx.compose.material3.TextButton(onClick = {
+                    com.photomed.app.export.Watermark.clear(context); version++
+                }) { Text(tr("Quitar")) }
+            }
+        }
+    }
 }

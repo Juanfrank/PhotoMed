@@ -96,9 +96,9 @@ object LiveMatch {
             if (rd > MATCH_ROT * 0.7f) hints += if (tt.rotationDegrees > 0) trn("Gire la cámara ↺") else trn("Gire la cámara ↻")
         }
         if (status != MatchStatus.MATCH && abs(headYawDelta) > LiveDecision.POSE_MAX)
-            hints += HintText.es(HintText.YAW_FIX, headYawDelta)
+            hints += "Cabeza: corregir giro %.0f°".format(headYawDelta)
         if (status != MatchStatus.MATCH && abs(headPitchDelta) > LiveDecision.POSE_MAX)
-            hints += HintText.es(if (headPitchDelta > 0) HintText.CHIN_DOWN else HintText.CHIN_UP, abs(headPitchDelta))
+            hints += (if (headPitchDelta > 0) "Barbilla: bajar %.0f°" else "Barbilla: subir %.0f°").format(abs(headPitchDelta))
         // keystoneDeg > 0: el cuadro actual necesita "nivelar" una cámara elevada → inclinarla hacia abajo
         if (status != MatchStatus.MATCH && abs(keystoneDeg) >= KEYSTONE_HINT) {
             hints += if (keystoneDeg > 0) trn("Cámara: inclinar hacia abajo") else trn("Cámara: inclinar hacia arriba")

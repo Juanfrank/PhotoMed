@@ -2,6 +2,7 @@ package com.photomed.app.ui.compare
 
 import com.photomed.app.i18n.trn
 import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trData
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Fullscreen
@@ -405,7 +406,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             val msg = when {
                 failed != null && res.isEmpty() -> tr("No se pudo alinear: %1\$s", failed?.message)
                 s.size == 2 -> res.first().let { a ->
-                    if (a.score.isNaN()) tr("Alineado: %1\$s", a.method) else tr("Alineado: %1\$s · contornos %2\$d%%", a.method, (a.score.coerceIn(0f, 1f) * 100).roundToInt())
+                    if (a.score.isNaN()) tr("Alineado: %1\$s", trData(a.method)) else tr("Alineado: %1\$s · contornos %2\$d%%", trData(a.method), (a.score.coerceIn(0f, 1f) * 100).roundToInt())
                 }
                 else -> tr("Alineadas %1\$d fotos a la referencia (%2\$s)", res.size, formatDate(s[0].takenAt))
             }
@@ -1062,7 +1063,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 val order = displayOrder(seq.map { it.key }, gridOrder, manualOrder).map { k -> seq.indexOfFirst { it.key == k } }
                 val r = CompareExport.build(context, repo, seq, shown, colorAdjusts,
                     individual = ch.kind == ExportKind.INDIVIDUAL, grid = ch.kind == ExportKind.GRID, anonymize = anonymize, dir = dir,
-                    onProgress = progress, side = ch.kind == ExportKind.SIDE, gif = ch.gif.takeIf { ch.kind.animated }, mp4 = ch.kind == ExportKind.MP4,
+                    onProgress = progress, side = ch.kind == ExportKind.SIDE, gif = ch.gif.takeIf { ch.kind.animated }, mp4 = ch.kind == ExportKind.MP4, watermark = ch.watermark,
                     gifTiming = ch.timing, crop = effectiveCrop(), labels = stampLabels(seq.map { it.takenAt }), order = order,
                     annots = exportAnnots, layers = diagram, annotAlpha = annotAlpha.value,
                     orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror), view = ch.view, ink = exportInk)
@@ -1189,7 +1190,7 @@ private fun AlignmentDetails(res: AlignmentResult, prefix: String) {
     Text(
         prefix + tr("%1\$s · %2\$.0f%% escala · %3\$.1f°",
             res.landmarks.takeIf { it.isNotEmpty() }?.let { tr("%1\$d puntos (%2\$s)", it.size, res.landmarkRegions.take(4).joinToString(", ")) }
-                ?: res.method.lowercase(),
+                ?: trData(res.method).lowercase(),
             res.transform.scale * 100, res.transform.rotationDegrees,
         ), style = style, color = color,
     )

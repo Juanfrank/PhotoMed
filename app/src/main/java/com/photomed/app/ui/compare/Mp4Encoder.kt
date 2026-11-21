@@ -32,11 +32,12 @@ object Mp4Encoder {
         }
     }
 
-    fun encode(images: List<Pair<Bitmap, String>>, mode: CompareExport.GifMode, timing: CompareExport.GifTiming, out: File) {
+    fun encode(images: List<Pair<Bitmap, String>>, mode: CompareExport.GifMode, timing: CompareExport.GifTiming, out: File,
+               watermark: com.photomed.app.export.Watermark.Mark? = null) {
         val (w, h) = CompareExport.frameSize(images, WIDTH, 16)
         val schedule = CompareExport.gifSchedule(images.size, timing)
         val yuv = ArrayList<ByteArray>()
-        CompareExport.renderFrames(images, mode, timing, w, h) { px, _ -> yuv += toI420(px, w, h) }
+        CompareExport.renderFrames(images, mode, timing, w, h, watermark) { px, _ -> yuv += toI420(px, w, h) }
         val order = frameIndices(schedule)
 
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, w, h).apply {

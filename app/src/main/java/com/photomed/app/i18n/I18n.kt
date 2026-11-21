@@ -8,7 +8,7 @@ import java.util.Locale
 /**
  * Internacionalización. El texto de origen (español) queda en el código dentro de [tr]; el script
  * `tools/i18n/extract.py` lo extrae a recursos Android estándar (`values/strings_i18n.xml`, español, y
- * `values-<idioma>/strings_i18n.xml` con las traducciones de `tools/i18n/<idioma>/*.json`). Así Android
+ * `values-<idioma>/strings_i18n.xml` con las traducciones de los catálogos JSON de `tools/i18n/<idioma>`). Así Android
  * elige el idioma (también el idioma por aplicación de Android 13+) y añadir otro idioma es añadir su
  * catálogo. Sin contexto (pruebas JVM) o sin traducción, se usa el texto de origen.
  */
@@ -85,4 +85,37 @@ enum class AppLanguage(val tag: String?, val label: String) {
             return base.createConfigurationContext(conf)
         }
     }
+}
+
+/**
+ * Traducción para mostrar de un texto que es DATO (se guarda en español: nombres de líneas y medidas,
+ * notas, métodos): primero el texto entero y, si no está en el catálogo, por fragmentos conocidos
+ * («Pata de gallo derecha 2» → «Crow's feet right 2»). En español no cambia nada.
+ */
+fun trData(source: String?): String {
+    if (source.isNullOrEmpty()) return source.orEmpty()
+    val whole = I18n.lookup(source)
+    if (whole != source) return whole
+    var out: String = source
+    for (f in DataFragments.ordered) {
+        val t = I18n.lookup(f)
+        if (t == f || !out.contains(f)) continue
+        out = Regex("(?<![\\p{L}\\p{N}])" + Regex.escape(f) + "(?![\\p{L}\\p{N}])").replace(out, Regex.escapeReplacement(t))
+    }
+    return out
+}
+
+/** Fragmentos de los nombres que se guardan como datos (se traducen al mostrarlos con [trData]). */
+private object DataFragments {
+    val ordered: List<String> = listOf(
+        trn("Parcialmente cubierto por barba o bigote"), trn("del recorrido"), trn("se traza y mide solo la parte visible"),
+        trn("derecha de la imagen"), trn("izquierda de la imagen"), trn("de la imagen"),
+        trn("Desviación hacia abajo"), trn("Ángulo goníaco"), trn("Rectitud"),
+        trn("Bolsa palpebral"), trn("Ceño, vertical"), trn("Ceño, raíz nasal"), trn("Frente, línea"),
+        trn("Infraorbitaria"), trn("Ojera"), trn("Pata de gallo"), trn("Perioral"), trn("Surco accesorio"),
+        trn("Surco añadido"), trn("Nasogeniano"), trn("Marioneta"), trn("Ceño"), trn("Frente"),
+        trn("Trazado de nuevo a mano"), trn("Trazado a mano"), trn("contornos"), trn("contorno"), trn("puntos"),
+        trn("derecha"), trn("izquierda"), trn("derecho"), trn("izquierdo"), trn("superior"), trn("inferior"),
+        trn("estimada"), trn("sensor de profundidad"), trn("interpupilar"), trn("manual"),
+    ).sortedByDescending { it.length }
 }

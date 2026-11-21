@@ -162,7 +162,14 @@ private fun Modifier.clickableItem(onClick: () -> Unit) = this.clickable(onClick
 @Composable
 fun LegalDocScreen(doc: LegalDoc, onBack: () -> Unit) {
     val context = LocalContext.current
-    val blocks = remember(doc) { parseMarkdown(context.assets.open(doc.asset).bufferedReader().use { it.readText() }) }
+    // traducción del documento en el idioma de la interfaz (legal/<idioma>/…) si existe; si no, el original en español
+    val blocks = remember(doc) {
+        val lang = com.photomed.app.i18n.I18n.locale.language
+        val translated = "legal/$lang/" + doc.asset.removePrefix("legal/")
+        val text = (if (lang != "es") runCatching { context.assets.open(translated) }.getOrNull() else null)
+            ?: context.assets.open(doc.asset)
+        parseMarkdown(text.bufferedReader().use { it.readText() })
+    }
     Scaffold(
         topBar = {
             TopAppBar(

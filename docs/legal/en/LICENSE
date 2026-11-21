@@ -1,0 +1,84 @@
+_This is a convenience translation. In case of discrepancy, the Spanish version prevails._
+
+# PhotoMed Commercial License (paid)
+
+**Version:** 1.0 · **Effective as of:** November 19, 2026
+**Licensor:** Juan Medina — juanfrank11@gmail.com
+
+Copyright © 2026 Juan Medina. **All rights reserved.**
+
+## 1. Purpose
+
+PhotoMed (the source code, the compiled application, its guides, texts, logos and documentation,
+hereinafter "the Software") is proprietary software licensed **for consideration (paid)**,
+with the sole exception of the free license granted to ProntoCare in section 3.
+
+## 2. Paid licenses
+
+Except for ProntoCare (section 3), PhotoMed **is not free of charge**. Using, copying, installing, modifying,
+distributing, sublicensing, selling or commercially exploiting the Software requires a **paid
+license** issued in writing by the licensor (purchase order, invoice or contract). Without a valid
+license there is no right of use.
+
+### 2.1 License types
+
+| License type | For whom | Scope |
+|---|---|---|
+| **Professional** | A healthcare or medical aesthetics professional | 1 user, up to 2 devices |
+| **Clinic** | A center or practice | Users and devices at one site, according to the number contracted |
+| **Institutional / network** | Groups, clinic networks, insurers and healthcare service companies | Multiple sites and users; terms set by contract |
+
+### 2.2 Price and payment terms
+
+- Each license type is contracted as a **subscription** (monthly or annual, renewable) or, at the
+  licensor's option, as a **perpetual license for the version purchased** with an optional annual fee for
+  updates and support.
+- Prices are those of the licensor's **current price list** or those set in the purchase order or the
+  contract, plus applicable taxes.
+- Payment is in advance. If a subscription is not renewed or not paid, the license is suspended
+  at the end of the paid period; the user's photographs and data remain the user's property and
+  remain on the user's devices.
+- Unless the law provides otherwise, amounts paid are non-refundable.
+- Licenses and quotes: juanfrank11@gmail.com.
+
+## 3. Express license to ProntoCare
+
+The licensor expressly grants **ProntoCare**, its affiliated companies and the staff,
+professionals and contractors acting on its behalf, a **free institutional license**, non-exclusive,
+worldwide and without term, with no limit on users, devices or sites, to:
+
+1. use, install and run the Software on their devices, **including commercial use** and the
+   provision of healthcare and medical aesthetics services to third parties;
+2. reproduce and distribute the Software to its staff and to the professionals in its network for those purposes;
+3. adapt or modify the Software for its own needs.
+
+This license **is free of charge** for ProntoCare (no fees, no subscription, no payment per user,
+device or site) and includes future versions of the Software. ProntoCare may not sell,
+sublicense or assign the Software or this license to third parties outside its organization without
+the licensor's written authorization, nor remove the authorship notices.
+
+## 4. General restrictions
+
+The following is prohibited without a license: redistributing the Software or modified versions; offering it as
+a service to third parties; removing copyright notices or third-party license notices; and using the
+PhotoMed name or logo for derivative products.
+
+## 5. Third-party components
+
+The Software includes components governed by their own licenses, which this license does not
+modify: AndroidX, Jetpack Compose, CameraX and ExifInterface (Apache 2.0), Coil (Apache 2.0),
+MediaPipe Tasks and the Face Landmarker and Selfie Multiclass models (Apache 2.0), Google ML Kit
+(ML Kit Terms) and the illustrations derived from **Open Pain Illustration** (Digital Health
+Zurich / University of Zurich, CC BY 4.0, with attribution and changes indicated in the Terms).
+
+## 6. Warranty and liability
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+THOSE OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. TO THE EXTENT PERMITTED
+BY LAW, THE LICENSOR SHALL NOT BE LIABLE FOR ANY DAMAGES ARISING FROM THE USE OF THE SOFTWARE.
+PhotoMed is not a medical device (see the Terms and Conditions).
+
+## 7. Termination
+
+Any license granted terminates automatically if its conditions are breached; in that case
+you must stop using the Software and delete your copies.

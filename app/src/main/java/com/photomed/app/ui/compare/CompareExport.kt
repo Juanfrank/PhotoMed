@@ -276,13 +276,14 @@ object CompareExport {
 
     /** Pinta cada cuadro del guion ([gifSchedule]) a [w]×[h] y lo entrega con su duración. */
     fun renderFrames(images: List<Pair<Bitmap, String>>, mode: GifMode, timing: GifTiming, w: Int, h: Int,
+                     watermark: com.photomed.app.export.Watermark.Mark? = null,
                      sink: (IntArray, Int) -> Unit) {
         val scaled = images.map { (b, l) -> Bitmap.createScaledBitmap(b, w, h, true) to l }
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         for (s in gifSchedule(scaled.size, timing)) {
             val (ba, la) = scaled[s.a]; val (bb, lb) = scaled[(s.a + 1).coerceAtMost(scaled.size - 1)]
             bmp.eraseColor(android.graphics.Color.BLACK)
-            drawGifFrame(Canvas(bmp), w, h, ba, bb, la, lb, s.t, mode)
+            Canvas(bmp).let { c -> drawGifFrame(c, w, h, ba, bb, la, lb, s.t, mode); com.photomed.app.export.Watermark.draw(c, w, h, watermark) }
             sink(IntArray(w * h).also { bmp.getPixels(it, 0, w, 0, 0, w, h) }, s.ms)
         }
     }
@@ -315,6 +316,8 @@ object CompareExport {
         gifTiming: GifTiming = GifTiming(),
         /** La animación como vídeo MP4 (H.264) en lugar de GIF. */
         mp4: Boolean = false,
+        /** Logo para las imágenes exportadas (ver [com.photomed.app.export.Watermark]). */
+        watermark: com.photomed.app.export.Watermark.Mark? = null,
         /** Recorte común según la alineación (ver [overlapCrop]). */
         crop: Similarity? = null,
         /** Etiquetas (fecha, y hora si hay fotos del mismo día); por defecto, la fecha. */
@@ -348,7 +351,7 @@ object CompareExport {
             if (individual) withContext(Dispatchers.IO) {
                 val name = if (anonymize) anonymizedName(p, i + 1).removeSuffix(".jpg") + "_ajustada.jpg"
                 else p.displayName.removeSuffix(".jpg") + "_ajustada.jpg"
-                val f = jpeg(b, File(dir, name))
+                val f = jpeg(com.photomed.app.export.Watermark.apply(b, watermark), File(dir, name))
                 if (!anonymize) runCatching { repo.readInfo(p)?.let { PhotoMetadata.write(f, it) } }
                 files += f
             }
@@ -357,24 +360,24 @@ object CompareExport {
         val shown = order?.filter { it in rendered.indices }?.takeIf { it.size == rendered.size }?.map { rendered[it] } ?: rendered
         if (grid && rendered.size >= 2) withContext(Dispatchers.IO) {
             val g = withContext(Dispatchers.Default) { composite(shown) }
-            files += jpeg(g, File(dir, "PhotoMed_${zone}_comparacion_${rendered.size}_$stamp.jpg"))
+            files += jpeg(com.photomed.app.export.Watermark.apply(g, watermark), File(dir, "PhotoMed_${zone}_comparacion_${rendered.size}_$stamp.jpg"))
         }
         if (side && rendered.size >= 2) withContext(Dispatchers.IO) {
             val g = withContext(Dispatchers.Default) { composite(shown, cols0 = shown.size) }
-            files += jpeg(g, File(dir, "PhotoMed_${zone}_lado_a_lado_${rendered.size}_$stamp.jpg"))
+            files += jpeg(com.photomed.app.export.Watermark.apply(g, watermark), File(dir, "PhotoMed_${zone}_lado_a_lado_${rendered.size}_$stamp.jpg"))
         }
         if (gif != null && rendered.size >= 2) {
             coroutineContext.ensureActive()
             val kind = if (gif == GifMode.FADE) "fundido" else "desplazamiento"
             if (mp4) {
                 val f = File(dir, "PhotoMed_${zone}_${kind}_${rendered.size}_$stamp.mp4")
-                withContext(Dispatchers.Default) { Mp4Encoder.encode(rendered, gif, gifTiming, f) }
+                withContext(Dispatchers.Default) { Mp4Encoder.encode(rendered, gif, gifTiming, f, watermark) }
                 files += f
             } else {
                 val bytes = withContext(Dispatchers.Default) {
                     val (w, h) = frameSize(rendered, GIF_W)
                     val enc = GifEncoder(w, h)
-                    renderFrames(rendered, gif, gifTiming, w, h) { px, ms -> enc.add(px, ms) }
+                    renderFrames(rendered, gif, gifTiming, w, h, watermark) { px, ms -> enc.add(px, ms) }
                     enc.toByteArray()
                 }
                 withContext(Dispatchers.IO) {
