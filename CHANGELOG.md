@@ -2,6 +2,12 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.29 — 21 de noviembre de 2026
+
+- Los tramos de los rasgos de los trazos confirmados en 2.23–2.24 se recuperan también al abrir la
+  foto en **Comparar** (no solo en el visor). Una sola recuperación por foto, aunque estén abiertas
+  las dos pantallas; queda guardada.
+
 ## 2.28 — 21 de noviembre de 2026
 
 - **Trazos confirmados de versiones anteriores, con tramo y fila**: al leerlos, cada tramo se enlaza

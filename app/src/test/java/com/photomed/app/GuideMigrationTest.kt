@@ -11,13 +11,44 @@ import com.photomed.app.align.StoredTrace
 import com.photomed.app.align.TraceJson
 import com.photomed.app.align.TraceSet
 import org.json.JSONArray
+import kotlinx.coroutines.async
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Trazos confirmados de versiones anteriores: cada tramo vuelve a su fila. */
+@org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
+@org.robolectric.annotation.Config(sdk = [34])
 class GuideMigrationTest {
+    @get:org.junit.Rule val tmp = org.junit.rules.TemporaryFolder()
+
+    /** La recuperación de los rasgos es la misma desde el visor y desde Comparar, y se guarda una sola vez. */
+    @Test fun backfillSavesOnceForEveryScreen() = kotlinx.coroutines.runBlocking {
+        val ctx = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val repo = com.photomed.app.data.PhotoRepository(java.io.File(tmp.root, "p"), com.photomed.app.data.FilePhotoStore(java.io.File(tmp.root, "g")),
+            openStream = { java.io.File(it.path!!).inputStream() })
+        val exp = repo.createExpediente("A", "1", "", consent = true)
+        val jpeg = java.io.File(tmp.root, "c.jpg").apply { writeBytes(this@GuideMigrationTest.javaClass.getResourceAsStream("/blank.jpg")!!.readBytes()) }
+        val photo = repo.savePhoto(exp, com.photomed.app.data.Zone.FACE_FRONTAL, jpeg, takenAt = 1_763_400_000_000L)
+        val m = LineMetrics("Ojo derecho", scale = "iris", features = listOf("Ancho hendidura, mm" to 30f))
+        com.photomed.app.align.ConfirmedTraces.save(ctx, photo.uri.toString(),
+            TraceSet(4f / 3f, listOf(StoredTrace(AnnotLayer.EYES, listOf(Pt(0.3f, 0.4f), Pt(0.4f, 0.4f)), true, false, false, m))))
+        var calls = 0
+        val fake: suspend (com.photomed.app.align.ImageEdit) -> List<AnnotLine> = { calls++; listOf(AnnotLine(AnnotLayer.EYES, emptyList(), true, metrics = m,
+            guides = listOf(MeasureGuide(FeatureMetrics.mmText("ancho", 31f), Pt(0.3f, 0.3f), Pt(0.4f, 0.3f), "Ancho hendidura")))) }
+        // visor y Comparar a la vez: una sola recuperación
+        val a = async(kotlinx.coroutines.Dispatchers.Default) { GuideMigration.backfill(ctx, photo.uri, com.photomed.app.data.Zone.FACE_FRONTAL, fake) }
+        val b = async(kotlinx.coroutines.Dispatchers.Default) { GuideMigration.backfill(ctx, photo.uri, com.photomed.app.data.Zone.FACE_FRONTAL, fake) }
+        val results = listOf(a.await(), b.await())
+        assertEquals(1, calls); assertEquals(1, results.count { it != null })
+        val saved = com.photomed.app.align.ConfirmedTraces.of(ctx, photo.uri.toString())!!
+        assertEquals(FeatureMetrics.mmText("ancho", 30f), saved.traces.single().guides.single().label)
+        assertEquals("Ancho hendidura", saved.traces.single().guides.single().key)
+        // ya recuperados: no se vuelve a analizar
+        assertEquals(null, GuideMigration.backfill(ctx, photo.uri, com.photomed.app.data.Zone.FACE_FRONTAL, fake)); assertEquals(1, calls)
+    }
+
     private fun pts(vararg p: Float) = JSONArray().apply { p.forEach { put(it.toDouble()) } }
     private fun metrics(m: LineMetrics) = TraceJson.metrics(m)
 

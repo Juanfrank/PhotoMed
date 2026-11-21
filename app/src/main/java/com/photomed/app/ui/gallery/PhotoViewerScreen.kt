@@ -469,16 +469,8 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
             onAnalyzed(value.orEmpty(), null)
             // trazos confirmados en 2.23–2.24 (sin tramos de los rasgos): se recuperan una vez de la cara,
             // sin cambiar los trazos ni las cifras confirmadas
-            if (com.photomed.app.align.GuideMigration.needsFeatureGuides(confirmed) && com.photomed.app.align.PhotoAnnotator.enabled) {
-                val updated = runCatching {
-                    val fresh = com.photomed.app.align.PhotoAnnotator(context.applicationContext)
-                        .analyze(com.photomed.app.align.ImageOps.loadFull(context, photo.uri, 1600, edit), zone).first
-                    val toOrig = { q: com.photomed.app.align.Pt ->
-                        com.photomed.app.align.TraceMap.fromView(edit, confirmed.baseAspect, com.photomed.app.align.TraceFrame.FULL, listOf(q)).single() }
-                    com.photomed.app.align.GuideMigration.adoptFeatureGuides(confirmed, fresh.map { l -> l.mapped(toOrig) })
-                }.getOrNull()
-                if (updated != null && updated != confirmed) {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.ConfirmedTraces.save(context, u, updated) }
+            if (com.photomed.app.align.GuideMigration.needsFeatureGuides(confirmed)) {
+                com.photomed.app.align.GuideMigration.backfill(context, photo.uri, zone)?.let { updated ->
                     value = updated.lines(edit, com.photomed.app.align.TraceFrame.FULL)
                     onAnalyzed(value.orEmpty(), null)
                 }

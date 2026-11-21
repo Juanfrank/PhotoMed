@@ -1,5 +1,7 @@
 package com.photomed.app.align
 
+import kotlinx.coroutines.sync.withLock
+
 import kotlin.math.hypot
 import kotlin.math.sqrt
 
@@ -112,4 +114,34 @@ object GuideMigration {
             if (v == null || g.label.isEmpty()) g else g.copy(label = FeatureMetrics.mmText(shortOf(g.label), v))
         })
     })
+
+    private val running = HashMap<String, kotlinx.coroutines.sync.Mutex>()
+
+    /**
+     * Recupera (una sola vez) los tramos de los rasgos de una foto con trazos confirmados sin ellos:
+     * analiza la foto para ubicar la cara y guarda el conjunto con los tramos. Sirve igual desde el
+     * visor y desde Comparar (una sola recuperación a la vez por foto). Devuelve el conjunto nuevo, o
+     * null si no hacía falta o no se pudo.
+     */
+    suspend fun backfill(context: android.content.Context, uri: android.net.Uri, zone: com.photomed.app.data.Zone,
+                         /** Líneas de la foto con su edición (encuadre completo); por defecto, el análisis de la app. */
+                         analyze: (suspend (ImageEdit) -> List<AnnotLine>)? = null): TraceSet? {
+        if (analyze == null && !PhotoAnnotator.enabled) return null
+        val run = analyze ?: { e -> PhotoAnnotator(context.applicationContext).analyze(ImageOps.loadFull(context, uri, 1600, e), zone).first }
+        val u = uri.toString()
+        val lock = synchronized(running) { running.getOrPut(u) { kotlinx.coroutines.sync.Mutex() } }
+        return lock.withLock {
+            // otra pantalla pudo recuperarlos mientras se esperaba
+            val set = ConfirmedTraces.of(context, u) ?: return@withLock null
+            if (!needsFeatureGuides(set)) return@withLock null
+            runCatching {
+                val e = PhotoEdits.of(context, u)
+                val fresh = run(e)
+                val toOrig = { q: Pt -> TraceMap.fromView(e, set.baseAspect, TraceFrame.FULL, listOf(q)).single() }
+                val updated = adoptFeatureGuides(set, fresh.map { it.mapped(toOrig) })
+                if (updated == set) null
+                else updated.also { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ConfirmedTraces.save(context, u, it) } }
+            }.getOrNull()
+        }
+    }
 }

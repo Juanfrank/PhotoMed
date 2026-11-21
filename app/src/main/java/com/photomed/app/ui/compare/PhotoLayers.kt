@@ -197,8 +197,13 @@ fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boole
         // trazos confirmados (guardados en la foto): se muestran tal cual, sin volver a analizar
         val confirmed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.ConfirmedTraces.of(context, u) }
         if (confirmed != null) {
-            val base = confirmed.lines(edit, com.photomed.app.align.TraceFrame.C34)
-            value = base.map { l -> if (phiDeg == 0f) l else l.mapped { Perspective.mapPt(it, phiDeg) } }
+            fun show(set: com.photomed.app.align.TraceSet) {
+                value = set.lines(edit, com.photomed.app.align.TraceFrame.C34).map { l -> if (phiDeg == 0f) l else l.mapped { Perspective.mapPt(it, phiDeg) } }
+            }
+            show(confirmed)
+            // trazos confirmados en 2.23–2.24 sin tramos de los rasgos: se recuperan también aquí
+            if (com.photomed.app.align.GuideMigration.needsFeatureGuides(confirmed))
+                com.photomed.app.align.GuideMigration.backfill(context, uri, zone)?.let { show(it) }
             return@produceState
         }
         val user = com.photomed.app.align.AnnotUserEdits.of(context, u).let { e ->
