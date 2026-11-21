@@ -1,5 +1,7 @@
 package com.photomed.app.align
 
+import com.photomed.app.i18n.trn
+import com.photomed.app.i18n.tr
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
@@ -12,6 +14,7 @@ import kotlinx.coroutines.withContext
 data class AlignmentResult(
     /** Semejanza después (ya corregida en perspectiva) → antes, en coordenadas normalizadas. */
     val transform: Similarity,
+    /** Método en español (se compara por su texto): mostrarlo con `tr(method)`. */
     val method: String,
     /** Puntos anatómicos usados. */
     val landmarks: List<String>,
@@ -181,17 +184,17 @@ class Aligner(private val context: Context) {
                   bodyOf: (Bitmap) -> Mask? = { null }): AlignmentResult {
         val bPts = if (options.points) bDet.points else emptyMap()
         val aPts0 = if (options.points) aDet0.points else emptyMap()
-        val (phi, src) = manualKeystone?.let { it to "manual" } ?: estimateKeystone(spec, b, a0, bPts, aPts0, options, maskOf)
+        val (phi, src) = manualKeystone?.let { it to tr("manual") } ?: estimateKeystone(spec, b, a0, bPts, aPts0, options, maskOf)
         val a = ImageOps.correctPerspective(a0, phi, Perspective.DEFAULT_FOCAL)
         val aPts = aPts0.mapValues { Perspective.mapPt(it.value, phi) }
         val lm = if (options.points) landmarkTransform(spec.landmarks + bPts.keys.filter { it.startsWith(FOLD_KEY) }, bPts, aPts) else null
         val gb = bDet.gaze.takeIf { options.gaze }
         val ga = aDet0.gaze.takeIf { options.gaze }
         val method = when {
-            lm != null && options.contours -> "Puntos anatómicos + contornos"
-            lm != null -> "Puntos anatómicos"
-            options.contours -> "Contornos anatómicos"
-            else -> "Sin alineación geométrica"
+            lm != null && options.contours -> trn("Puntos anatómicos + contornos")
+            lm != null -> trn("Puntos anatómicos")
+            options.contours -> trn("Contornos anatómicos")
+            else -> trn("Sin alineación geométrica")
         }
         val window = when {
             !options.contours -> EdgeAligner.Window(0f, 0f, 0f)   // solo puntúa, no mueve
@@ -215,7 +218,7 @@ class Aligner(private val context: Context) {
             val refined = Similarity.rms(r.transform, pa, pb)
             if (refined > base * REFINE_TOLERANCE + REFINE_SLACK) {
                 r = edges.align(gB, gA, lm.first, EdgeAligner.Window(0f, 0f, 0f))
-                m = "Puntos anatómicos"
+                m = trn("Puntos anatómicos")
             }
         }
         // validación por rasgo con la transformación final (después → antes)
@@ -226,17 +229,17 @@ class Aligner(private val context: Context) {
     private fun estimateKeystone(spec: ZoneAlignment, b: Bitmap, a: Bitmap, bPts: Map<String, Pt>, aPts: Map<String, Pt>,
                                  options: AlignOptions, maskOf: (Bitmap) -> Mask?): Pair<Float, String> {
         if (options.contours && options.beforeOutline != null && options.afterOutline != null) {
-            KeystoneFit.fromOutlines(options.beforeOutline, options.afterOutline)?.let { return it to "contornos seleccionados" }
+            KeystoneFit.fromOutlines(options.beforeOutline, options.afterOutline)?.let { return it to tr("contornos seleccionados") }
         }
         val keys = spec.landmarks.filter { it in bPts && it in aPts }
         KeystoneFit.fromLandmarks(keys.map { bPts[it]!! }, keys.map { aPts[it]!! })?.let {
-            return it.keystoneDeg to "proporciones de ${keys.size} puntos de contorno"
+            return it.keystoneDeg to tr("proporciones de %1\$d puntos de contorno", keys.size)
         }
         if (!options.contours) return 0f to ""
         val mb = maskOf(Bitmap.createScaledBitmap(b, MEASURE_W, MEASURE_W * 4 / 3, true))?.let(ContourMetrics::of)
         val ma = maskOf(Bitmap.createScaledBitmap(a, MEASURE_W, MEASURE_W * 4 / 3, true))?.let(ContourMetrics::of)
         if (mb != null && ma != null) {
-            KeystoneFit.fromOutlines(mb.outline, ma.outline)?.let { return it to "proporciones de la silueta" }
+            KeystoneFit.fromOutlines(mb.outline, ma.outline)?.let { return it to tr("proporciones de la silueta") }
         }
         return 0f to ""
     }

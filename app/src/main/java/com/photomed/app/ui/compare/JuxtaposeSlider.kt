@@ -1,5 +1,6 @@
 package com.photomed.app.ui.compare
 
+import com.photomed.app.i18n.tr
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -90,11 +91,11 @@ fun JuxtaposeSlider(
             scaleX = zoom.scale; scaleY = zoom.scale
             translationX = zoom.offset.x; translationY = zoom.offset.y
         }
-        ComparePhoto(after, afterTransform, "Después", layer)
+        ComparePhoto(after, afterTransform, tr("Después"), layer)
         Box(Modifier.fillMaxSize().drawWithContent {
             clipRect(right = size.width * position) { this@drawWithContent.drawContent() }
         }) {
-            ComparePhoto(before, beforeTransform, "Antes", layer)
+            ComparePhoto(before, beforeTransform, tr("Antes"), layer)
         }
 
         // Divisor y manija

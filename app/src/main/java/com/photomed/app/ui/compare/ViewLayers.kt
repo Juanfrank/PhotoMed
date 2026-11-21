@@ -1,5 +1,6 @@
 package com.photomed.app.ui.compare
 
+import com.photomed.app.i18n.tr
 import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
@@ -53,13 +54,13 @@ fun ViewLayersButton(state: MutableState<ViewLayers>, tint: Color = androidx.com
     var open by remember { mutableStateOf(false) }
     val v = state.value
     Box {
-        IconButton(onClick = { open = true }) { Icon(Icons.Default.Visibility, "Vista: imagen, diagrama, anotaciones y overlay", tint = tint) }
+        IconButton(onClick = { open = true }) { Icon(Icons.Default.Visibility, tr("Vista: imagen, diagrama, anotaciones y overlay"), tint = tint) }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             listOf(
-                Triple("Imagen", v.image) { b: Boolean -> v.copy(image = b) },
-                Triple("Diagrama facial (contornos y números)", v.diagram) { b: Boolean -> v.copy(diagram = b) },
-                Triple("Anotaciones", v.notes) { b: Boolean -> v.copy(notes = b) },
-                Triple("Overlay (fechas y rótulos)", v.overlay) { b: Boolean -> v.copy(overlay = b) },
+                Triple(tr("Imagen"), v.image) { b: Boolean -> v.copy(image = b) },
+                Triple(tr("Diagrama facial (contornos y números)"), v.diagram) { b: Boolean -> v.copy(diagram = b) },
+                Triple(tr("Anotaciones"), v.notes) { b: Boolean -> v.copy(notes = b) },
+                Triple(tr("Overlay (fechas y rótulos)"), v.overlay) { b: Boolean -> v.copy(overlay = b) },
             ).forEach { (label, on, set) ->
                 DropdownMenuItem(text = { Text(label) }, leadingIcon = { Checkbox(checked = on, onCheckedChange = null) },
                     onClick = { state.value = set(!on) })

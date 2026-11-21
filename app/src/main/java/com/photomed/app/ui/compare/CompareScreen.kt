@@ -1,5 +1,7 @@
 package com.photomed.app.ui.compare
 
+import com.photomed.app.i18n.trn
+import com.photomed.app.i18n.tr
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Fullscreen
@@ -136,7 +138,10 @@ import kotlinx.coroutines.cancelAndJoin
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
-private enum class Mode(val label: String) { SLIDER("Deslizar"), SIDE("Lado a lado"), GRID("Cuadrícula"), FADE("Fundido") }
+private enum class Mode(private val labelEs: String) {
+    SLIDER(trn("Deslizar")), SIDE(trn("Lado a lado")), GRID(trn("Cuadrícula")), FADE(trn("Fundido"));
+    val label: String get() = tr(labelEs)
+}
 
 /**
  * Comparación de 2…N fotos. Con N > 2 la yuxtaposición es progresiva: una línea de tiempo recorre
@@ -236,7 +241,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 }
             }
             userVersion++
-            if (failed > 0) snackbar.showSnackbar("Trazos guardados en la app; no se pudieron escribir en $failed foto(s)")
+            if (failed > 0) snackbar.showSnackbar(tr("Trazos guardados en la app; no se pudieron escribir en %1\$d foto(s)", failed))
         }
     }
     // opacidad de los trazos y números (se recuerda; empieza en 50 %)
@@ -320,7 +325,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         // tricología: altura de la frente (cejas → línea de implantación) en cada foto
         hairlineInfo = hairlineSummary(infos)
         conditionsWarning = infos.drop(1).mapIndexedNotNull { i, c ->
-            captureConditionsWarning(infos[0], c)?.let { w -> if (s.size > 2) "Foto ${i + 2}: $w" else w }
+            captureConditionsWarning(infos[0], c)?.let { w -> if (s.size > 2) tr("Foto %1\$d: %2\$s", i + 2, w) else w }
         }.joinToString("\n").ifEmpty { null }
     }
 
@@ -335,7 +340,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
 
     fun toggle(p: Photo) {
         if (p.key !in selected && selected.size >= Timeline.MAX_PHOTOS)
-            scope.launch { snackbar.showSnackbar("Máximo ${Timeline.MAX_PHOTOS} fotos: se quitó la primera elegida") }
+            scope.launch { snackbar.showSnackbar(tr("Máximo %1\$d fotos: se quitó la primera elegida", Timeline.MAX_PHOTOS)) }
         selected = toggleSelection(selected, p.key)
         resetAlignment()
     }
@@ -358,7 +363,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 .sortedByDescending { it.takenAt }.map { it.uri.toString() }
             val lines = HashMap<String, List<com.photomed.app.align.AnnotLine>>()
             if (showLayers && com.photomed.app.align.PhotoAnnotator.enabled) {
-                alignProgress = "Esperando el análisis de arrugas…"
+                alignProgress = tr("Esperando el análisis de arrugas…")
                 kotlinx.coroutines.withTimeoutOrNull(25_000) {
                     while (true) {
                         s.forEach { p -> if (p.key !in lines) withContext(Dispatchers.IO) { photoBaseLines(context, p.uri, prevOf(p)) }?.let { lines[p.key] = it } }
@@ -370,7 +375,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             val out = mutableMapOf<String, AlignmentResult>()
             var failed: Throwable? = null
             for (i in 1 until s.size) {
-                alignProgress = if (s.size > 2) "Alineando ${i}/${s.size - 1}…" else "Alineando…"
+                alignProgress = if (s.size > 2) tr("Alineando %1\$d/%2\$d…", i, s.size - 1) else tr("Alineando…")
                 val r = runCatching {
                     aligner.auto(s[0].zone, s[0].uri, s[i].uri, manualK,
                         opts.copy(beforeOutline = outlines[s[0].key], afterOutline = outlines[s[i].key],
@@ -387,22 +392,22 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             // color de la piel igualado a la referencia, tras alinear
             var colorNote = ""
             if (autoColor && res.isNotEmpty()) {
-                alignProgress = "Igualando el color…"
+                alignProgress = tr("Igualando el color…")
                 val adj = s.drop(1).mapNotNull { p ->
                     runCatching { autoColorAdjust(context, aligner, s[0], p) }
                         .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
                         .getOrNull()?.let { p.key to it }
                 }.toMap()
                 if (alignToken != token) return@launch
-                if (adj.isNotEmpty()) { colorAdjusts = adj; colorNote = " · color igualado" }
+                if (adj.isNotEmpty()) { colorAdjusts = adj; colorNote = " · " + tr("color igualado") }
                 alignProgress = null
             }
             val msg = when {
-                failed != null && res.isEmpty() -> "No se pudo alinear: ${failed?.message}"
+                failed != null && res.isEmpty() -> tr("No se pudo alinear: %1\$s", failed?.message)
                 s.size == 2 -> res.first().let { a ->
-                    "Alineado: ${a.method}" + if (a.score.isNaN()) "" else " · contornos ${(a.score.coerceIn(0f, 1f) * 100).roundToInt()}%"
+                    if (a.score.isNaN()) tr("Alineado: %1\$s", a.method) else tr("Alineado: %1\$s · contornos %2\$d%%", a.method, (a.score.coerceIn(0f, 1f) * 100).roundToInt())
                 }
-                else -> "Alineadas ${res.size} fotos a la referencia (${formatDate(s[0].takenAt)})"
+                else -> tr("Alineadas %1\$d fotos a la referencia (%2\$s)", res.size, formatDate(s[0].takenAt))
             }
             snackbar.showSnackbar(msg + colorNote)
         }
@@ -427,35 +432,35 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             if (!fullscreen) TopAppBar(
                 title = {
                     Column {
-                        Text(if (n > 2) "Comparar $n fotos" else "Comparar")
+                        Text(if (n > 2) tr("Comparar %1\$d fotos", n) else tr("Comparar"))
                         Text(exp?.patientName.orEmpty(), style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Atrás")) } },
                 actions = {
                     ViewLayersButton(viewLayers)
-                    IconButton(onClick = { fullscreen = true }, enabled = seq != null) { Icon(Icons.Default.Fullscreen, "Pantalla completa") }
+                    IconButton(onClick = { fullscreen = true }, enabled = seq != null) { Icon(Icons.Default.Fullscreen, tr("Pantalla completa")) }
                     IconButton(onClick = { reversed = !reversed; resetAlignment() }, enabled = seq != null) {
-                        Icon(Icons.Default.SwapHoriz, "Invertir el orden")
+                        Icon(Icons.Default.SwapHoriz, tr("Invertir el orden"))
                     }
                     Box {
-                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, tr("Más opciones")) }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             // menú corto: el resto, agrupado en la hoja de ajustes de comparación
                             DropdownMenuItem(
-                                text = { Text("Ajustes de comparación") },
+                                text = { Text(tr("Ajustes de comparación")) },
                                 leadingIcon = { Icon(Icons.Default.Tune, null) },
                                 onClick = { menu = false; settings = true },
                             )
                             DropdownMenuItem(
-                                text = { Text("Exportar imágenes ajustadas") },
+                                text = { Text(tr("Exportar imágenes ajustadas")) },
                                 leadingIcon = { Icon(Icons.Default.IosShare, null) },
                                 enabled = seq != null,
                                 onClick = { menu = false; exportSheet = true },
                             )
                             DropdownMenuItem(
-                                text = { Text("Restablecer zoom") },
+                                text = { Text(tr("Restablecer zoom")) },
                                 leadingIcon = { Icon(Icons.Default.ZoomOutMap, null) },
                                 onClick = { menu = false; zoom = ZoomState() },
                             )
@@ -468,8 +473,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             androidx.compose.foundation.layout.Column {
                 val (_, _, _, seqC, _, nC) = derive()
                 com.photomed.app.ui.components.CoachMark("comparar_gestos", Icons.Default.TouchApp,
-                    "Los controles se ocultan solos: toque para verlos. En la cuadrícula, mantenga pulsada una foto y arrástrela para reordenar. " +
-                        "Ajustes y recorte en ⋮.", show = seqC != null && nC >= 2)
+                    tr("Los controles se ocultan solos: toque para verlos. En la cuadrícula, mantenga pulsada una foto y arrástrela para reordenar. " +
+                        "Ajustes y recorte en ⋮."), show = seqC != null && nC >= 2)
                 SnackbarHost(snackbar)
             }
         },
@@ -501,8 +506,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             // tocar una línea: se selecciona en todas las fotos y la tabla se abre en su fila
             onSelect = { l, key -> selLine = l?.metrics?.name; selKey = key; if (l?.metrics != null) metricsSheet = true })
         if (all != null && photos.size < 2) {
-            EmptyState(Icons.Default.Compare, "Se necesitan dos fotografías",
-                "Tome al menos dos fotografías de una zona para compararlas.", Modifier.padding(padding))
+            EmptyState(Icons.Default.Compare, tr("Se necesitan dos fotografías"),
+                tr("Tome al menos dos fotografías de una zona para compararlas."), Modifier.padding(padding))
             return@Scaffold
         }
         Column(Modifier.padding(padding).fillMaxSize().pointerInput(Unit) {
@@ -528,15 +533,15 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 onMetrics = { metricsSheet = !metricsSheet }, opacity = annotAlpha.value, onOpacity = { annotAlpha.value = it })
             // expresiones distintas en la comparación: las arrugas dinámicas no son comparables
             seq?.map { it.expression }?.distinct()?.takeIf { it.size > 1 }?.let { ex ->
-                Text("Atención: compara expresiones distintas (${ex.joinToString(" / ") { it.label }}); las arrugas dinámicas solo se comparan con la misma expresión.",
+                Text(tr("Atención: compara expresiones distintas (%1\$s); las arrugas dinámicas solo se comparan con la misma expresión.", ex.joinToString(" / ") { it.label }),
                     color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = Md3Spacing.marginCompact, vertical = 2.dp))
             }
             // análisis de arrugas y rasgos en curso: barra de proceso visible
             if (showLayers && seq != null && seq.any { annots[it.key] == null }) Row(
                 Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                LinearProgressIndicator(Modifier.weight(1f).semantics { contentDescription = "Analizando arrugas y rasgos" })
-                Text("Analizando ${seq.count { annots[it.key] != null }}/${seq.size}…", style = MaterialTheme.typography.labelMedium,
+                LinearProgressIndicator(Modifier.weight(1f).semantics { contentDescription = tr("Analizando arrugas y rasgos") })
+                Text(tr("Analizando %1\$d/%2\$d…", seq.count { annots[it.key] != null }, seq.size), style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(start = 10.dp))
             }
             }
@@ -596,7 +601,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 contentAlignment = Alignment.Center,
             ) {
                 if (seq == null) {
-                    Text("Seleccione dos o más fotografías abajo para compararlas.",
+                    Text(tr("Seleccione dos o más fotografías abajo para compararlas."),
                         color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
                 } else {
                     // fecha; con hora y minuto solo en las fotos que comparten día con otra
@@ -605,7 +610,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     val shownOrder = displayOrder(seqKeys, gridOrder, manualOrder).mapNotNull { k -> seq.indexOfFirst { it.key == k }.takeIf { it >= 0 } }
                     fun label(i: Int): String {
                         val d = stamps[i]
-                        return if (n == 2) (if (i == 0) "Antes · $d" else "Después · $d") else "${i + 1} · $d"
+                        return if (n == 2) (if (i == 0) tr("Antes · %1\$s", d) else tr("Después · %1\$s", d)) else "${i + 1} · $d"
                     }
                     val from = seq[timeline.from]; val to = seq[timeline.to]
                     when (mode) {
@@ -667,9 +672,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                                                 }
                                                 .semantics {
                                                     customActions = listOfNotNull(
-                                                        if (pos > 0) androidx.compose.ui.semantics.CustomAccessibilityAction("Mover antes") {
+                                                        if (pos > 0) androidx.compose.ui.semantics.CustomAccessibilityAction(tr("Mover antes")) {
                                                             manualOrder = orderKeys.moved(pos, pos - 1); gridOrder = GridOrder.MANUAL; true } else null,
-                                                        if (pos < orderKeys.size - 1) androidx.compose.ui.semantics.CustomAccessibilityAction("Mover después") {
+                                                        if (pos < orderKeys.size - 1) androidx.compose.ui.semantics.CustomAccessibilityAction(tr("Mover después")) {
                                                             manualOrder = orderKeys.moved(pos, pos + 1); gridOrder = GridOrder.MANUAL; true } else null,
                                                     )
                                                 })
@@ -702,7 +707,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                         value = timeline.value, onValueChange = { timelineState = Timeline.of(n, it) },
                         valueRange = 0f..(n - 1).toFloat(),
                         modifier = Modifier.fillMaxWidth().semantics {
-                            contentDescription = if (n > 2) "Progresión entre $n fotos" else "Fundido antes/después"
+                            contentDescription = if (n > 2) tr("Progresión entre %1\$d fotos", n) else tr("Fundido antes/después")
                         },
                     )
                     if (n > 2) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -710,7 +715,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                             Text("${i + 1}", style = MaterialTheme.typography.labelSmall,
                                 fontWeight = if (i == timeline.from || i == timeline.to) FontWeight.Bold else FontWeight.Normal,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.semantics { contentDescription = "Foto ${i + 1}, ${formatDate(p.takenAt)}" })
+                                modifier = Modifier.semantics { contentDescription = tr("Foto %1\$d, %2\$s", i + 1, formatDate(p.takenAt)) })
                         }
                     }
                 }
@@ -721,15 +726,15 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
 
             // asa para plegar o desplegar todo lo que hay bajo las fotos (menos la línea de tiempo)
             if (seq != null) Row(
-                Modifier.fillMaxWidth().heightIn(min = 40.dp).clickable(onClickLabel = if (panelOpen) "Plegar los controles" else "Desplegar los controles") {
+                Modifier.fillMaxWidth().heightIn(min = 40.dp).clickable(onClickLabel = if (panelOpen) tr("Plegar los controles") else tr("Desplegar los controles")) {
                     panelOpen = !panelOpen; prefs.edit().putBoolean("compare_panel_open", panelOpen).apply()
                 }.padding(horizontal = Md3Spacing.marginCompact),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
             ) {
                 Icon(if (panelOpen) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
-                    if (panelOpen) "Plegar los controles" else "Desplegar los controles", Modifier.size(22.dp),
+                    if (panelOpen) tr("Plegar los controles") else tr("Desplegar los controles"), Modifier.size(22.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(if (panelOpen) "Ocultar controles" else "Mostrar controles", style = MaterialTheme.typography.labelMedium,
+                Text(if (panelOpen) tr("Ocultar controles") else tr("Mostrar controles"), style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             androidx.compose.animation.AnimatedVisibility(panelOpen || seq == null) {
@@ -753,29 +758,29 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                             selected = false,
                             onClick = { runAlign() },
                             enabled = !aligning,
-                            label = { Text(alignProgress ?: "Alinear automáticamente") },
+                            label = { Text(alignProgress ?: tr("Alinear automáticamente")) },
                             leadingIcon = { Icon(Icons.Default.AutoFixHigh, null, Modifier.size(18.dp)) },
                         )
                         val days = TimeUnit.MILLISECONDS.toDays(kotlin.math.abs(s.last().takenAt - s.first().takenAt))
-                        Text("$days días", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tr("%1\$d días", days), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         Row(
                             Modifier.weight(1f).toggleable(useAligned, role = Role.Switch) { useAligned = it },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(if (n > 2) "Alineadas a la foto 1 · ${alignments.size}/${n - 1}" + (alignProgress?.let { " · $it" } ?: "")
-                                else "Alineado", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                            Text(if (n > 2) tr("Alineadas a la foto 1 · %1\$d/%2\$d", alignments.size, n - 1) + (alignProgress?.let { " · $it" } ?: "")
+                                else tr("Alineado"), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
                             Switch(checked = useAligned, onCheckedChange = null)
                         }
                     }
                     // detalles de la alineación y avisos: detrás del botón de información (ocupaban mucho)
                     val gazeIssues = if (validAlign && options.gaze) s.drop(1).mapIndexedNotNull { i, p ->
-                        alignments[p.key]?.gazeHint?.let { h -> if (n > 2) "Foto ${i + 2}: $h" else h }
+                        alignments[p.key]?.gazeHint?.let { h -> if (n > 2) tr("Foto %1\$d: %2\$s", i + 2, h) else h }
                     } else emptyList()
-                    val zoneWarn = if (s.map { it.zone }.distinct().size > 1) "Atención: zonas distintas (${s.map { it.zone.label }.distinct().joinToString(" / ")})" else null
+                    val zoneWarn = if (s.map { it.zone }.distinct().size > 1) tr("Atención: zonas distintas (%1\$s)", s.map { it.zone.label }.distinct().joinToString(" / ")) else null
                     val warnings = listOfNotNull(conditionsWarning, zoneWarn) + gazeIssues
                     if (res != null || hairlineInfo != null || warnings.isNotEmpty()) AlignmentInfoButton(warnings.isNotEmpty()) {
-                        res?.let { AlignmentDetails(it, if (n > 2) "Foto ${s.indexOf(target) + 1}: " else "") }
+                        res?.let { AlignmentDetails(it, if (n > 2) tr("Foto %1\$d: ", s.indexOf(target) + 1) else "") }
                         hairlineInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         listOfNotNull(conditionsWarning).plus(gazeIssues).forEach {
                             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
@@ -792,7 +797,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Md3Spacing.marginCompact),
                 horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2),
             ) {
-                FilterChip(selected = zoneFilter == null, onClick = { zoneFilter = null }, label = { Text("Todas") },
+                FilterChip(selected = zoneFilter == null, onClick = { zoneFilter = null }, label = { Text(tr("Todas")) },
                     leadingIcon = if (zoneFilter == null) { { Icon(Icons.Default.Check, null, Modifier.size(FilterChipDefaults.IconSize)) } } else null)
                 zonesWithPhotos.forEach { z ->
                     FilterChip(selected = zoneFilter == z, onClick = { zoneFilter = z }, label = { Text(z.label) },
@@ -806,7 +811,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Md3Spacing.marginCompact),
                 horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2),
             ) {
-                FilterChip(selected = expFilter == null, onClick = { expFilter = null }, label = { Text("Todas las expresiones") })
+                FilterChip(selected = expFilter == null, onClick = { expFilter = null }, label = { Text(tr("Todas las expresiones")) })
                 exps.sortedBy { it.ordinal }.forEach { e ->
                     FilterChip(selected = expFilter == e, onClick = { expFilter = e }, label = { Text(e.label) },
                         leadingIcon = if (expFilter == e) { { Icon(Icons.Default.Check, null, Modifier.size(FilterChipDefaults.IconSize)) } } else null)
@@ -832,7 +837,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                                     else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                     MaterialTheme.shapes.small,
                                 )
-                                .clickable(onClickLabel = if (isSel) "Quitar de la comparación" else "Añadir a la comparación") { toggle(p) }
+                                .clickable(onClickLabel = if (isSel) tr("Quitar de la comparación") else tr("Añadir a la comparación")) { toggle(p) }
                                 .semantics {
                                     this.selected = isSel
                                     contentDescription = "${p.zone.label}, ${formatDate(p.takenAt)}"
@@ -870,7 +875,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 photosArea(Modifier.fillMaxSize())
                 IconButton(onClick = { fullscreen = false },
                     modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.Black.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape)) {
-                    Icon(Icons.Default.FullscreenExit, "Salir de pantalla completa", tint = Color.White.copy(alpha = 0.9f))
+                    Icon(Icons.Default.FullscreenExit, tr("Salir de pantalla completa"), tint = Color.White.copy(alpha = 0.9f))
                 }
             }
             else if (wide) Row(Modifier.fillMaxSize()) {
@@ -900,14 +905,14 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
 
     if (regenerate) {
         androidx.compose.material3.AlertDialog(onDismissRequest = { regenerate = false },
-            title = { Text("¿Regenerar los trazos?") },
-            text = { Text("Se borrarán los trazos confirmados de las fotos comparadas (también de sus metadatos) y se volverán a analizar.") },
+            title = { Text(tr("¿Regenerar los trazos?")) },
+            text = { Text(tr("Se borrarán los trazos confirmados de las fotos comparadas (también de sus metadatos) y se volverán a analizar.")) },
             confirmButton = { androidx.compose.material3.TextButton(onClick = {
                 regenerate = false
                 val ps = derive().seq.orEmpty()
                 scope.launch { withContext(Dispatchers.IO) { ps.forEach { com.photomed.app.align.ConfirmedTraces.clear(context, it.uri.toString()) } }; userVersion++ }
-            }) { Text("Regenerar") } },
-            dismissButton = { androidx.compose.material3.TextButton(onClick = { regenerate = false }) { Text("Cancelar") } })
+            }) { Text(tr("Regenerar")) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { regenerate = false }) { Text(tr("Cancelar")) } })
     }
 
     if (settings) {
@@ -915,37 +920,37 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         SafeBottomSheet(onDismiss = { settings = false }) {
             Column(Modifier.padding(horizontal = Md3Spacing.s6).padding(bottom = Md3Spacing.s8).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
-                Text("Ajustes de comparación", style = MaterialTheme.typography.titleLarge)
+                Text(tr("Ajustes de comparación"), style = MaterialTheme.typography.titleLarge)
                 // Alineación
-                SectionTitle("Alineación automática")
-                SheetSwitch("Alinear al abrir la comparación", autoAlign, "Alinea las fotos en cuanto se abre o cambia la selección.") {
+                SectionTitle(tr("Alineación automática"))
+                SheetSwitch(tr("Alinear al abrir la comparación"), autoAlign, tr("Alinea las fotos en cuanto se abre o cambia la selección.")) {
                     autoAlign = it; prefs.edit().putBoolean("compare_auto_align", it).apply()
                 }
-                SheetSwitch("Usar puntos anatómicos", options.points) { setOption(options.copy(points = it)) }
-                SheetSwitch("Usar contornos", options.contours) { setOption(options.copy(contours = it)) }
-                SheetSwitch("Usar mirada (gaze)", options.gaze) { setOption(options.copy(gaze = it)) }
+                SheetSwitch(tr("Usar puntos anatómicos"), options.points) { setOption(options.copy(points = it)) }
+                SheetSwitch(tr("Usar contornos"), options.contours) { setOption(options.copy(contours = it)) }
+                SheetSwitch(tr("Usar mirada (gaze)"), options.gaze) { setOption(options.copy(gaze = it)) }
                 androidx.compose.material3.TextButton(onClick = { settings = false; measure = true }, enabled = seq != null) {
-                    Icon(Icons.Default.Straighten, null); Text("  Contornos (configuración)")
+                    Icon(Icons.Default.Straighten, null); Text("  " + tr("Contornos (configuración)"))
                 }
                 // Presentación
-                SectionTitle("Presentación")
-                SheetSwitch("Recortar según la alineación", cropToAlign,
-                    "Todas las fotos al área común que dejan tras alinearse, sin bordes negros.") {
+                SectionTitle(tr("Presentación"))
+                SheetSwitch(tr("Recortar según la alineación"), cropToAlign,
+                    tr("Todas las fotos al área común que dejan tras alinearse, sin bordes negros.")) {
                     cropToAlign = it; prefs.edit().putBoolean("compare_crop", it).apply()
-                    if (it && !validAlign) scope.launch { snackbar.showSnackbar("Se aplicará al alinear automáticamente") }
+                    if (it && !validAlign) scope.launch { snackbar.showSnackbar(tr("Se aplicará al alinear automáticamente")) }
                 }
-                Text("Vista", style = MaterialTheme.typography.bodyLarge)
+                Text(tr("Vista"), style = MaterialTheme.typography.bodyLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
                     androidx.compose.material3.OutlinedButton(onClick = { viewRot = (viewRot + 1) % 4 }) { Icon(Icons.Default.RotateRight, null); Text(" 90°") }
-                    androidx.compose.material3.OutlinedButton(onClick = { viewMirror = !viewMirror }) { Icon(Icons.Default.Flip, null); Text(" Espejo") }
+                    androidx.compose.material3.OutlinedButton(onClick = { viewMirror = !viewMirror }) { Icon(Icons.Default.Flip, null); Text(" " + tr("Espejo")) }
                     androidx.compose.material3.OutlinedButton(onClick = { settings = false; cropEditing = true }, enabled = seq != null) {
-                        Icon(Icons.Default.Crop, null); Text(" Recortar")
+                        Icon(Icons.Default.Crop, null); Text(" " + tr("Recortar"))
                     }
                 }
                 if (viewRot != 0 || viewMirror || manualCrop != null) androidx.compose.material3.TextButton(onClick = { viewRot = 0; viewMirror = false; manualCrop = null }) {
-                    Text("Restablecer la vista (giro, espejo y recorte manual)")
+                    Text(tr("Restablecer la vista (giro, espejo y recorte manual)"))
                 }
-                Text("Orden de la cuadrícula y lado a lado", style = MaterialTheme.typography.bodyLarge)
+                Text(tr("Orden de la cuadrícula y lado a lado"), style = MaterialTheme.typography.bodyLarge)
                 Column(Modifier.selectableGroup()) {
                     GridOrder.entries.forEach { o ->
                         Row(Modifier.fillMaxWidth().selectable(gridOrder == o, role = Role.RadioButton) {
@@ -958,15 +963,15 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     }
                 }
                 // Color
-                SectionTitle("Color de la piel")
-                SheetSwitch("Igualar el color automáticamente al alinear", autoColor,
-                    "Tras la alineación automática, el color de la piel de cada foto se iguala al de la referencia.") {
+                SectionTitle(tr("Color de la piel"))
+                SheetSwitch(tr("Igualar el color automáticamente al alinear"), autoColor,
+                    tr("Tras la alineación automática, el color de la piel de cada foto se iguala al de la referencia.")) {
                     autoColor = it; prefs.edit().putBoolean("compare_auto_color", it).apply()
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
                     if (colorAdjusts.isEmpty()) {
                         androidx.compose.material3.OutlinedButton(onClick = { settings = false; colorDialog = true }, enabled = seq != null) {
-                            Icon(Icons.Default.Palette, null); Text("  Igualar")
+                            Icon(Icons.Default.Palette, null); Text("  " + tr("Igualar"))
                         }
                         if ((seq?.size ?: 0) > 2) androidx.compose.material3.OutlinedButton(onClick = {
                             val s = seq ?: return@OutlinedButton
@@ -978,39 +983,39 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                                         .getOrNull()?.let { p.key to it }
                                 }.toMap()
                                 colorAdjusts = out
-                                snackbar.showSnackbar(if (out.isEmpty()) "No se encontró piel para igualar" else "Color igualado en ${out.size} fotos")
+                                snackbar.showSnackbar(if (out.isEmpty()) tr("No se encontró piel para igualar") else tr("Color igualado en %1\$d fotos", out.size))
                             }
-                        }) { Icon(Icons.Default.AutoFixHigh, null); Text("  Todas (automático)") }
-                    } else androidx.compose.material3.OutlinedButton(onClick = { colorAdjusts = emptyMap() }) { Text("Quitar igualación de color") }
+                        }) { Icon(Icons.Default.AutoFixHigh, null); Text("  " + tr("Todas (automático)")) }
+                    } else androidx.compose.material3.OutlinedButton(onClick = { colorAdjusts = emptyMap() }) { Text(tr("Quitar igualación de color")) }
                 }
                 // Perspectiva
-                SectionTitle("Perspectiva vertical")
+                SectionTitle(tr("Perspectiva vertical"))
                 Row(
                     Modifier.fillMaxWidth().toggleable(keystoneAuto, role = Role.Switch) { keystoneAuto = it; resetAlignment() },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Automática por proporciones de contornos", style = MaterialTheme.typography.bodyLarge)
+                        Text(tr("Automática por proporciones de contornos"), style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "Estima la inclinación entre tomas con la geometría del contorno (puntos faciales, contornos " +
-                                "elegidos en “Contornos” o anchos de la silueta a cada altura), sin usar sensores.",
+                            tr("Estima la inclinación entre tomas con la geometría del contorno (puntos faciales, contornos " +
+                                "elegidos en “Contornos” o anchos de la silueta a cada altura), sin usar sensores."),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Switch(checked = keystoneAuto, onCheckedChange = null)
                 }
                 target?.let { alignments[it.key] }?.takeIf { validAlign }?.let {
-                    Text("Última estimación: %+.1f°".format(it.keystoneDeg) +
+                    Text(tr("Última estimación: %1\$+.1f°", it.keystoneDeg) +
                         (it.keystoneSource.takeIf { s -> s.isNotEmpty() }?.let { s -> " · $s" } ?: ""),
                         style = MaterialTheme.typography.labelLarge)
                 }
-                Text("Ajuste manual de las fotos posteriores: %+.1f°".format(keystoneManual), style = MaterialTheme.typography.labelLarge)
+                Text(tr("Ajuste manual de las fotos posteriores: %1\$+.1f°", keystoneManual), style = MaterialTheme.typography.labelLarge)
                 Slider(
                     value = keystoneManual, onValueChange = { keystoneManual = it; resetAlignment() },
                     valueRange = -15f..15f, enabled = !keystoneAuto,
-                    modifier = Modifier.semantics { contentDescription = "Perspectiva vertical manual" },
+                    modifier = Modifier.semantics { contentDescription = tr("Perspectiva vertical manual") },
                 )
-                Text("Vuelva a alinear para aplicar los cambios.", style = MaterialTheme.typography.bodySmall,
+                Text(tr("Vuelva a alinear para aplicar los cambios."), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -1047,7 +1052,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                         annots = exportAnnots[p.key], layers = diagram,
                         orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror), annotAlpha = annotAlpha.value,
                         view = pv, ink = exportInk[p.key].orEmpty()) to
-                        (if (!pv.overlay) "" else if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d")
+                        (if (!pv.overlay) "" else if (seq.size == 2) (if (i == 0) tr("Antes · %1\$s", d) else tr("Después · %1\$s", d)) else "${i + 1} · $d")
                 }
             },
             onExport = { ch, toGallery, progress ->
@@ -1062,11 +1067,11 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     annots = exportAnnots, layers = diagram, annotAlpha = annotAlpha.value,
                     orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror), view = ch.view, ink = exportInk)
                 when {
-                    r.files.isEmpty() -> "No se pudo exportar ninguna imagen"
+                    r.files.isEmpty() -> tr("No se pudo exportar ninguna imagen")
                     toGallery && e != null -> {
                         val ok = CompareExport.saveToGallery(repo, e, r.files)
-                        "Guardadas $ok imágenes en la galería: PhotoMed/${e.id}/${com.photomed.app.data.PhotoRepository.EXPORT_DIR}" +
-                            if (r.failed > 0) " (${r.failed} no se pudieron leer)" else ""
+                        tr("Guardadas %1\$d imágenes en la galería: %2\$s", ok, "PhotoMed/${e.id}/${com.photomed.app.data.PhotoRepository.EXPORT_DIR}") +
+                            if (r.failed > 0) " " + tr("(%1\$d no se pudieron leer)", r.failed) else ""
                     }
                     else -> { CompareExport.share(context, r.files, anonymize); null }
                 }
@@ -1078,7 +1083,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     if (colorDialog && reference != null && target != null) {
         ColorMatchDialog(reference, target, onDismiss = { colorDialog = false }, onApply = {
             colorDialog = false; colorAdjusts = colorAdjusts + (target.key to it)
-            scope.launch { snackbar.showSnackbar("Color igualado: ${it.describe()}") }
+            scope.launch { snackbar.showSnackbar(tr("Color igualado: %1\$s", it.describe())) }
         })
     }
 
@@ -1127,7 +1132,7 @@ private fun CheckItem(text: String, checked: Boolean, onChange: (Boolean) -> Uni
         leadingIcon = { Icon(if (checked) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, null,
             tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
         onClick = { onChange(!checked) },
-        modifier = Modifier.semantics { stateDescription = if (checked) "Activado" else "Desactivado" },
+        modifier = Modifier.semantics { stateDescription = if (checked) tr("Activado") else tr("Desactivado") },
     )
 }
 
@@ -1165,12 +1170,12 @@ private fun AlignmentInfoButton(warn: Boolean, content: @Composable androidx.com
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
-            Icon(if (warn) Icons.Default.Warning else Icons.Default.Info, "Detalles de la alineación",
+            Icon(if (warn) Icons.Default.Warning else Icons.Default.Info, tr("Detalles de la alineación"),
                 tint = if (warn) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             Column(Modifier.widthIn(max = 320.dp).padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Alineación", style = MaterialTheme.typography.titleSmall)
+                Text(tr("Alineación"), style = MaterialTheme.typography.titleSmall)
                 content()
             }
         }
@@ -1182,28 +1187,28 @@ private fun AlignmentDetails(res: AlignmentResult, prefix: String) {
     val style = MaterialTheme.typography.bodySmall
     val color = MaterialTheme.colorScheme.onSurfaceVariant
     Text(
-        prefix + "%s · %.0f%% escala · %.1f°".format(
-            res.landmarks.takeIf { it.isNotEmpty() }?.let { "${it.size} puntos (${res.landmarkRegions.take(4).joinToString(", ")})" }
+        prefix + tr("%1\$s · %2\$.0f%% escala · %3\$.1f°",
+            res.landmarks.takeIf { it.isNotEmpty() }?.let { tr("%1\$d puntos (%2\$s)", it.size, res.landmarkRegions.take(4).joinToString(", ")) }
                 ?: res.method.lowercase(),
             res.transform.scale * 100, res.transform.rotationDegrees,
         ), style = style, color = color,
     )
-    if (res.keystoneDeg != 0f) Text("Perspectiva vertical %+.1f° (%s)".format(res.keystoneDeg, res.keystoneSource), style = style, color = color)
+    if (res.keystoneDeg != 0f) Text(tr("Perspectiva vertical %1\$+.1f° (%2\$s)", res.keystoneDeg, res.keystoneSource), style = style, color = color)
     // validación por rasgo: ojos, cejas, nariz, labios y contorno tras alinear
     if (res.featureScores.isNotEmpty()) {
-        Text("Coincidencia por rasgo: " + res.featureScores.joinToString(" · ") { (n, v) -> "$n ${(v * 100).roundToInt()} %" },
-            style = style, color = color, modifier = Modifier.semantics { contentDescription = "Coincidencia por rasgo" })
+        Text(tr("Coincidencia por rasgo: %1\$s", res.featureScores.joinToString(" · ") { (n, v) -> "$n ${(v * 100).roundToInt()} %" }),
+            style = style, color = color, modifier = Modifier.semantics { contentDescription = tr("Coincidencia por rasgo") })
         val low = res.featureScores.filter { it.second < com.photomed.app.align.FeatureMatch.WARN }.map { it.first }
         if (low.isNotEmpty() && low.size < res.featureScores.size)
-            Text("No coinciden: ${low.joinToString(", ")} (expresión, pose o cambio local distinto del resto)",
+            Text(tr("No coinciden: %1\$s (expresión, pose o cambio local distinto del resto)", low.joinToString(", ")),
                 style = style, color = MaterialTheme.colorScheme.error)
     }
     if (res.regionScores.isNotEmpty() && res.method.contains("ontorno")) {
-        Text("Contornos: " + res.regionScores.sortedByDescending { it.second }.take(4)
-            .joinToString(" · ") { (nm, v) -> "$nm ${(v.coerceIn(0f, 1f) * 100).roundToInt()}%" }, style = style, color = color)
+        Text(tr("Contornos: %1\$s", res.regionScores.sortedByDescending { it.second }.take(4)
+            .joinToString(" · ") { (nm, v) -> "$nm ${(v.coerceIn(0f, 1f) * 100).roundToInt()}%" }), style = style, color = color)
     }
     when (res.gazeMatches) {
-        true -> Text("Mirada: misma dirección", style = style, color = color)
+        true -> Text(tr("Mirada: misma dirección"), style = style, color = color)
         false -> Unit   // se avisa debajo
         null -> Unit
     }
@@ -1261,25 +1266,25 @@ fun hairlineSummary(infos: List<Map<String, String>>): String? {
     val first = v.firstOrNull() ?: return null
     if (v.count { it != null } < 2) return null
     val parts = v.map { x -> x?.let { "%.2f".format(it) } ?: "—" }
-    val last = v.last() ?: return "Frente (cejas → implantación): " + parts.joinToString(" → ") + " ×IPD"
+    val last = v.last() ?: return tr("Frente (cejas → implantación): %1\$s ×IPD", parts.joinToString(" → "))
     val pct = (last - first) / first * 100
-    return "Frente (cejas → implantación): " + parts.joinToString(" → ") + " ×IPD (%+.0f %%%s)".format(pct,
-        if (kotlin.math.abs(pct) < 4) ", estable" else if (pct > 0) ", la línea retrocede" else ", la línea avanza")
+    return tr("Frente (cejas → implantación): %1\$s ×IPD (%2\$+.0f %%%3\$s)", parts.joinToString(" → "), pct,
+        if (kotlin.math.abs(pct) < 4) tr(", estable") else if (pct > 0) tr(", la línea retrocede") else tr(", la línea avanza"))
 }
 
 /** Diferencias relevantes entre las condiciones de captura de dos fotos (o null si son comparables). */
 fun captureConditionsWarning(b: Map<String, String>, a: Map<String, String>): String? {
     val issues = mutableListOf<String>()
     val yb = b["HeadYaw"]?.toFloatOrNull(); val ya = a["HeadYaw"]?.toFloatOrNull()
-    if (yb != null && ya != null && kotlin.math.abs(yb - ya) > 6f) issues += "giro de la cabeza %.0f° vs %.0f°".format(yb, ya)
-    if (b["Side"] != null && a["Side"] != null && b["Side"] != a["Side"]) issues += "lado distinto (${b["Side"]} / ${a["Side"]})"
+    if (yb != null && ya != null && kotlin.math.abs(yb - ya) > 6f) issues += tr("giro de la cabeza %1\$.0f° vs %2\$.0f°", yb, ya)
+    if (b["Side"] != null && a["Side"] != null && b["Side"] != a["Side"]) issues += tr("lado distinto (%1\$s / %2\$s)", b["Side"], a["Side"])
     val pb = b["HeadPitch"]?.toFloatOrNull(); val pa = a["HeadPitch"]?.toFloatOrNull()
-    if (pb != null && pa != null && kotlin.math.abs(pb - pa) > 6f) issues += "cabeceo (barbilla) %+.0f° vs %+.0f°".format(pb, pa)
+    if (pb != null && pa != null && kotlin.math.abs(pb - pa) > 6f) issues += tr("cabeceo (barbilla) %1\$+.0f° vs %2\$+.0f°", pb, pa)
     val db = b["DistanceCm"]?.toFloatOrNull(); val da = a["DistanceCm"]?.toFloatOrNull()
-    if (db != null && da != null && kotlin.math.abs(db - da) / maxOf(db, da) > 0.25f) issues += "distancia %.0f vs %.0f cm".format(db, da)
-    if (b["Engine"] != null && a["Engine"] != null && b["Engine"] != a["Engine"]) issues += "motor de puntos distinto"
+    if (db != null && da != null && kotlin.math.abs(db - da) / maxOf(db, da) > 0.25f) issues += tr("distancia %1\$.0f vs %2\$.0f cm", db, da)
+    if (b["Engine"] != null && a["Engine"] != null && b["Engine"] != a["Engine"]) issues += tr("motor de puntos distinto")
     listOf(b, a).forEachIndexed { i, c ->
-        if (c["Status"] != null && c["Status"] != "MATCH") issues += (if (i == 0) "“antes”" else "“después”") + " sin encuadre confirmado"
+        if (c["Status"] != null && c["Status"] != "MATCH") issues += if (i == 0) tr("“antes” sin encuadre confirmado") else tr("“después” sin encuadre confirmado")
     }
-    return if (issues.isEmpty()) null else "Condiciones de captura distintas: " + issues.joinToString("; ")
+    return if (issues.isEmpty()) null else tr("Condiciones de captura distintas: %1\$s", issues.joinToString("; "))
 }

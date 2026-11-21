@@ -1,5 +1,823 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- ARCHIVO GENERADO por tools/i18n/extract.py: no editar a mano. -->
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation,UnusedResources,Typos">
+    <string name="t_003df45d60ec" formatted="false">Head: turn more (%1$s° of 45°)</string>
+    <string name="t_00bccb32acd1" formatted="false">no changes</string>
+    <string name="t_00d72ed74f10" formatted="false">Anatomical edges (jaw, forehead, ears, silhouette) and perspective from proportions.</string>
+    <string name="t_00ed27346c1e" formatted="false">Relief not saved: there was movement or shadows</string>
+    <string name="t_00f632af022d" formatted="false">hypereuryprosopic (very broad)</string>
+    <string name="t_0124b6146b70" formatted="false">lower</string>
+    <string name="t_01c2fc66311c" formatted="false">Dark</string>
+    <string name="t_020017a431a2" formatted="false">Strokes not confirmed (automatic analysis)</string>
+    <string name="t_024ea0aed6da" formatted="false">Manual adjustment of later photos: %1$+.1f°</string>
+    <string name="t_02a16c0db8dc" formatted="false">Face: look toward the right of the image</string>
+    <string name="t_02de0ba40288" formatted="false">navel</string>
+    <string name="t_03138cfb5765" formatted="false">Lower third (ideal 33 %), %</string>
+    <string name="t_038af6ebd772" formatted="false">“before” without confirmed framing</string>
+    <string name="t_04ba8712add8" formatted="false">Plays back and forth: the jump is not noticeable when it loops.</string>
+    <string name="t_04e82e5facef" formatted="false">More lines: accessory folds, more forehead and under-eye lines (more findings, some false).</string>
+    <string name="t_0518bede37b6" formatted="false">Skip</string>
+    <string name="t_0532f3b58ec2" formatted="false">Chin: lower %1$.0f°</string>
+    <string name="t_0590fd75b2c4" formatted="false">brow</string>
+    <string name="t_068adb33e7f6" formatted="false">Contrast ΔL*</string>
+    <string name="t_06ed6be6fc9c" formatted="false">Face front</string>
+    <string name="t_07592612817c" formatted="false">Abdomen right side</string>
+    <string name="t_076099a024c1" formatted="false">EEEE, MMMM d, yyyy</string>
+    <string name="t_07b18ac218ae" formatted="false">Opacity</string>
+    <string name="t_08963e35ae5a" formatted="false">selected contours</string>
+    <string name="t_0902fcf1e707" formatted="false">Match color automatically when aligning</string>
+    <string name="t_093c3057cec8" formatted="false">skull contour, whorl, nape and hair pattern</string>
+    <string name="t_09429b8c043a" formatted="false">Tap the same skin area in each photo (e.g. the center of the cheek).</string>
+    <string name="t_09b1747ecb81" formatted="false">No measurable wrinkles or folds found.</string>
+    <string name="t_09cbeb561d9f" formatted="false">The protocol has no shots.</string>
+    <string name="t_09d78d508a5e" formatted="false">Without patient data</string>
+    <string name="t_0a2e4188186c" formatted="false">Feature · measurement</string>
+    <string name="t_0a3f30b0eafe" formatted="false">Line and fold measurements</string>
+    <string name="t_0a9fc4c16b25" formatted="false">Chin forward, shoulders relaxed.</string>
+    <string name="t_0b25fd170cc1" formatted="false">Left profile at 90°, arms raised above the head (armpit visible).</string>
+    <string name="t_0b5d027dbc0b" formatted="false">Lower third (subnasale → chin), mm</string>
+    <string name="t_0b8237d43c3b" formatted="false">Relief measurement (screen)</string>
+    <string name="t_0b82e54a9daa" formatted="false">Latest: %1$s</string>
+    <string name="t_0b90e21b7a10" formatted="false">Reference: %1$s</string>
+    <string name="t_0ba2e5910750" formatted="false">No errors logged</string>
+    <string name="t_0c2e214fbd42" formatted="false">MMM d, yyyy, HH:mm</string>
+    <string name="t_0c7ef22eb303" formatted="false">Head: straighten %1$.0f° (tilted to the left)</string>
+    <string name="t_0d14bbd7d06c" formatted="false">hips</string>
+    <string name="t_0d30c89f2b38" formatted="false">Rotate the camera ↻</string>
+    <string name="t_0d384b0e671f" formatted="false">Got it</string>
+    <string name="t_0d550d593192" formatted="false">Delete %1$s (false positive)</string>
+    <string name="t_0d56cf108531" formatted="false">Add to comparison</string>
+    <string name="t_0da2f3c3fbdf" formatted="false">Take photo</string>
+    <string name="t_0e30c89f2ceb" formatted="false">Rotate the camera ↺</string>
+    <string name="t_0ed6e55792e9" formatted="false">University of Zurich; JMIR Med Inform 2026;e75737. Adapted: cropped by area, strokes extracted and recolored; 45° oblique and lateral views derived.</string>
+    <string name="t_0eda5e284764" formatted="false">could not load the model: %1$s: %2$s</string>
+    <string name="t_0ee6b84f5826" formatted="false">Requires: %1$s</string>
+    <string name="t_0eef4a6195d8" formatted="false">Vertical perspective %1$+.1f° (%2$s)</string>
+    <string name="t_0f4641c5c9cd" formatted="false">Length, mm</string>
+    <string name="t_0f6d848fd891" formatted="false">The video lasts one cycle; the gallery or chat loops it.</string>
+    <string name="t_0f90bc66e211" formatted="false">Time per image</string>
+    <string name="t_0fe9d2ab08a2" formatted="false">Settings</string>
+    <string name="t_10301d22d36a" formatted="false">Probable type</string>
+    <string name="t_107dd702208f" formatted="false">Share the error log</string>
+    <string name="t_117505051690" formatted="false">Width (at half depth)</string>
+    <string name="t_1191194b39e2" formatted="false">elbow</string>
+    <string name="t_119b057adfe1" formatted="false">Slider</string>
+    <string name="t_11b9c23183bc" formatted="false">moderate</string>
+    <string name="t_11db942c0d82" formatted="false">Show controls</string>
+    <string name="t_12021b9b2d63" formatted="false">Camera above the right side (≈ 45° downward); right ear at the bottom on the mark, parting at the top following the curve, forehead toward the right of the frame.</string>
+    <string name="t_13316e5c5c1a" formatted="false">Adjusted photos (one per photo)</string>
+    <string name="t_1370f73e6d00" formatted="false">Canthal tilt, °</string>
+    <string name="t_1382e9b3df58" formatted="false">neutral point</string>
+    <string name="t_13be493b48b5" formatted="false">same as the reference from %1$s</string>
+    <string name="t_13c109cf3197" formatted="false">Area</string>
+    <string name="t_1409f2deba17" formatted="false">Automatic detection</string>
+    <string name="t_1434aafdff99" formatted="false">Profile: no face mesh; the neck and double chin are measured from the silhouette.</string>
+    <string name="t_145687c7dfc5" formatted="false">Strokes saved in the app; could not be written to %1$d photo(s)</string>
+    <string name="t_1534ef8d044e" formatted="false">Could not get the full face mesh%1$s: only the folds are measured (nasolabial, marionette, tear trough); forehead, glabellar lines, crow\'s feet and dark circles need the mesh.</string>
+    <string name="t_15609a434b4a" formatted="false">Expression: %1$s</string>
+    <string name="t_156b6e765065" formatted="false">Adjust the pose</string>
+    <string name="t_158457f1b14f" formatted="false">Patient lying prone, soles toward the camera, heels up.</string>
+    <string name="t_15a6d2360496" formatted="false">MediaPipe could not start (%1$s); using ML Kit</string>
+    <string name="t_15cd998637d6" formatted="false">(Scale: interpupillary distance of 63 mm; iris not reliable.)</string>
+    <string name="t_1631c0359f81" formatted="false">Anatomical landmarks + contours</string>
+    <string name="t_16347a056990" formatted="false">phalanges</string>
+    <string name="t_16ac6c8f2cec" formatted="false">Remove from comparison</string>
+    <string name="t_16ec46256140" formatted="false">Bridge width (root), mm</string>
+    <string name="t_17ae71394b0b" formatted="false">Commercial license (paid)</string>
+    <string name="t_17c7a1c3439a" formatted="false">tap the same skin area in each photo</string>
+    <string name="t_17f06e51bbef" formatted="false">The file is not a PhotoMed results package.</string>
+    <string name="t_184f722b9abb" formatted="false">MediaPipe did not find the face</string>
+    <string name="t_186f52743f02" formatted="false">Feet slightly apart, weight evenly distributed; gluteal fold on the lower line.</string>
+    <string name="t_187836f2f17f" formatted="false">Central forehead (brows → hair), mm</string>
+    <string name="t_18a1fada86e2" formatted="false">Expression: relax the smile</string>
+    <string name="t_18ec8fd63278" formatted="false">Head: straighten %1$s° (tilted to the right)</string>
+    <string name="t_195bcd630dc2" formatted="false">Match by feature: %1$s</string>
+    <string name="t_19c8f885a482" formatted="false">Infraorbital lines</string>
+    <string name="t_19d84bad2295" formatted="false">Could not analyze the image: use a reference point</string>
+    <string name="t_19ec20015659" formatted="false">proportions of %1$d contour points</string>
+    <string name="t_19f2880751fd" formatted="false">eyelids, brow and lateral creases</string>
+    <string name="t_1a1970365e03" formatted="false">%1$d landmarks (%2$s)</string>
+    <string name="t_1ac260c89ac2" formatted="false">Analyzing %1$d/%2$d…</string>
+    <string name="t_1b077769f9df" formatted="false">Right</string>
+    <string name="t_1ba4db38f99b" formatted="false">jaw</string>
+    <string name="t_1bed538322b1" formatted="false">Automatic (skin)</string>
+    <string name="t_1c7402de2578" formatted="false">The file is not an image</string>
+    <string name="t_1d0b663fafa5" formatted="false">Collapse controls</string>
+    <string name="t_1d7495e97c6e" formatted="false">View: image, diagram, annotations and overlay</string>
+    <string name="t_1d7ea196ebd2" formatted="false">Crop area</string>
+    <string name="t_1d928203f8be" formatted="false">Match</string>
+    <string name="t_1e0ff7ae5eab" formatted="false">Standard framing · capturing</string>
+    <string name="t_1e4a2b79f969" formatted="false">Middle / lower third (ideal 1)</string>
+    <string name="t_1e9f658d7a5d" formatted="false">knees</string>
+    <string name="t_1f8666e583a9" formatted="false">Uneven lighting across cheeks (max. %1$.0f %%)</string>
+    <string name="t_204e71f59454" formatted="false">Pupils on the horizontal line; take at rest and smiling.</string>
+    <string name="t_20d371afcbd3" formatted="false">, hairline advancing</string>
+    <string name="t_211dfdb3d5e7" formatted="false">arm</string>
+    <string name="t_21462af5c782" formatted="false">Fissure width, mm</string>
+    <string name="t_2165b6dd853c" formatted="false">Show in photo: %1$s</string>
+    <string name="t_218a79c95847" formatted="false">ITA° dark circle / cheek</string>
+    <string name="t_21a686deba9a" formatted="false">Selection only: %1$s</string>
+    <string name="t_2287a8a894ae" formatted="false">euryprosopic (broad)</string>
+    <string name="t_22f7fb923994" formatted="false">no category mask</string>
+    <string name="t_2329c6542404" formatted="false">Overlay (dates and labels)</string>
+    <string name="t_23337146cf27" formatted="false">PhotoMed uses the camera only to take the clinical photos for the patient record. On this Android version it also needs permission to save to the gallery.</string>
+    <string name="t_2368a0230bde" formatted="false">The match also requires the patient to look in the same direction as in the reference (iris position within the eye).</string>
+    <string name="t_23a1ab9d310a" formatted="false">Captures on reaching %1$d %% match (yellow-green); fine alignment is done in Compare.</string>
+    <string name="t_23b4c5944c51" formatted="false">Body</string>
+    <string name="t_247eb52cfe22" formatted="false">Capture failed</string>
+    <string name="t_24ab142de9ab" formatted="false">Tilt that matches the width proportions (upper, middle, lower) of both contours.</string>
+    <string name="t_251335561371" formatted="false">more to the right</string>
+    <string name="t_25de1b008229" formatted="false">Fissure height, mm</string>
+    <string name="t_266bcac5ad18" formatted="false">shoulders, hips, waist and navel</string>
+    <string name="t_267af10925e9" formatted="false">Neutral point (gray card)</string>
+    <string name="t_26d8ed0f0da1" formatted="false">File names without the patient\'s name and without identifying metadata.</string>
+    <string name="t_27740810736d" formatted="false">Uneven light: right side darker</string>
+    <string name="t_27c8f1eb19c5" formatted="false">Back</string>
+    <string name="t_28086fbbf304" formatted="false">%1$s (darker)</string>
+    <string name="t_28b06caf116d" formatted="false">Absolute measurements are comparable if both photos have the same framing (use the guide and the match); ratios do not depend on distance.</string>
+    <string name="t_28e0f891a9f8" formatted="false">cropped to the alignment</string>
+    <string name="t_29c0267d9bf2" formatted="false">Rotate the reference 90°</string>
+    <string name="t_2a05733cc358" formatted="false">Flash on</string>
+    <string name="t_2a61544ac64a" formatted="false">Use gaze</string>
+    <string name="t_2af6b92bb5b7" formatted="false">Move earlier</string>
+    <string name="t_2b2a98b2b5d2" formatted="false">Auto flash</string>
+    <string name="t_2b2e813f82b3" formatted="false">Stomion → chin, mm</string>
+    <string name="t_2b34962aae4c" formatted="false">Like the phone\'s cameras. Photos are always saved unmirrored.</string>
+    <string name="t_2b918057a110" formatted="false">Before · %1$s</string>
+    <string name="t_2bd2c7394ca0" formatted="false">Pulses that speed up as you approach a match and a tone on match, so you don\'t have to look at the screen.</string>
+    <string name="t_2bd812186a0c" formatted="false">Perioral lines</string>
+    <string name="t_2c1e30188754" formatted="false">Aligning…</string>
+    <string name="t_2c27bba71882" formatted="false">All photos cropped to the common area left after alignment, without black borders.</string>
+    <string name="t_2c5eaefeacf5" formatted="false">brows</string>
+    <string name="t_2c9668b2ccde" formatted="false">Estimated depth (shading)</string>
+    <string name="t_2c9dab4679ab" formatted="false">Chin: lower %1$s°</string>
+    <string name="t_2cb8817a760e" formatted="false">Show all (%1$d)</string>
+    <string name="t_2d043845ab46" formatted="false">Camera: aim lower %1$s°</string>
+    <string name="t_2d47bfed01f3" formatted="false">Palms toward the camera, fingers slightly apart, wrists at the top edge.</string>
+    <string name="t_2d5672cde099" formatted="false">Manual vertical perspective</string>
+    <string name="t_2e654369c5b4" formatted="false">Move closer</string>
+    <string name="t_2eb6ad5c0c0b" formatted="false">Close-up of the right eye, gaze straight ahead; pupil on the crosshair, tail of the eyebrow and crow\'s feet within the framing (on the left); at rest and smiling.</string>
+    <string name="t_2f0ce3a73424" formatted="false">Couldn\'t create the file in the gallery</string>
+    <string name="t_2fa4eae4aa41" formatted="false">nape and shoulders</string>
+    <string name="t_2ff695f0d3cc" formatted="false">superficial</string>
+    <string name="t_302fa4975051" formatted="false">PhotoMed: error log</string>
+    <string name="t_30789a1c2726" formatted="false">match ≥ %1$d %%</string>
+    <string name="t_30d0b1778b73" formatted="false">Hands (dorsal)</string>
+    <string name="t_30dc0bfe7274" formatted="false">The file is not a PhotoMed protocol.</string>
+    <string name="t_30fba1e31f72" formatted="false">Light</string>
+    <string name="t_31033391e217" formatted="false">Dark circles</string>
+    <string name="t_310aad2bdd11" formatted="false">Right arm</string>
+    <string name="t_3150836d4aa1" formatted="false">Time per image: %1$.1f s</string>
+    <string name="t_323466e141c0" formatted="false">Gaze: %1$s</string>
+    <string name="t_324467fb374e" formatted="false">Relaxed lips touching, mouth corners on the horizontal line.</string>
+    <string name="t_329b2bc0decb" formatted="false">Frame from the hairline to the eyebrows; take at rest and contracted.</string>
+    <string name="t_32eb60561cba" formatted="false">Posterior view: patient seated with their back to the camera; camera behind and slightly above (≈ 35° downward); crown whorl on the mark, nape and shoulders at the bottom.</string>
+    <string name="t_335b37132835" formatted="false">Aligned: %1$s</string>
+    <string name="t_3360cf63b9b0" formatted="false">Leg</string>
+    <string name="t_33bcf26552cb" formatted="false">Hairline not available. %1$s</string>
+    <string name="t_34612878e638" formatted="false">Camera: tilt up</string>
+    <string name="t_34935d17221f" formatted="false">Fifth 1 (edge → lateral canthus) (ideal 20 %), %</string>
+    <string name="t_34e00bafc6fd" formatted="false">Area (% of width²)</string>
+    <string name="t_35f468f84181" formatted="false">PhotoMed logo</string>
+    <string name="t_36358b4fbbb2" formatted="false">Terms and conditions</string>
+    <string name="t_36782846ff0b" formatted="false">Clear the log</string>
+    <string name="t_3683101ec240" formatted="false">Face: look toward the left of the image</string>
+    <string name="t_36afc4605af8" formatted="false">Drawn by hand in a chosen area</string>
+    <string name="t_36c31f9119b2" formatted="false">Glabellar lines</string>
+    <string name="t_36d230ccded6" formatted="false">Conservative</string>
+    <string name="t_36e37887e080" formatted="false">All</string>
+    <string name="t_370cadbbc2e5" formatted="false">A point matches if it is within %1$d %% of the width from its position in the reference photo. Default %2$d %%.</string>
+    <string name="t_377cafea39a1" formatted="false">Grid with dates</string>
+    <string name="t_37b6b243a5d6" formatted="false">Language</string>
+    <string name="t_381d8e7bd7a5" formatted="false">leptoprosopic (long)</string>
+    <string name="t_384fb0cacb99" formatted="false">facial oval, eyes, nose and lips</string>
+    <string name="t_3869222c591a" formatted="false">≈ %1$s cm: step back ≥ 1 m and use zoom</string>
+    <string name="t_3897f53716ec" formatted="false">Author</string>
+    <string name="t_394b982af15b" formatted="false">Beard or moustache on %1$d %% of the lower face: folds in that area are traced and measured only on visible skin (lines marked with ✱ are partial).</string>
+    <string name="t_3968e915637e" formatted="false">"Color difference ΔE2000: %1$.1f → %2$.1f  (≤ 2: barely perceptible)"</string>
+    <string name="t_3a34ea0d24cd" formatted="false">Strokes confirmed: saved in the photo</string>
+    <string name="t_3a6928bdb644" formatted="false">Head: straighten %1$s° (tilted to the left)</string>
+    <string name="t_3b369d2fe9d5" formatted="false">occiput</string>
+    <string name="t_3b4a959db9a1" formatted="false">Display</string>
+    <string name="t_3b4b1c48f4b4" formatted="false">Expression: smile as in the reference</string>
+    <string name="t_3c48d7318913" formatted="false">orbicularis oris</string>
+    <string name="t_3c5d2f55ebf7" formatted="false">Analyzing wrinkles and features</string>
+    <string name="t_3cb2fd0f447c" formatted="false">Image</string>
+    <string name="t_3ce9cb82b824" formatted="false">Front view, feet slightly apart; kneecaps on the marks.</string>
+    <string name="t_3cf5ba5ede2d" formatted="false">Vermilion area, mm²</string>
+    <string name="t_3d3aa4986b1a" formatted="false">Alar width, mm</string>
+    <string name="t_3d9078e6c9eb" formatted="false">Gaze: %1$s and %2$s</string>
+    <string name="t_3e920f07e297" formatted="false">Fewer lines, nearly all certain (more precision).</string>
+    <string name="t_3ed6d3ecc66a" formatted="false">Close</string>
+    <string name="t_3ed944fa135a" formatted="false">Head: turn less (%1$s° of 45°)</string>
+    <string name="t_3edb7a0744b4" formatted="false">Patient\'s face not detected</string>
+    <string name="t_3f3b565f15f4" formatted="false">Cancel</string>
+    <string name="t_3f7285d9f1ae" formatted="false">ear</string>
+    <string name="t_3f85d3e65acf" formatted="false">Fifth 5 (lateral canthus → edge) (ideal 20 %), %</string>
+    <string name="t_400373925bb5" formatted="false">Couldn\'t read the file.</string>
+    <string name="t_40231b23fe1b" formatted="false">Sadness (mouth corners down)</string>
+    <string name="t_411ba31f0183" formatted="false">Back</string>
+    <string name="t_412cec9894e0" formatted="false">Automatic alignment (compare)</string>
+    <string name="t_414daa71537f" formatted="false">Alignment details</string>
+    <string name="t_41a1167e32f3" formatted="false">Face width, mm</string>
+    <string name="t_42c3b22a448e" formatted="false">The confirmed strokes of the compared photos will be deleted (also from their metadata) and they will be analyzed again.</string>
+    <string name="t_42c7f6c305ac" formatted="false">Height (between eyes → subnasale), mm</string>
+    <string name="t_42d286caf0ef" formatted="false">Both</string>
+    <string name="t_42ecee036596" formatted="false">Reference: %1$s · zoom %2$.1f×</string>
+    <string name="t_4314cc1fd6d2" formatted="false">Analysis not available</string>
+    <string name="t_433f3c2f2188" formatted="false">Grade: depth &lt; %1$s mm → 0 to 4; greater → 5.</string>
+    <string name="t_437551bac17b" formatted="false">Abdomen front</string>
+    <string name="t_43b90fed8680" formatted="false">Relief: the photo does not match the sequence</string>
+    <string name="t_43dc7ff7a410" formatted="false">Aligns the photos as soon as the selection is opened or changed.</string>
+    <string name="t_43efaf6ac681" formatted="false">%1$s · step %2$d/%3$d · photo %4$d/%5$d</string>
+    <string name="t_4422310a6126" formatted="false">Instruction: %1$s</string>
+    <string name="t_44509d401a83" formatted="false">eyes and brows</string>
+    <string name="t_44aed0109780" formatted="false">Hand</string>
+    <string name="t_4526a6bffc0f" formatted="false">Head: correct turn %1$.0f°</string>
+    <string name="t_45583668a731" formatted="false">Expression: close the lips</string>
+    <string name="t_45965b380fd4" formatted="false">light ≥ %1$d %%</string>
+    <string name="t_45cef7c7f58c" formatted="false">Automatic from contour proportions</string>
+    <string name="t_45e9fb45d94f" formatted="false">Crop</string>
+    <string name="t_46fcd20feebd" formatted="false">Lips / perioral</string>
+    <string name="t_47f434181700" formatted="false">Move left</string>
+    <string name="t_487178f56e5f" formatted="false">Aligned to photo 1 · %1$d/%2$d</string>
+    <string name="t_48a83a7f4052" formatted="false">Depth (measured relief)</string>
+    <string name="t_48fa332e0fda" formatted="false">Gaze: further up</string>
+    <string name="t_494ef03084c7" formatted="false">Align with the reference · follow the arrows</string>
+    <string name="t_494f1759f2d4" formatted="false">Upper third (ideal 33 %), %</string>
+    <string name="t_495dd48b5ee0" formatted="false">Expression: turn down the corners of the mouth</string>
+    <string name="t_496a6456cb07" formatted="false">The app closed due to an error</string>
+    <string name="t_4983db4be84a" formatted="false">Gaze differs: in “after” the patient looks %1$s (in the image)</string>
+    <string name="t_49cd4c058a1f" formatted="false">Length</string>
+    <string name="t_4a3ac8201945" formatted="false">Transition: none (cut)</string>
+    <string name="t_4a6a19c750ad" formatted="false">Saved %1$d images to the gallery: %2$s</string>
+    <string name="t_4acd99878e19" formatted="false">Records</string>
+    <string name="t_4af96df36831" formatted="false">buttock</string>
+    <string name="t_4bc68be6b728" formatted="false">Forehead (eyebrows → hairline): %1$s ×IPD (%2$+.0f %%%3$s)</string>
+    <string name="t_4c5c21ea9391" formatted="false">Stomion → chin / subnasale → stomion (ideal 2)</string>
+    <string name="t_4cd4d1e48f6f" formatted="false">Middle third (brows → subnasale), mm</string>
+    <string name="t_4d2fb9e961f0" formatted="false">ankles and heels</string>
+    <string name="t_4d9a7ee81a48" formatted="false">orbicularis oculi and zygomatic muscles</string>
+    <string name="t_4e7b9da23085" formatted="false">Also capture when nearly aligned</string>
+    <string name="t_4ef50f502afc" formatted="false">Expression: raise the eyebrows more</string>
+    <string name="t_4f56621ff92c" formatted="false">" (detail: %1$s)"</string>
+    <string name="t_4f97d5fdc00d" formatted="false">Color matched: %1$s</string>
+    <string name="t_4fdf323adbdf" formatted="false">No preview</string>
+    <string name="t_50482af326c7" formatted="false">Patient standing, feet parallel and apart; camera directly above the dorsum.</string>
+    <string name="t_5069209546b3" formatted="false">Head: turn to profile (%1$.0f° to go)</string>
+    <string name="t_508a6fa0e318" formatted="false">Skin color</string>
+    <string name="t_50f0a746e538" formatted="false">tap the gray or white card in each photo</string>
+    <string name="t_521a1ca39081" formatted="false">"Photo %1$d: "</string>
+    <string name="t_52b53141bc8d" formatted="false">Free</string>
+    <string name="t_52cb0c4bf02a" formatted="false">Relaxed face, lips together, gaze straight ahead</string>
+    <string name="t_52f09c57b072" formatted="false">Wrinkle your nose, as if at a bad smell</string>
+    <string name="t_5300f4fae710" formatted="false">Aligned: %1$s · contours %2$d%%</string>
+    <string name="t_53351ee254e5" formatted="false">AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + Face Landmarker and Selfie Multiclass models (Apache 2.0), Google ML Kit (ML Kit Terms)</string>
+    <string name="t_5464ada4f9fd" formatted="false">More camera options</string>
+    <string name="t_55d86c63e7ce" formatted="false">Width</string>
+    <string name="t_55f7a4b0e3df" formatted="false">Camera above the left side (≈ 45° downward); left ear at the bottom on the mark, parting at the top following the curve, forehead toward the left of the frame.</string>
+    <string name="t_560050b56b59" formatted="false">Accept and continue</string>
+    <string name="t_568489c3d3c8" formatted="false">No logo</string>
+    <string name="t_568de8cb715e" formatted="false">Head: turn right %1$.0f°</string>
+    <string name="t_569e67fe790e" formatted="false">Layers in the image</string>
+    <string name="t_57d396bb6e2c" formatted="false">Abdomen left side</string>
+    <string name="t_57d4c792a6bb" formatted="false">Height above pupil, mm</string>
+    <string name="t_57f3263afaf2" formatted="false">Comparison settings</string>
+    <string name="t_57fb6f299e39" formatted="false">, hairline receding</string>
+    <string name="t_5848fcb02f6d" formatted="false">head tilt (chin) %1$+.0f° vs %2$+.0f°</string>
+    <string name="t_5894b02eb49e" formatted="false">On</string>
+    <string name="t_5920b532f4d0" formatted="false">Expression: raise the eyebrows as in the reference</string>
+    <string name="t_5927a9ab246d" formatted="false">Face 5 views</string>
+    <string name="t_5941607ae9e5" formatted="false">After</string>
+    <string name="t_59d881e74674" formatted="false">Pull down the corners of your mouth</string>
+    <string name="t_59edaa58eb7e" formatted="false">Balanced</string>
+    <string name="t_59fb7022ded4" formatted="false">Adjusts the zoom to match the size of the reference; lets you step back (≥ 1 m for the face) without losing accuracy.</string>
+    <string name="t_59fd10156d62" formatted="false">deep</string>
+    <string name="t_5a0a125ae748" formatted="false">Confirm</string>
+    <string name="t_5abd6d28b8b0" formatted="false">Off</string>
+    <string name="t_5b056224f293" formatted="false">Head: straighten %1$.0f° (tilted to the right)</string>
+    <string name="t_5bf4eb7779eb" formatted="false">What\'s new (changelog)</string>
+    <string name="t_5c9d78682ea2" formatted="false">Scale measured with the phone\'s depth sensor.</string>
+    <string name="t_5d86bdfa1dd6" formatted="false">Could not read the photo (%1$s)</string>
+    <string name="t_5dca90037cb7" formatted="false">silhouette proportions</string>
+    <string name="t_5dd5955a808d" formatted="false">Mirror</string>
+    <string name="t_5dfe4db15923" formatted="false">Face 3 views</string>
+    <string name="t_5e3ecb862cbf" formatted="false">Relief: could not be computed</string>
+    <string name="t_5e5898a10a27" formatted="false">Anatomical illustrations</string>
+    <string name="t_5e6aa89c725a" formatted="false">Eyes, eyebrows, nose, mouth, facial oval; joints on the body.</string>
+    <string name="t_5ec025834fbe" formatted="false">back / palm</string>
+    <string name="t_5ed8ae63732e" formatted="false">Before</string>
+    <string name="t_5fbb9e559d95" formatted="false">more to the left</string>
+    <string name="t_60a536a1dd64" formatted="false">Left brow</string>
+    <string name="t_61059f4fb2dd" formatted="false">Probable dark circle type: %1$s</string>
+    <string name="t_61922699fa9d" formatted="false">Error log</string>
+    <string name="t_61be58c5c5f2" formatted="false">Expression: relax the eyebrows</string>
+    <string name="t_61cfb6e4138d" formatted="false">Always shows the reference lines, detected points, percentages, the hint strip, the zoom bar and all layers. Simple mode shows only the contour, an icon with the main correction and the shutter ring.</string>
+    <string name="t_622d40af41e8" formatted="false">shoulders, hips and chest contour</string>
+    <string name="t_63097946d25d" formatted="false">Turn 45° showing the left side; nasal tip aligned with the cheek.</string>
+    <string name="t_633c06fb0900" formatted="false">Camera: aim higher %1$s°</string>
+    <string name="t_63686d0bea65" formatted="false">shoulder, elbow, wrist and arm edges</string>
+    <string name="t_63bf81c325ee" formatted="false">Wrinkle detection</string>
+    <string name="t_640ec3c53deb" formatted="false">%1$s · %2$.0f%% scale · %3$.1f°</string>
+    <string name="t_6438eefe9818" formatted="false">The protocol is from a newer version of PhotoMed: please update the app.</string>
+    <string name="t_6484b3b41642" formatted="false">Forehead and glabella</string>
+    <string name="t_64c7f70f7b18" formatted="false">Trunk</string>
+    <string name="t_657cf4f67345" formatted="false">Philtrum (subnasale → lip), mm</string>
+    <string name="t_657e6bd7dca9" formatted="false">Trichology</string>
+    <string name="t_6595c3428412" formatted="false">interpupillary (63 mm)</string>
+    <string name="t_65a865e54207" formatted="false">GIF animation</string>
+    <string name="t_65bc5dbb14bd" formatted="false">Date: newest first</string>
+    <string name="t_65e05899cce4" formatted="false">ear and temple</string>
+    <string name="t_65fa38524ad2" formatted="false">Maximum width</string>
+    <string name="t_66025c5c7eaf" formatted="false">Finish</string>
+    <string name="t_66f5cbc1e91b" formatted="false">Too much light: no flash</string>
+    <string name="t_670e1266954a" formatted="false">thighs</string>
+    <string name="t_67328f50e2e3" formatted="false">Expand controls</string>
+    <string name="t_67a6a8875837" formatted="false">Relief: face not found</string>
+    <string name="t_67e619c9a05e" formatted="false">Analyzing…</string>
+    <string name="t_67e91749d9da" formatted="false">Skin point</string>
+    <string name="t_67f8b4c9252e" formatted="false">Double chin</string>
+    <string name="t_6871ba7dbcc8" formatted="false">Bottom left</string>
+    <string name="t_6893cf009de6" formatted="false">Preparing the reference…</string>
+    <string name="t_68b9fdf93487" formatted="false">Close-up of the left eye, gaze straight ahead; pupil on the crosshair, tail of the eyebrow and crow\'s feet within the framing (on the right); at rest and smiling.</string>
+    <string name="t_69040ec55544" formatted="false">"  points %1$d %% / %2$d %%"</string>
+    <string name="t_69a33da6bb50" formatted="false">Cupid\'s bow (peak − center), mm</string>
+    <string name="t_6a25ffa43e97" formatted="false">Align automatically</string>
+    <string name="t_6a8dfad2d163" formatted="false">elbows</string>
+    <string name="t_6a93c397012f" formatted="false">phalanges, wrists and hand edges</string>
+    <string name="t_6b04d1843add" formatted="false">Gaze: same direction</string>
+    <string name="t_6c107d8b7f81" formatted="false">Photo %1$d, %2$s</string>
+    <string name="t_6cbca9120f3c" formatted="false">Gesture tips: long press, drag, pinch…</string>
+    <string name="t_6d1c2869e948" formatted="false">Read: %1$s</string>
+    <string name="t_6dae4a587f52" formatted="false">Before you start, review how your patients\' photos and data are handled:</string>
+    <string name="t_6e02dbd5caf1" formatted="false">Eyes squeezed shut</string>
+    <string name="t_6e55e6ca7557" formatted="false">Couldn\'t import the file</string>
+    <string name="t_6e95ba71fd93" formatted="false">Left oblique 45°</string>
+    <string name="t_6ef984590179" formatted="false">Exit full screen</string>
+    <string name="t_6f4d86ec4e09" formatted="false">part and frontal hairline</string>
+    <string name="t_6f4e8d1f4ec7" formatted="false">Trace fold</string>
+    <string name="t_6fea53b6791e" formatted="false">Relief saved (%1$s cm, %2$s)</string>
+    <string name="t_702d9dd20dfc" formatted="false">Select all</string>
+    <string name="t_705b10597910" formatted="false">Camera: tilt down</string>
+    <string name="t_70661bd0b08b" formatted="false">Photo %1$d: %2$s</string>
+    <string name="t_70b3b2f4924e" formatted="false">skull contour and ears</string>
+    <string name="t_7167c70600d6" formatted="false">Features: distances projected in the photo (depend on head rotation).</string>
+    <string name="t_7192150aa159" formatted="false">✱ Partially covered by beard or mustache: only the visible part is measured.</string>
+    <string name="t_71aa46677249" formatted="false">Stroke %1$d</string>
+    <string name="t_7243410808b9" formatted="false">Forehead</string>
+    <string name="t_735083a35c5c" formatted="false">crow\'s feet</string>
+    <string name="t_73676362f60a" formatted="false">Raise your eyebrows as high as you can, as if surprised</string>
+    <string name="t_738a2619c3e1" formatted="false">Draw the fold…</string>
+    <string name="t_73a66ffdcbd9" formatted="false">Line</string>
+    <string name="t_73b889ba0440" formatted="false">Pinch to zoom. The shutter ring fills as you match the guide. More layers and data: expert mode in the settings (⋯).</string>
+    <string name="t_73ed3ebbcae1" formatted="false">Saved to album %1$s</string>
+    <string name="t_748144601740" formatted="false">PhotoMed uses the camera only to take the clinical photos for the patient record.</string>
+    <string name="t_750b1c251620" formatted="false">Aligning %1$d/%2$d…</string>
+    <string name="t_752896c47d93" formatted="false">Periocular</string>
+    <string name="t_753b29ba91af" formatted="false">Push up your lower lip, tightening your chin</string>
+    <string name="t_754dfbc8242a" formatted="false">skull contour, part, ear and hair pattern</string>
+    <string name="t_758e816f3152" formatted="false">shoulders and clavicles</string>
+    <string name="t_75e30874f7c7" formatted="false">Camera: point %1$.0f° lower</string>
+    <string name="t_75f3b26238dd" formatted="false">Full screen</string>
+    <string name="t_773067c6106c" formatted="false">The file is not a PhotoMed protocol (invalid JSON).</string>
+    <string name="t_78204b4b705d" formatted="false">Regenerate the strokes?</string>
+    <string name="t_78230a632ffa" formatted="false">Fifth 2 (eye) (ideal 20 %), %</string>
+    <string name="t_784623e1f673" formatted="false">Color, typography, shape, elevation and motion tokens from Juanfrank/MD (@material/web v0_192).</string>
+    <string name="t_788b3c975f16" formatted="false">Auto</string>
+    <string name="t_79734eb60ee3" formatted="false">Apply</string>
+    <string name="t_79cc145cf69e" formatted="false">Hairline</string>
+    <string name="t_79e50ea0013c" formatted="false">Height at center, mm</string>
+    <string name="t_7a76b0628fed" formatted="false">Matching color…</string>
+    <string name="t_7a84b06608b5" formatted="false">Right profile at 90°, arms raised above the head (armpit visible).</string>
+    <string name="t_7acf3d9afa79" formatted="false">Left profile</string>
+    <string name="t_7b171f703490" formatted="false">Move right</string>
+    <string name="t_7b1cc2277603" formatted="false">Maximum %1$d photos: the first selected one was removed</string>
+    <string name="t_7b57b8e6ff9c" formatted="false">Top right</string>
+    <string name="t_7bd9ca0c7776" formatted="false">Bradford + skin tone grading</string>
+    <string name="t_7c202a18e673" formatted="false">Upper lip</string>
+    <string name="t_7c8fe6f6aa02" formatted="false">Grade</string>
+    <string name="t_7d2b55ef9aa6" formatted="false">Export preview</string>
+    <string name="t_7d3deef34dd9" formatted="false">(%1$d could not be read)</string>
+    <string name="t_7d3e13939d24" formatted="false">color matched</string>
+    <string name="t_7d5cc5b0bc55" formatted="false">Could not analyze the photo.</string>
+    <string name="t_7db14b4ea0ba" formatted="false">Everything is stored on this phone; there are no servers or accounts.</string>
+    <string name="t_7dbe7df7f816" formatted="false">In photo %1$d · %2$s</string>
+    <string name="t_7e0d9d612558" formatted="false">Could not open the image</string>
+    <string name="t_7e30dbc7dfca" formatted="false">Inner contour</string>
+    <string name="t_7e534a11685d" formatted="false">skin points</string>
+    <string name="t_7ee1b19b9bed" formatted="false">Move down</string>
+    <string name="t_7ef8d986a719" formatted="false">Gaze: further right and further down</string>
+    <string name="t_7f36a30290ff" formatted="false">Could not start the camera: %1$s</string>
+    <string name="t_7f4ea5af07e6" formatted="false">Facial thirds</string>
+    <string name="t_7fd9acb19dda" formatted="false">Gaze: straight ahead</string>
+    <string name="t_801cd2ac2806" formatted="false">Tense chin</string>
+    <string name="t_807734e959d3" formatted="false">Tolerance %1$d</string>
+    <string name="t_80ae134de8ea" formatted="false">Flash off</string>
+    <string name="t_80b47fc5604e" formatted="false">eyes</string>
+    <string name="t_8123a8bdfe6b" formatted="false">Privacy policy</string>
+    <string name="t_814bb354fdfb" formatted="false">Indicative grade (0–5)</string>
     <string name="t_815ee15e8d98" formatted="false">System default</string>
+    <string name="t_81c08134212e" formatted="false">Eyes</string>
+    <string name="t_81ee0c76034a" formatted="false">Both hands on a plain background, fingers slightly apart, camera parallel to the surface.</string>
+    <string name="t_81f060cbca57" formatted="false">estimated (30 cm)</string>
+    <string name="t_82d7030f5dd9" formatted="false">Restore deleted lines (%1$d)</string>
+    <string name="t_82eb11e9105d" formatted="false">Expression: smile as wide as possible</string>
+    <string name="t_831f8c23aa69" formatted="false">Couldn\'t rename the photo</string>
+    <string name="t_833441da859f" formatted="false">Photo cancelled: the face left the framing or the position. Hold still until it is saved.</string>
+    <string name="t_8362953a2d53" formatted="false">%1$d photos in the reference framing</string>
+    <string name="t_8373099b273d" formatted="false">%1$s: %2$d of %3$d layers visible</string>
+    <string name="t_8381626a401d" formatted="false">Show the tips again</string>
+    <string name="t_839fb4236da8" formatted="false">Above the left brow tail (lateral canthus), mm</string>
+    <string name="t_83d5f7b19326" formatted="false">Top view: camera parallel to the floor above the head, forehead toward the top of the frame, parting on the midline and the highest point of the skull on the crosshair; hair dry and combed the same way in every shot.</string>
+    <string name="t_83e90b010e8c" formatted="false">Smile as widely as you can, showing your teeth</string>
+    <string name="t_83f0e1bce631" formatted="false">Hands and feet</string>
+    <string name="t_83f3ad0a4102" formatted="false">Opacity %1$d %%</string>
+    <string name="t_842eda68cab4" formatted="false">Outer contour</string>
+    <string name="t_84aebef27172" formatted="false">Side by side</string>
+    <string name="t_84eb1e3d9f31" formatted="false">Measurements table</string>
+    <string name="t_851cb3c4d906" formatted="false">Low light on the face</string>
+    <string name="t_85b5292afd29" formatted="false">Found using the previous photo as reference</string>
+    <string name="t_8619692251dc" formatted="false">Folds</string>
+    <string name="t_863b7007bb19" formatted="false">Saved to album %1$s · nearly aligned: fine alignment in Compare</string>
+    <string name="t_864a0b2daf51" formatted="false">breast contour</string>
+    <string name="t_8663b2b2cf93" formatted="false">Strokes confirmed (saved in the app)</string>
+    <string name="t_868fd8142f47" formatted="false">Head: turn right %1$s°</string>
+    <string name="t_869fd2508052" formatted="false">depth sensor</string>
+    <string name="t_86a7c3901d2b" formatted="false">Hands (palmar)</string>
+    <string name="t_86bcad245b63" formatted="false">Slide</string>
+    <string name="t_86e94219c2f0" formatted="false">Checks that both photos look in the same direction.</string>
+    <string name="t_87287f6ce048" formatted="false">No geometric alignment</string>
+    <string name="t_87363f0e213e" formatted="false">corrugator and procerus</string>
+    <string name="t_874b300c9053" formatted="false">Bigonial / bizygomatic, %</string>
+    <string name="t_8790c5b15043" formatted="false">manual</string>
+    <string name="t_88450313f199" formatted="false">assisted zoom %1$s×</string>
+    <string name="t_885995c5d7aa" formatted="false">Lower lip</string>
+    <string name="t_88c182c61089" formatted="false">ΔL* vs. cheek</string>
+    <string name="t_88e1b84740d7" formatted="false">, stable</string>
+    <string name="t_88ebf21e03ca" formatted="false">Chin: raise %1$s°</string>
+    <string name="t_89d8bfc90c14" formatted="false">Right brow</string>
+    <string name="t_8a19b4a51fac" formatted="false">Dorsum width (middle), mm</string>
+    <string name="t_8a850948781b" formatted="false">Alignment</string>
+    <string name="t_8b3e31080154" formatted="false">%1$d more hints: %2$s</string>
+    <string name="t_8b6f303fb29c" formatted="false">Above the right brow tail (lateral canthus), mm</string>
+    <string name="t_8be3cd8b6d72" formatted="false">Above the right brow (pupil vertical), mm</string>
+    <string name="t_8be5decf7efa" formatted="false">toes, ankles, heels and foot edges</string>
+    <string name="t_8bfca062c8c0" formatted="false">Guidance vibration and sound</string>
+    <string name="t_8c5c68006d39" formatted="false">Two photos are needed</string>
+    <string name="t_8cc90afa4e92" formatted="false">Reset zoom</string>
+    <string name="t_8d28a741b5c3" formatted="false">Any region: the guide is drawn from the contour of what is visible (plain background or person); in the following shots, from that of the reference photo.</string>
+    <string name="t_8d2aaadc2bd5" formatted="false">frontalis</string>
+    <string name="t_8d871db0a35d" formatted="false">Grid</string>
+    <string name="t_8e01d018e058" formatted="false">MP4 video</string>
+    <string name="t_8e0c34b92f54" formatted="false">Fifth 4 (eye) (ideal 20 %), %</string>
+    <string name="t_8e149752ad1a" formatted="false">Relief: %1$s</string>
+    <string name="t_8e15f4b1a1d2" formatted="false">Remove color matching</string>
+    <string name="t_8edd895923c2" formatted="false">Revert tracing of %1$s</string>
+    <string name="t_8f0bce1ba72e" formatted="false">brows and forehead contour</string>
+    <string name="t_8f630bc63fc8" formatted="false">armpit</string>
+    <string name="t_8ff57aa27c22" formatted="false">Wrinkle and fold measurements are only for face areas.</string>
+    <string name="t_9119f4190f35" formatted="false">Foot</string>
+    <string name="t_911b9bb62b92" formatted="false">eyelids</string>
+    <string name="t_918e6c2cd00d" formatted="false">Vertical perspective</string>
+    <string name="t_91a50fdf85ca" formatted="false">Chin: lower %1$.0f° (Frankfort)</string>
+    <string name="t_91aa28956e31" formatted="false">Mirror the reference</string>
+    <string name="t_9272bf0b27dd" formatted="false">hips, gluteal folds and thighs</string>
+    <string name="t_92b6ccb678fa" formatted="false">Central forehead / interpupillary</string>
+    <string name="t_9324907d3d1a" formatted="false">mesoprosopic (medium)</string>
+    <string name="t_9329529253cb" formatted="false">After · %1$s</string>
+    <string name="t_933327535aba" formatted="false">Before/after fade</string>
+    <string name="t_936f37fffb9c" formatted="false">Appearance</string>
+    <string name="t_9415e0096405" formatted="false">distance %1$.0f vs %2$.0f cm</string>
+    <string name="t_945181473167" formatted="false">Warning: different areas (%1$s)</string>
+    <string name="t_94afefc4021f" formatted="false">Chin: raise %1$.0f° (Frankfort)</string>
+    <string name="t_9527927b5fbc" formatted="false">Warning: comparing different expressions (%1$s); dynamic wrinkles can only be compared with the same expression.</string>
+    <string name="t_953c8c5d5466" formatted="false">platysma</string>
+    <string name="t_958e16aa08ff" formatted="false">Capture date</string>
+    <string name="t_9648db36a28b" formatted="false">Camera access needed</string>
+    <string name="t_96aa5bfec709" formatted="false">Head: turn less (%1$.0f° of 45°)</string>
+    <string name="t_96c1cef63bd2" formatted="false">Too much light: %1$.0f %% (max. %2$.0f %%)</string>
+    <string name="t_9766d880a12c" formatted="false">Mirror the guide</string>
+    <string name="t_97d68778a060" formatted="false">Tense neck</string>
+    <string name="t_980d60c084b4" formatted="false">Align with the reference</string>
+    <string name="t_9838e4424e51" formatted="false">Lips</string>
+    <string name="t_98758df61c0e" formatted="false">right ear</string>
+    <string name="t_992c617f83b0" formatted="false">iris (11.7 mm)</string>
+    <string name="t_9963bcd72735" formatted="false">mentalis</string>
+    <string name="t_9b14bad7b6df" formatted="false">↓ Lower the camera</string>
+    <string name="t_9b6c44cdcc72" formatted="false">contours of everything visible (silhouette and edges)</string>
+    <string name="t_9b7b8cbacd98" formatted="false">Bottom right</string>
+    <string name="t_9c2edb480558" formatted="false">Apply to comparison</string>
+    <string name="t_9c3b3561cdbe" formatted="false">left ear</string>
+    <string name="t_9c5b6b10ba42" formatted="false">Chin: raise %1$s° (Frankfort)</string>
+    <string name="t_9c7706beaba2" formatted="false">different landmark engine</string>
+    <string name="t_9cf00ab7e291" formatted="false">Expert mode</string>
+    <string name="t_9dcc5693fc83" formatted="false">Auto-capture on</string>
+    <string name="t_9e33a91b0e7e" formatted="false">No skin found to match</string>
+    <string name="t_9f0a54155487" formatted="false">Crown</string>
+    <string name="t_9feef613aeb8" formatted="false">Share</string>
+    <string name="t_a02f2403db18" formatted="false">alignment applied</string>
+    <string name="t_a0eacbeb1067" formatted="false">Could not align: %1$s</string>
+    <string name="t_a1e2bf1981b7" formatted="false">Upper third (hair → brows), mm</string>
+    <string name="t_a1e56a034b63" formatted="false">nasal base</string>
+    <string name="t_a1e9db9161f2" formatted="false">Width at 50 % (middle)</string>
+    <string name="t_a217f294e4f4" formatted="false">Do not match: %1$s (expression, pose or a local change different from the rest)</string>
+    <string name="t_a23190537144" formatted="false">Width at 25 % (upper)</string>
+    <string name="t_a276b1754a3a" formatted="false">Tips</string>
+    <string name="t_a2eeab6cf8ab" formatted="false">Match · capturing</string>
+    <string name="t_a3b4b3ced269" formatted="false">Burst of 3 photos</string>
+    <string name="t_a3c3312199a7" formatted="false">Gaze: further right and further up</string>
+    <string name="t_a4b65578b7c4" formatted="false">Height (% of image width)</string>
+    <string name="t_a4fd3d637813" formatted="false">About and legal</string>
+    <string name="t_a515b9ac3524" formatted="false">Maximum smile</string>
+    <string name="t_a5714f0e2414" formatted="false">Area · measurement</string>
+    <string name="t_a5eb5d15060e" formatted="false">Compare</string>
+    <string name="t_a63145796ff5" formatted="false">Camera: point %1$.0f° higher</string>
+    <string name="t_a688a1d7704b" formatted="false">Detector (%1$s): %2$s</string>
+    <string name="t_a6b8e28b41d6" formatted="false">Relief not saved: too much ambient light (use dim light)</string>
+    <string name="t_a6fe655b0a42" formatted="false">Matches the reference</string>
+    <string name="t_a700e8086506" formatted="false">Vertex</string>
+    <string name="t_a78a8487ded9" formatted="false">forehead</string>
+    <string name="t_a798fb2afe6d" formatted="false">Profile: align the ear and the Frankfort plane with the guide</string>
+    <string name="t_a7bd9d2bdf3c" formatted="false">Aligned</string>
+    <string name="t_a7dd75edd054" formatted="false">Fifth 3 (between the eyes) (ideal 20 %), %</string>
+    <string name="t_a7f8444e8893" formatted="false">not available</string>
+    <string name="t_a83ceb735905" formatted="false">Dorsum length (root → tip), mm</string>
+    <string name="t_a85ae4a4d3c4" formatted="false">Use anatomical landmarks</string>
+    <string name="t_a8cad326a759" formatted="false">Use contours</string>
+    <string name="t_a8ef65cd3561" formatted="false">Version %1$s</string>
+    <string name="t_a9068e529958" formatted="false">Anger (frown)</string>
+    <string name="t_a911e08a3f15" formatted="false">shoulders, shoulder blades, waist and hips</string>
+    <string name="t_a9c0140505bf" formatted="false">same as the reference</string>
+    <string name="t_a9f2783372f5" formatted="false">Mandibular width (approx. bigonial), mm</string>
+    <string name="t_aa1fcb4c281c" formatted="false">Transition: %1$.1f s</string>
+    <string name="t_aa5ce19eeacc" formatted="false">Assist</string>
+    <string name="t_aab9a9914310" formatted="false">Looking for the patient…</string>
+    <string name="t_ac336ab5f83c" formatted="false">Export adjusted images</string>
+    <string name="t_ac4c285af4b5" formatted="false">Exhaustive</string>
+    <string name="t_ac997155fa87" formatted="false">ears</string>
+    <string name="t_acaaf28356e6" formatted="false">GIF preview</string>
+    <string name="t_acef3fb35664" formatted="false">An error log was saved (%1$d). Sharing it helps fix the problem; it contains no photos or patient data. It\'s also in Settings → Error log.</string>
+    <string name="t_ad1fadd96032" formatted="false">eyelid contours and brows</string>
+    <string name="t_adadd16fb157" formatted="false">jaw, shoulders and neck contour</string>
+    <string name="t_adc6f02af7a7" formatted="false">Len.</string>
+    <string name="t_add1ad2589a8" formatted="false">Wrinkles and folds</string>
+    <string name="t_ae1dc9eacb9a" formatted="false">Line · measurement</string>
+    <string name="t_ae4adbcc6535" formatted="false">Thighs / legs</string>
+    <string name="t_ae4ed3f45eaa" formatted="false">No image could be exported</string>
+    <string name="t_ae658ab24a46" formatted="false">Frown hard, as if angry</string>
+    <string name="t_ae8f5455934c" formatted="false">Minimum matching-point threshold: %1$d %%</string>
+    <string name="t_aed993cf30cb" formatted="false">Auto-capture off</string>
+    <string name="t_afb24bdf22f7" formatted="false">Date: oldest first</string>
+    <string name="t_b09d1db47f11" formatted="false">Takes the photo automatically when the reference points match (held for ~0.4 s).</string>
+    <string name="t_b0eea58fe6aa" formatted="false">Screen flash on</string>
+    <string name="t_b0fc27f183f4" formatted="false">Opacity of strokes and numbers</string>
+    <string name="t_b1613f282739" formatted="false">Side by side (one row)</string>
+    <string name="t_b1cd095fc01d" formatted="false">Uneven light: left side darker</string>
+    <string name="t_b21c214f5b3d" formatted="false">very deep</string>
+    <string name="t_b2ed9f62c551" formatted="false">no wrinkle</string>
+    <string name="t_b2fd376ac423" formatted="false">Take at least two photos of an area to compare them.</string>
+    <string name="t_b38c66da72fa" formatted="false">Purse your lips as if to kiss or whistle</string>
+    <string name="t_b4191e0c89c6" formatted="false">Buttocks</string>
+    <string name="t_b4d237c413a5" formatted="false">Anatomical contours</string>
+    <string name="t_b4f9a0730767" formatted="false">Protocols</string>
+    <string name="t_b563bae5a395" formatted="false">Gaze: further left and further down</string>
+    <string name="t_b591c80ca2f8" formatted="false">MediaPipe disabled due to errors; using ML Kit</string>
+    <string name="t_b5c1e7d80d01" formatted="false">More options</string>
+    <string name="t_b5e68a4cda70" formatted="false">Auto-capture</string>
+    <string name="t_b620988533fd" formatted="false">Show the first-time tips again</string>
+    <string name="t_b6dcb7e4967f" formatted="false">Focus not confirmed: the photo was taken anyway</string>
+    <string name="t_b6ed7ad9ba78" formatted="false">Adapt</string>
+    <string name="t_b74c8e681eb3" formatted="false">Anatomical landmarks</string>
+    <string name="t_b7cbea7ff8fe" formatted="false">Reset view (rotation, mirror and manual crop)</string>
+    <string name="t_b7d9598781c5" formatted="false">abdomen</string>
+    <string name="t_b819d9d561b6" formatted="false">Expression: pucker the lips more</string>
+    <string name="t_b826124188b7" formatted="false">Sequence completed</string>
+    <string name="t_b82b53c2aa50" formatted="false">Color matched in %1$d photos</string>
+    <string name="t_b836f188c7fb" formatted="false">waist</string>
+    <string name="t_b86a1ff61e8d" formatted="false">Progression across %1$d photos</string>
+    <string name="t_b90b02a0f5e6" formatted="false">Shot %1$d: unknown area “%2$s”.</string>
+    <string name="t_b915675fc12f" formatted="false">%1$d days</string>
+    <string name="t_b9b78451e24f" formatted="false">Right eye</string>
+    <string name="t_ba1855345cf7" formatted="false">Width/height ratio</string>
+    <string name="t_baf06b3da531" formatted="false">After (adjusted)</string>
+    <string name="t_bb3c858539dd" formatted="false">facial oval, brows, eyes, nose and lips</string>
+    <string name="t_bbc41080e486" formatted="false">Latest estimate: %1$+.1f°</string>
+    <string name="t_bbeb8af1b415" formatted="false">ear, eye, nose and profile</string>
+    <string name="t_bc2126a3764a" formatted="false">Standard framing correct</string>
+    <string name="t_bc2551b565d8" formatted="false">Could not export: %1$s</string>
+    <string name="t_bca769290b6b" formatted="false">Photo %1$d of %2$d for this step saved</string>
+    <string name="t_bcaf80d48ecb" formatted="false">“after” without confirmed framing</string>
+    <string name="t_bd4fa49fd746" formatted="false">Move closer</string>
+    <string name="t_bdbdb16bc541" formatted="false">Lower / upper ratio</string>
+    <string name="t_be94adf8a363" formatted="false">Aligned %1$d photos to the reference (%2$s)</string>
+    <string name="t_bf98b1c3ecb6" formatted="false">Shutter</string>
+    <string name="t_bfaa30801a7f" formatted="false">Design</string>
+    <string name="t_bfe7a2b90ec2" formatted="false">Manual (drag)</string>
+    <string name="t_c014d981fcea" formatted="false">Show in photo</string>
+    <string name="t_c09cc665a368" formatted="false">Facial skin (excluding eyes, eyebrows, lips and nostrils) or limb skin: white balance and exposure (Bradford) and tone grading.</string>
+    <string name="t_c0a51d000889" formatted="false">hands</string>
+    <string name="t_c0e01083a120" formatted="false">Will be applied when aligning automatically</string>
+    <string name="t_c105f7a0e771" formatted="false">Contours: %1$s</string>
+    <string name="t_c114994c49e6" formatted="false">cheeks</string>
+    <string name="t_c1505510411d" formatted="false">Welcome to PhotoMed</string>
+    <string name="t_c1546eff2391" formatted="false">Expression: narrow the eyes as in the reference</string>
+    <string name="t_c1d39c9cef17" formatted="false">All expressions</string>
+    <string name="t_c2dc01bfee6b" formatted="false">Facial diagram (contours and numbers)</string>
+    <string name="t_c306b0e76930" formatted="false">barely perceptible</string>
+    <string name="t_c32b97e1d02e" formatted="false">hips, knees, ankles and edges</string>
+    <string name="t_c37fefe2ab0f" formatted="false">Show only the main hint</string>
+    <string name="t_c38a50292304" formatted="false">Takes three when shooting and keeps the best match (avoids retakes due to a blink).</string>
+    <string name="t_c3d96b63ac7a" formatted="false">Photos appear in the gallery, in one album per patient, with their data embedded as metadata.</string>
+    <string name="t_c4e1b24dbe73" formatted="false">Expression: part the lips as in the reference</string>
+    <string name="t_c506d7dafb1a" formatted="false">Detector (hair and skin): %1$s</string>
+    <string name="t_c514f2ce264f" formatted="false">Protocol “%1$s” imported: open it from a patient record</string>
+    <string name="t_c5bfa99fbdbf" formatted="false">Chin: lower %1$s° (Frankfort)</string>
+    <string name="t_c5c5ad829102" formatted="false">Depth measured on the relief (photometric stereo using the screen).</string>
+    <string name="t_c5e5986106aa" formatted="false">Adjust the pose · follow the arrows</string>
+    <string name="t_c665df74ee05" formatted="false">Nose</string>
+    <string name="t_c6ee9646f46c" formatted="false">Top left</string>
+    <string name="t_c6f6fd04679c" formatted="false">Standardized clinical photography for medical aesthetics.</string>
+    <string name="t_c766fa366bed" formatted="false">In all</string>
+    <string name="t_c79155e38c96" formatted="false">Tense your neck, showing your lower teeth</string>
+    <string name="t_c7ce774c95c3" formatted="false">Gaze: further left</string>
+    <string name="t_c802c46db199" formatted="false">Retrace %1$s</string>
+    <string name="t_c8b670ee5707" formatted="false">Upper/lower ratio</string>
+    <string name="t_c90bc1798963" formatted="false">Eyes and brows</string>
+    <string name="t_c9624b4244e6" formatted="false">Overlay</string>
+    <string name="t_c9917a9212d9" formatted="false">Feet (plantar)</string>
+    <string name="t_c9add3494705" formatted="false">Facial</string>
+    <string name="t_ca8573b2c7f1" formatted="false">Annotations</string>
+    <string name="t_caaba254857c" formatted="false">Left temporal recession, mm</string>
+    <string name="t_cb2ef9c83dd0" formatted="false">head rotation %1$.0f° vs %2$.0f°</string>
+    <string name="t_cb45a483842b" formatted="false">Share the log (%1$d)</string>
+    <string name="t_cc33f5c3ebda" formatted="false">Free mode</string>
+    <string name="t_cc3e4926930d" formatted="false">After automatic alignment, the skin color of each photo is matched to the reference.</string>
+    <string name="t_cc698faa9f1d" formatted="false">Right profile</string>
+    <string name="t_ccf4b002ccfa" formatted="false">skin detected automatically</string>
+    <string name="t_cd262f501a9d" formatted="false">Posterior view, arm relaxed beside the body and palm toward the thigh; elbow on the line.</string>
+    <string name="t_cd3dfd1eeecc" formatted="false">Hide controls</string>
+    <string name="t_cd3e9ebdb1d3" formatted="false">Not enough light: %1$.0f %% (min. %2$.0f %%)</string>
+    <string name="t_cd8adfd2d41c" formatted="false">Depth</string>
+    <string name="t_cdb63aa62f7a" formatted="false">Gaze straight ahead, Frankfort plane horizontal, hair tied back.</string>
+    <string name="t_cddc0432d04a" formatted="false">I have read and accept the Terms and conditions and the Privacy policy.</string>
+    <string name="t_ce287217f28f" formatted="false">Compare %1$d photos</string>
+    <string name="t_ce38e9db98e8" formatted="false">not aligned (tap “Align automatically” first to export them aligned)</string>
+    <string name="t_ce63d639938a" formatted="false">Looking for anatomical landmarks…</string>
+    <string name="t_ce9a59f3fe5c" formatted="false">Partly over beard or moustache</string>
+    <string name="t_ceae33ba7e46" formatted="false">Spine on the midline, arms relaxed.</string>
+    <string name="t_ced32e86466e" formatted="false">Head: turn left %1$.0f°</string>
+    <string name="t_cf3a2d1b5fbe" formatted="false">Automatic alignment</string>
+    <string name="t_cf3dc15b515d" formatted="false">Sequence %1$d/%2$d · %3$s</string>
+    <string name="t_cf5d12c09cec" formatted="false">Move back</string>
+    <string name="t_cf622aafba92" formatted="false">View</string>
+    <string name="t_cfad6d1ed298" formatted="false">Relief: dim light, phone at 25–35 cm, and hold still for about 2 s when shooting</string>
+    <string name="t_cfe1fa235790" formatted="false">Switch camera</string>
+    <string name="t_d02bb3619494" formatted="false">depressor anguli oris</string>
+    <string name="t_d07b2f59af76" formatted="false">Previous photo overlaid</string>
+    <string name="t_d11aacc843c5" formatted="false">nasalis (bunny lines)</string>
+    <string name="t_d194abdfdc4c" formatted="false">Wrinkle the nose</string>
+    <string name="t_d1cb9a9304f9" formatted="false">Move back</string>
+    <string name="t_d2923df8af54" formatted="false">Fade</string>
+    <string name="t_d2e6b744766d" formatted="false">Rotate %1$.1f° %2$s</string>
+    <string name="t_d40dc5248012" formatted="false">feet</string>
+    <string name="t_d45ba16a1d1f" formatted="false">Vertical perspective estimated from proportions: %1$+.1f°</string>
+    <string name="t_d45c0c1bb8e4" formatted="false">different side (%1$s / %2$s)</string>
+    <string name="t_d48fce64744d" formatted="false">Expression: squeeze the eyes shut</string>
+    <string name="t_d4b272bdee37" formatted="false">Middle third (ideal 33 %), %</string>
+    <string name="t_d500c64bc7c1" formatted="false">Rotate the guide 90°</string>
+    <string name="t_d56d19670a72" formatted="false">Zoom</string>
+    <string name="t_d57eb960ad9c" formatted="false">If the app closes due to an error, it is logged here (without photos or patient data).</string>
+    <string name="t_d6adbcd82421" formatted="false">Face height (nasion → chin), mm</string>
+    <string name="t_d737047377da" formatted="false">MMM d, yyyy</string>
+    <string name="t_d77e6063de0a" formatted="false">Pucker the lips</string>
+    <string name="t_d7845bc2fef4" formatted="false">Profile at 90°, Frankfort line on the horizontal guide.</string>
+    <string name="t_d7cbf447d822" formatted="false">Above the left brow (pupil vertical), mm</string>
+    <string name="t_d7d4c829d31b" formatted="false">Move up</string>
+    <string name="t_d7e8bcb69bb6" formatted="false">Last photo</string>
+    <string name="t_d915261e4f86" formatted="false">parietal region</string>
+    <string name="t_d957b9e4846b" formatted="false">Close your eyes tightly</string>
+    <string name="t_d9ae8c89a729" formatted="false">Protocol “%1$s” completed</string>
+    <string name="t_d9ba65202e9e" formatted="false">Match skin color</string>
+    <string name="t_da10e62a882b" formatted="false">shoulder blades</string>
+    <string name="t_da8ef37264d5" formatted="false">Relief: face not found in the photo</string>
+    <string name="t_db0bc3c474cf" formatted="false">chin</string>
+    <string name="t_db14f1031553" formatted="false">Could not save: %1$s</string>
+    <string name="t_db3ca99cdae0" formatted="false">Matching-point threshold</string>
+    <string name="t_db572b235918" formatted="false">Recommended: balance between precision and lines found.</string>
+    <string name="t_db5eb8a74f8f" formatted="false">no skin found: use a skin point or a neutral point</string>
+    <string name="t_db6afa7169a4" formatted="false">Edges</string>
+    <string name="t_db7da3de4a3c" formatted="false">Third-party components</string>
+    <string name="t_dba6ee5cf628" formatted="false">Arms away from the body; navel on the reference crosshair.</string>
+    <string name="t_dbfb8661fa53" formatted="false">No face was detected in the photo%1$s.</string>
+    <string name="t_dc8f372e00c2" formatted="false">↑ Raise the camera</string>
+    <string name="t_dd0596b6970d" formatted="false">Left arm</string>
+    <string name="t_dd6873ebfccb" formatted="false">Chin: raise %1$.0f°</string>
+    <string name="t_dd69e5ce28fa" formatted="false">Capture time</string>
+    <string name="t_ddd8a5be2381" formatted="false">Require the same gaze</string>
+    <string name="t_de1a26aef80c" formatted="false">orbicularis oculi</string>
+    <string name="t_de9f5e12edff" formatted="false">Reverse order</string>
+    <string name="t_dec649bf4c43" formatted="false">Gaze: further left and further up</string>
+    <string name="t_ded83f435556" formatted="false">framing</string>
+    <string name="t_dee26f07310e" formatted="false">All (automatic)</string>
+    <string name="t_deff6d5f9ba5" formatted="false">nose</string>
+    <string name="t_dfab2229cb3e" formatted="false">Head: correct turn %1$s°</string>
+    <string name="t_dfbde4614273" formatted="false">Expression: frown harder (lower the eyebrows)</string>
+    <string name="t_dfc5d9d3e25c" formatted="false">Assisted zoom</string>
+    <string name="t_dfe5a9d95670" formatted="false">Original orientation</string>
+    <string name="t_e0b52191b7f9" formatted="false">Width (corners), mm</string>
+    <string name="t_e0d877a84b4d" formatted="false">vermilion, mouth corners and nasal base</string>
+    <string name="t_e14e4c18206d" formatted="false">crown whorl</string>
+    <string name="t_e1a787d57adc" formatted="false">Measurements</string>
+    <string name="t_e2c3ffae0535" formatted="false">Controls hide automatically: tap to show them. In the grid, press and hold a photo and drag it to reorder. Settings and cropping in ⋮.</string>
+    <string name="t_e3334765d36a" formatted="false">Match %1$d %%</string>
+    <string name="t_e35bfade0a18" formatted="false">higher</string>
+    <string name="t_e3851fd945d3" formatted="false">Neck and décolletage</string>
+    <string name="t_e3a2e5e446eb" formatted="false">Left eye</string>
+    <string name="t_e3bfaa09c85c" formatted="false">Match settings</string>
+    <string name="t_e4262b3ab335" formatted="false">Left parietal</string>
+    <string name="t_e46de2e96bb4" formatted="false">Expression: open the eyes</string>
+    <string name="t_e471f77c13c7" formatted="false">Measurement</string>
+    <string name="t_e4982dcc2abc" formatted="false">Crow\'s feet</string>
+    <string name="t_e4a806fd6bb3" formatted="false">Level</string>
+    <string name="t_e522bafa6dc4" formatted="false">Head: turn to profile (%1$s° to go)</string>
+    <string name="t_e540d6c6e9ed" formatted="false">Grant permission</string>
+    <string name="t_e5958546a707" formatted="false">Relief: missing shots</string>
+    <string name="t_e5f31b7c46b0" formatted="false">Approx. facial index (nasion → chin / face width × 100)</string>
+    <string name="t_e60379872c03" formatted="false">Tap a region to select it with the magic wand, or use automatic detection.</string>
+    <string name="t_e621cc476862" formatted="false">Jawline</string>
+    <string name="t_e64fcbbe8a01" formatted="false">The guides and automatic alignment are visual aids; this is not a medical device.</string>
+    <string name="t_e6bf62799a1d" formatted="false">Hair</string>
+    <string name="t_e6c7c90e855f" formatted="false">Gaze: further right</string>
+    <string name="t_e6f51aa6f62c" formatted="false">Surprise (brows raised)</string>
+    <string name="t_e74d6b16db5d" formatted="false">Save</string>
+    <string name="t_e7a46d5c1461" formatted="false">Value</string>
+    <string name="t_e828ad8f71a7" formatted="false">Bradford (neutral point)</string>
+    <string name="t_e8f77fe9b2a0" formatted="false">Distance: %1$s cm → %2$s cm</string>
+    <string name="t_e8fe7fbede72" formatted="false">No measurable wrinkles or folds were found in this photo (smooth skin, low face resolution or very flat lighting).</string>
+    <string name="t_e93f50f136b5" formatted="false">Grid and side-by-side order</string>
+    <string name="t_e95de47186f8" formatted="false">Chest / breasts</string>
+    <string name="t_e9a94d4fc08f" formatted="false">Head: turn more (%1$.0f° of 45°)</string>
+    <string name="t_ea00baff4378" formatted="false">Move the camera right →</string>
+    <string name="t_ea0e80b70740" formatted="false">Features</string>
+    <string name="t_ea10026ef986" formatted="false">Different capture conditions: %1$s</string>
+    <string name="t_eb06430dfef3" formatted="false">Contours (settings)</string>
+    <string name="t_eb29391f8be7" formatted="false">Patient\'s body not detected</string>
+    <string name="t_eb823a506f9f" formatted="false">Transition time</string>
+    <string name="t_ebaa417f7c98" formatted="false">Select two or more photos below to compare them.</string>
+    <string name="t_ebac7940a45e" formatted="false">Gaze: further down</string>
+    <string name="t_ebb890c46560" formatted="false">Feet (dorsal)</string>
+    <string name="t_ec616f599f8c" formatted="false">Could not read the image</string>
+    <string name="t_ecffc6c021fa" formatted="false">Waiting for wrinkle analysis…</string>
+    <string name="t_ee18e51f8a8f" formatted="false">%1$s · exposure %2$+.2f EV · temperature %3$+.1f · tint %4$+.1f</string>
+    <string name="t_eed4c0f9f797" formatted="false">Right oblique 45°</string>
+    <string name="t_ef36078c712d" formatted="false">Close measurements</string>
+    <string name="t_ef927bc3c4f0" formatted="false">Share (anonymized)</string>
+    <string name="t_ef92cad31e39" formatted="false">Turn 45° showing the right side; nasal tip aligned with the cheek.</string>
+    <string name="t_f008941e1774" formatted="false">Next</string>
+    <string name="t_f099873be54c" formatted="false">Right temporal recession, mm</string>
+    <string name="t_f160e84da1b1" formatted="false">abdominal silhouette, buttock and armpit</string>
+    <string name="t_f1ff8ac62d87" formatted="false">skull contour</string>
+    <string name="t_f23570e88159" formatted="false">Right parietal</string>
+    <string name="t_f24d8579fbb1" formatted="false">Facial contour</string>
+    <string name="t_f26850cccf7f" formatted="false">Expression</string>
+    <string name="t_f2b08d1a6a9c" formatted="false">Width at 75 % (lower)</string>
+    <string name="t_f31bb8dfdd12" formatted="false">Tap a neutral reference in each photo (gray or white card, lab coat): corrects white balance and exposure without assuming anything about the skin. Most reliable if a card is photographed.</string>
+    <string name="t_f40e4dbe6b61" formatted="false">Measure contours</string>
+    <string name="t_f44c86021554" formatted="false">and</string>
+    <string name="t_f467e2a807fe" formatted="false">Subnasale → stomion, mm</string>
+    <string name="t_f56d196357fb" formatted="false">Area</string>
+    <string name="t_f6035f28511e" formatted="false">nose and lips</string>
+    <string name="t_f6a2900ce741" formatted="false">These contours will be used as the basis when you tap “Align automatically” (with “Use contours” enabled).</string>
+    <string name="t_f6dba81ee3d4" formatted="false">Forehead (eyebrows → hairline): %1$s ×IPD</string>
+    <string name="t_f7086f530c87" formatted="false">Match by feature</string>
+    <string name="t_f74e604cb36f" formatted="false">Match with the reference</string>
+    <string name="t_f7504f6c9f42" formatted="false">Regenerate</string>
+    <string name="t_f7587cedda36" formatted="false">Scale</string>
+    <string name="t_f75e8637c90b" formatted="false">Light: measuring…</string>
+    <string name="t_f76d9918a893" formatted="false">Estimates the tilt between shots from the contour geometry (facial landmarks, contours chosen in “Contours” or silhouette widths at each height), without using sensors.</string>
+    <string name="t_f79c2d3b4a68" formatted="false">cheek and nose</string>
+    <string name="t_f7e989a2266c" formatted="false">Eye bags</string>
+    <string name="t_f7f892110571" formatted="false">lips</string>
+    <string name="t_f80e874fb0b7" formatted="false">ΔE*ab vs. cheek</string>
+    <string name="t_f823987a03ce" formatted="false">hyperleptoprosopic (very long)</string>
+    <string name="t_f892ea479f7e" formatted="false">gluteal folds</string>
+    <string name="t_f8c2c6c3d17b" formatted="false">Contour</string>
+    <string name="t_f8c6d2c8e9f1" formatted="false">Note</string>
+    <string name="t_f90294325f09" formatted="false">Indicative measurements from a single photo: scale from the iris diameter (11.7 mm), width and depth from the shadow profile (shape from shading) and Lemperle-style grade. They depend on lighting and pose: compare photos taken the same way. They do not replace profilometry or clinical assessment.</string>
+    <string name="t_f97234567a18" formatted="false">skull contour, part, vertex and hair pattern</string>
+    <string name="t_f988427901ff" formatted="false">Align again to apply the changes.</string>
+    <string name="t_f9a5ca47037e" formatted="false">Reset to 80 %</string>
+    <string name="t_fa53653fbe43" formatted="false">Left</string>
+    <string name="t_fba67fbec4de" formatted="false">Align when opening the comparison</string>
+    <string name="t_fbb4a7f35c17" formatted="false">Head: turn left %1$s°</string>
+    <string name="t_fc737fa77cae" formatted="false">Move later</string>
+    <string name="t_fcb326592a25" formatted="false">Camera</string>
+    <string name="t_fcc6849ad1b6" formatted="false">Crop to alignment</string>
+    <string name="t_fcffe4ff76d1" formatted="false">Arms at the sides; nipple-areola complexes on the marks.</string>
+    <string name="t_fd22026d48ff" formatted="false">At rest</string>
+    <string name="t_fd5316cbb849" formatted="false">shoulders</string>
+    <string name="t_fdf1055e24e6" formatted="false">vertex</string>
+    <string name="t_fe18f806b021" formatted="false">You are responsible for obtaining informed consent and for complying with health data regulations.</string>
+    <string name="t_fec02633dfb2" formatted="false">← Move the camera left</string>
+    <string name="t_ff2c03c8aeb8" formatted="false">Mirrored preview (front camera)</string>
 </resources>

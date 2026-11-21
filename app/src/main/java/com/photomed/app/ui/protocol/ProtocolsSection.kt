@@ -50,6 +50,7 @@ import com.photomed.app.data.Expediente
 import com.photomed.app.data.Protocol
 import com.photomed.app.data.ProtocolResults
 import com.photomed.app.data.Protocols
+import com.photomed.app.i18n.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -100,26 +101,26 @@ fun ProtocolsSection(exp: Expediente?, snackbar: SnackbarHostState, photoVersion
             busy = true
             val f = runCatching { withContext(Dispatchers.IO) { ProtocolResults.buildZip(context, repo, e, p, anonymize) } }.getOrNull()
             busy = false
-            if (f == null) { snackbar.showSnackbar("No se pudo preparar el paquete de resultados"); return@launch }
+            if (f == null) { snackbar.showSnackbar(tr("No se pudo preparar el paquete de resultados")); return@launch }
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", f)
             context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = "application/zip"; putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_SUBJECT, "Resultados del protocolo: ${p.name}")
+                putExtra(Intent.EXTRA_SUBJECT, tr("Resultados del protocolo: %1\$s", p.name))
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }, if (anonymize) "Compartir resultados (sin datos del paciente)" else "Compartir resultados"))
+            }, if (anonymize) tr("Compartir resultados (sin datos del paciente)") else tr("Compartir resultados")))
         }
     }
 
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Protocolos de fotos", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+            Text(tr("Protocolos de fotos"), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f))
             if (onImportFile != null) TextButton(onClick = onImportFile, enabled = !busy) {
-                Icon(Icons.Default.FileOpen, null); Spacer(Modifier.width(4.dp)); Text("Importar")
+                Icon(Icons.Default.FileOpen, null); Spacer(Modifier.width(4.dp)); Text(tr("Importar"))
             }
-            TextButton(onClick = { onEdit("new", emptyList()) }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text("Nuevo") }
+            TextButton(onClick = { onEdit("new", emptyList()) }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text(tr("Nuevo")) }
         }
-        if (list.isEmpty()) Text("Cree una lista de tomas (zonas, gestos, cantidad, coincidencia, luz y referencia) o importe una que le compartieron.",
+        if (list.isEmpty()) Text(tr("Cree una lista de tomas (zonas, gestos, cantidad, coincidencia, luz y referencia) o importe una que le compartieron."),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
             list.forEach { p ->
@@ -128,26 +129,26 @@ fun ProtocolsSection(exp: Expediente?, snackbar: SnackbarHostState, photoVersion
                         Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                             Text(p.name, style = MaterialTheme.typography.bodyLarge)
                             val n = taken[p.id] ?: 0
-                            Text("${p.steps.size} tomas · ${p.totalShots} fotos" + (if (p.author.isNotBlank()) " · ${p.author}" else "") +
-                                if (n > 0) " · $n tomadas aquí" else "", style = MaterialTheme.typography.bodySmall,
+                            Text(tr("%1\$d tomas · %2\$d fotos", p.steps.size, p.totalShots) + (if (p.author.isNotBlank()) " · ${p.author}" else "") +
+                                if (n > 0) tr(" · %1\$d tomadas aquí", n) else "", style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconButton(onClick = { onStart(p) }) { Icon(Icons.Default.PlayArrow, "Iniciar el protocolo ${p.name}", tint = MaterialTheme.colorScheme.primary) }
+                        IconButton(onClick = { onStart(p) }) { Icon(Icons.Default.PlayArrow, tr("Iniciar el protocolo %1\$s", p.name), tint = MaterialTheme.colorScheme.primary) }
                         var menu by remember { mutableStateOf(false) }
                         Box {
-                            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Opciones del protocolo ${p.name}") }
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, tr("Opciones del protocolo %1\$s", p.name)) }
                             DropdownMenu(menu, { menu = false }) {
-                                DropdownMenuItem(text = { Text("Editar") }, leadingIcon = { Icon(Icons.Default.Edit, null) },
+                                DropdownMenuItem(text = { Text(tr("Editar")) }, leadingIcon = { Icon(Icons.Default.Edit, null) },
                                     onClick = { menu = false; onEdit(p.id, emptyList()) })
-                                DropdownMenuItem(text = { Text("Compartir el protocolo") }, leadingIcon = { Icon(Icons.Default.Share, null) },
+                                DropdownMenuItem(text = { Text(tr("Compartir el protocolo")) }, leadingIcon = { Icon(Icons.Default.Share, null) },
                                     onClick = { menu = false; shareProtocol(context, p) })
                                 if ((taken[p.id] ?: 0) > 0) {
-                                    DropdownMenuItem(text = { Text("Compartir resultados sin datos del paciente") }, leadingIcon = { Icon(Icons.Outlined.PrivacyTip, null) },
+                                    DropdownMenuItem(text = { Text(tr("Compartir resultados sin datos del paciente")) }, leadingIcon = { Icon(Icons.Outlined.PrivacyTip, null) },
                                         onClick = { menu = false; shareResults(p, anonymize = true) })
-                                    DropdownMenuItem(text = { Text("Compartir resultados con datos del paciente") }, leadingIcon = { Icon(Icons.Default.Unarchive, null) },
+                                    DropdownMenuItem(text = { Text(tr("Compartir resultados con datos del paciente")) }, leadingIcon = { Icon(Icons.Default.Unarchive, null) },
                                         onClick = { menu = false; shareResults(p, anonymize = false) })
                                 }
-                                DropdownMenuItem(text = { Text("Eliminar") }, leadingIcon = { Icon(Icons.Default.Delete, null) },
+                                DropdownMenuItem(text = { Text(tr("Eliminar")) }, leadingIcon = { Icon(Icons.Default.Delete, null) },
                                     onClick = { menu = false; confirmDelete = p })
                             }
                         }
@@ -158,10 +159,10 @@ fun ProtocolsSection(exp: Expediente?, snackbar: SnackbarHostState, photoVersion
     }
     confirmDelete?.let { p ->
         AlertDialog(onDismissRequest = { confirmDelete = null },
-            title = { Text("¿Eliminar el protocolo «${p.name}»?") },
-            text = { Text("Se quita de la app; las fotos tomadas con él no se borran.") },
-            confirmButton = { TextButton(onClick = { Protocols.delete(context, p.id); confirmDelete = null; version++ }) { Text("Eliminar") } },
-            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancelar") } })
+            title = { Text(tr("¿Eliminar el protocolo «%1\$s»?", p.name)) },
+            text = { Text(tr("Se quita de la app; las fotos tomadas con él no se borran.")) },
+            confirmButton = { TextButton(onClick = { Protocols.delete(context, p.id); confirmDelete = null; version++ }) { Text(tr("Eliminar")) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(tr("Cancelar")) } })
     }
 }
 
@@ -176,12 +177,12 @@ suspend fun importProtocolFile(context: android.content.Context, repo: com.photo
         val zip = name.lowercase().endsWith(".zip") || type.contains("zip")
         runCatching {
             if (zip) {
-                val e = exp ?: error("Abra un expediente para importar resultados")
+                val e = exp ?: error(tr("Abra un expediente para importar resultados"))
                 val r = ProtocolResults.importZip(context, repo, e, uri)
-                ("Resultados importados: ${r.photos} fotos" + (r.protocol?.let { " del protocolo «${it.name}»" } ?: "") +
-                    if (r.duplicates > 0) " (${r.duplicates} ya estaban)" else "") to (r.photos > 0)
-            } else ("Protocolo «${Protocols.import(context, uri).name}» importado") to false
-        }.getOrElse { (it.message ?: "No se pudo importar el archivo") to false }
+                ((r.protocol?.let { tr("Resultados importados: %1\$d fotos del protocolo «%2\$s»", r.photos, it.name) } ?: tr("Resultados importados: %1\$d fotos", r.photos)) +
+                    if (r.duplicates > 0) tr(" (%1\$d ya estaban)", r.duplicates) else "") to (r.photos > 0)
+            } else (tr("Protocolo «%1\$s» importado", Protocols.import(context, uri).name)) to false
+        }.getOrElse { (it.message ?: tr("No se pudo importar el archivo")) to false }
     }
 
 private fun displayName(context: android.content.Context, uri: Uri): String? = runCatching {

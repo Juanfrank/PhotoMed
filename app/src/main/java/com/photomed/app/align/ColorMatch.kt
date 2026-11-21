@@ -1,5 +1,7 @@
 package com.photomed.app.align
 
+import com.photomed.app.i18n.trn
+import com.photomed.app.i18n.tr
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cbrt
@@ -140,10 +142,10 @@ class ColorAdjust(
         }
     }
 
-    fun describe(): String = "%s · exposición %+.2f EV · temperatura %+.1f · tinte %+.1f".format(method, exposureEv, temperature, tint)
+    fun describe(): String = tr("%1\$s · exposición %2\$+.2f EV · temperatura %3\$+.1f · tinte %4\$+.1f", tr(method), exposureEv, temperature, tint)
 
     companion object {
-        val IDENTITY = ColorAdjust(doubleArrayOf(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0), null, 0.0, 0.0, 0.0, "sin cambios")
+        val IDENTITY = ColorAdjust(doubleArrayOf(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0), null, 0.0, 0.0, 0.0, trn("sin cambios"))
     }
 }
 
@@ -194,14 +196,14 @@ object ColorMatch {
             toneCurve(qs, dst.quantilesL)
         }
         return ColorAdjust(m, lut, ev, dst.meanA - src.meanA, dst.meanB - src.meanB,
-            if (lut != null) "Bradford + gradación de piel" else "Bradford")
+            if (lut != null) trn("Bradford + gradación de piel") else "Bradford")
     }
 
     /** Ajuste por un punto neutro (carta gris o blanca) en ambas fotos: solo adaptación cromática. */
     fun fitNeutral(src: SkinStats, dst: SkinStats): ColorAdjust {
         val m = ColorSpace.bradford(src.meanLin, dst.meanLin)
         val ev = ln(lum(dst.meanLin) / lum(src.meanLin).coerceAtLeast(1e-6)) / ln(2.0)
-        return ColorAdjust(m, null, ev, dst.meanA - src.meanA, dst.meanB - src.meanB, "Bradford (punto neutro)")
+        return ColorAdjust(m, null, ev, dst.meanA - src.meanA, dst.meanB - src.meanB, trn("Bradford (punto neutro)"))
     }
 
     /** ΔE2000 entre los colores medios de dos regiones de piel. */

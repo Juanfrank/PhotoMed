@@ -76,6 +76,8 @@ import com.photomed.app.ui.components.Avatar
 import com.photomed.app.ui.components.EmptyState
 import com.photomed.app.ui.formatDate
 import com.photomed.app.ui.theme.Md3Spacing
+import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -105,10 +107,10 @@ fun ExpedientesScreen(onOpen: (String) -> Unit, onAbout: () -> Unit, onSettings:
     fun recover() = scope.launch {
         val n = withContext(Dispatchers.IO) { runCatching { repo.recoverFromGallery() }.getOrDefault(0) }
         reload++
-        snackbar.showSnackbar(if (n > 0) "Se recuperaron $n expedientes desde la galería" else "No se encontraron álbumes nuevos de PhotoMed")
+        snackbar.showSnackbar(if (n > 0) tr("Se recuperaron %1\$d expedientes desde la galería", n) else tr("No se encontraron álbumes nuevos de PhotoMed"))
     }
     val readPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) recover() else scope.launch { snackbar.showSnackbar("Sin permiso no es posible leer fotos de otra instalación") }
+        if (granted) recover() else scope.launch { snackbar.showSnackbar(tr("Sin permiso no es posible leer fotos de otra instalación")) }
     }
 
     ExpedientesContent(
@@ -129,7 +131,7 @@ fun ExpedientesScreen(onOpen: (String) -> Unit, onAbout: () -> Unit, onSettings:
 
     if (showCreate) {
         ExpedienteForm(
-            title = "Nuevo expediente",
+            title = tr("Nuevo expediente"),
             onDismiss = { showCreate = false },
             onConfirm = { name, record, notes, consent ->
                 showCreate = false
@@ -167,23 +169,23 @@ fun ExpedientesContent(
             // logo y nombre de la aplicación, y la sección; el buscador va debajo, en el contenido
             // (dentro de la barra quedaba recortado por arriba)
             androidx.compose.material3.TopAppBar(
-                title = { com.photomed.app.ui.components.AppSectionTitle("Expedientes") },
+                title = { com.photomed.app.ui.components.AppSectionTitle(tr("Expedientes")) },
                 actions = {
                     Box {
-                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, tr("Más opciones")) }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(
-                                text = { Text("Recuperar desde la galería") },
+                                text = { Text(tr("Recuperar desde la galería")) },
                                 leadingIcon = { Icon(Icons.Default.PhotoLibrary, null) },
                                 onClick = { menu = false; onRecover() },
                             )
                             DropdownMenuItem(
-                                text = { Text("Ajustes") },
+                                text = { Text(tr("Ajustes")) },
                                 leadingIcon = { Icon(Icons.Default.Settings, null) },
                                 onClick = { menu = false; onSettings() },
                             )
                             DropdownMenuItem(
-                                text = { Text("Acerca de y legal") },
+                                text = { Text(tr("Acerca de y legal")) },
                                 leadingIcon = { Icon(Icons.Default.Info, null) },
                                 onClick = { menu = false; onAbout() },
                             )
@@ -197,8 +199,8 @@ fun ExpedientesContent(
                 onClick = onCreate,
                 expanded = fabExpanded,
                 icon = { Icon(Icons.Default.Add, null) },
-                text = { Text("Nuevo expediente") },
-                modifier = Modifier.semantics { contentDescription = "Nuevo expediente" },
+                text = { Text(tr("Nuevo expediente")) },
+                modifier = Modifier.semantics { contentDescription = tr("Nuevo expediente") },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -212,10 +214,10 @@ fun ExpedientesContent(
             if (list.isEmpty()) {
                 EmptyState(
                     icon = Icons.Default.PersonAdd,
-                    title = "Aún no hay expedientes",
-                    body = "Cree un expediente por paciente. Sus fotografías se organizarán por zona y " +
-                        "aparecerán en la galería, en un álbum con su nombre.",
-                    actionLabel = "Crear el primero",
+                    title = tr("Aún no hay expedientes"),
+                    body = tr("Cree un expediente por paciente. Sus fotografías se organizarán por zona y " +
+                        "aparecerán en la galería, en un álbum con su nombre."),
+                    actionLabel = tr("Crear el primero"),
                     actionIcon = Icons.Default.Add,
                     onAction = onCreate,
                 )
@@ -227,12 +229,16 @@ fun ExpedientesContent(
 }
 
 /** Orden de la tabla de expedientes. */
-enum class ExpSort(val label: String) { NAME("Nombre"), PHOTOS("Fotos"), ANGLES("Ángulos"), LAST("Última toma"), PENDING("Pendientes") }
+enum class ExpSort(private val es: String) {
+    NAME(trn("Nombre")), PHOTOS(trn("Fotos")), ANGLES(trn("Ángulos")), LAST(trn("Última toma")), PENDING(trn("Pendientes"));
+    val label: String get() = tr(es)
+}
 
 /** Filtros de la tabla de expedientes. */
-enum class ExpFilter(val label: String) {
-    WITH_PHOTOS("Con fotos"), NO_PHOTOS("Sin fotos"), PENDING("Con tomas pendientes"), RECENT("Últimos 30 días"),
-    STALE("Sin fotos en 6 meses"), NO_CONSENT("Sin consentimiento")
+enum class ExpFilter(private val es: String) {
+    WITH_PHOTOS(trn("Con fotos")), NO_PHOTOS(trn("Sin fotos")), PENDING(trn("Con tomas pendientes")), RECENT(trn("Últimos 30 días")),
+    STALE(trn("Sin fotos en 6 meses")), NO_CONSENT(trn("Sin consentimiento"));
+    val label: String get() = tr(es)
 }
 
 /**
@@ -258,9 +264,9 @@ fun ExpedientesTable(list: List<Expediente>, summaries: Map<String, com.photomed
             onValueChange = onQuery,
             leadingIcon = { Icon(Icons.Default.Search, null) },
             trailingIcon = {
-                if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Default.Close, "Borrar búsqueda") }
+                if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Default.Close, tr("Borrar búsqueda")) }
             },
-            placeholder = { Text("Buscar paciente o n.º de expediente", maxLines = 1) },
+            placeholder = { Text(tr("Buscar paciente o n.º de expediente"), maxLines = 1) },
             singleLine = true,
             shape = CircleShape,
             colors = TextFieldDefaults.colors(
@@ -270,7 +276,7 @@ fun ExpedientesTable(list: List<Expediente>, summaries: Map<String, com.photomed
                 unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
             ),
             modifier = Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact, vertical = Md3Spacing.s2)
-                .semantics { contentDescription = "Buscar paciente o número de expediente" },
+                .semantics { contentDescription = tr("Buscar paciente o número de expediente") },
         )
         androidx.compose.foundation.layout.Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Md3Spacing.marginCompact),
@@ -306,7 +312,7 @@ fun ExpedientesTable(list: List<Expediente>, summaries: Map<String, com.photomed
             Text(s.label + if (on) (if (asc) " ▲" else " ▼") else "", style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (on) androidx.compose.ui.text.font.FontWeight.Bold else null, textAlign = align, maxLines = 2,
                 color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = mod.clickable(onClickLabel = "Ordenar por ${s.label}") { if (sort == s) asc = !asc else { sort = s; asc = s == ExpSort.NAME } }
+                modifier = mod.clickable(onClickLabel = tr("Ordenar por %1\$s", s.label)) { if (sort == s) asc = !asc else { sort = s; asc = s == ExpSort.NAME } }
                     .padding(vertical = 6.dp))
         }
         androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(start = Md3Spacing.marginCompact, end = 8.dp, top = 4.dp),
@@ -320,11 +326,11 @@ fun ExpedientesTable(list: List<Expediente>, summaries: Map<String, com.photomed
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         if (shown.isEmpty()) {
-            EmptyState(Icons.Default.SearchOff, "Sin resultados",
-                if (query.isNotBlank()) "Ningún expediente coincide con “$query”." else "Ningún expediente cumple los filtros elegidos.")
+            EmptyState(Icons.Default.SearchOff, tr("Sin resultados"),
+                if (query.isNotBlank()) tr("Ningún expediente coincide con “%1\$s”.", query) else tr("Ningún expediente cumple los filtros elegidos."))
             return@Column
         }
-        Text("${shown.size} de ${list.size} expedientes", style = MaterialTheme.typography.labelSmall,
+        Text(tr("%1\$d de %2\$d expedientes", shown.size, list.size), style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = Md3Spacing.marginCompact, top = 2.dp))
         val context = androidx.compose.ui.platform.LocalContext.current
         LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 88.dp)) {
@@ -333,21 +339,21 @@ fun ExpedientesTable(list: List<Expediente>, summaries: Map<String, com.photomed
                 val n = s?.photos ?: exp.photoCount
                 val last = s?.lastAt ?: exp.lastPhotoAt
                 androidx.compose.foundation.layout.Row(
-                    Modifier.fillMaxWidth().clickable(onClickLabel = "Abrir expediente") { onOpen(exp.id) }
+                    Modifier.fillMaxWidth().clickable(onClickLabel = tr("Abrir expediente")) { onOpen(exp.id) }
                         .padding(start = Md3Spacing.marginCompact, end = 8.dp, top = 6.dp, bottom = 6.dp)
                         .semantics(mergeDescendants = true) {},
                     verticalAlignment = Alignment.CenterVertically) {
                     // última foto de la cara (solo ángulos faciales); si no hay, las iniciales
                     Box(Modifier.width(44.dp).height(58.dp).clip(MaterialTheme.shapes.small), contentAlignment = Alignment.Center) {
                         val face = s?.lastFace
-                        if (face != null) coil.compose.AsyncImage(com.photomed.app.ui.photoModel(context, face.uri), "Última foto de la cara",
+                        if (face != null) coil.compose.AsyncImage(com.photomed.app.ui.photoModel(context, face.uri), tr("Última foto de la cara"),
                             contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.fillMaxSize())
                         else Avatar(exp.patientName)
                     }
                     androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(exp.patientName.ifBlank { "(sin nombre)" }, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text(listOfNotNull(exp.recordNumber.takeIf { it.isNotBlank() }?.let { "Exp. $it" }, if (!exp.consent) "sin consentimiento" else null)
+                        Text(exp.patientName.ifBlank { tr("(sin nombre)") }, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(listOfNotNull(exp.recordNumber.takeIf { it.isNotBlank() }?.let { tr("Exp. %1\$s", it) }, if (!exp.consent) tr("sin consentimiento") else null)
                             .joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
                     }
                     Text("$n", style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End, modifier = Modifier.width(40.dp))
@@ -355,7 +361,7 @@ fun ExpedientesTable(list: List<Expediente>, summaries: Map<String, com.photomed
                     Text(last?.let { formatDate(it) } ?: "—", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.End, maxLines = 2,
                         modifier = Modifier.width(62.dp))
                     val pend = s?.pendingShots ?: 0
-                    Text(when { s == null -> "…"; pend > 0 -> "$pend fotos"; s.protocols.isNotEmpty() -> "completo"; else -> "—" },
+                    Text(when { s == null -> "…"; pend > 0 -> tr("%1\$d fotos", pend); s.protocols.isNotEmpty() -> tr("completo"); else -> "—" },
                         style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.End, maxLines = 2,
                         color = if (pend > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(66.dp))

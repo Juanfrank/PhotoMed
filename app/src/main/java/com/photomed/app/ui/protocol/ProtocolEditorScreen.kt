@@ -83,6 +83,7 @@ import com.photomed.app.data.Zone
 import com.photomed.app.data.expression
 import com.photomed.app.ui.LocalRepository
 import com.photomed.app.ui.formatDate
+import com.photomed.app.i18n.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -92,10 +93,10 @@ fun shareProtocol(context: Context, p: Protocol) {
     val f = Protocols.shareFile(context, p)
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", f)
     val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "application/json"; putExtra(Intent.EXTRA_STREAM, uri); putExtra(Intent.EXTRA_SUBJECT, "Protocolo fotográfico: ${p.name}")
+        type = "application/json"; putExtra(Intent.EXTRA_STREAM, uri); putExtra(Intent.EXTRA_SUBJECT, tr("Protocolo fotográfico: %1\$s", p.name))
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(intent, "Compartir protocolo"))
+    context.startActivity(Intent.createChooser(intent, tr("Compartir protocolo")))
 }
 
 /**
@@ -135,9 +136,9 @@ fun ProtocolEditorScreen(expId: String, protocolId: String?, fromPhotos: List<St
         // desde fotos: un paso por foto (zona, gesto) con su referencia
         if (original == null && fromPhotos.isNotEmpty() && steps.isEmpty()) {
             val chosen = fromPhotos.mapNotNull { n -> photos.firstOrNull { it.displayName == n } }
-            if (name.isBlank()) name = "Protocolo del ${formatDate(System.currentTimeMillis())}"
+            if (name.isBlank()) name = tr("Protocolo del %1\$s", formatDate(System.currentTimeMillis()))
             chosen.forEachIndexed { i, p ->
-                busy = "Referencia ${i + 1} de ${chosen.size}…"
+                busy = tr("Referencia %1\$d de %2\$d…", i + 1, chosen.size)
                 steps += ProtocolDefaults.step(p.zone, p.expression, refFrom(p), LiveMatch.DEFAULT_THRESHOLD)
             }
             busy = null
@@ -148,20 +149,20 @@ fun ProtocolEditorScreen(expId: String, protocolId: String?, fromPhotos: List<St
     val open = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
     fun isOpen(s: ProtocolStep) = open[s.id] ?: (s.id !in initialIds)
 
-    fun current() = (original ?: Protocol(name = name)).copy(name = name.ifBlank { "Protocolo" }, author = author, notes = notes, steps = steps.toList())
+    fun current() = (original ?: Protocol(name = name)).copy(name = name.ifBlank { tr("Protocolo") }, author = author, notes = notes, steps = steps.toList())
     fun save(): Protocol? {
-        if (steps.isEmpty()) { scope.launch { snackbar.showSnackbar("Añada al menos una toma") }; return null }
+        if (steps.isEmpty()) { scope.launch { snackbar.showSnackbar(tr("Añada al menos una toma")) }; return null }
         return current().also { Protocols.save(context, it) }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (original == null) "Nuevo protocolo" else "Editar protocolo") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
+                title = { Text(if (original == null) tr("Nuevo protocolo") else tr("Editar protocolo")) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Atrás")) } },
                 actions = {
-                    IconButton(onClick = { save()?.let { shareProtocol(context, it) } }, enabled = busy == null) { Icon(Icons.Default.Share, "Guardar y compartir el protocolo") }
-                    IconButton(onClick = { if (save() != null) onBack() }, enabled = busy == null) { Icon(Icons.Default.Check, "Guardar el protocolo") }
+                    IconButton(onClick = { save()?.let { shareProtocol(context, it) } }, enabled = busy == null) { Icon(Icons.Default.Share, tr("Guardar y compartir el protocolo")) }
+                    IconButton(onClick = { if (save() != null) onBack() }, enabled = busy == null) { Icon(Icons.Default.Check, tr("Guardar el protocolo")) }
                 },
             )
         },
@@ -170,17 +171,17 @@ fun ProtocolEditorScreen(expId: String, protocolId: String?, fromPhotos: List<St
         LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
-                OutlinedTextField(name, { name = it.take(80) }, label = { Text("Nombre del protocolo") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(author, { author = it.take(80) }, label = { Text("Autor (opcional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(notes, { notes = it.take(500) }, label = { Text("Notas e indicaciones generales (opcional)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(name, { name = it.take(80) }, label = { Text(tr("Nombre del protocolo")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(author, { author = it.take(80) }, label = { Text(tr("Autor (opcional)")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(notes, { notes = it.take(500) }, label = { Text(tr("Notas e indicaciones generales (opcional)")) }, modifier = Modifier.fillMaxWidth())
                 busy?.let { Column(Modifier.padding(top = 8.dp)) { Text(it, style = MaterialTheme.typography.bodySmall); LinearProgressIndicator(Modifier.fillMaxWidth()) } }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                     refExpObj?.let { PatientThumb(it, 32.dp); Spacer(Modifier.width(8.dp)) }
-                    Text("Fotos de referencia: " + (refExpName ?: "ningún expediente"), style = MaterialTheme.typography.bodySmall,
+                    Text(tr("Fotos de referencia: %1\$s", refExpName ?: tr("ningún expediente")), style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.weight(1f))
-                    TextButton(onClick = { pickExp = true }) { Text(if (refExp == null) "Elegir expediente" else "Cambiar") }
+                    TextButton(onClick = { pickExp = true }) { Text(if (refExp == null) tr("Elegir expediente") else tr("Cambiar")) }
                 }
-                Text("Tomas en orden (${steps.sumOf { it.count }} fotos)", style = MaterialTheme.typography.titleSmall,
+                Text(tr("Tomas en orden (%1\$d fotos)", steps.sumOf { it.count }), style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
             }
             itemsIndexed(steps, key = { _, s -> s.id }) { i, s ->
@@ -192,33 +193,33 @@ fun ProtocolEditorScreen(expId: String, protocolId: String?, fromPhotos: List<St
             item {
                 OutlinedButton(onClick = { steps += ProtocolDefaults.step(steps.lastOrNull()?.zone ?: Zone.FACE_FRONTAL, threshold = LiveMatch.DEFAULT_THRESHOLD) },
                     modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.Add, null); Spacer(Modifier.width(8.dp)); Text("Añadir toma")
+                    Icon(Icons.Default.Add, null); Spacer(Modifier.width(8.dp)); Text(tr("Añadir toma"))
                 }
                 OutlinedButton(onClick = { pickMany = true }, enabled = photos.isNotEmpty() && busy == null, modifier = Modifier.fillMaxWidth()) {
-                    Text("Añadir tomas desde fotos del expediente")
+                    Text(tr("Añadir tomas desde fotos del expediente"))
                 }
-                Text("La referencia de una toma guarda solo puntos, pose, contornos y surcos de la foto elegida (no la imagen): " +
-                    "quien use el protocolo deberá coincidir con ella.", style = MaterialTheme.typography.bodySmall,
+                Text(tr("La referencia de una toma guarda solo puntos, pose, contornos y surcos de la foto elegida (no la imagen): " +
+                    "quien use el protocolo deberá coincidir con ella."), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
             }
         }
     }
 
-    if (pickExp) ExpedientePicker("Fotos de referencia de…", onDismiss = { pickExp = false }) { e -> pickExp = false; refExp = e.id }
+    if (pickExp) ExpedientePicker(tr("Fotos de referencia de…"), onDismiss = { pickExp = false }) { e -> pickExp = false; refExp = e.id }
     if (pickMany) {
         val chosen = remember { mutableStateListOf<String>() }
         AlertDialog(onDismissRequest = { pickMany = false },
-            title = { Text("Tomas desde fotos") },
+            title = { Text(tr("Tomas desde fotos")) },
             text = {
                 Column {
-                    Text("Cada foto elegida será una toma con su zona, su gesto y su referencia (sin la imagen).",
+                    Text(tr("Cada foto elegida será una toma con su zona, su gesto y su referencia (sin la imagen)."),
                         style = MaterialTheme.typography.bodySmall)
                     LazyVerticalGrid(GridCells.Fixed(3), Modifier.height(340.dp).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(photos.sortedWith(compareBy({ it.zone.ordinal }, { it.takenAt })), key = { it.key }) { p ->
                             val k = chosen.indexOf(p.key)
                             Box(Modifier.clickable { if (k >= 0) chosen.remove(p.key) else chosen += p.key }
-                                .semantics { contentDescription = "${p.zone.label}, ${formatDate(p.takenAt)}" + if (k >= 0) ", elegida ${k + 1}" else "" }) {
+                                .semantics { contentDescription = "${p.zone.label}, ${formatDate(p.takenAt)}" + if (k >= 0) tr(", elegida %1\$d", k + 1) else "" }) {
                                 AsyncImage(com.photomed.app.ui.photoModel(context, p.uri), null, contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f))
                                 Text(if (k >= 0) "${k + 1}" else p.zone.label, style = MaterialTheme.typography.labelSmall,
@@ -237,39 +238,39 @@ fun ProtocolEditorScreen(expId: String, protocolId: String?, fromPhotos: List<St
                     val sel = chosen.mapNotNull { k -> photos.firstOrNull { it.key == k } }
                     scope.launch {
                         sel.forEachIndexed { i, p ->
-                            busy = "Referencia ${i + 1} de ${sel.size}…"
+                            busy = tr("Referencia %1\$d de %2\$d…", i + 1, sel.size)
                             steps += ProtocolDefaults.step(p.zone, p.expression, refFrom(p), LiveMatch.DEFAULT_THRESHOLD)
                         }
                         busy = null
                     }
-                }) { Text("Añadir (${chosen.size})") }
+                }) { Text(tr("Añadir (%1\$d)", chosen.size)) }
             },
-            dismissButton = { TextButton(onClick = { pickMany = false }) { Text("Cancelar") } })
+            dismissButton = { TextButton(onClick = { pickMany = false }) { Text(tr("Cancelar")) } })
     }
     pickRefFor?.let { i ->
         val s = steps.getOrNull(i) ?: run { pickRefFor = null; return@let }
         val candidates = photos.filter { it.zone == s.zone }.sortedByDescending { it.takenAt }
         AlertDialog(onDismissRequest = { pickRefFor = null },
-            title = { Text("Referencia: ${s.zone.label}") },
+            title = { Text(tr("Referencia: %1\$s", s.zone.label)) },
             text = {
-                if (candidates.isEmpty()) Text("No hay fotos de esta zona en el expediente.")
+                if (candidates.isEmpty()) Text(tr("No hay fotos de esta zona en el expediente."))
                 else LazyVerticalGrid(GridCells.Fixed(3), Modifier.height(320.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(candidates, key = { it.key }) { p ->
                         Column(Modifier.clickable {
                             pickRefFor = null
                             scope.launch {
-                                busy = "Calculando la referencia…"
+                                busy = tr("Calculando la referencia…")
                                 val r = refFrom(p)
                                 busy = null
-                                if (r == null) snackbar.showSnackbar("No se encontraron puntos ni contornos en esa foto")
+                                if (r == null) snackbar.showSnackbar(tr("No se encontraron puntos ni contornos en esa foto"))
                                 else steps.indexOfFirst { it.id == s.id }.takeIf { it >= 0 }?.let { k ->
                                     // la luz pedida pasa a ser la de la foto de referencia
                                     steps[k] = ProtocolDefaults.withRefLight(steps[k].copy(ref = r,
                                         expression = p.expression.takeIf { e -> s.zone.guide in e.guides } ?: steps[k].expression))
                                 }
                             }
-                        }.semantics { contentDescription = "Foto del ${formatDate(p.takenAt)}" }) {
+                        }.semantics { contentDescription = tr("Foto del %1\$s", formatDate(p.takenAt)) }) {
                             AsyncImage(com.photomed.app.ui.photoModel(context, p.uri), null, contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f))
                             Text(formatDate(p.takenAt) + (p.expression.takeIf { it != FacialExpression.NEUTRAL }?.let { " · ${it.label}" } ?: ""),
@@ -278,7 +279,7 @@ fun ProtocolEditorScreen(expId: String, protocolId: String?, fromPhotos: List<St
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { pickRefFor = null }) { Text("Cancelar") } })
+            confirmButton = { TextButton(onClick = { pickRefFor = null }) { Text(tr("Cancelar")) } })
     }
 }
 
@@ -290,7 +291,7 @@ private fun StepCard(i: Int, s: ProtocolStep, total: Int, expanded: Boolean, onE
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { onExpand(!expanded) }) {
                     Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        if (expanded) "Plegar la toma ${i + 1}" else "Desplegar la toma ${i + 1}")
+                        if (expanded) tr("Plegar la toma %1\$d", i + 1) else tr("Desplegar la toma %1\$d", i + 1))
                 }
                 if (s.ref != null && !expanded) { RefThumb(s, refPhoto, 36.dp); Spacer(Modifier.width(8.dp)) }
                 Column(Modifier.weight(1f).clickable { onExpand(!expanded) }) {
@@ -298,15 +299,15 @@ private fun StepCard(i: Int, s: ProtocolStep, total: Int, expanded: Boolean, onE
                     if (!expanded) Text(stepSummary(s), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
                 }
-                IconButton(onClick = { onMove(-1) }, enabled = i > 0) { Icon(Icons.Default.ArrowUpward, "Subir la toma ${i + 1}") }
-                IconButton(onClick = { onMove(1) }, enabled = i < total - 1) { Icon(Icons.Default.ArrowDownward, "Bajar la toma ${i + 1}") }
-                IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "Quitar la toma ${i + 1}", tint = MaterialTheme.colorScheme.error) }
+                IconButton(onClick = { onMove(-1) }, enabled = i > 0) { Icon(Icons.Default.ArrowUpward, tr("Subir la toma %1\$d", i + 1)) }
+                IconButton(onClick = { onMove(1) }, enabled = i < total - 1) { Icon(Icons.Default.ArrowDownward, tr("Bajar la toma %1\$d", i + 1)) }
+                IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, tr("Quitar la toma %1\$d", i + 1), tint = MaterialTheme.colorScheme.error) }
             }
             if (!expanded) return@Column
             // zona (ángulo)
             var zoneMenu by remember { mutableStateOf(false) }
             Box {
-                OutlinedButton(onClick = { zoneMenu = true }) { Text("Zona: ${s.zone.label}") }
+                OutlinedButton(onClick = { zoneMenu = true }) { Text(tr("Zona: %1\$s", s.zone.label)) }
                 DropdownMenu(zoneMenu, { zoneMenu = false }) {
                     Zone.entries.forEach { z ->
                         DropdownMenuItem(text = { Text("${z.category.label} · ${z.label}") }, onClick = {
@@ -323,55 +324,55 @@ private fun StepCard(i: Int, s: ProtocolStep, total: Int, expanded: Boolean, onE
             }
             // cantidad
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Fotos", modifier = Modifier.weight(1f))
+                Text(tr("Fotos"), modifier = Modifier.weight(1f))
                 TextButton(onClick = { onChange(s.copy(count = (s.count - 1).coerceAtLeast(1))) }) { Text("−") }
                 Text("${s.count}", style = MaterialTheme.typography.titleMedium)
                 TextButton(onClick = { onChange(s.copy(count = (s.count + 1).coerceAtMost(20))) }) { Text("+") }
             }
             val thr = s.threshold ?: LiveMatch.DEFAULT_THRESHOLD
-            Text("Coincidencia mínima: ${(thr * 100).toInt()} %", style = MaterialTheme.typography.bodyMedium)
+            Text(tr("Coincidencia mínima: %1\$d %%", (thr * 100).toInt()), style = MaterialTheme.typography.bodyMedium)
             Slider(thr * 100, { onChange(s.copy(threshold = it.toInt() / 100f)) }, valueRange = 50f..100f,
-                modifier = Modifier.semantics { contentDescription = "Coincidencia mínima de la toma ${i + 1}" })
+                modifier = Modifier.semantics { contentDescription = tr("Coincidencia mínima de la toma %1\$d", i + 1) })
             val minL = s.minLight ?: 0f
-            Text(if (minL <= 0f) "Luz mínima en el rostro: sin exigir" else "Luz mínima en el rostro: ${(minL * 100).toInt()} %", style = MaterialTheme.typography.bodyMedium)
+            Text(if (minL <= 0f) tr("Luz mínima en el rostro: sin exigir") else tr("Luz mínima en el rostro: %1\$d %%", (minL * 100).toInt()), style = MaterialTheme.typography.bodyMedium)
             Slider(minL * 100, { onChange(s.copy(minLight = (it.toInt() / 100f).takeIf { v -> v > 0f })) }, valueRange = 0f..80f,
-                modifier = Modifier.semantics { contentDescription = "Luz mínima de la toma ${i + 1}" })
+                modifier = Modifier.semantics { contentDescription = tr("Luz mínima de la toma %1\$d", i + 1) })
             val asym = s.maxLightAsym ?: 0f
-            Text(if (asym <= 0f) "Luz pareja entre mejillas: sin exigir" else "Diferencia de luz entre mejillas: máx. ${(asym * 100).toInt()} %",
+            Text(if (asym <= 0f) tr("Luz pareja entre mejillas: sin exigir") else tr("Diferencia de luz entre mejillas: máx. %1\$d %%", (asym * 100).toInt()),
                 style = MaterialTheme.typography.bodyMedium)
             Slider(asym * 100, { onChange(s.copy(maxLightAsym = (it.toInt() / 100f).takeIf { v -> v > 0f })) }, valueRange = 0f..40f,
-                modifier = Modifier.semantics { contentDescription = "Diferencia máxima de luz de la toma ${i + 1}" })
+                modifier = Modifier.semantics { contentDescription = tr("Diferencia máxima de luz de la toma %1\$d", i + 1) })
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Disparo automático al coincidir", Modifier.weight(1f))
+                Text(tr("Disparo automático al coincidir"), Modifier.weight(1f))
                 Switch(s.autoCapture != false, { onChange(s.copy(autoCapture = it)) })
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Mirada al frente", Modifier.weight(1f))
+                Text(tr("Mirada al frente"), Modifier.weight(1f))
                 Switch(s.gaze != false, { onChange(s.copy(gaze = it)) })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Cámara")
-                listOf(null to "Cualquiera", "back" to "Trasera", "front" to "Frontal").forEach { (k, l) ->
+                Text(tr("Cámara"))
+                listOf(null to tr("Cualquiera"), "back" to tr("Trasera"), "front" to tr("Frontal")).forEach { (k, l) ->
                     FilterChip(selected = s.lens == k, onClick = { onChange(s.copy(lens = k)) }, label = { Text(l) })
                 }
             }
             OutlinedTextField(s.instructions.orEmpty(), { onChange(s.copy(instructions = it.take(300).ifBlank { null })) },
-                label = { Text("Indicaciones (opcional)") }, modifier = Modifier.fillMaxWidth())
+                label = { Text(tr("Indicaciones (opcional)")) }, modifier = Modifier.fillMaxWidth())
             // referencia sin imagen
             val r = s.ref
             if (r != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RefThumb(s, refPhoto, 96.dp)
-                r.light?.let { l -> Text("Luz de la foto: %.0f %%".format(l * 100) + (r.lightAsym?.let { " · diferencia entre mejillas %.0f %%".format(it * 100) } ?: "") +
-                    "\nLa luz pedida se ajustó a la de la referencia.", style = MaterialTheme.typography.bodySmall,
+                r.light?.let { l -> Text(tr("Luz de la foto: %1\$.0f %%", l * 100) + (r.lightAsym?.let { tr(" · diferencia entre mejillas %1\$.0f %%", it * 100) } ?: "") +
+                    tr("\nLa luz pedida se ajustó a la de la referencia."), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f)) }
             }
-            Text(if (r == null) "Sin referencia: se estandariza la toma (pose, luz, gesto)"
-                else "Referencia" + (r.sourceTakenAt?.let { " del ${formatDate(it)}" } ?: "") +
-                    ": ${r.points.size} puntos, ${r.lines.size} contornos y surcos" + (r.distanceCm?.let { " · %.0f cm".format(it) } ?: ""),
+            Text(if (r == null) tr("Sin referencia: se estandariza la toma (pose, luz, gesto)")
+                else (r.sourceTakenAt?.let { tr("Referencia del %1\$s: %2\$d puntos, %3\$d contornos y surcos", formatDate(it), r.points.size, r.lines.size) }
+                    ?: tr("Referencia: %1\$d puntos, %2\$d contornos y surcos", r.points.size, r.lines.size)) + (r.distanceCm?.let { " · %.0f cm".format(it) } ?: ""),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onPickRef) { Text(if (r == null) "Usar una foto como referencia" else "Cambiar la referencia") }
-                if (r != null) TextButton(onClick = { onChange(s.copy(ref = null)) }) { Text("Quitar") }
+                OutlinedButton(onClick = onPickRef) { Text(if (r == null) tr("Usar una foto como referencia") else tr("Cambiar la referencia")) }
+                if (r != null) TextButton(onClick = { onChange(s.copy(ref = null)) }) { Text(tr("Quitar")) }
             }
         }
     }
@@ -379,12 +380,12 @@ private fun StepCard(i: Int, s: ProtocolStep, total: Int, expanded: Boolean, onE
 
 /** Resumen de una toma plegada: fotos, coincidencia, luz, disparo y referencia. */
 private fun stepSummary(s: ProtocolStep): String = listOfNotNull(
-    "${s.count} foto" + if (s.count != 1) "s" else "",
-    "coincidencia ${((s.threshold ?: LiveMatch.DEFAULT_THRESHOLD) * 100).toInt()} %",
-    s.minLight?.let { "luz ≥ ${(it * 100).toInt()} %" },
-    s.maxLightAsym?.let { "mejillas ≤ ${(it * 100).toInt()} %" },
-    if (s.autoCapture != false) "disparo automático" else null,
-    if (s.ref != null) "con referencia" else null,
+    if (s.count != 1) tr("%1\$d fotos", s.count) else tr("%1\$d foto", s.count),
+    tr("coincidencia %1\$d %%", ((s.threshold ?: LiveMatch.DEFAULT_THRESHOLD) * 100).toInt()),
+    s.minLight?.let { tr("luz ≥ %1\$d %%", (it * 100).toInt()) },
+    s.maxLightAsym?.let { tr("mejillas ≤ %1\$d %%", (it * 100).toInt()) },
+    if (s.autoCapture != false) tr("disparo automático") else null,
+    if (s.ref != null) tr("con referencia") else null,
 ).joinToString(" · ")
 
 /**
@@ -396,7 +397,7 @@ private fun RefThumb(s: ProtocolStep, photo: Photo?, width: androidx.compose.ui.
     val r = s.ref ?: return
     val context = LocalContext.current
     Box(Modifier.width(width).aspectRatio(3f / 4f).androidxClip().background(MaterialTheme.colorScheme.surfaceContainerHighest)
-        .semantics { contentDescription = "Miniatura de la referencia de ${s.title}" }) {
+        .semantics { contentDescription = tr("Miniatura de la referencia de %1\$s", s.title) }) {
         if (photo != null) AsyncImage(com.photomed.app.ui.photoModel(context, photo.uri), null, contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize())
         val line = MaterialTheme.colorScheme.primary

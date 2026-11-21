@@ -1,5 +1,7 @@
 package com.photomed.app.ui.compare
 
+import com.photomed.app.i18n.trn
+import com.photomed.app.i18n.tr
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -173,7 +175,10 @@ object CompareExport {
     }
 
     /** Animación GIF: [SLIDE] desplazamiento (cortinilla como el deslizador) o [FADE] fundido. */
-    enum class GifMode(val label: String) { SLIDE("Desplazamiento"), FADE("Fundido") }
+    enum class GifMode(private val labelEs: String) {
+        SLIDE(trn("Desplazamiento")), FADE(trn("Fundido"));
+        val label: String get() = tr(labelEs)
+    }
 
     const val GIF_W = 480
     /** Duración de cada paso de la transición (≈ 14 cuadros/s). */
@@ -338,7 +343,7 @@ object CompareExport {
                 view = view, ink = ink[p.key].orEmpty()) }.getOrNull()
             if (b == null) { failed++; return@forEachIndexed }
             val d = labels?.getOrNull(i) ?: formatDate(p.takenAt)
-            val label = if (!view.overlay) "" else if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d"
+            val label = if (!view.overlay) "" else if (seq.size == 2) (if (i == 0) tr("Antes · %1\$s", d) else tr("Después · %1\$s", d)) else "${i + 1} · $d"
             rendered += (if (grid || side || gif != null) Bitmap.createScaledBitmap(b, 540, 540 * b.height / b.width, true) else b) to label
             if (individual) withContext(Dispatchers.IO) {
                 val name = if (anonymize) anonymizedName(p, i + 1).removeSuffix(".jpg") + "_ajustada.jpg"
@@ -400,6 +405,6 @@ object CompareExport {
             else -> "image/jpeg"
         }
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        context.startActivity(Intent.createChooser(intent, if (anonymize) "Compartir (anonimizada)" else "Compartir"))
+        context.startActivity(Intent.createChooser(intent, if (anonymize) tr("Compartir (anonimizada)") else tr("Compartir")))
     }
 }

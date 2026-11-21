@@ -80,6 +80,7 @@ import com.photomed.app.ui.components.SectionHeader
 import com.photomed.app.ui.formatDateTime
 import com.photomed.app.ui.formatDayHeader
 import com.photomed.app.ui.theme.Md3Spacing
+import com.photomed.app.i18n.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
@@ -130,26 +131,26 @@ fun ZoneGalleryScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             if (selecting) TopAppBar(
-                title = { Text("${selection.size} seleccionada" + if (selection.size == 1) "" else "s") },
-                navigationIcon = { IconButton(onClick = { selection = emptyList() }) { Icon(Icons.Default.Close, "Cancelar selección") } },
+                title = { Text(if (selection.size == 1) tr("%1\$d seleccionada", selection.size) else tr("%1\$d seleccionadas", selection.size)) },
+                navigationIcon = { IconButton(onClick = { selection = emptyList() }) { Icon(Icons.Default.Close, tr("Cancelar selección")) } },
                 actions = {
-                    IconButton(onClick = { selection = photos.orEmpty().map { it.key } }) { Icon(Icons.Default.SelectAll, "Seleccionar todas") }
+                    IconButton(onClick = { selection = photos.orEmpty().map { it.key } }) { Icon(Icons.Default.SelectAll, tr("Seleccionar todas")) }
                     IconButton(onClick = { onCompare(selectedPhotos().map { it.displayName }) }, enabled = selection.size >= 2) {
-                        Icon(Icons.Default.Compare, "Comparar seleccionadas")
+                        Icon(Icons.Default.Compare, tr("Comparar seleccionadas"))
                     }
                     Box {
-                        IconButton(onClick = { shareMenu = true }) { Icon(Icons.Default.Share, "Compartir seleccionadas") }
+                        IconButton(onClick = { shareMenu = true }) { Icon(Icons.Default.Share, tr("Compartir seleccionadas")) }
                         DropdownMenu(expanded = shareMenu, onDismissRequest = { shareMenu = false }) {
-                            listOf(true to "Compartir sin datos del paciente", false to "Compartir con datos del paciente").forEach { (anon, label) ->
+                            listOf(true to tr("Compartir sin datos del paciente"), false to tr("Compartir con datos del paciente")).forEach { (anon, label) ->
                                 DropdownMenuItem(text = { Text(label) }, onClick = {
                                     shareMenu = false
                                     val list = selectedPhotos()
-                                    scope.launch { if (!sharePhotos(context, list, anon)) snackbar.showSnackbar("Algunas fotografías no se pudieron compartir") }
+                                    scope.launch { if (!sharePhotos(context, list, anon)) snackbar.showSnackbar(tr("Algunas fotografías no se pudieron compartir")) }
                                 })
                             }
                         }
                     }
-                    IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Eliminar seleccionadas") }
+                    IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, tr("Eliminar seleccionadas")) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
             ) else TopAppBar(
@@ -160,9 +161,9 @@ fun ZoneGalleryScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Atrás")) } },
                 actions = {
-                    if ((photos?.size ?: 0) >= 2) IconButton(onClick = { onCompare(emptyList()) }) { Icon(Icons.Default.Compare, "Comparar") }
+                    if ((photos?.size ?: 0) >= 2) IconButton(onClick = { onCompare(emptyList()) }) { Icon(Icons.Default.Compare, tr("Comparar")) }
                 },
                 scrollBehavior = scrollBehavior,
             )
@@ -171,7 +172,7 @@ fun ZoneGalleryScreen(
             if (!selecting) ExtendedFloatingActionButton(
                 onClick = onCamera,
                 icon = { Icon(Icons.Default.CameraAlt, null) },
-                text = { Text("Tomar foto") },
+                text = { Text(tr("Tomar foto")) },
             )
         }
     ) { padding ->
@@ -181,9 +182,9 @@ fun ZoneGalleryScreen(
                 HintCard(zone, Modifier.padding(Md3Spacing.marginCompact))
                 EmptyState(
                     icon = Icons.Default.AddAPhoto,
-                    title = "Sin fotografías de esta zona",
-                    body = "La cámara mostrará el contorno y las líneas de referencia de ${zone.label.lowercase()}.",
-                    actionLabel = "Tomar la primera",
+                    title = tr("Sin fotografías de esta zona"),
+                    body = tr("La cámara mostrará el contorno y las líneas de referencia de %1\$s.", zone.label.lowercase()),
+                    actionLabel = tr("Tomar la primera"),
                     actionIcon = Icons.Default.CameraAlt,
                     onAction = onCamera,
                 )
@@ -200,25 +201,25 @@ fun ZoneGalleryScreen(
             verticalArrangement = Arrangement.spacedBy(Md3Spacing.s1),
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                if (selecting) Text("Toque para añadir o quitar fotos. Compare 2 o más (máx. ${Timeline.MAX_PHOTOS}).",
+                if (selecting) Text(tr("Toque para añadir o quitar fotos. Compare 2 o más (máx. %1\$d).", Timeline.MAX_PHOTOS),
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else HintCard(zone)
             }
             byDay.forEach { (_, dayPhotos) ->
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     val days = TimeUnit.MILLISECONDS.toDays(dayPhotos.first().takenAt - first)
-                    SectionHeader(formatDayHeader(dayPhotos.first().takenAt) + if (days > 0) " · día $days" else " · basal")
+                    SectionHeader(formatDayHeader(dayPhotos.first().takenAt) + if (days > 0) tr(" · día %1\$d", days) else tr(" · basal"))
                 }
                 items(dayPhotos, key = { it.key }) { photo ->
                     val isSel = photo.key in selection
                     val ex = com.photomed.app.data.FacialExpression.ofFileName(photo.displayName)
-                    val desc = "Fotografía del ${formatDateTime(photo.takenAt)}" +
+                    val desc = tr("Fotografía del %1\$s", formatDateTime(photo.takenAt)) +
                         (if (ex != com.photomed.app.data.FacialExpression.NEUTRAL) ", ${ex.label}" else "")
                     Box(
                         Modifier.fillMaxWidth().aspectRatio(3f / 4f).clip(MaterialTheme.shapes.small)
                             .combinedClickable(
-                                onClickLabel = if (selecting) (if (isSel) "Quitar de la selección" else "Añadir a la selección") else "Ver",
-                                onLongClickLabel = "Seleccionar",
+                                onClickLabel = if (selecting) (if (isSel) tr("Quitar de la selección") else tr("Añadir a la selección")) else tr("Ver"),
+                                onLongClickLabel = tr("Seleccionar"),
                                 onLongClick = { if (!isSel) selection = selection + photo.key },
                                 onClick = {
                                     if (selecting) selection = if (isSel) selection - photo.key else selection + photo.key
@@ -256,9 +257,9 @@ fun ZoneGalleryScreen(
 
 @Composable
 private fun DeleteSelectionDialog(count: Int, onDismiss: () -> Unit, onConfirm: () -> Unit) = ConfirmDialog(
-    title = "¿Eliminar $count fotografía" + (if (count == 1) "?" else "s?"),
-    text = "Se eliminarán de la galería del teléfono y del expediente.",
-    confirmLabel = "Eliminar",
+    title = if (count == 1) tr("¿Eliminar %1\$d fotografía?", count) else tr("¿Eliminar %1\$d fotografías?", count),
+    text = tr("Se eliminarán de la galería del teléfono y del expediente."),
+    confirmLabel = tr("Eliminar"),
     icon = Icons.Default.Delete,
     onDismiss = onDismiss,
     onConfirm = onConfirm,

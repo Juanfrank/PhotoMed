@@ -1,5 +1,6 @@
 package com.photomed.app.align
 
+import com.photomed.app.i18n.tr
 import android.content.Context
 import android.graphics.Bitmap
 import com.google.mediapipe.framework.image.BitmapImageBuilder
@@ -118,7 +119,7 @@ class MediaPipeFace(context: Context) : Closeable {
         suspend fun <T> withShared(context: Context, block: (MediaPipeFace) -> T): T? = lock.withLockCompat {
             val m = shared ?: runCatching { MediaPipeFace(context.applicationContext) }
                 // se conserva el primer error (los siguientes de una clase que no se inició solo repiten su nombre)
-                .onFailure { if (lastError == null) lastError = "no se pudo cargar el modelo: ${it.javaClass.simpleName}: ${it.message}" + (it.cause?.let { c -> " (${c.javaClass.simpleName}: ${c.message})" } ?: "") }
+                .onFailure { if (lastError == null) lastError = tr("no se pudo cargar el modelo: %1\$s: %2\$s", it.javaClass.simpleName, it.message) + (it.cause?.let { c -> " (${c.javaClass.simpleName}: ${c.message})" } ?: "") }
                 .getOrNull()?.also { shared = it }
             m?.let { mp -> runCatching { block(mp) }.onFailure { if (lastError == null) lastError = "${it.javaClass.simpleName}: ${it.message}" }.getOrNull() }
         }

@@ -1,5 +1,7 @@
 package com.photomed.app.ui.compare
 
+import com.photomed.app.i18n.trn
+import com.photomed.app.i18n.tr
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.min
@@ -117,7 +119,10 @@ fun stampLabels(times: List<Long>): List<String> {
 }
 
 /** Orden de las fotos en la cuadrícula y lado a lado (solo presentación: no cambia la referencia). */
-enum class GridOrder(val label: String) { OLDEST_FIRST("Fecha: antigua primero"), NEWEST_FIRST("Fecha: reciente primero"), MANUAL("Manual (arrastrar)") }
+enum class GridOrder(private val labelEs: String) {
+    OLDEST_FIRST(trn("Fecha: antigua primero")), NEWEST_FIRST(trn("Fecha: reciente primero")), MANUAL(trn("Manual (arrastrar)"));
+    val label: String get() = tr(labelEs)
+}
 
 /** Claves en el orden de presentación; en manual, las nuevas se añaden al final. */
 fun displayOrder(seqByDate: List<String>, order: GridOrder, manual: List<String>): List<String> = when (order) {

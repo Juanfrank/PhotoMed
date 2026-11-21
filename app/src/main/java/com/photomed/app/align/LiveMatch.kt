@@ -1,5 +1,6 @@
 package com.photomed.app.align
 
+import com.photomed.app.i18n.trn
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.ln
@@ -64,7 +65,7 @@ object LiveMatch {
         gate: Boolean = false,
     ): MatchEval {
         if (t == null && pointFraction == null) {
-            return MatchEval(MatchStatus.SEARCHING, 0f, listOf("Buscando referencias anatómicas…"), threshold = threshold)
+            return MatchEval(MatchStatus.SEARCHING, 0f, listOf(trn("Buscando referencias anatómicas…")), threshold = threshold)
         }
         val tt = t ?: Similarity.IDENTITY
         val d = tt.apply(pivot) - pivot
@@ -89,19 +90,18 @@ object LiveMatch {
         }
         val hints = mutableListOf<String>()
         if (status != MatchStatus.MATCH && t != null) {
-            if (abs(d.x) > MATCH_OFFSET * 0.7f) hints += if (d.x > 0) "← Mueva la cámara a la izquierda" else "Mueva la cámara a la derecha →"
-            if (abs(d.y) > MATCH_OFFSET * 0.7f) hints += if (d.y > 0) "↑ Suba la cámara" else "↓ Baje la cámara"
-            if (se > MATCH_SCALE * 0.7f) hints += if (tt.scale > 1f) "Acérquese" else "Aléjese"
-            if (rd > MATCH_ROT * 0.7f) hints += if (tt.rotationDegrees > 0) "Gire la cámara ↺" else "Gire la cámara ↻"
+            if (abs(d.x) > MATCH_OFFSET * 0.7f) hints += if (d.x > 0) trn("← Mueva la cámara a la izquierda") else trn("Mueva la cámara a la derecha →")
+            if (abs(d.y) > MATCH_OFFSET * 0.7f) hints += if (d.y > 0) trn("↑ Suba la cámara") else trn("↓ Baje la cámara")
+            if (se > MATCH_SCALE * 0.7f) hints += if (tt.scale > 1f) trn("Acérquese") else trn("Aléjese")
+            if (rd > MATCH_ROT * 0.7f) hints += if (tt.rotationDegrees > 0) trn("Gire la cámara ↺") else trn("Gire la cámara ↻")
         }
         if (status != MatchStatus.MATCH && abs(headYawDelta) > LiveDecision.POSE_MAX)
-            hints += "Cabeza: corregir giro %.0f°".format(headYawDelta)
+            hints += HintText.es(HintText.YAW_FIX, headYawDelta)
         if (status != MatchStatus.MATCH && abs(headPitchDelta) > LiveDecision.POSE_MAX)
-            hints += (if (headPitchDelta > 0) "Barbilla: bajar" else "Barbilla: subir") +
-                " %.0f°".format(abs(headPitchDelta))
+            hints += HintText.es(if (headPitchDelta > 0) HintText.CHIN_DOWN else HintText.CHIN_UP, abs(headPitchDelta))
         // keystoneDeg > 0: el cuadro actual necesita "nivelar" una cámara elevada → inclinarla hacia abajo
         if (status != MatchStatus.MATCH && abs(keystoneDeg) >= KEYSTONE_HINT) {
-            hints += if (keystoneDeg > 0) "Cámara: inclinar hacia abajo" else "Cámara: inclinar hacia arriba"
+            hints += if (keystoneDeg > 0) trn("Cámara: inclinar hacia abajo") else trn("Cámara: inclinar hacia arriba")
         }
         val quality = pointFraction ?: (1f - (norm - 1f) / (CLOSE_FACTOR * 2f)).coerceIn(0f, 1f).let { if (norm <= 1f) 1f else it }
         return MatchEval(status, quality, hints, off, se, tt.rotationDegrees, pointFraction, threshold, keystoneDeg,

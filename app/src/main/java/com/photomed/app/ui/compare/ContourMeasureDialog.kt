@@ -1,5 +1,6 @@
 package com.photomed.app.ui.compare
 
+import com.photomed.app.i18n.tr
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -119,7 +120,7 @@ private fun ContourMeasureContent(before: Photo, after: Photo, onDismiss: () -> 
                 error = null
             } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (e: Exception) {
-                error = "No se pudo leer la fotografía (${e.message ?: e.javaClass.simpleName})"
+                error = tr("No se pudo leer la fotografía (%1\$s)", e.message ?: e.javaClass.simpleName)
             } finally { busy = false }
         }.also { jobs[i] = it }
     }
@@ -156,8 +157,8 @@ private fun ContourMeasureContent(before: Photo, after: Photo, onDismiss: () -> 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Medir contornos") },
-                navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Cerrar") } },
+                title = { Text(tr("Medir contornos")) },
+                navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, tr("Cerrar")) } },
             )
         },
     ) { padding ->
@@ -169,12 +170,12 @@ private fun ContourMeasureContent(before: Photo, after: Photo, onDismiss: () -> 
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth()) else Box(Modifier.height(4.dp))
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                listOf("Antes · ${formatDate(before.takenAt)}", "Después · ${formatDate(after.takenAt)}").forEachIndexed { i, l ->
+                listOf(tr("Antes · %1\$s", formatDate(before.takenAt)), tr("Después · %1\$s", formatDate(after.takenAt))).forEachIndexed { i, l ->
                     SegmentedButton(selected = active == i, onClick = { active = i },
                         shape = SegmentedButtonDefaults.itemShape(i, 2)) { Text(l, maxLines = 1) }
                 }
             }
-            Text("Toque una región para seleccionarla con la varita mágica, o use la detección automática.",
+            Text(tr("Toque una región para seleccionarla con la varita mágica, o use la detección automática."),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Box(
                 Modifier.fillMaxWidth().aspectRatio(3f / 4f).clip(MaterialTheme.shapes.medium).background(Color.Black)
@@ -188,20 +189,20 @@ private fun ContourMeasureContent(before: Photo, after: Photo, onDismiss: () -> 
                 metrics[active]?.let { m -> MetricsOverlay(m) }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
-                AssistChip(onClick = { auto(active) }, label = { Text("Detección automática") },
+                AssistChip(onClick = { auto(active) }, label = { Text(tr("Detección automática")) },
                     leadingIcon = { Icon(Icons.Default.AutoFixHigh, null) })
-                Text("Tolerancia ${tolerance.roundToInt()}", style = MaterialTheme.typography.labelLarge)
+                Text(tr("Tolerancia %1\$d", tolerance.roundToInt()), style = MaterialTheme.typography.labelLarge)
             }
             Slider(tolerance, { tolerance = it }, valueRange = 4f..40f)
             MetricsTable(metrics[0], metrics[1])
             keystone?.let { k ->
                 HorizontalDivider()
-                Text("Perspectiva vertical estimada por proporciones: %+.1f°".format(k),
+                Text(tr("Perspectiva vertical estimada por proporciones: %1\$+.1f°", k),
                     style = MaterialTheme.typography.titleSmall)
-                Text("Inclinación que iguala las proporciones de anchos (superior, medio, inferior) de ambos contornos.",
+                Text(tr("Inclinación que iguala las proporciones de anchos (superior, medio, inferior) de ambos contornos."),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text("Estos contornos se usarán como base al pulsar “Alinear automáticamente” (con “Usar contornos” activo).",
+            Text(tr("Estos contornos se usarán como base al pulsar “Alinear automáticamente” (con “Usar contornos” activo)."),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             Box(Modifier.height(Md3Spacing.s8))
         }
@@ -240,18 +241,18 @@ private fun MetricsTable(a: ContourMetrics?, b: ContourMetrics?) {
     fun num(v: Float?) = v?.let { "%.3f".format(it) } ?: "—"
     fun delta(x: Float?, y: Float?) = if (x != null && y != null && x != 0f) "%+.1f%%".format((y / x - 1) * 100) else "—"
     val rows = listOf(
-        Triple("Alto (% ancho de imagen)", a?.height, b?.height) to ::pct,
-        Triple("Ancho máximo", a?.maxWidth, b?.maxWidth) to ::pct,
-        Triple("Ancho al 25 % (sup.)", a?.widthUpper, b?.widthUpper) to ::pct,
-        Triple("Ancho al 50 % (medio)", a?.widthMiddle, b?.widthMiddle) to ::pct,
-        Triple("Ancho al 75 % (inf.)", a?.widthLower, b?.widthLower) to ::pct,
-        Triple("Área (% del ancho²)", a?.area, b?.area) to ::pct,
-        Triple("Proporción ancho/alto", a?.aspect, b?.aspect) to ::num,
-        Triple("Proporción sup./inf.", a?.upperLowerRatio, b?.upperLowerRatio) to ::num,
+        Triple(tr("Alto (% ancho de imagen)"), a?.height, b?.height) to ::pct,
+        Triple(tr("Ancho máximo"), a?.maxWidth, b?.maxWidth) to ::pct,
+        Triple(tr("Ancho al 25 % (sup.)"), a?.widthUpper, b?.widthUpper) to ::pct,
+        Triple(tr("Ancho al 50 % (medio)"), a?.widthMiddle, b?.widthMiddle) to ::pct,
+        Triple(tr("Ancho al 75 % (inf.)"), a?.widthLower, b?.widthLower) to ::pct,
+        Triple(tr("Área (% del ancho²)"), a?.area, b?.area) to ::pct,
+        Triple(tr("Proporción ancho/alto"), a?.aspect, b?.aspect) to ::num,
+        Triple(tr("Proporción sup./inf."), a?.upperLowerRatio, b?.upperLowerRatio) to ::num,
     )
     Column {
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-            listOf("Medida", "Antes", "Después", "Δ").forEachIndexed { i, h ->
+            listOf(tr("Medida"), tr("Antes"), tr("Después"), "Δ").forEachIndexed { i, h ->
                 Text(h, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(if (i == 0) 2f else 1f))
             }
@@ -265,8 +266,8 @@ private fun MetricsTable(a: ContourMetrics?, b: ContourMetrics?) {
                 Text(delta(r.second, r.third), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
             }
         }
-        Text("Las medidas absolutas son comparables si ambas fotos tienen el mismo encuadre (use la guía y la coincidencia); " +
-            "las proporciones no dependen de la distancia.", style = MaterialTheme.typography.bodySmall,
+        Text(tr("Las medidas absolutas son comparables si ambas fotos tienen el mismo encuadre (use la guía y la coincidencia); " +
+            "las proporciones no dependen de la distancia."), style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

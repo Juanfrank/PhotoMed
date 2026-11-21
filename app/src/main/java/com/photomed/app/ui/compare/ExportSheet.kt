@@ -1,5 +1,7 @@
 package com.photomed.app.ui.compare
 
+import com.photomed.app.i18n.trn
+import com.photomed.app.i18n.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
@@ -56,12 +58,14 @@ import com.photomed.app.ui.theme.Md3Spacing
 import kotlinx.coroutines.launch
 
 /** Qué exportar (una sola opción a la vez). */
-enum class ExportKind(val label: String, val needsTwo: Boolean) {
-    INDIVIDUAL("Fotos ajustadas (una por foto)", false),
-    GRID("Cuadrícula con fechas", true),
-    SIDE("Lado a lado (una fila)", true),
-    GIF("Animación GIF", true),
-    MP4("Vídeo MP4", true);
+enum class ExportKind(private val labelEs: String, val needsTwo: Boolean) {
+    INDIVIDUAL(trn("Fotos ajustadas (una por foto)"), false),
+    GRID(trn("Cuadrícula con fechas"), true),
+    SIDE(trn("Lado a lado (una fila)"), true),
+    GIF(trn("Animación GIF"), true),
+    MP4(trn("Vídeo MP4"), true);
+
+    val label: String get() = tr(labelEs)
 
     /** Animación (GIF o MP4): mismo guion de ida y vuelta, en bucle sin salto. */
     val animated: Boolean get() = this == GIF || this == MP4
@@ -114,7 +118,7 @@ fun ExportSheet(
         scope.launch {
             val msg = runCatching {
                 onExport(ExportChoice(kind, gifMode, timing, anonymize, view), toGallery) { i, n -> progress = if (n > 0) i / n.toFloat() else 1f }
-            }.getOrElse { "No se pudo exportar: ${it.message ?: it.javaClass.simpleName}" }
+            }.getOrElse { tr("No se pudo exportar: %1\$s", it.message ?: it.javaClass.simpleName) }
             progress = null
             msg?.let(onMessage)
             onDismiss()
@@ -128,13 +132,13 @@ fun ExportSheet(
         Column(Modifier.padding(horizontal = Md3Spacing.s6).padding(bottom = Md3Spacing.s6)
             .verticalScroll(scroll),
             verticalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
-            Text("Exportar imágenes ajustadas", style = MaterialTheme.typography.titleLarge)
+            Text(tr("Exportar imágenes ajustadas"), style = MaterialTheme.typography.titleLarge)
             Text(
                 buildList {
-                    add("$count fotos en el encuadre de la referencia")
-                    add(if (aligned) "alineación aplicada" else "sin alinear (pulse “Alinear automáticamente” antes para exportarlas alineadas)")
-                    if (colorMatched) add("color igualado")
-                    if (cropped) add("recortadas según la alineación")
+                    add(tr("%1\$d fotos en el encuadre de la referencia", count))
+                    add(if (aligned) tr("alineación aplicada") else tr("sin alinear (pulse “Alinear automáticamente” antes para exportarlas alineadas)"))
+                    if (colorMatched) add(tr("color igualado"))
+                    if (cropped) add(tr("recortadas según la alineación"))
                 }.joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -158,21 +162,21 @@ fun ExportSheet(
                         ) { Text(m.label) }
                     }
                 }
-                Text("Tiempo por imagen: %.1f s".format(holdS), style = MaterialTheme.typography.bodyMedium)
+                Text(tr("Tiempo por imagen: %1\$.1f s", holdS), style = MaterialTheme.typography.bodyMedium)
                 Slider(holdS, { holdS = (it * 10).roundToInt() / 10f }, valueRange = 0.3f..5f,
-                    modifier = Modifier.semantics { contentDescription = "Tiempo por imagen" })
-                Text(if (transS < 0.05f) "Transición: sin transición (corte)" else "Transición: %.1f s".format(transS),
+                    modifier = Modifier.semantics { contentDescription = tr("Tiempo por imagen") })
+                Text(if (transS < 0.05f) tr("Transición: sin transición (corte)") else tr("Transición: %1\$.1f s", transS),
                     style = MaterialTheme.typography.bodyMedium)
                 Slider(transS, { transS = (it * 10).roundToInt() / 10f }, valueRange = 0f..3f,
-                    modifier = Modifier.semantics { contentDescription = "Tiempo de transición" })
+                    modifier = Modifier.semantics { contentDescription = tr("Tiempo de transición") })
             }
             // capas de la imagen exportada
-            Text("Capas en la imagen", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
+            Text(tr("Capas en la imagen"), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
             listOf(
-                Triple("Imagen", view.image) { b: Boolean -> view.copy(image = b) },
-                Triple("Diagrama facial (contornos y números)", view.diagram) { b: Boolean -> view.copy(diagram = b) },
-                Triple("Anotaciones", view.notes) { b: Boolean -> view.copy(notes = b) },
-                Triple("Overlay (fechas y rótulos)", view.overlay) { b: Boolean -> view.copy(overlay = b) },
+                Triple(tr("Imagen"), view.image) { b: Boolean -> view.copy(image = b) },
+                Triple(tr("Diagrama facial (contornos y números)"), view.diagram) { b: Boolean -> view.copy(diagram = b) },
+                Triple(tr("Anotaciones"), view.notes) { b: Boolean -> view.copy(notes = b) },
+                Triple(tr("Overlay (fechas y rótulos)"), view.overlay) { b: Boolean -> view.copy(overlay = b) },
             ).forEach { (label, on, set) ->
                 Row(Modifier.fillMaxWidth().toggleable(on, role = Role.Checkbox) { view = set(it) }.padding(vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically) {
@@ -188,14 +192,14 @@ fun ExportSheet(
             Box(Modifier.fillMaxWidth().height(272.dp), contentAlignment = Alignment.Center) {
                 ExportPreview(kind, previewImgs, gifMode, timing, Modifier.padding(vertical = 4.dp))
             }
-            if (kind.animated) Text("Se reproduce de ida y vuelta: al repetirse en bucle no se nota el salto." +
-                (if (kind == ExportKind.MP4) " El vídeo dura un ciclo; la galería o el chat lo repiten." else ""),
+            if (kind.animated) Text(tr("Se reproduce de ida y vuelta: al repetirse en bucle no se nota el salto.") +
+                (if (kind == ExportKind.MP4) " " + tr("El vídeo dura un ciclo; la galería o el chat lo repiten.") else ""),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.fillMaxWidth().toggleable(anonymize, role = Role.Switch) { anonymize = it }.padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Sin datos del paciente", style = MaterialTheme.typography.bodyLarge)
-                    Text("Nombres sin el nombre del paciente y sin metadatos de identificación.",
+                    Text(tr("Sin datos del paciente"), style = MaterialTheme.typography.bodyLarge)
+                    Text(tr("Nombres sin el nombre del paciente y sin metadatos de identificación."),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = anonymize, onCheckedChange = null)
@@ -204,10 +208,10 @@ fun ExportSheet(
             val ok = !kind.needsTwo || count >= 2
             Row(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
                 OutlinedButton(onClick = { run(toGallery = false) }, enabled = ok && progress == null, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Share, null); Text("  Compartir")
+                    Icon(Icons.Default.Share, null); Text("  " + tr("Compartir"))
                 }
                 Button(onClick = { run(toGallery = true) }, enabled = ok && progress == null, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.PhotoLibrary, null); Text("  Guardar")
+                    Icon(Icons.Default.PhotoLibrary, null); Text("  " + tr("Guardar"))
                 }
             }
         }
@@ -234,10 +238,10 @@ fun ExportPreview(kind: ExportKind, images: List<Pair<android.graphics.Bitmap, S
     }
     Box(modifier.heightIn(max = 260.dp).widthIn(max = 320.dp).clip(MaterialTheme.shapes.small)
         .background(androidx.compose.ui.graphics.Color.Black)
-        .semantics { contentDescription = "Vista previa de la exportación" }, contentAlignment = Alignment.Center) {
+        .semantics { contentDescription = tr("Vista previa de la exportación") }, contentAlignment = Alignment.Center) {
         when {
             images == null -> CircularProgressIndicator(Modifier.padding(24.dp).size(28.dp))
-            bmp == null -> Text("Sin vista previa", color = androidx.compose.ui.graphics.Color.White, modifier = Modifier.padding(24.dp))
+            bmp == null -> Text(tr("Sin vista previa"), color = androidx.compose.ui.graphics.Color.White, modifier = Modifier.padding(24.dp))
             else -> androidx.compose.foundation.Image(bmp.asImageBitmap(), null,
                 Modifier.aspectRatio(bmp.width / bmp.height.toFloat()), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
         }
@@ -255,11 +259,11 @@ fun GifPreview(images: List<Pair<android.graphics.Bitmap, String>>?, mode: Compa
     }
     Box(modifier.width(192.dp).aspectRatio(3f / 4f).clip(MaterialTheme.shapes.small)
         .background(androidx.compose.ui.graphics.Color.Black)
-        .semantics { contentDescription = "Vista previa del GIF" }, contentAlignment = Alignment.Center) {
+        .semantics { contentDescription = tr("Vista previa del GIF") }, contentAlignment = Alignment.Center) {
         val imgs = images
         when {
             imgs == null -> CircularProgressIndicator(Modifier.size(28.dp))
-            imgs.size < 2 -> Text("Sin vista previa", color = androidx.compose.ui.graphics.Color.White)
+            imgs.size < 2 -> Text(tr("Sin vista previa"), color = androidx.compose.ui.graphics.Color.White)
             else -> androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
                 val (i, t) = CompareExport.gifStateAt(timeMs, imgs.size, timing)
                 val (a, la) = imgs[i]; val (b, lb) = imgs[(i + 1) % imgs.size]

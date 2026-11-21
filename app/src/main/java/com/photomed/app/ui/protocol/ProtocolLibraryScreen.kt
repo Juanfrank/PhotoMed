@@ -63,6 +63,7 @@ import com.photomed.app.data.Protocol
 import com.photomed.app.data.Protocols
 import com.photomed.app.ui.LocalRepository
 import com.photomed.app.ui.formatDate
+import com.photomed.app.i18n.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -93,7 +94,7 @@ fun ProtocolLibraryScreen(onEdit: (String) -> Unit, onApply: (String, Protocol) 
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) scope.launch {
             val msg = withContext(Dispatchers.IO) {
-                runCatching { "Protocolo «${Protocols.import(context, uri).name}» importado" }.getOrElse { it.message ?: "No se pudo importar el archivo" }
+                runCatching { tr("Protocolo «%1\$s» importado", Protocols.import(context, uri).name) }.getOrElse { it.message ?: tr("No se pudo importar el archivo") }
             }
             version++
             snackbar.showSnackbar(msg)
@@ -102,23 +103,23 @@ fun ProtocolLibraryScreen(onEdit: (String) -> Unit, onApply: (String, Protocol) 
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { com.photomed.app.ui.components.AppSectionTitle("Protocolos") }, actions = {
+            TopAppBar(title = { com.photomed.app.ui.components.AppSectionTitle(tr("Protocolos")) }, actions = {
                 IconButton(onClick = { importer.launch(arrayOf("application/json", "application/octet-stream", "*/*")) }) {
-                    Icon(Icons.Default.FileOpen, "Importar un protocolo")
+                    Icon(Icons.Default.FileOpen, tr("Importar un protocolo"))
                 }
             })
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = { onEdit("new") }, icon = { Icon(Icons.Default.Add, null) }, text = { Text("Nuevo protocolo") })
+            ExtendedFloatingActionButton(onClick = { onEdit("new") }, icon = { Icon(Icons.Default.Add, null) }, text = { Text(tr("Nuevo protocolo")) })
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         val l = list
         if (l != null && l.isEmpty()) {
-            com.photomed.app.ui.components.EmptyState(Icons.Default.PlaylistAddCheck, "Aún no hay protocolos",
-                "Un protocolo es una lista de tomas (zonas, gestos, cantidad, coincidencia, luz y referencia) que se reutiliza con " +
-                    "cualquier paciente y se comparte con otros profesionales.", Modifier.padding(padding),
-                actionLabel = "Crear el primero", actionIcon = Icons.Default.Add, onAction = { onEdit("new") })
+            com.photomed.app.ui.components.EmptyState(Icons.Default.PlaylistAddCheck, tr("Aún no hay protocolos"),
+                tr("Un protocolo es una lista de tomas (zonas, gestos, cantidad, coincidencia, luz y referencia) que se reutiliza con " +
+                    "cualquier paciente y se comparte con otros profesionales."), Modifier.padding(padding),
+                actionLabel = tr("Crear el primero"), actionIcon = Icons.Default.Add, onAction = { onEdit("new") })
             return@Scaffold
         }
         LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(12.dp, 8.dp, 12.dp, 96.dp),
@@ -128,24 +129,24 @@ fun ProtocolLibraryScreen(onEdit: (String) -> Unit, onApply: (String, Protocol) 
                     Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
                             Text(p.name, style = MaterialTheme.typography.titleMedium)
-                            Text("${p.steps.size} tomas · ${p.totalShots} fotos" + (if (p.author.isNotBlank()) " · ${p.author}" else "") +
+                            Text(tr("%1\$d tomas · %2\$d fotos", p.steps.size, p.totalShots) + (if (p.author.isNotBlank()) " · ${p.author}" else "") +
                                 " · ${formatDate(p.createdAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(p.steps.joinToString(" → ") { it.title }, style = MaterialTheme.typography.bodySmall, maxLines = 2,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        TextButton(onClick = { applying = p }) { Text("Aplicar") }
+                        TextButton(onClick = { applying = p }) { Text(tr("Aplicar")) }
                         var menu by remember { mutableStateOf(false) }
                         Box {
-                            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Opciones del protocolo ${p.name}") }
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, tr("Opciones del protocolo %1\$s", p.name)) }
                             DropdownMenu(menu, { menu = false }) {
-                                DropdownMenuItem(text = { Text("Editar") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { menu = false; onEdit(p.id) })
-                                DropdownMenuItem(text = { Text("Duplicar") }, leadingIcon = { Icon(Icons.Default.ContentCopy, null) }, onClick = {
+                                DropdownMenuItem(text = { Text(tr("Editar")) }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { menu = false; onEdit(p.id) })
+                                DropdownMenuItem(text = { Text(tr("Duplicar")) }, leadingIcon = { Icon(Icons.Default.ContentCopy, null) }, onClick = {
                                     menu = false
-                                    Protocols.save(context, p.copy(id = UUID.randomUUID().toString(), name = p.name + " (copia)", createdAt = System.currentTimeMillis()))
+                                    Protocols.save(context, p.copy(id = UUID.randomUUID().toString(), name = tr("%1\$s (copia)", p.name), createdAt = System.currentTimeMillis()))
                                     version++
                                 })
-                                DropdownMenuItem(text = { Text("Compartir") }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { menu = false; shareProtocol(context, p) })
-                                DropdownMenuItem(text = { Text("Eliminar") }, leadingIcon = { Icon(Icons.Default.Delete, null) }, onClick = { menu = false; deleting = p })
+                                DropdownMenuItem(text = { Text(tr("Compartir")) }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { menu = false; shareProtocol(context, p) })
+                                DropdownMenuItem(text = { Text(tr("Eliminar")) }, leadingIcon = { Icon(Icons.Default.Delete, null) }, onClick = { menu = false; deleting = p })
                             }
                         }
                     }
@@ -155,14 +156,14 @@ fun ProtocolLibraryScreen(onEdit: (String) -> Unit, onApply: (String, Protocol) 
     }
 
     applying?.let { p ->
-        ExpedientePicker("Aplicar «${p.name}» a…", onDismiss = { applying = null }) { e -> applying = null; onApply(e.id, p) }
+        ExpedientePicker(tr("Aplicar «%1\$s» a…", p.name), onDismiss = { applying = null }) { e -> applying = null; onApply(e.id, p) }
     }
     deleting?.let { p ->
         AlertDialog(onDismissRequest = { deleting = null },
-            title = { Text("¿Eliminar el protocolo «${p.name}»?") },
-            text = { Text("Se quita de la app; las fotos tomadas con él no se borran.") },
-            confirmButton = { TextButton(onClick = { Protocols.delete(context, p.id); deleting = null; version++ }) { Text("Eliminar") } },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancelar") } })
+            title = { Text(tr("¿Eliminar el protocolo «%1\$s»?", p.name)) },
+            text = { Text(tr("Se quita de la app; las fotos tomadas con él no se borran.")) },
+            confirmButton = { TextButton(onClick = { Protocols.delete(context, p.id); deleting = null; version++ }) { Text(tr("Eliminar")) } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text(tr("Cancelar")) } })
     }
 }
 
@@ -175,21 +176,21 @@ fun ExpedientePicker(title: String, onDismiss: () -> Unit, onPick: (Expediente) 
     AlertDialog(onDismissRequest = onDismiss, title = { Text(title) },
         text = {
             Column {
-                OutlinedTextField(q, { q = it }, singleLine = true, label = { Text("Buscar por nombre o número") },
+                OutlinedTextField(q, { q = it }, singleLine = true, label = { Text(tr("Buscar por nombre o número")) },
                     leadingIcon = { Icon(Icons.Default.PersonSearch, null) }, modifier = Modifier.fillMaxWidth())
                 val shown = all.filter { q.isBlank() || it.patientName.contains(q, true) || it.recordNumber.contains(q, true) }
                 LazyColumn(Modifier.height(320.dp)) {
                     items(shown, key = { it.id }) { e ->
                         ListItem(leadingContent = { PatientThumb(e) },
-                            headlineContent = { Text(e.patientName.ifBlank { "(sin nombre)" }) },
-                            supportingContent = { Text(listOfNotNull(e.recordNumber.takeIf { it.isNotBlank() }?.let { "Exp. $it" }, "${e.photoCount} fotos").joinToString(" · ")) },
+                            headlineContent = { Text(e.patientName.ifBlank { tr("(sin nombre)") }) },
+                            supportingContent = { Text(listOfNotNull(e.recordNumber.takeIf { it.isNotBlank() }?.let { tr("Exp. %1\$s", it) }, tr("%1\$d fotos", e.photoCount)).joinToString(" · ")) },
                             modifier = Modifier.clickable { onPick(e) })
                         HorizontalDivider()
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
+        confirmButton = { TextButton(onClick = onDismiss) { Text(tr("Cancelar")) } })
 }
 
 /**
@@ -206,7 +207,7 @@ fun PatientThumb(e: Expediente, width: androidx.compose.ui.unit.Dp = 40.dp) {
     androidx.compose.foundation.layout.Box(Modifier.width(width).aspectRatio(3f / 4f).clip(MaterialTheme.shapes.small),
         contentAlignment = androidx.compose.ui.Alignment.Center) {
         val f = face
-        if (f != null) coil.compose.AsyncImage(com.photomed.app.ui.photoModel(context, f.uri), "Foto del paciente",
+        if (f != null) coil.compose.AsyncImage(com.photomed.app.ui.photoModel(context, f.uri), tr("Foto del paciente"),
             contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.fillMaxSize())
         else com.photomed.app.ui.components.Avatar(e.patientName, width)
     }

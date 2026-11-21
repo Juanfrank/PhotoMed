@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import com.photomed.app.ui.components.FullScreenOverlay
 import com.photomed.app.ui.theme.Md3Spacing
+import com.photomed.app.i18n.tr
 
 /**
  * Formulario de expediente como diálogo a pantalla completa (patrón M3 para formularios en
@@ -64,12 +65,12 @@ fun ExpedienteForm(
             topBar = {
                 TopAppBar(
                     title = { Text(title) },
-                    navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Cerrar") } },
+                    navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, tr("Cerrar")) } },
                     actions = {
                         TextButton(onClick = {
                             triedSave = true
                             if (name.isNotBlank()) onConfirm(name, record, notes, consent)
-                        }) { Text("Guardar") }
+                        }) { Text(tr("Guardar")) }
                     },
                 )
             },
@@ -81,24 +82,24 @@ fun ExpedienteForm(
             ) {
                 OutlinedTextField(
                     value = name, onValueChange = { name = it },
-                    label = { Text("Nombre del paciente *") },
+                    label = { Text(tr("Nombre del paciente *")) },
                     isError = nameError,
-                    supportingText = { Text(if (nameError) "El nombre es obligatorio" else "Nombre y apellidos") },
+                    supportingText = { Text(if (nameError) tr("El nombre es obligatorio") else tr("Nombre y apellidos")) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = record, onValueChange = { record = it },
-                    label = { Text("Número de expediente") },
-                    supportingText = { Text("Se usa, junto con el nombre, para nombrar el álbum") },
+                    label = { Text(tr("Número de expediente")) },
+                    supportingText = { Text(tr("Se usa, junto con el nombre, para nombrar el álbum")) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = notes, onValueChange = { notes = it },
-                    label = { Text("Notas / tratamiento") },
+                    label = { Text(tr("Notas / tratamiento")) },
                     minLines = 3,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth(),
@@ -110,9 +111,9 @@ fun ExpedienteForm(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f).padding(end = Md3Spacing.s4)) {
-                            Text("Consentimiento informado", style = MaterialTheme.typography.titleMedium)
+                            Text(tr("Consentimiento informado"), style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "El paciente autorizó por escrito la toma y el uso clínico de fotografías.",
+                                tr("El paciente autorizó por escrito la toma y el uso clínico de fotografías."),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -121,8 +122,8 @@ fun ExpedienteForm(
                     }
                 }
                 Text(
-                    "Las fotografías se guardan en la galería del teléfono, en el álbum del paciente, e incluyen " +
-                        "estos datos como metadatos. Use “Compartir sin datos del paciente” para enviarlas anonimizadas.",
+                    tr("Las fotografías se guardan en la galería del teléfono, en el álbum del paciente, e incluyen " +
+                        "estos datos como metadatos. Use “Compartir sin datos del paciente” para enviarlas anonimizadas."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

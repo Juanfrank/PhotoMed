@@ -1,5 +1,6 @@
 package com.photomed.app.align
 
+import com.photomed.app.i18n.tr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -27,7 +28,7 @@ object ImageOps {
             .data(uri).size(width, width * 4 / 3).scale(Scale.FILL).precision(Precision.EXACT)
             .allowHardware(false).build()
         val bmp = (context.imageLoader.execute(request) as? SuccessResult)?.drawable
-            ?.let { (it as BitmapDrawable).bitmap } ?: error("No se pudo abrir la imagen")
+            ?.let { (it as BitmapDrawable).bitmap } ?: error(tr("No se pudo abrir la imagen"))
         return centerCrop34(bmp, width)
     }
 
@@ -37,7 +38,7 @@ object ImageOps {
             .data(uri).size(maxSide, maxSide).scale(Scale.FIT).precision(Precision.INEXACT)
             .allowHardware(false).build()
         val bmp = (context.imageLoader.execute(request) as? SuccessResult)?.drawable
-            ?.let { (it as BitmapDrawable).bitmap } ?: error("No se pudo abrir la imagen")
+            ?.let { (it as BitmapDrawable).bitmap } ?: error(tr("No se pudo abrir la imagen"))
         return (edit ?: PhotoEdits.of(context, uri.toString())).apply(bmp)
     }
 

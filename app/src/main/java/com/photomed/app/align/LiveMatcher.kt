@@ -1,5 +1,6 @@
 package com.photomed.app.align
 
+import com.photomed.app.i18n.tr
 import android.graphics.Bitmap
 import com.photomed.app.data.Zone
 import java.io.Closeable
@@ -290,10 +291,10 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     private fun withDiagnostic(e: MatchEval, cur: Detection): MatchEval {
         // segmentación de pelo y piel que no carga en este teléfono: decirlo (la línea del pelo no saldría)
         if (tracksHairline && cur.points.isNotEmpty() && hairSkin == null)
-            return e.copy(hints = e.hints + "Detector (pelo y piel): ${HairSkinSegmenter.lastError ?: "no disponible"}")
+            return e.copy(hints = e.hints + HintText.es(HintText.DETECTOR_HAIR, HairSkinSegmenter.lastError ?: tr("no disponible")))
         if (spec.detector == Detector.NONE || cur.points.isNotEmpty()) return e
         val d = detector.diagnostic ?: return e
-        return e.copy(hints = e.hints + "Detector ($engine): $d")
+        return e.copy(hints = e.hints + HintText.es(HintText.DETECTOR, engine, d))
     }
 
     private var liveHairline: List<Pt>? = null

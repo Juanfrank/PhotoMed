@@ -1,5 +1,7 @@
 package com.photomed.app.ui.compare
 
+import com.photomed.app.i18n.trn
+import com.photomed.app.i18n.tr
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -125,13 +127,13 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
             adjust = res?.first; preview = res?.second; deltaE = res?.third
             source = when {
                 res != null -> m.done
-                m == ColorMode.AUTO -> "no se encontró piel: use un punto de piel o un punto neutro"
+                m == ColorMode.AUTO -> tr("no se encontró piel: use un punto de piel o un punto neutro")
                 else -> m.ask
             }
         } catch (e: kotlinx.coroutines.CancellationException) { throw e
         } catch (e: Exception) {
             adjust = null; preview = null; deltaE = null
-            source = "No se pudo analizar la imagen: use un punto de referencia"
+            source = tr("No se pudo analizar la imagen: use un punto de referencia")
         } finally { busy = false }
     } }
 
@@ -143,13 +145,13 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
         } catch (e: kotlinx.coroutines.CancellationException) { throw e
         } catch (e: Exception) {
             busy = false
-            source = "No se pudo leer la fotografía (${e.message ?: e.javaClass.simpleName})"
+            source = tr("No se pudo leer la fotografía (%1\$s)", e.message ?: e.javaClass.simpleName)
         }
     }
 
     Scaffold(topBar = {
-        TopAppBar(title = { Text("Igualar color de piel") },
-            navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Cerrar") } })
+        TopAppBar(title = { Text(tr("Igualar color de piel")) },
+            navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, tr("Cerrar")) } })
     }) { padding ->
         Column(
             Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Md3Spacing.marginCompact),
@@ -159,7 +161,7 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
             Text(mode.help,
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
-                listOf("Antes", "Después (ajustada)").forEachIndexed { i, label ->
+                listOf(tr("Antes"), tr("Después (ajustada)")).forEachIndexed { i, label ->
                     Column(Modifier.weight(1f)) {
                         Box(
                             Modifier.fillMaxWidth().aspectRatio(3f / 4f).clip(MaterialTheme.shapes.small).background(Color.Black)
@@ -201,11 +203,11 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
             Text(source, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             adjust?.let { Text(it.describe(), style = MaterialTheme.typography.bodyMedium) }
             deltaE?.let { (b0, a0) ->
-                Text("Diferencia de color ΔE2000: %.1f → %.1f  (≤ 2: apenas perceptible)".format(b0, a0),
+                Text(tr("Diferencia de color ΔE2000: %1\$.1f → %2\$.1f  (≤ 2: apenas perceptible)", b0, a0),
                     style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             }
             Button(onClick = { adjust?.let(onApply) }, enabled = adjust != null, modifier = Modifier.fillMaxWidth()) {
-                Text("Aplicar a la comparación")
+                Text(tr("Aplicar a la comparación"))
             }
             Box(Modifier.height(Md3Spacing.s8))
         }
@@ -225,14 +227,19 @@ suspend fun autoColorAdjust(context: android.content.Context, aligner: Aligner, 
 }
 
 /** Modos de igualación de color. */
-enum class ColorMode(val label: String, val help: String, val ask: String, val done: String) {
-    AUTO("Automático (piel)",
-        "Piel del rostro (sin ojos, cejas, labios ni fosas nasales) o de la extremidad: balance de blancos y exposición (Bradford) y gradación tonal.",
-        "", "piel detectada automáticamente"),
-    SKIN_POINT("Punto de piel",
-        "Toque la misma zona de piel en cada foto (p. ej. el centro de la mejilla).",
-        "toque la misma zona de piel en cada foto", "puntos de piel"),
-    NEUTRAL("Punto neutro (carta gris)",
-        "Toque una referencia neutra en cada foto (carta gris o blanca, bata): corrige el balance de blancos y la exposición sin suponer nada de la piel. Es lo más fiable si se fotografía una carta.",
-        "toque la carta gris o blanca en cada foto", "punto neutro"),
+enum class ColorMode(private val labelEs: String, private val helpEs: String, private val askEs: String, private val doneEs: String) {
+    AUTO(trn("Automático (piel)"),
+        trn("Piel del rostro (sin ojos, cejas, labios ni fosas nasales) o de la extremidad: balance de blancos y exposición (Bradford) y gradación tonal."),
+        "", trn("piel detectada automáticamente")),
+    SKIN_POINT(trn("Punto de piel"),
+        trn("Toque la misma zona de piel en cada foto (p. ej. el centro de la mejilla)."),
+        trn("toque la misma zona de piel en cada foto"), trn("puntos de piel")),
+    NEUTRAL(trn("Punto neutro (carta gris)"),
+        trn("Toque una referencia neutra en cada foto (carta gris o blanca, bata): corrige el balance de blancos y la exposición sin suponer nada de la piel. Es lo más fiable si se fotografía una carta."),
+        trn("toque la carta gris o blanca en cada foto"), trn("punto neutro")),
+    ;
+    val label: String get() = tr(labelEs)
+    val help: String get() = tr(helpEs)
+    val ask: String get() = if (askEs.isEmpty()) "" else tr(askEs)
+    val done: String get() = tr(doneEs)
 }

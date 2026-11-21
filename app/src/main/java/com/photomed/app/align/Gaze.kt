@@ -1,5 +1,7 @@
 package com.photomed.app.align
 
+import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trn
 import kotlin.math.abs
 import kotlin.math.hypot
 
@@ -83,18 +85,27 @@ object Gaze {
     /** Diferencia de mirada entre dos fotos ([d] = después − antes), o null si coinciden. */
     fun describe(d: Pt): String? {
         val parts = buildList {
-            if (abs(d.x) > TOL_X) add(if (d.x > 0) "más a la derecha" else "más a la izquierda")
-            if (abs(d.y) > TOL_Y) add(if (d.y > 0) "más abajo" else "más arriba")
+            if (abs(d.x) > TOL_X) add(if (d.x > 0) tr("más a la derecha") else tr("más a la izquierda"))
+            if (abs(d.y) > TOL_Y) add(if (d.y > 0) tr("más abajo") else tr("más arriba"))
         }
-        return if (parts.isEmpty()) null else "La mirada difiere: en “después” mira " + parts.joinToString(" y ") + " (de la imagen)"
+        return if (parts.isEmpty()) null else tr("La mirada difiere: en “después” mira %1\$s (de la imagen)", parts.joinToString(" " + tr("y") + " "))
     }
 
     /** Indicación para el paciente (en coordenadas de la imagen guardada). [d] = actual − referencia. */
     fun hint(d: Pt): String? {
-        val parts = buildList {
-            if (abs(d.x) > TOL_X) add(if (d.x > 0) "más a la izquierda" else "más a la derecha")
-            if (abs(d.y) > TOL_Y) add(if (d.y > 0) "más arriba" else "más abajo")
+        // texto en español (lo analiza HintCues); se traduce al mostrarlo con HintText.display
+        val x = if (abs(d.x) > TOL_X) (if (d.x > 0) -1 else 1) else 0   // −1: más a la izquierda
+        val y = if (abs(d.y) > TOL_Y) (if (d.y > 0) -1 else 1) else 0   // −1: más arriba
+        return when {
+            x < 0 && y < 0 -> trn("Mirada: más a la izquierda y más arriba")
+            x < 0 && y > 0 -> trn("Mirada: más a la izquierda y más abajo")
+            x > 0 && y < 0 -> trn("Mirada: más a la derecha y más arriba")
+            x > 0 && y > 0 -> trn("Mirada: más a la derecha y más abajo")
+            x < 0 -> trn("Mirada: más a la izquierda")
+            x > 0 -> trn("Mirada: más a la derecha")
+            y < 0 -> trn("Mirada: más arriba")
+            y > 0 -> trn("Mirada: más abajo")
+            else -> null
         }
-        return if (parts.isEmpty()) null else "Mirada: " + parts.joinToString(" y ")
     }
 }

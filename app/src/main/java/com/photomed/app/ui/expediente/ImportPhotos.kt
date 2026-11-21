@@ -49,6 +49,7 @@ import com.photomed.app.data.ImportItem
 import com.photomed.app.data.Zone
 import com.photomed.app.data.ZoneCategory
 import com.photomed.app.ui.formatDateTime
+import com.photomed.app.i18n.tr
 
 /**
  * Importar fotos: una fila por foto con su miniatura, fecha y el ángulo (zona) al que corresponde.
@@ -66,23 +67,23 @@ fun ImportPhotosDialog(initial: List<ImportItem>, onDismiss: () -> Unit, onImpor
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Importar ${items.size} ${if (items.size == 1) "foto" else "fotos"}") },
-                    navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Cancelar") } },
+                    title = { Text(if (items.size == 1) tr("Importar %1\$d foto", items.size) else tr("Importar %1\$d fotos", items.size)) },
+                    navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, tr("Cancelar")) } },
                     // también arriba, siempre al alcance
                     actions = {
                         androidx.compose.material3.TextButton(onClick = { onImport(items) },
-                            enabled = items.isNotEmpty() && items.none { it.zone == null }) { Text("Importar") }
+                            enabled = items.isNotEmpty() && items.none { it.zone == null }) { Text(tr("Importar")) }
                     },
                 )
             },
             bottomBar = {
                 val missing = items.count { it.zone == null }
                 Column(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(16.dp)) {
-                    if (missing > 0) Text("Elija el ángulo de ${if (missing == 1) "1 foto" else "$missing fotos"}.",
+                    if (missing > 0) Text(if (missing == 1) tr("Elija el ángulo de 1 foto.") else tr("Elija el ángulo de %1\$d fotos.", missing),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.height(6.dp))
                     Button(onClick = { onImport(items) }, enabled = missing == 0 && items.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
-                        Text("Importar al expediente")
+                        Text(tr("Importar al expediente"))
                     }
                 }
             },
@@ -90,11 +91,11 @@ fun ImportPhotosDialog(initial: List<ImportItem>, onDismiss: () -> Unit, onImpor
             LazyColumn(Modifier.fillMaxSize().padding(padding)) {
                 item {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Mismo ángulo para todas", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        ZonePicker(null, "Elegir") { z -> items = items.map { it.copy(zone = z, suggested = false) } }
+                        Text(tr("Mismo ángulo para todas"), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        ZonePicker(null, tr("Elegir")) { z -> items = items.map { it.copy(zone = z, suggested = false) } }
                     }
-                    Text("Las fotos se guardan en el álbum del paciente con sus datos y sin los metadatos originales " +
-                        "(ubicación, dispositivo). Se conserva la fecha de toma si la foto la tiene.",
+                    Text(tr("Las fotos se guardan en el álbum del paciente con sus datos y sin los metadatos originales " +
+                        "(ubicación, dispositivo). Se conserva la fecha de toma si la foto la tiene."),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp))
                     HorizontalDivider(Modifier.padding(top = 8.dp))
@@ -102,24 +103,24 @@ fun ImportPhotosDialog(initial: List<ImportItem>, onDismiss: () -> Unit, onImpor
                 itemsIndexed(items, key = { _, it -> it.uri.toString() }) { i, it ->
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        AsyncImage(it.uri, "Foto ${i + 1} a importar", contentScale = ContentScale.Crop,
+                        AsyncImage(it.uri, tr("Foto %1\$d a importar", i + 1), contentScale = ContentScale.Crop,
                             modifier = Modifier.size(72.dp, 96.dp).clip(RoundedCornerShape(8.dp)))
                         Column(Modifier.weight(1f)) {
                             Text(formatDateTime(it.takenAt), style = MaterialTheme.typography.bodyMedium)
-                            Text(if (it.dateFromPhoto) "Fecha de la foto" else "Sin fecha en la foto: fecha de importación",
+                            Text(if (it.dateFromPhoto) tr("Fecha de la foto") else tr("Sin fecha en la foto: fecha de importación"),
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(4.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                ZonePicker(it.zone, "Elegir ángulo", Modifier.semantics { contentDescription = "Ángulo de la foto ${i + 1}" }) { z ->
+                                ZonePicker(it.zone, tr("Elegir ángulo"), Modifier.semantics { contentDescription = tr("Ángulo de la foto %1\$d", i + 1) }) { z ->
                                     items = items.toMutableList().also { l -> l[i] = l[i].copy(zone = z, suggested = false) }
                                 }
-                                if (it.suggested) Icon(Icons.Default.AutoFixHigh, "Ángulo sugerido por el giro de la cabeza",
+                                if (it.suggested) Icon(Icons.Default.AutoFixHigh, tr("Ángulo sugerido por el giro de la cabeza"),
                                     Modifier.padding(start = 4.dp).size(18.dp), tint = MaterialTheme.colorScheme.primary)
                             }
                             // expresión facial (solo en las zonas que la admiten)
                             val exps = it.zone?.let { z -> com.photomed.app.data.FacialExpression.forZone(z) }.orEmpty()
                             if (exps.size > 1) ExpressionPicker(it.expression, exps,
-                                Modifier.semantics { contentDescription = "Expresión de la foto ${i + 1}" }) { e ->
+                                Modifier.semantics { contentDescription = tr("Expresión de la foto %1\$d", i + 1) }) { e ->
                                 items = items.toMutableList().also { l -> l[i] = l[i].copy(expression = e) }
                             }
                         }
@@ -137,7 +138,7 @@ fun ExpressionPicker(value: com.photomed.app.data.FacialExpression, options: Lis
     var open by remember { mutableStateOf(false) }
     Box(modifier.padding(top = 4.dp)) {
         OutlinedButton(onClick = { open = true }) {
-            Text("Expresión: ${value.label}", maxLines = 1)
+            Text(tr("Expresión: %1\$s", value.label), maxLines = 1)
             Icon(Icons.Default.ArrowDropDown, null)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {

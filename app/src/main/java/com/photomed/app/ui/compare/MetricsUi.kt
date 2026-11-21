@@ -2,6 +2,8 @@
 
 package com.photomed.app.ui.compare
 
+import com.photomed.app.i18n.trn
+import com.photomed.app.i18n.tr
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -63,23 +65,26 @@ private fun f1(v: Float?) = v?.let { String.format(Locale.getDefault(), "%.1f", 
 private fun f2(v: Float?) = v?.let { String.format(Locale.getDefault(), "%.2f", it) } ?: "—"
 private fun signed(v: Float?, digits: Int) = v?.let { String.format(Locale.getDefault(), "%+.${digits}f", it) } ?: "—"
 
-/** Filas (etiqueta, valor) de las medidas de una línea o zona. */
+/**
+ * Filas (etiqueta, valor) de las medidas de una línea o zona. La etiqueta queda en español (es la clave
+ * que enlaza con [com.photomed.app.align.MeasureGuide.key]); se traduce al mostrarla con `tr(etiqueta)`.
+ */
 fun metricRows(m: LineMetrics): List<Pair<String, String>> =
-    if (m.isFeature) m.features.map { (k, v) -> k.substringBeforeLast(",") to featureValue(k, v) } + ("Escala" to scaleLabel(m.scale))
+    if (m.isFeature) m.features.map { (k, v) -> k.substringBeforeLast(",") to featureValue(k, v) } + (trn("Escala") to scaleLabel(m.scale))
     else if (m.areaMm2 != null || m.deltaE != null) listOfNotNull(
-        "Área" to "${f1(m.areaMm2?.div(100f))} cm²",
-        "ΔL* frente a la mejilla" to "${f1(m.deltaL)} (más oscura)",
-        m.deltaE?.let { "ΔE*ab frente a la mejilla" to f1(it) },
-        m.ita?.let { "ITA° ojera / mejilla" to "${f1(it)}° / ${f1(m.itaRef)}°" },
-        m.type?.let { "Tipo probable" to it },
+        trn("Área") to "${f1(m.areaMm2?.div(100f))} cm²",
+        trn("ΔL* frente a la mejilla") to tr("%1\$s (más oscura)", f1(m.deltaL)),
+        m.deltaE?.let { trn("ΔE*ab frente a la mejilla") to f1(it) },
+        m.ita?.let { trn("ITA° ojera / mejilla") to "${f1(it)}° / ${f1(m.itaRef)}°" },
+        m.type?.let { trn("Tipo probable") to it },
     ) else listOf(
-        "Longitud" to "${f1(m.lengthMm)} mm",
-        "Ancho (a media profundidad)" to "${f1(m.widthMm)} mm",
-        (if (m.depthSource == "relieve") "Profundidad (relieve medido)" else "Profundidad estimada (sombreado)") to "${f2(m.depthMm)} mm",
-        "Contraste ΔL*" to f1(m.contrastL),
-        "Grado orientativo (0–5)" to (m.grade?.let { "$it · ${gradeLabel(it)}" } ?: "—"),
-        "Escala" to scaleLabel(m.scale),
-    ) + listOfNotNull(m.note?.let { "Nota" to it })
+        trn("Longitud") to "${f1(m.lengthMm)} mm",
+        trn("Ancho (a media profundidad)") to "${f1(m.widthMm)} mm",
+        (if (m.depthSource == "relieve") trn("Profundidad (relieve medido)") else trn("Profundidad estimada (sombreado)")) to "${f2(m.depthMm)} mm",
+        trn("Contraste ΔL*") to f1(m.contrastL),
+        trn("Grado orientativo (0–5)") to (m.grade?.let { "$it · ${gradeLabel(it)}" } ?: "—"),
+        trn("Escala") to scaleLabel(m.scale),
+    ) + listOfNotNull(m.note?.let { trn("Nota") to it })
 
 /** Valor de una medida de rasgo con su unidad (la de la etiqueta tras la coma). */
 fun featureValue(label: String, v: Float): String {
@@ -95,16 +100,16 @@ fun featureValue(label: String, v: Float): String {
 }
 
 fun scaleLabel(s: String) = when (s) {
-    "sensor de profundidad" -> "sensor de profundidad"
-    "interpupilar" -> "interpupilar (63 mm)"
-    else -> "iris (11,7 mm)"
+    "sensor de profundidad" -> tr("sensor de profundidad")
+    "interpupilar" -> tr("interpupilar (63 mm)")
+    else -> tr("iris (11,7 mm)")
 }
 
-fun gradeLabel(g: Int) = listOf("sin arruga", "apenas perceptible", "superficial", "moderada", "profunda", "muy profunda")[g.coerceIn(0, 5)]
+fun gradeLabel(g: Int) = tr(listOf(trn("sin arruga"), trn("apenas perceptible"), trn("superficial"), trn("moderada"), trn("profunda"), trn("muy profunda"))[g.coerceIn(0, 5)])
 
-const val METRICS_NOTE = "Medidas orientativas desde una sola foto: escala por el diámetro del iris (11,7 mm), " +
+val METRICS_NOTE: String get() = tr("Medidas orientativas desde una sola foto: escala por el diámetro del iris (11,7 mm), " +
     "ancho y profundidad por el perfil de sombra (forma a partir del sombreado) y grado al estilo de Lemperle. " +
-    "Dependen de la luz y la pose: compare fotos tomadas igual. No sustituyen a la perfilometría ni a la valoración clínica."
+    "Dependen de la luz y la pose: compare fotos tomadas igual. No sustituyen a la perfilometría ni a la valoración clínica.")
 
 /**
  * Línea con medidas más cercana a [p] (unidades del ancho) entre las capas visibles, a menos de [tol];
@@ -175,7 +180,7 @@ fun MetricsCard(line: AnnotLine, onTable: () -> Unit, onClose: () -> Unit, modif
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Canvas(Modifier.size(10.dp)) { drawCircle(com.photomed.app.ui.camera.lineColor(line)) }
                 Text((number?.let { "$it · " } ?: "") + m.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 8.dp).weight(1f))
-                IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Cerrar") }
+                IconButton(onClick = onClose) { Icon(Icons.Default.Close, tr("Cerrar")) }
             }
             // la muestra del trazo de cada tramo va delante de su medida (sin leyenda aparte)
             val styles = com.photomed.app.ui.camera.guideStyleIndices(line)
@@ -184,11 +189,11 @@ fun MetricsCard(line: AnnotLine, onTable: () -> Unit, onClose: () -> Unit, modif
             @Composable fun row(label: String, value: String, style: Int?) {
                 Row(Modifier.fillMaxWidth().padding(end = 12.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (hasSw) {
-                        if (style != null) GuideSwatch(style, Modifier.size(30.dp, 12.dp).semantics { contentDescription = "Trazo ${style + 1}" })
+                        if (style != null) GuideSwatch(style, Modifier.size(30.dp, 12.dp).semantics { contentDescription = tr("Trazo %1\$d", style + 1) })
                         else Spacer(Modifier.width(30.dp))
                         Spacer(Modifier.width(8.dp))
                     }
-                    Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    Text(tr(label), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
                     Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
@@ -200,16 +205,16 @@ fun MetricsCard(line: AnnotLine, onTable: () -> Unit, onClose: () -> Unit, modif
                 row(label, g.label.removePrefix(g.label.substringBeforeLast(" ").substringBeforeLast(" ")).trim(), styles[gi])
             }
             TextButton(onClick = onTable) {
-                Icon(Icons.Default.TableChart, null, Modifier.size(18.dp)); Text("Tabla de medidas", Modifier.padding(start = 6.dp))
+                Icon(Icons.Default.TableChart, null, Modifier.size(18.dp)); Text(tr("Tabla de medidas"), Modifier.padding(start = 6.dp))
             }
         }
     }
 }
 
 /** Columnas numéricas de la tabla de líneas. */
-private val LINE_COLS = listOf("Long.\nmm", "Ancho\nmm", "Prof.\nmm", "ΔL*", "Grado")
+private val LINE_COLS: List<String> get() = listOf(tr("Long.") + "\nmm", tr("Ancho") + "\nmm", tr("Prof.") + "\nmm", "ΔL*", tr("Grado"))
 private fun lineVals(m: LineMetrics?): List<Float?> = listOf(m?.lengthMm, m?.widthMm, m?.depthMm, m?.contrastL, m?.grade?.toFloat())
-private val AREA_COLS = listOf("Área\ncm²", "ΔL*", "ΔE*ab", "ITA°", "")
+private val AREA_COLS: List<String> get() = listOf(tr("Área") + "\ncm²", "ΔL*", "ΔE*ab", "ITA°", "")
 private fun areaVals(m: LineMetrics?): List<Float?> = listOf(m?.areaMm2?.div(100f), m?.deltaL, m?.deltaE, m?.ita, null)
 private fun fmt(i: Int, v: Float?, area: Boolean) = when {
     v == null -> "—"
@@ -230,7 +235,7 @@ fun MetricsSheet(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
                  onDelete: ((String, Int?) -> Unit)? = null, dismissedCount: Int = 0, onRestore: (() -> Unit)? = null) {
     SafeBottomSheet(onDismiss = onDismiss) {
         Column(Modifier.padding(horizontal = 16.dp).heightIn(max = 640.dp).verticalScroll(rememberScrollState())) {
-            Text("Medidas de líneas y surcos", style = MaterialTheme.typography.titleLarge)
+            Text(tr("Medidas de líneas y surcos"), style = MaterialTheme.typography.titleLarge)
             MetricsContent(columns, layers, loading, note, onShowLayers, onDelete, dismissedCount, onRestore)
         }
     }
@@ -263,8 +268,8 @@ fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
         Column(Modifier.fillMaxWidth()) {
             // cabecera baja: el panel tiene poco alto (20 % de la pantalla) y es casi todo filas
             Row(Modifier.fillMaxWidth().height(32.dp).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Medidas", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Close, "Cerrar las medidas", Modifier.size(20.dp)) }
+                Text(tr("Medidas"), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Close, tr("Cerrar las medidas"), Modifier.size(20.dp)) }
             }
             HorizontalDivider()
             Column(Modifier.padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
@@ -314,11 +319,11 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
     if (traces != null && !loading) Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(if (traces.confirmed) Icons.Default.Verified else Icons.Default.Info, null, Modifier.size(18.dp),
             tint = if (traces.confirmed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(if (traces.confirmed) (if (traces.savedInPhoto) "Trazos confirmados: guardados en la foto" else "Trazos confirmados (guardados en la app)")
-            else "Trazos sin confirmar (análisis automático)",
+        Text(if (traces.confirmed) (if (traces.savedInPhoto) tr("Trazos confirmados: guardados en la foto") else tr("Trazos confirmados (guardados en la app)"))
+            else tr("Trazos sin confirmar (análisis automático)"),
             style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f).padding(start = 6.dp))
-        if (traces.confirmed) TextButton(onClick = traces.onRegenerate) { Text("Regenerar") }
-        else androidx.compose.material3.FilledTonalButton(onClick = traces.onConfirm) { Text("Confirmar") }
+        if (traces.confirmed) TextButton(onClick = traces.onRegenerate) { Text(tr("Regenerar")) }
+        else androidx.compose.material3.FilledTonalButton(onClick = traces.onConfirm) { Text(tr("Confirmar")) }
     }
     // todas las líneas medidas, estén o no visibles sus capas en la foto
     val byName = LinkedHashMap<String, Pair<AnnotLine, MutableList<LineMetrics?>>>()
@@ -331,9 +336,9 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
     val numbers = com.photomed.app.align.MeasureNumbering.of(columns.map { it.second })
     if (loading) Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f))
-        Text("Analizando…", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 12.dp))
+        Text(tr("Analizando…"), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 12.dp))
     }
-    if (byName.isEmpty() && !loading) Text(note ?: "No se encontraron arrugas ni surcos medibles.",
+    if (byName.isEmpty() && !loading) Text(note ?: tr("No se encontraron arrugas ni surcos medibles."),
         style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 16.dp))
     // medidas parciales (sin malla facial): el motivo, también con medidas
     if (byName.isNotEmpty() && note != null) Text(note, style = MaterialTheme.typography.bodySmall,
@@ -341,15 +346,15 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
     val hidden = byName.values.map { it.first.layer }.toSet() - layers
     if (hidden.isNotEmpty() && onShowLayers != null) {
         TextButton(onClick = { onShowLayers(layers + hidden) }) {
-            Text("Mostrar en la foto: " + hidden.sortedBy { it.ordinal }.joinToString(", ") { it.label })
+            Text(tr("Mostrar en la foto: %1\$s", hidden.sortedBy { it.ordinal }.joinToString(", ") { it.label }))
         }
     }
     val ordered = byName.entries.sortedBy { numbers[it.key] ?: Int.MAX_VALUE }.filter { !filtering || it.key == selName }
     if (filtering && byName.containsKey(selName)) Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.FilterAlt, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-        Text("Solo la selección: ${numbers[selName]?.let { "$it  " }.orEmpty()}$selName" + (selectedKey?.let { " · $it" } ?: ""),
+        Text(tr("Solo la selección: %1\$s", numbers[selName]?.let { "$it  " }.orEmpty() + selName) + (selectedKey?.let { " · $it" } ?: ""),
             style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f).padding(start = 6.dp))
-        TextButton(onClick = { showAll = true }) { Text("Ver todas (${byName.size})") }
+        TextButton(onClick = { showAll = true }) { Text(tr("Ver todas (%1\$d)", byName.size)) }
     }
     val single = columns.size == 1
     // un desplazamiento horizontal por tabla (compartido, la tabla más estrecha limitaba a las demás)
@@ -359,12 +364,12 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
         val rows = ordered.filter { e -> e.value.second.firstNotNullOfOrNull { it }?.let { com.photomed.app.align.MeasureNumbering.group(it) } == group }
         if (rows.isEmpty()) continue
         val area = group == 1
-        Text(listOf("Arrugas y surcos", "Ojeras", "Rasgos")[group], style = MaterialTheme.typography.titleSmall,
+        Text(listOf(tr("Arrugas y surcos"), tr("Ojeras"), tr("Rasgos"))[group], style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
         Column(Modifier.horizontalScroll(scrolls[group])) {
             if (group == 2) {
                 // rasgos: una fila por medida
-                val featCells = listOf("Rasgo · medida") + (if (single) listOf("Valor") else columns.map { it.first.replace(", ", "\n") } + "Δ")
+                val featCells = listOf(tr("Rasgo · medida")) + (if (single) listOf(tr("Valor")) else columns.map { it.first.replace(", ", "\n") } + "Δ")
                 val (fw, vw) = widthsFor(featCells.size, 0.dp)
                 TableRow(featCells, header = true, firstW = fw, valueW = vw)
                 rows.forEach { (name, v) ->
@@ -394,7 +399,7 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
             val cols = if (area) AREA_COLS.take(4) else LINE_COLS
             val specs = ArrayList<RowSpec>()
             if (single) {
-                specs += RowSpec(listOf(if (area) "Zona" else "Línea") + cols, header = true)
+                specs += RowSpec(listOf(if (area) tr("Zona") else tr("Línea")) + cols, header = true)
                 rows.forEach { (name, v) ->
                     val m = v.second[0]
                     specs += RowSpec(listOf(label(name, v)) + (if (area) areaVals(m) else lineVals(m)).take(cols.size).mapIndexed { i, x -> fmt(i, x, area) },
@@ -402,7 +407,7 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
                 }
             } else {
                 val head = columns.map { it.first.replace(", ", "\n") }
-                specs += RowSpec(listOf(if (area) "Zona · medida" else "Línea · medida") + head + "Δ", header = true)
+                specs += RowSpec(listOf(if (area) tr("Zona · medida") else tr("Línea · medida")) + head + "Δ", header = true)
                 rows.forEach { (name, v) ->
                     cols.forEachIndexed { i, c ->
                         val vals = v.second.map { m -> (if (area) areaVals(m) else lineVals(m))[i] }
@@ -451,12 +456,12 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
                             val n = r.deleteName
                             if (edit != null) androidx.compose.foundation.layout.Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
                                 if (n != null) IconButton(onClick = { edit(n) }, modifier = Modifier.size(btn)) {
-                                    Icon(Icons.Default.Edit, "Volver a trazar $n", Modifier.size(minOf(20.dp, btn - 4.dp)), tint = MaterialTheme.colorScheme.primary)
+                                    Icon(Icons.Default.Edit, tr("Volver a trazar %1\$s", n), Modifier.size(minOf(20.dp, btn - 4.dp)), tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                             if (revert != null) androidx.compose.foundation.layout.Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
                                 if (n != null && n in traces.edited) IconButton(onClick = { revert(n) }, modifier = Modifier.size(btn)) {
-                                    Icon(Icons.AutoMirrored.Filled.Undo, "Revertir el trazado de $n", Modifier.size(minOf(20.dp, btn - 4.dp)), tint = MaterialTheme.colorScheme.primary)
+                                    Icon(Icons.AutoMirrored.Filled.Undo, tr("Revertir el trazado de %1\$s", n), Modifier.size(minOf(20.dp, btn - 4.dp)), tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                             if (onDelete != null) androidx.compose.foundation.layout.Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
@@ -470,22 +475,22 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
         }
     }
     if (dismissedCount > 0 && onRestore != null) TextButton(onClick = onRestore) {
-        Text("Restaurar líneas eliminadas ($dismissedCount)")
+        Text(tr("Restaurar líneas eliminadas (%1\$d)", dismissedCount))
     }
     if (ordered.any { it.value.second.any { m -> m?.type != null } }) {
-        Text("Tipo probable de ojera: " + ordered.mapNotNull { e -> e.value.second.lastOrNull { it?.type != null }?.let { "${e.key}: ${it.type}" } }.joinToString("; "),
+        Text(tr("Tipo probable de ojera: %1\$s", ordered.mapNotNull { e -> e.value.second.lastOrNull { it?.type != null }?.let { "${e.key}: ${it.type}" } }.joinToString("; ")),
             style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
     }
-    if (ordered.any { it.value.second.any { m -> m?.note != null } }) Text("✱ Parcialmente cubierto por barba o bigote: se mide solo la parte visible.",
+    if (ordered.any { it.value.second.any { m -> m?.note != null } }) Text(tr("✱ Parcialmente cubierto por barba o bigote: se mide solo la parte visible."),
         style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
     val all = ordered.flatMap { it.value.second }.filterNotNull()
     val scale = all.firstOrNull()?.scale
     val relief = all.any { it.depthSource == "relieve" }
-    Text(METRICS_NOTE + (if (scale == "interpupilar") " (Escala: distancia interpupilar de 63 mm; iris no fiable.)" else "") +
-        (if (scale == "sensor de profundidad") " Escala medida con el sensor de profundidad del teléfono." else "") +
-        (if (relief) " Profundidad medida en el relieve (estéreo fotométrico con la pantalla)." else "") +
-        " Grado: profundidad < ${LineMeasure.GRADE_MM.joinToString(" / ") { f2(it) }} mm → 0 a 4; mayor → 5." +
-        " Rasgos: distancias proyectadas en la foto (dependen del giro de la cabeza).",
+    Text(METRICS_NOTE + (if (scale == "interpupilar") " " + tr("(Escala: distancia interpupilar de 63 mm; iris no fiable.)") else "") +
+        (if (scale == "sensor de profundidad") " " + tr("Escala medida con el sensor de profundidad del teléfono.") else "") +
+        (if (relief) " " + tr("Profundidad medida en el relieve (estéreo fotométrico con la pantalla).") else "") +
+        " " + tr("Grado: profundidad < %1\$s mm → 0 a 4; mayor → 5.", LineMeasure.GRADE_MM.joinToString(" / ") { f2(it) }) +
+        " " + tr("Rasgos: distancias proyectadas en la foto (dependen del giro de la cabeza)."),
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(vertical = 12.dp))
 }
@@ -528,12 +533,12 @@ private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLi
     Row((if (fixedHeight != null) Modifier.height(fixedHeight) else Modifier)
         .then(if (highlight) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) else Modifier)
         .then(if (bring != null) Modifier.bringIntoViewRequester(bring) else Modifier)
-        .then(if (onClick != null) Modifier.clickable(onClickLabel = "Ver en la foto", role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) else Modifier)
+        .then(if (onClick != null) Modifier.clickable(onClickLabel = tr("Ver en la foto"), role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) else Modifier)
         .semantics { if (highlight) selected = true },
         verticalAlignment = Alignment.CenterVertically) {
         cells.forEachIndexed { i, c ->
             val w: Dp = if (i == 0) firstW else valueW
-            Row(Modifier.width(w).then(if (onCellClick != null) Modifier.clickable(onClickLabel = "Ver en la foto") { onCellClick(i) } else Modifier),
+            Row(Modifier.width(w).then(if (onCellClick != null) Modifier.clickable(onClickLabel = tr("Ver en la foto")) { onCellClick(i) } else Modifier),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = if (i == 0) Arrangement.Start else Arrangement.End) {
                 if (i == 0 && swatch != null) { GuideSwatch(swatch, Modifier.size(26.dp, 11.dp)); Spacer(Modifier.width(4.dp)) }
                 if (swatchCell?.first == i && !(i == 0 && swatch != null)) { GuideSwatch(swatchCell.second, Modifier.size(22.dp, 10.dp)); Spacer(Modifier.width(3.dp)) }
@@ -566,12 +571,12 @@ private fun DeleteLineButton(name: String, photos: List<Pair<Int, String>>, size
     var menu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.foundation.layout.Box {
         IconButton(onClick = { if (photos.isEmpty()) onDelete(null) else menu = true }, modifier = Modifier.size(size)) {
-            Icon(Icons.Default.Delete, "Eliminar $name (falso positivo)", Modifier.size(minOf(20.dp, size - 4.dp)), tint = MaterialTheme.colorScheme.error)
+            Icon(Icons.Default.Delete, tr("Eliminar %1\$s (falso positivo)", name), Modifier.size(minOf(20.dp, size - 4.dp)), tint = MaterialTheme.colorScheme.error)
         }
         androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            photos.forEach { (i, d) -> androidx.compose.material3.DropdownMenuItem(text = { Text("En la foto ${i + 1} · ${d.replace("\n", " ")}") },
+            photos.forEach { (i, d) -> androidx.compose.material3.DropdownMenuItem(text = { Text(tr("En la foto %1\$d · %2\$s", i + 1, d.replace("\n", " "))) },
                 onClick = { menu = false; onDelete(i) }) }
-            if (photos.size > 1) androidx.compose.material3.DropdownMenuItem(text = { Text("En todas") }, onClick = { menu = false; onDelete(null) })
+            if (photos.size > 1) androidx.compose.material3.DropdownMenuItem(text = { Text(tr("En todas")) }, onClick = { menu = false; onDelete(null) })
         }
     }
 }

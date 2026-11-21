@@ -1,5 +1,6 @@
 package com.photomed.app.align
 
+import com.photomed.app.i18n.trn
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
@@ -84,9 +85,9 @@ object Relief {
         val irisPx = maxOf(hypot(mesh[469].x - mesh[471].x, mesh[469].y - mesh[471].y), hypot(mesh[474].x - mesh[476].x, mesh[474].y - mesh[476].y)) * fw
         val mmPerPxIris = LineMeasure.HVID_MM / irisPx.coerceAtLeast(1f)
         val (dist, src) = when {
-            sensorDistMm != null && sensorDistMm in 100f..1500f -> sensorDistMm to "sensor de profundidad"
+            sensorDistMm != null && sensorDistMm in 100f..1500f -> sensorDistMm to trn("sensor de profundidad")
             focalPx != null -> focalPx * mmPerPxIris to "iris"
-            else -> 300f to "estimada (30 cm)"
+            else -> 300f to trn("estimada (30 cm)")
         }
         val mmPerPx = if (src == "sensor de profundidad" && focalPx != null) dist / focalPx else mmPerPxIris
         val lights = lit.map { PhotometricStereo.light(it.first, screen, dist) }

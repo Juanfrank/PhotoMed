@@ -1,5 +1,6 @@
 package com.photomed.app.align
 
+import com.photomed.app.i18n.trn
 import kotlin.math.abs
 
 /**
@@ -23,8 +24,8 @@ object LiveDecision {
                  expression: com.photomed.app.data.FacialExpression = com.photomed.app.data.FacialExpression.NEUTRAL): MatchEval {
         val keys = spec.landmarks.filter { it in ref.points && it in cur.points }
         if (keys.size < MIN_POINTS) {
-            val what = if (spec.detector == Detector.FACE) "No se detecta el rostro" else "No se detecta el cuerpo"
-            return MatchEval(MatchStatus.SEARCHING, 0f, listOf("$what del paciente"), threshold = threshold)
+            val hint = if (spec.detector == Detector.FACE) trn("No se detecta el rostro del paciente") else trn("No se detecta el cuerpo del paciente")
+            return MatchEval(MatchStatus.SEARCHING, 0f, listOf(hint), threshold = threshold)
         }
         val rp = keys.map { ref.points[it]!! }; val cp = keys.map { cur.points[it]!! }
         val t = landmarkTransform(spec.landmarks, ref.points, cur.points)?.first
@@ -47,7 +48,7 @@ object LiveDecision {
         // expresión pedida (sorpresa, enojo, sonrisa…): obligatoria para el disparo automático
         val exprOk = spec.detector != Detector.FACE || Expression.meets(expression, cur.points, cur.yaw)
         val targetHints = if (exprOk || spec.detector != Detector.FACE) emptyList()
-            else Expression.measure(cur.points)?.let { Expression.target(expression, it) }.orEmpty().ifEmpty { listOf("Expresión: ${expression.instruction}") }
+            else Expression.measure(cur.points)?.let { Expression.target(expression, it) }.orEmpty().ifEmpty { listOf(HintText.es(HintText.EXPRESSION, expression.instruction)) }
         val allExpr = (exprHints + targetHints).distinct()
         val e = (if (allExpr.isEmpty()) e0 else e0.copy(
             status = if (e0.status == MatchStatus.MATCH) MatchStatus.CLOSE else e0.status, hints = e0.hints + allExpr)).copy(expressionOk = exprOk)

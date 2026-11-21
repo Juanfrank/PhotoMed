@@ -91,6 +91,8 @@ import com.photomed.app.ui.components.ConfirmDialog
 import com.photomed.app.ui.components.rememberGalleryDelete
 import com.photomed.app.ui.formatDateTime
 import com.photomed.app.ui.theme.ImmersiveTheme
+import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -220,7 +222,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                         .measureTrace(bmp, zone, com.photomed.app.align.PhotoAnnotator.extrasFor(context, ph.uri, 1600, crop34 = false), r.points)
                     Triple(r, m, bmp.height / bmp.width.toFloat())
                 }.getOrNull() }
-                if (out == null) { snackbar.showSnackbar("No se pudo trazar ahí; dibuje una línea sobre el surco o rodéelo"); return@launch }
+                if (out == null) { snackbar.showSnackbar(tr("No se pudo trazar ahí; dibuje una línea sobre el surco o rodéelo")); return@launch }
                 val (r, m, aE) = out
                 val ok = withContext(Dispatchers.IO) {
                     val set = com.photomed.app.align.ConfirmedTraces.of(context, u)
@@ -239,9 +241,9 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 savedInPhoto[u] = ok
                 if (com.photomed.app.align.AnnotLayer.FOLDS !in layersState.value) layersState.value = layersState.value + com.photomed.app.align.AnnotLayer.FOLDS
                 userVersion++
-                snackbar.showSnackbar((if (target != null) "«$target» trazado de nuevo" else "Surco añadido") +
-                    (if (!r.snapped) " (se usó su trazo: no se halló una sombra clara)" else "") +
-                    (if (!ok) " · guardado en la app (no se pudo escribir en la foto)" else ""))
+                snackbar.showSnackbar((if (target != null) tr("«%1\$s» trazado de nuevo", target) else tr("Surco añadido")) +
+                    (if (!r.snapped) tr(" (se usó su trazo: no se halló una sombra clara)") else "") +
+                    (if (!ok) tr(" · guardado en la app (no se pudo escribir en la foto)") else ""))
             } finally { traceBusy = false }
         }
     }
@@ -275,7 +277,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 if (next != old) { inkUndo[u] = (inkUndo[u].orEmpty() + old).takeLast(30); com.photomed.app.align.Annotations.save(context, u, next) }
                 true
             }.onFailure { com.photomed.app.CrashLog.write("Guardar una anotación", it) }.getOrDefault(false) }
-            if (!ok) snackbar.showSnackbar("No se pudo guardar la anotación")
+            if (!ok) snackbar.showSnackbar(tr("No se pudo guardar la anotación"))
             inkVersion++
         }
     }
@@ -297,7 +299,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 inkUndo[u] = (inkUndo[u].orEmpty() + old).takeLast(30); com.photomed.app.align.Annotations.save(context, u, next)
                 true
             }.onFailure { com.photomed.app.CrashLog.write("Guardar una línea multipunto", it) }.getOrDefault(false) }
-            if (!ok) snackbar.showSnackbar("No se pudo guardar la línea")
+            if (!ok) snackbar.showSnackbar(tr("No se pudo guardar la línea"))
             inkVersion++
         }
     }
@@ -356,43 +358,43 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
-                navigationIcon = { IconButton(onClick = review?.onKeep ?: onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
+                navigationIcon = { IconButton(onClick = review?.onKeep ?: onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Atrás")) } },
                 actions = {
                     // tres acciones a la vista (el título no se aplasta); el resto en ⋯
                     // en la revisión tras la captura, Comparar a la vista (no hay Eliminar)
                     if (review != null && onCompare != null) IconButton(onClick = { onCompare(compareNames(current)) }) {
-                        Icon(Icons.Default.CompareArrows, "Comparar")
+                        Icon(Icons.Default.CompareArrows, tr("Comparar"))
                     }
                     IconButton(onClick = { inking = !inking; if (inking) { tracing = false; metricsSheet = false; viewLayers.value = viewLayers.value.copy(notes = true) } }) {
-                        Icon(Icons.Default.Draw, if (inking) "Terminar de anotar" else "Anotar sobre la foto")
+                        Icon(Icons.Default.Draw, if (inking) tr("Terminar de anotar") else tr("Anotar sobre la foto"))
                     }
-                    IconButton(onClick = { fullscreen = true }) { Icon(Icons.Default.Fullscreen, "Pantalla completa") }
+                    IconButton(onClick = { fullscreen = true }) { Icon(Icons.Default.Fullscreen, tr("Pantalla completa")) }
                     Box {
-                        IconButton(onClick = { shareMenu = true }) { Icon(Icons.Default.Share, "Compartir") }
+                        IconButton(onClick = { shareMenu = true }) { Icon(Icons.Default.Share, tr("Compartir")) }
                         DropdownMenu(expanded = shareMenu, onDismissRequest = { shareMenu = false }) {
                             DropdownMenuItem(
-                                text = { Text("Compartir sin datos del paciente") },
+                                text = { Text(tr("Compartir sin datos del paciente")) },
                                 leadingIcon = { Icon(Icons.Outlined.PrivacyTip, null) },
-                                onClick = { shareMenu = false; scope.launch { if (!sharePhotos(context, listOf(current), anonymize = true)) snackbar.showSnackbar("No se pudo compartir la fotografía") } },
+                                onClick = { shareMenu = false; scope.launch { if (!sharePhotos(context, listOf(current), anonymize = true)) snackbar.showSnackbar(tr("No se pudo compartir la fotografía")) } },
                             )
                             DropdownMenuItem(
-                                text = { Text("Compartir con datos del paciente") },
+                                text = { Text(tr("Compartir con datos del paciente")) },
                                 leadingIcon = { Icon(Icons.Outlined.Badge, null) },
-                                onClick = { shareMenu = false; scope.launch { if (!sharePhotos(context, listOf(current), anonymize = false)) snackbar.showSnackbar("No se pudo compartir la fotografía") } },
+                                onClick = { shareMenu = false; scope.launch { if (!sharePhotos(context, listOf(current), anonymize = false)) snackbar.showSnackbar(tr("No se pudo compartir la fotografía")) } },
                             )
                         }
                     }
                     Box {
                         var more by remember { mutableStateOf(false) }
-                        IconButton(onClick = { more = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
+                        IconButton(onClick = { more = true }) { Icon(Icons.Default.MoreVert, tr("Más opciones")) }
                         DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
-                            if (onCompare != null && review == null) DropdownMenuItem(text = { Text("Comparar") }, leadingIcon = { Icon(Icons.Default.CompareArrows, null) },
+                            if (onCompare != null && review == null) DropdownMenuItem(text = { Text(tr("Comparar")) }, leadingIcon = { Icon(Icons.Default.CompareArrows, null) },
                                 onClick = { more = false; onCompare(compareNames(current)) })
-                            DropdownMenuItem(text = { Text(if (editing) "Terminar edición" else "Girar, espejo y recorte") }, leadingIcon = { Icon(Icons.Default.Crop, null) },
+                            DropdownMenuItem(text = { Text(if (editing) tr("Terminar edición") else tr("Girar, espejo y recorte")) }, leadingIcon = { Icon(Icons.Default.Crop, null) },
                                 onClick = { more = false; editing = !editing })
-                            DropdownMenuItem(text = { Text("Información") }, leadingIcon = { Icon(Icons.Default.Info, null) },
+                            DropdownMenuItem(text = { Text(tr("Información")) }, leadingIcon = { Icon(Icons.Default.Info, null) },
                                 onClick = { more = false; scope.launch { info = current to withContext(Dispatchers.IO) { repo.readInfo(current) } } })
-                            if (review == null) DropdownMenuItem(text = { Text("Eliminar") }, leadingIcon = { Icon(Icons.Default.Delete, null) },
+                            if (review == null) DropdownMenuItem(text = { Text(tr("Eliminar")) }, leadingIcon = { Icon(Icons.Default.Delete, null) },
                                 onClick = { more = false; confirmDelete = true })
                         }
                     }
@@ -409,10 +411,10 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     scope.launch { galleryDelete(withContext(Dispatchers.IO) {
                         com.photomed.app.align.ReliefStore.delete(context, current.uri.toString()); repo.deletePhotos(listOf(current)) }) }
                 }) {
-                    Icon(Icons.Default.Replay, null); androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 8.dp)); Text("Repetir", color = Color.White)
+                    Icon(Icons.Default.Replay, null); androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 8.dp)); Text(tr("Repetir"), color = Color.White)
                 }
                 androidx.compose.material3.Button(onClick = review.onKeep, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Check, null); androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 8.dp)); Text("Guardar")
+                    Icon(Icons.Default.Check, null); androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 8.dp)); Text(tr("Guardar"))
                 }
             }
         },
@@ -441,7 +443,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                         onConfirm = { mutateTraces(current) { it } },
                         onRegenerate = { confirmRegen = true },
                         onEdit = { name -> traceTarget = name; tracing = true; metricsSheet = false
-                            scope.launch { snackbar.showSnackbar("Vuelva a dibujar «$name»: una línea por donde se ve, o rodee el área") } },
+                            scope.launch { snackbar.showSnackbar(tr("Vuelva a dibujar «%1\$s»: una línea por donde se ve, o rodee el área", name)) } },
                         onRevert = { name -> mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.revert(it, name) } },
                         edited = set?.editedNames.orEmpty(), savedInPhoto = savedInPhoto[u] != false),
                     onSelectLine = { l, key -> selected = l; selectedKey = key; focusTick++; if (l.layer !in layersState.value) layersState.value = layersState.value + l.layer },
@@ -454,14 +456,14 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
             if (showLayers && !fullscreen) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
                 Modifier.fillMaxWidth().padding(vertical = 4.dp), onMetrics = { metricsSheet = !metricsSheet },
                 onTrace = { traceTarget = null; tracing = !tracing
-                    if (tracing) scope.launch { snackbar.showSnackbar("Dibuje sobre el surco: una línea por donde se ve, o rodee el área") } },
+                    if (tracing) scope.launch { snackbar.showSnackbar(tr("Dibuje sobre el surco: una línea por donde se ve, o rodee el área")) } },
                 tracing = tracing, viewLayers = viewLayers, opacity = annotAlpha.value, onOpacity = { annotAlpha.value = it })
             // análisis en curso: barra de proceso visible
             val analyzing = showLayers && annotsByUri[current.uri.toString()] == null || traceBusy
             if (analyzing) androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f).semantics { contentDescription = "Analizando arrugas y rasgos" })
-                Text(if (traceBusy) "Trazando y midiendo el surco…" else "Analizando arrugas y rasgos…", color = Color.White, style = MaterialTheme.typography.labelMedium,
+                androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f).semantics { contentDescription = tr("Analizando arrugas y rasgos") })
+                Text(if (traceBusy) tr("Trazando y midiendo el surco…") else tr("Analizando arrugas y rasgos…"), color = Color.White, style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(start = 10.dp))
             }
             }
@@ -475,12 +477,12 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 fun save(n: com.photomed.app.align.ImageEdit) { com.photomed.app.align.PhotoEdits.set(context, current.uri.toString(), n); editVersion++ }
                 androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly) {
-                    EditButton(Icons.Default.RotateRight, "Girar 90°") { save(now().rotated()) }
-                    EditButton(Icons.Default.Flip, "Espejo") { save(now().mirrored()) }
-                    EditButton(Icons.Default.Crop, "Recortar") { cropping = true }
-                    EditButton(Icons.Default.Restore, "Original", enabled = !e.isIdentity) { save(com.photomed.app.align.ImageEdit.NONE) }
+                    EditButton(Icons.Default.RotateRight, tr("Girar 90°")) { save(now().rotated()) }
+                    EditButton(Icons.Default.Flip, tr("Espejo")) { save(now().mirrored()) }
+                    EditButton(Icons.Default.Crop, tr("Recortar")) { cropping = true }
+                    EditButton(Icons.Default.Restore, tr("Original"), enabled = !e.isIdentity) { save(com.photomed.app.align.ImageEdit.NONE) }
                 }
-                Text("La foto original no se modifica; la edición se aplica también en Comparar y al exportar.",
+                Text(tr("La foto original no se modifica; la edición se aplica también en Comparar y al exportar."),
                     color = Color.LightGray, style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
             }
@@ -513,7 +515,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                         // toque sin línea medida y ninguna capa de arrugas visible: cómo verlas
                         val visibleMeasured = annotsByUri[list[page].uri.toString()].orEmpty().any { it.metrics != null && it.layer in layersState.value }
                         if (hit == null && !visibleMeasured) scope.launch {
-                            snackbar.showSnackbar("Active Surcos, Frente, Ceño, Patas de gallo u Ojeras y toque una línea, o abra «Medidas»")
+                            snackbar.showSnackbar(tr("Active Surcos, Frente, Ceño, Patas de gallo u Ojeras y toque una línea, o abra «Medidas»"))
                         }
                     },
                     onAnalyzed = { lines, note ->
@@ -541,18 +543,18 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 if (polyMode && polyDraft.isNotEmpty()) androidx.compose.foundation.layout.Row(
                     Modifier.align(Alignment.TopCenter).padding(8.dp).background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
                         .padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${polyDraft.size} puntos", color = Color.White, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp))
+                    Text(tr("%1\$d puntos", polyDraft.size), color = Color.White, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp))
                     IconButton(onClick = { polyDraft = polyDraft.dropLast(1) }) {
-                        Icon(Icons.AutoMirrored.Filled.Undo, "Quitar el último punto", tint = Color.White) }
-                    IconButton(onClick = { polyDraft = emptyList() }) { Icon(Icons.Default.Close, "Descartar la línea", tint = Color.White) }
+                        Icon(Icons.AutoMirrored.Filled.Undo, tr("Quitar el último punto"), tint = Color.White) }
+                    IconButton(onClick = { polyDraft = emptyList() }) { Icon(Icons.Default.Close, tr("Descartar la línea"), tint = Color.White) }
                     IconButton(onClick = { inkPoly(current, polyDraft, polyAspect); polyDraft = emptyList() }, enabled = polyDraft.size >= 2) {
-                        Icon(Icons.Default.Check, "Confirmar la línea", tint = if (polyDraft.size >= 2) Color(0xFF69F0AE) else Color.Gray) }
+                        Icon(Icons.Default.Check, tr("Confirmar la línea"), tint = if (polyDraft.size >= 2) Color(0xFF69F0AE) else Color.Gray) }
                 }
                 // en pantalla completa: botón semitransparente para salir, arriba a la derecha de la foto
                 if (fullscreen) IconButton(onClick = { fullscreen = false },
                     modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.Black.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape)) {
                     Icon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                        if (fullscreen) "Salir de pantalla completa" else "Pantalla completa", tint = Color.White.copy(alpha = 0.9f))
+                        if (fullscreen) tr("Salir de pantalla completa") else tr("Pantalla completa"), tint = Color.White.copy(alpha = 0.9f))
                 }
             }
             }
@@ -592,10 +594,10 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     LaunchedEffect(pager.currentPage) { selected = null }
     if (confirmRegen) {
         ConfirmDialog(
-            title = "¿Regenerar los trazos?",
-            text = "Se borrarán los trazos confirmados de esta foto (también de sus metadatos), con sus ediciones y " +
-                "surcos añadidos, y se volverá a analizar.",
-            confirmLabel = "Regenerar",
+            title = tr("¿Regenerar los trazos?"),
+            text = tr("Se borrarán los trazos confirmados de esta foto (también de sus metadatos), con sus ediciones y " +
+                "surcos añadidos, y se volverá a analizar."),
+            confirmLabel = tr("Regenerar"),
             icon = Icons.Default.Replay,
             onDismiss = { confirmRegen = false },
             onConfirm = {
@@ -610,9 +612,9 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     }
     if (confirmDelete) {
         ConfirmDialog(
-            title = "¿Eliminar fotografía?",
-            text = "Se eliminará de la galería del teléfono y del expediente.",
-            confirmLabel = "Eliminar",
+            title = tr("¿Eliminar fotografía?"),
+            text = tr("Se eliminará de la galería del teléfono y del expediente."),
+            confirmLabel = tr("Eliminar"),
             icon = Icons.Default.Delete,
             onDismiss = { confirmDelete = false },
             onConfirm = {
@@ -631,8 +633,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     val e = repo.getExpediente(expId) ?: error("Sin expediente")
                     repo.setCaptureDate(e, ph, t).also { com.photomed.app.align.PhotoKeys.move(context, ph.uri.toString(), it.uri.toString()) }
                 }.onFailure { com.photomed.app.CrashLog.write("Cambiar la fecha de captura", it) }.getOrNull() }
-                if (np == null) snackbar.showSnackbar("No se pudo cambiar la fecha")
-                else { trackName = np.displayName; reload++; snackbar.showSnackbar("Fecha de captura: ${formatDateTime(np.takenAt)}") }
+                if (np == null) snackbar.showSnackbar(tr("No se pudo cambiar la fecha"))
+                else { trackName = np.displayName; reload++; snackbar.showSnackbar(tr("Fecha de captura: %1\$s", formatDateTime(np.takenAt))) }
             }
         })
     }
@@ -640,22 +642,22 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     info?.let { (photo, meta) ->
         SafeBottomSheet(onDismiss = { info = null }) {
             Column(Modifier.padding(bottom = androidx.compose.ui.unit.Dp(16f))) {
-                Text("Información de la fotografía", style = MaterialTheme.typography.titleLarge,
+                Text(tr("Información de la fotografía"), style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(horizontal = androidx.compose.ui.unit.Dp(24f)))
-                InfoRow("Paciente", meta?.patientName ?: "—")
-                InfoRow("Expediente", meta?.recordNumber?.ifBlank { null } ?: "—")
-                InfoRow("Zona", meta?.zoneLabel ?: photo.zone.label)
-                ListItem(overlineContent = { Text("Fecha de captura") }, headlineContent = { Text(formatDateTime(photo.takenAt)) },
-                    trailingContent = { IconButton(onClick = { editDate = photo; info = null }) { Icon(Icons.Default.EditCalendar, "Editar la fecha de captura") } })
-                InfoRow("Consentimiento", if (meta?.consent == true) "Registrado" else "No registrado")
+                InfoRow(tr("Paciente"), meta?.patientName ?: "—")
+                InfoRow(tr("Expediente"), meta?.recordNumber?.ifBlank { null } ?: "—")
+                InfoRow(tr("Zona"), meta?.zoneLabel ?: photo.zone.label)
+                ListItem(overlineContent = { Text(tr("Fecha de captura")) }, headlineContent = { Text(formatDateTime(photo.takenAt)) },
+                    trailingContent = { IconButton(onClick = { editDate = photo; info = null }) { Icon(Icons.Default.EditCalendar, tr("Editar la fecha de captura")) } })
+                InfoRow(tr("Consentimiento"), if (meta?.consent == true) tr("Registrado") else tr("No registrado"))
                 meta?.conditions?.takeIf { it.isNotEmpty() }?.let { c ->
-                    val labels = mapOf("Engine" to "Motor de puntos", "Assist" to "Asistencia", "MatchPercent" to "Puntos coincidentes (%)",
-                        "HeadYaw" to "Giro de la cabeza (°)", "HeadPitch" to "Cabeceo, barbilla arriba + (°)", "Side" to "Lado (extremidad)", "DistanceCm" to "Distancia estimada (cm)", "Zoom" to "Zoom", "Status" to "Estado")
-                    c.forEach { (k, v) -> InfoRow(labels[k] ?: k, v) }
+                    val labels = mapOf("Engine" to trn("Motor de puntos"), "Assist" to trn("Asistencia"), "MatchPercent" to trn("Puntos coincidentes (%)"),
+                        "HeadYaw" to trn("Giro de la cabeza (°)"), "HeadPitch" to trn("Cabeceo, barbilla arriba + (°)"), "Side" to trn("Lado (extremidad)"), "DistanceCm" to trn("Distancia estimada (cm)"), "Zoom" to trn("Zoom"), "Status" to trn("Estado"))
+                    c.forEach { (k, v) -> InfoRow(labels[k]?.let { tr(it) } ?: k, v) }
                 }
-                InfoRow("Archivo", "Pictures/PhotoMed/$expId/${photo.displayName}")
+                InfoRow(tr("Archivo"), "Pictures/PhotoMed/$expId/${photo.displayName}")
                 Text(
-                    "Estos datos están incrustados en la imagen (EXIF y XMP).",
+                    tr("Estos datos están incrustados en la imagen (EXIF y XMP)."),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = androidx.compose.ui.unit.Dp(24f)),
                 )
@@ -743,8 +745,8 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
         val hit = com.photomed.app.align.PhotoAnnotator.cached(key)
         // sin análisis disponible (pruebas en la JVM): no se carga la imagen para nada
         if (hit == null && !com.photomed.app.align.PhotoAnnotator.enabled) {
-            com.photomed.app.align.PhotoAnnotator.putNote(key, "Análisis no disponible"); value = emptyList()
-            onAnalyzed(emptyList(), "Análisis no disponible"); return@produceState
+            com.photomed.app.align.PhotoAnnotator.putNote(key, tr("Análisis no disponible")); value = emptyList()
+            onAnalyzed(emptyList(), tr("Análisis no disponible")); return@produceState
         }
         value = hit ?: runCatching {
             com.photomed.app.align.PhotoAnnotator(context.applicationContext)
@@ -754,7 +756,7 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
         }.getOrNull()?.let { (lines, note) ->
             com.photomed.app.align.PhotoAnnotator.put(key, lines); com.photomed.app.align.PhotoAnnotator.putNote(key, note); lines
         } ?: emptyList<com.photomed.app.align.AnnotLine>().also {
-            com.photomed.app.align.PhotoAnnotator.putNote(key, "No se pudo analizar la foto.")
+            com.photomed.app.align.PhotoAnnotator.putNote(key, tr("No se pudo analizar la foto."))
         }
         onAnalyzed(value.orEmpty(), com.photomed.app.align.PhotoAnnotator.note(key))
     }
@@ -816,7 +818,7 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                 },
             )
         }
-        .semantics { contentDescription = "Fotografía ${photo.zone.label}, ${formatDateTime(photo.takenAt)}" },
+        .semantics { contentDescription = tr("Fotografía %1\$s, %2\$s", photo.zone.label, formatDateTime(photo.takenAt)) },
         contentAlignment = Alignment.Center) {
         if (b == null) CircularProgressIndicator()
         else androidx.compose.foundation.Canvas(Modifier.fillMaxSize().graphicsLayer {
@@ -858,7 +860,7 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
             val polyNow = androidx.compose.runtime.rememberUpdatedState(poly)
             fun d(a: com.photomed.app.align.Pt, q: com.photomed.app.align.Pt) = kotlin.math.hypot(a.x - q.x, a.y - q.y)
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()
-                .semantics { contentDescription = "Dibuje sobre la foto" }
+                .semantics { contentDescription = tr("Dibuje sobre la foto") }
                 .pointerInput(b, ink) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
@@ -969,7 +971,7 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
         if (tracing && b != null) {
             val path = remember { androidx.compose.runtime.mutableStateListOf<androidx.compose.ui.geometry.Offset>() }
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()
-                .semantics { contentDescription = "Dibuje el surco sobre la foto" }
+                .semantics { contentDescription = tr("Dibuje el surco sobre la foto") }
                 .pointerInput(b) {
                     awaitEachGesture {
                         val down = awaitFirstDown()

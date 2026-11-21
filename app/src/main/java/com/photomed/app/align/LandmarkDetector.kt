@@ -1,5 +1,6 @@
 package com.photomed.app.align
 
+import com.photomed.app.i18n.tr
 import android.content.Context
 import android.graphics.Bitmap
 import com.google.android.gms.tasks.Tasks
@@ -39,7 +40,7 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
         private set
     private val mediaPipe: MediaPipeFace? =
         if (engine == FaceEngine.MEDIAPIPE && context != null) runCatching { MediaPipeFace(context.applicationContext) }
-            .onFailure { initError = "MediaPipe no se pudo iniciar (${it.javaClass.simpleName}); se usa ML Kit" }.getOrNull()
+            .onFailure { initError = tr("MediaPipe no se pudo iniciar (%1\$s); se usa ML Kit", it.javaClass.simpleName) }.getOrNull()
         else null
     private val face: FaceDetector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
@@ -111,7 +112,7 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
     val mediaPipeUnavailable: Boolean get() = engine == FaceEngine.MEDIAPIPE && (mediaPipe == null || mediaPipeFailures >= 5)
 
     /** Texto de diagnóstico para mostrar cuando no hay puntos (null si no hay nada que reportar). */
-    val diagnostic: String? get() = lastError ?: initError ?: if (mediaPipeUnavailable) "MediaPipe desactivado por errores; se usa ML Kit" else null
+    val diagnostic: String? get() = lastError ?: initError ?: if (mediaPipeUnavailable) tr("MediaPipe desactivado por errores; se usa ML Kit") else null
 
     private fun detectFace(bmp: Bitmap): Detection {
         val faces = Tasks.await(face.process(InputImage.fromBitmap(bmp, 0)), ML_KIT_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)

@@ -63,14 +63,17 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trn
 
 /**
  * Herramienta de anotación: lápiz, símbolo (marcador con un toque o arrastrado de un extremo a otro),
  * seleccionar (arrastrar un trazo o símbolo), borrar trazos enteros o borrar como una goma.
  */
-enum class InkTool(val label: String, val icon: ImageVector) {
-    PEN("Lápiz", Icons.Default.Edit), SYMBOL("Símbolo", Icons.Default.Interests), SELECT("Seleccionar y mover", Icons.Default.OpenWith),
-    ERASE_STROKE("Borrar trazo", Icons.Default.CleaningServices), ERASE_PAINT("Goma", Icons.Default.AutoFixOff)
+enum class InkTool(private val es: String, val icon: ImageVector) {
+    PEN(trn("Lápiz"), Icons.Default.Edit), SYMBOL(trn("Símbolo"), Icons.Default.Interests), SELECT(trn("Seleccionar y mover"), Icons.Default.OpenWith),
+    ERASE_STROKE(trn("Borrar trazo"), Icons.Default.CleaningServices), ERASE_PAINT(trn("Goma"), Icons.Default.AutoFixOff);
+    val label: String get() = tr(es)
 }
 
 /**
@@ -84,10 +87,10 @@ data class InkStyle(val tool: InkTool = InkTool.PEN, val color: Int = INK_COLORS
 }
 
 val INK_COLORS = listOf(0xFFFF1744, 0xFFFFEA00, 0xFF00E676, 0xFF00B0FF, 0xFF2962FF, 0xFFD500F9, 0xFFFFFFFF, 0xFF000000).map { it.toInt() }
-private val COLOR_NAMES = listOf("rojo", "amarillo", "verde", "celeste", "azul", "violeta", "blanco", "negro")
-val SYMBOL_LABELS = linkedMapOf("dot" to "Punto", "circle" to "Círculo", "triangle" to "Triángulo", "square" to "Cuadrado",
-    "x" to "X", "plus" to "Cruz", "star" to "Estrella", "line" to "Línea", "arrow" to "Flecha", "polyline" to "Ángulos (multipunto)")
-val SIDE_LABELS = linkedMapOf("auto" to "Auto", "top" to "Arriba", "bottom" to "Abajo", "left" to "Izquierda", "right" to "Derecha")
+private val COLOR_NAMES = listOf(trn("rojo"), trn("amarillo"), trn("verde"), trn("celeste"), trn("azul"), trn("violeta"), trn("blanco"), trn("negro"))
+val SYMBOL_LABELS = linkedMapOf("dot" to trn("Punto"), "circle" to trn("Círculo"), "triangle" to trn("Triángulo"), "square" to trn("Cuadrado"),
+    "x" to "X", "plus" to trn("Cruz"), "star" to trn("Estrella"), "line" to trn("Línea"), "arrow" to trn("Flecha"), "polyline" to trn("Ángulos (multipunto)"))
+val SIDE_LABELS = linkedMapOf("auto" to trn("Auto"), "top" to trn("Arriba"), "bottom" to trn("Abajo"), "left" to trn("Izquierda"), "right" to trn("Derecha"))
 
 /**
  * Barra flotante vertical (sobre la foto) con un icono por herramienta, deshacer, borrar todo (con
@@ -109,15 +112,15 @@ fun InkRail(style: InkStyle, onStyle: (InkStyle) -> Unit, canUndo: Boolean, onUn
                 Icon(t.icon, t.label, tint = Color.White)
             }
         }
-        IconButton(onClick = onUndo, enabled = canUndo) { Icon(Icons.AutoMirrored.Filled.Undo, "Deshacer", tint = if (canUndo) Color.White else Color.Gray) }
-        IconButton(onClick = { confirmClear = true }) { Icon(Icons.Default.Delete, "Borrar todas las anotaciones", tint = Color.White) }
-        IconButton(onClick = onDone) { Icon(Icons.Default.Check, "Terminar de anotar", tint = Color.White) }
+        IconButton(onClick = onUndo, enabled = canUndo) { Icon(Icons.AutoMirrored.Filled.Undo, tr("Deshacer"), tint = if (canUndo) Color.White else Color.Gray) }
+        IconButton(onClick = { confirmClear = true }) { Icon(Icons.Default.Delete, tr("Borrar todas las anotaciones"), tint = Color.White) }
+        IconButton(onClick = onDone) { Icon(Icons.Default.Check, tr("Terminar de anotar"), tint = Color.White) }
     }
     if (confirmClear) AlertDialog(onDismissRequest = { confirmClear = false },
-        title = { Text("¿Borrar todas las anotaciones?") },
-        text = { Text("Se quitarán todos los trazos y símbolos de esta foto. Puede deshacerlo después.") },
-        confirmButton = { TextButton(onClick = { confirmClear = false; onClear() }) { Text("Borrar todo") } },
-        dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancelar") } })
+        title = { Text(tr("¿Borrar todas las anotaciones?")) },
+        text = { Text(tr("Se quitarán todos los trazos y símbolos de esta foto. Puede deshacerlo después.")) },
+        confirmButton = { TextButton(onClick = { confirmClear = false; onClear() }) { Text(tr("Borrar todo")) } },
+        dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(tr("Cancelar")) } })
 }
 
 /** Icono de cada símbolo (en lugar del nombre; el nombre queda como descripción accesible). */
@@ -138,7 +141,7 @@ private fun IconPicker(icons: Map<String, ImageVector>, labels: Map<String, Stri
             val sel = value == k
             IconButton(onClick = { onPick(k) }, modifier = Modifier.size(44.dp).semantics { selected = sel }
                 .then(if (sel) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f), CircleShape) else Modifier)) {
-                Icon(ic, "$what: ${labels[k] ?: k}", tint = Color.White)
+                Icon(ic, "$what: ${labels[k]?.let { tr(it) } ?: k}", tint = Color.White)
             }
         }
     }
@@ -148,22 +151,22 @@ private fun IconPicker(icons: Map<String, ImageVector>, labels: Map<String, Stri
 fun InkOptions(style: InkStyle, onStyle: (InkStyle) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.background(Color.Black.copy(alpha = 0.7f)).padding(horizontal = 8.dp, vertical = 2.dp)) {
         if (style.tool == InkTool.SYMBOL) {
-            IconPicker(SYMBOL_ICONS, SYMBOL_LABELS, style.symbol, { onStyle(style.copy(symbol = it)) }, "Símbolo")
+            IconPicker(SYMBOL_ICONS, SYMBOL_LABELS, style.symbol, { onStyle(style.copy(symbol = it)) }, tr("Símbolo"))
             if (style.symbol != "polyline") Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.TextFields, null, tint = Color.LightGray, modifier = Modifier.padding(end = 6.dp))
                 androidx.compose.material3.OutlinedTextField(style.text, { onStyle(style.copy(text = it.take(30))) }, singleLine = true,
-                    placeholder = { Text("Texto", color = Color.Gray) }, modifier = Modifier.weight(1f).semantics { contentDescription = "Texto corto (opcional)" },
+                    placeholder = { Text(tr("Texto"), color = Color.Gray) }, modifier = Modifier.weight(1f).semantics { contentDescription = tr("Texto corto (opcional)") },
                     colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
             }
-            if (style.text.isNotBlank() && style.symbol != "polyline") IconPicker(SIDE_ICONS, SIDE_LABELS, style.side, { onStyle(style.copy(side = it)) }, "Lado del texto")
+            if (style.text.isNotBlank() && style.symbol != "polyline") IconPicker(SIDE_ICONS, SIDE_LABELS, style.side, { onStyle(style.copy(side = it)) }, tr("Lado del texto"))
         }
         if (style.tool in setOf(InkTool.PEN, InkTool.SYMBOL)) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             INK_COLORS.forEachIndexed { i, c ->
                 val sel = style.color == c
                 // área táctil de 44 dp (accesibilidad) con el círculo de color dentro
-                Box(Modifier.size(44.dp).clickable(onClickLabel = "Elegir el color ${COLOR_NAMES[i]}") { onStyle(style.copy(color = c)) }
-                    .semantics { contentDescription = "Color ${COLOR_NAMES[i]}"; selected = sel }, contentAlignment = Alignment.Center) {
+                Box(Modifier.size(44.dp).clickable(onClickLabel = tr("Elegir el color %1\$s", tr(COLOR_NAMES[i]))) { onStyle(style.copy(color = c)) }
+                    .semantics { contentDescription = tr("Color %1\$s", tr(COLOR_NAMES[i])); selected = sel }, contentAlignment = Alignment.Center) {
                     Box(Modifier.size(28.dp).background(Color(c), CircleShape)
                         .border(if (sel) 3.dp else 1.dp, if (sel) MaterialTheme.colorScheme.primary else Color.Gray, CircleShape))
                 }
@@ -176,7 +179,7 @@ fun InkOptions(style: InkStyle, onStyle: (InkStyle) -> Unit, modifier: Modifier 
                 Box(Modifier.size(d).background(if (style.tool in setOf(InkTool.PEN, InkTool.SYMBOL)) Color(style.color) else Color.LightGray, CircleShape))
             }
             Slider(value = style.width, onValueChange = { onStyle(style.copy(width = it)) }, valueRange = 0.002f..0.025f,
-                modifier = Modifier.weight(1f).semantics { contentDescription = if (style.tool == InkTool.SYMBOL) "Tamaño del símbolo" else "Grosor del trazo" })
+                modifier = Modifier.weight(1f).semantics { contentDescription = if (style.tool == InkTool.SYMBOL) tr("Tamaño del símbolo") else tr("Grosor del trazo") })
         }
     }
 }

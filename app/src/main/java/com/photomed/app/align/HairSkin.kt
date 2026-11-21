@@ -1,5 +1,6 @@
 package com.photomed.app.align
 
+import com.photomed.app.i18n.tr
 import android.content.Context
 import android.graphics.Bitmap
 import com.google.mediapipe.framework.image.BitmapImageBuilder
@@ -49,7 +50,7 @@ class HairSkinSegmenter(context: Context) : Closeable {
     fun labels(bmp: Bitmap): FaceLabels? = runCatching<FaceLabels?> {
         val src = if (bmp.config == Bitmap.Config.ARGB_8888) bmp else bmp.copy(Bitmap.Config.ARGB_8888, false)
         val r = seg.segment(BitmapImageBuilder(src).build())
-        val m = r.categoryMask().orElse(null) ?: error("sin máscara de categorías")
+        val m = r.categoryMask().orElse(null) ?: error(tr("sin máscara de categorías"))
         val buf = ByteBufferExtractor.extract(m)
         val out = ByteArray(m.width * m.height); buf.rewind(); buf.get(out)
         FaceLabels(m.width, m.height, out)

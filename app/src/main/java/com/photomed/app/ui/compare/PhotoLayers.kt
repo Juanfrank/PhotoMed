@@ -1,5 +1,6 @@
 package com.photomed.app.ui.compare
 
+import com.photomed.app.i18n.tr
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.material.icons.filled.Contrast
 import com.photomed.app.ui.components.detectTapPassThrough
@@ -83,11 +84,11 @@ fun rememberAnnotAlpha(): MutableState<Float> {
 @Composable
 fun OpacitySlider(alpha: Float, onChange: (Float) -> Unit, modifier: Modifier = Modifier, light: Boolean = false) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Text("Opacidad ${(alpha * 100).toInt()} %", style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+        Text(tr("Opacidad %1\$d %%", (alpha * 100).toInt()), style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
             color = if (light) androidx.compose.ui.graphics.Color.White else androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(end = 8.dp))
         androidx.compose.material3.Slider(value = alpha, onValueChange = onChange, valueRange = 0.1f..1f,
-            modifier = Modifier.weight(1f).semantics { contentDescription = "Opacidad de los trazos y números" })
+            modifier = Modifier.weight(1f).semantics { contentDescription = tr("Opacidad de los trazos y números") })
     }
 }
 
@@ -130,18 +131,18 @@ fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, mod
                opacity: Float? = null, onOpacity: ((Float) -> Unit)? = null, light: Boolean = false) {
     Row(modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        if (onMetrics != null) androidx.compose.material3.AssistChip(onClick = onMetrics, label = { Text("Medidas") },
+        if (onMetrics != null) androidx.compose.material3.AssistChip(onClick = onMetrics, label = { Text(tr("Medidas")) },
             leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.TableChart, null, Modifier.size(18.dp)) })
-        if (onTrace != null) FilterChip(selected = tracing, onClick = onTrace, label = { Text(if (tracing) "Dibuje el surco…" else "Trazar surco") },
+        if (onTrace != null) FilterChip(selected = tracing, onClick = onTrace, label = { Text(if (tracing) tr("Dibuje el surco…") else tr("Trazar surco")) },
             leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.Gesture, null, Modifier.size(18.dp)) })
-        LayerMenu("Contorno externo", OUTER_LAYERS, layers, onChange)
-        LayerMenu("Contorno interno", INNER_LAYERS, layers, onChange)
+        LayerMenu(tr("Contorno externo"), OUTER_LAYERS, layers, onChange)
+        LayerMenu(tr("Contorno interno"), INNER_LAYERS, layers, onChange)
         if (opacity != null && onOpacity != null) androidx.compose.foundation.layout.Box {
             var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
             val pct = (opacity * 100).toInt()
             androidx.compose.material3.AssistChip(onClick = { open = true }, label = { Text("$pct %") },
                 leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.Contrast, null, Modifier.size(18.dp)) },
-                modifier = Modifier.semantics { contentDescription = "Opacidad $pct %" })
+                modifier = Modifier.semantics { contentDescription = tr("Opacidad %1\$d %%", pct) })
             androidx.compose.material3.DropdownMenu(open, { open = false }) {
                 OpacitySlider(opacity, onOpacity, Modifier.requiredWidth(260.dp).padding(horizontal = 12.dp))
             }
@@ -159,11 +160,11 @@ fun LayerMenu(title: String, group: List<AnnotLayer>, layers: Set<AnnotLayer>, o
         FilterChip(selected = on > 0, onClick = { open = true },
             label = { Text("$title ($on/${group.size})") },
             trailingIcon = { Icon(androidx.compose.material.icons.Icons.Filled.ArrowDropDown, null, Modifier.size(18.dp)) },
-            modifier = Modifier.semantics { contentDescription = "$title: $on de ${group.size} capas visibles" })
+            modifier = Modifier.semantics { contentDescription = tr("%1\$s: %2\$d de %3\$d capas visibles", title, on, group.size) })
         androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             val all = on == group.size
             androidx.compose.material3.DropdownMenuItem(
-                text = { Text("Seleccionar todos", fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) },
+                text = { Text(tr("Seleccionar todos"), fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) },
                 leadingIcon = {
                     androidx.compose.material3.TriStateCheckbox(
                         state = when (on) { 0 -> androidx.compose.ui.state.ToggleableState.Off; group.size -> androidx.compose.ui.state.ToggleableState.On
@@ -239,7 +240,7 @@ fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boole
                 PhotoAnnotator.extrasFor(context, uri, 1080, crop34 = true),
                 user = user, priors = com.photomed.app.align.LineMemory.priors(context, previous), memoryUri = u)
         }.getOrNull()?.let { (lines, note) -> PhotoAnnotator.put(key, lines); PhotoAnnotator.putNote(key, note); lines }
-            ?: emptyList<AnnotLine>().also { PhotoAnnotator.putNote(key, "No se pudo analizar la foto.") }
+            ?: emptyList<AnnotLine>().also { PhotoAnnotator.putNote(key, tr("No se pudo analizar la foto.")) }
         value = base?.map { l -> if (phiDeg == 0f) l else l.mapped { Perspective.mapPt(it, phiDeg) } }
     }
 }

@@ -90,6 +90,7 @@ import com.photomed.app.ui.expedientes.ExpedienteForm
 import com.photomed.app.ui.formatDate
 import com.photomed.app.ui.theme.Md3Palette
 import com.photomed.app.ui.theme.Md3Spacing
+import com.photomed.app.i18n.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -122,7 +123,7 @@ fun ExpedienteScreen(
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(50)) { uris ->
         if (uris.isNotEmpty()) scope.launch {
-            importBusy = "Analizando ${uris.size} ${if (uris.size == 1) "foto" else "fotos"}…"
+            importBusy = if (uris.size == 1) tr("Analizando %1\$d foto…", uris.size) else tr("Analizando %1\$d fotos…", uris.size)
             importItems = runCatching { com.photomed.app.data.PhotoImport.prepare(context, uris, default = null) }.getOrNull()
                 ?: uris.map { com.photomed.app.data.ImportItem(it, System.currentTimeMillis(), false, null) }
             importBusy = null
@@ -134,7 +135,7 @@ fun ExpedienteScreen(
     val protocolPicker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
-            importBusy = "Importando…"
+            importBusy = tr("Importando…")
             val (msg, photosIn) = com.photomed.app.ui.protocol.importProtocolFile(context, repo, exp, uri)
             importBusy = null
             protocolsVersion++
@@ -175,14 +176,14 @@ fun ExpedienteScreen(
             importItems = null
             val e = exp ?: return@ImportPhotosDialog
             scope.launch {
-                importBusy = "Importando ${chosen.size} ${if (chosen.size == 1) "foto" else "fotos"}…"
+                importBusy = if (chosen.size == 1) tr("Importando %1\$d foto…", chosen.size) else tr("Importando %1\$d fotos…", chosen.size)
                 val r = runCatching { com.photomed.app.data.PhotoImport.importAll(context, repo, e, chosen) }.getOrNull()
                 importBusy = null
                 reload++
                 val saved = r?.saved?.size ?: 0; val dup = r?.duplicates ?: 0
                 val failed = chosen.size - saved - dup
-                snackbar.showSnackbar("Importadas $saved de ${chosen.size}" + (if (dup > 0) " ($dup ya estaban en el expediente)" else "") +
-                    if (failed > 0) " ($failed no se pudieron leer)" else "")
+                snackbar.showSnackbar(tr("Importadas %1\$d de %2\$d", saved, chosen.size) + (if (dup > 0) tr(" (%1\$d ya estaban en el expediente)", dup) else "") +
+                    if (failed > 0) tr(" (%1\$d no se pudieron leer)", failed) else "")
             }
         }
     }
@@ -201,7 +202,7 @@ fun ExpedienteScreen(
     val current = exp
     if (editing && current != null) {
         ExpedienteForm(
-            title = "Editar expediente",
+            title = tr("Editar expediente"),
             initialName = current.patientName,
             initialRecord = current.recordNumber,
             initialNotes = current.notes,
@@ -212,17 +213,17 @@ fun ExpedienteScreen(
                 scope.launch {
                     withContext(Dispatchers.IO) { repo.updateExpediente(current, n, r, notes, consent) }
                     reload++
-                    snackbar.showSnackbar("Expediente actualizado. Las fotos nuevas usarán estos datos.")
+                    snackbar.showSnackbar(tr("Expediente actualizado. Las fotos nuevas usarán estos datos."))
                 }
             }
         )
     }
     if (confirmDelete && current != null) {
         ConfirmDialog(
-            title = "¿Eliminar expediente?",
-            text = "Se eliminarán el expediente de ${current.patientName} y sus ${current.photoCount} fotografías " +
-                "de la galería. Esta acción no se puede deshacer.",
-            confirmLabel = "Eliminar",
+            title = tr("¿Eliminar expediente?"),
+            text = tr("Se eliminarán el expediente de %1\$s y sus %2\$d fotografías " +
+                "de la galería. Esta acción no se puede deshacer.", current.patientName, current.photoCount),
+            confirmLabel = tr("Eliminar"),
             icon = Icons.Default.Delete,
             onDismiss = { confirmDelete = false },
             onConfirm = {
@@ -280,27 +281,27 @@ fun ExpedienteContent(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             if (selecting) androidx.compose.material3.TopAppBar(
-                title = { Text("${selection.size} zona" + if (selection.size == 1) "" else "s") },
-                navigationIcon = { IconButton(onClick = { selection = emptyList() }) { Icon(Icons.Default.Close, "Cancelar selección") } },
+                title = { Text(if (selection.size == 1) tr("%1\$d zona", selection.size) else tr("%1\$d zonas", selection.size)) },
+                navigationIcon = { IconButton(onClick = { selection = emptyList() }) { Icon(Icons.Default.Close, tr("Cancelar selección")) } },
                 actions = {
-                    IconButton(onClick = { naming = true }) { Icon(Icons.Default.BookmarkAdd, "Guardar como protocolo") }
+                    IconButton(onClick = { naming = true }) { Icon(Icons.Default.BookmarkAdd, tr("Guardar como protocolo")) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
             ) else MediumTopAppBar(
                 title = { Text(exp?.patientName.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Atrás")) } },
                 actions = {
-                    IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Editar expediente") }
+                    IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, tr("Editar expediente")) }
                     Box {
-                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, tr("Más opciones")) }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(
-                                text = { Text("Importar fotos") },
+                                text = { Text(tr("Importar fotos")) },
                                 leadingIcon = { Icon(Icons.Default.AddPhotoAlternate, null) },
                                 onClick = { menu = false; onImport() },
                             )
                             DropdownMenuItem(
-                                text = { Text("Eliminar expediente") },
+                                text = { Text(tr("Eliminar expediente")) },
                                 leadingIcon = { Icon(Icons.Default.Delete, null) },
                                 onClick = { menu = false; onDelete() },
                             )
@@ -315,20 +316,20 @@ fun ExpedienteContent(
                 ExtendedFloatingActionButton(
                     onClick = { onSequence(selection.mapNotNull { Zone.fromId(it) }); selection = emptyList() },
                     icon = { Icon(Icons.Default.PlayArrow, null) },
-                    text = { Text("Iniciar secuencia de fotos (${selection.size})") },
+                    text = { Text(tr("Iniciar secuencia de fotos (%1\$d)", selection.size)) },
                 )
             } else if (photos.size >= 2) {
                 ExtendedFloatingActionButton(
                     onClick = onCompare,
                     icon = { Icon(Icons.Default.Compare, null) },
-                    text = { Text("Comparar") },
+                    text = { Text(tr("Comparar")) },
                 )
             }
         },
         snackbarHost = {
             androidx.compose.foundation.layout.Column {
                 com.photomed.app.ui.components.CoachMark("expediente_seleccion", Icons.Default.TouchApp,
-                    "Mantenga pulsada una zona para elegir varias: inicie una secuencia de fotos o guárdela como protocolo.")
+                    tr("Mantenga pulsada una zona para elegir varias: inicie una secuencia de fotos o guárdela como protocolo."))
                 SnackbarHost(snackbar)
             }
         },
@@ -346,10 +347,10 @@ fun ExpedienteContent(
             }
             // iniciar una sesión: protocolos (los predefinidos incluidos), plegados si el expediente ya tiene fotos
             item(span = { GridItemSpan(maxLineSpan) }, key = "sesion") {
-                Row(Modifier.fillMaxWidth().clickable(onClickLabel = if (sessionOpen) "Plegar" else "Desplegar") { sessionOpenUser = !sessionOpen }
+                Row(Modifier.fillMaxWidth().clickable(onClickLabel = if (sessionOpen) tr("Plegar") else tr("Desplegar")) { sessionOpenUser = !sessionOpen }
                     .padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
-                    Text("Iniciar sesión de fotos (protocolos)", style = MaterialTheme.typography.titleSmall,
+                    Text(tr("Iniciar sesión de fotos (protocolos)"), style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f).padding(start = 6.dp))
                     Icon(if (sessionOpen) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null)
                 }
@@ -362,7 +363,7 @@ fun ExpedienteContent(
             // (abiertas si el expediente aún no tiene fotos o si hay zonas suyas seleccionadas)
             val withPhotos = Zone.entries.filter { byZone.containsKey(it) }
             if (withPhotos.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader("Con fotos · ${withPhotos.size} zonas") }
+                item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader(tr("Con fotos · %1\$d zonas", withPhotos.size)) }
                 items(withPhotos, key = { "f_" + it.id }) { zone ->
                     val order = selection.indexOf(zone.id).takeIf { it >= 0 }?.plus(1)
                     ZoneCard(zone, byZone[zone].orEmpty(), order, selecting,
@@ -374,7 +375,7 @@ fun ExpedienteContent(
                 if (zones.isEmpty()) return@forEach
                 val open = cat.name in openCats || withPhotos.isEmpty() || zones.any { it.id in selection }
                 item(span = { GridItemSpan(maxLineSpan) }, key = "cat_" + cat.name) {
-                    CategoryHeader("${cat.label} · ${zones.size} ${if (withPhotos.isEmpty()) "zonas" else "zonas más"}", open) {
+                    CategoryHeader("${cat.label} · " + if (withPhotos.isEmpty()) tr("%1\$d zonas", zones.size) else tr("%1\$d zonas más", zones.size), open) {
                         openCats = if (cat.name in openCats) openCats - cat.name else openCats + cat.name
                     }
                 }
@@ -393,7 +394,7 @@ fun ExpedienteContent(
         savedProtocols++
         selection = emptyList()
         sessionOpenUser = true
-        scope.launch { snackbar.showSnackbar("Protocolo «$name» guardado") }
+        scope.launch { snackbar.showSnackbar(tr("Protocolo «%1\$s» guardado", name)) }
     }
 }
 
@@ -401,9 +402,9 @@ fun ExpedienteContent(
 @Composable
 private fun CategoryHeader(text: String, open: Boolean, onToggle: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable(onClickLabel = if (open) "Plegar" else "Desplegar", onClick = onToggle)
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable(onClickLabel = if (open) tr("Plegar") else tr("Desplegar"), onClick = onToggle)
             .padding(vertical = Md3Spacing.s2)
-            .semantics { stateDescription = if (open) "Desplegada" else "Plegada"; heading() },
+            .semantics { stateDescription = if (open) tr("Desplegada") else tr("Plegada"); heading() },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
@@ -416,12 +417,12 @@ private fun TemplateNameDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) 
     var name by remember { mutableStateOf("") }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Guardar como protocolo") },
+        title = { Text(tr("Guardar como protocolo")) },
         text = {
-            androidx.compose.material3.OutlinedTextField(name, { name = it }, label = { Text("Nombre") }, singleLine = true)
+            androidx.compose.material3.OutlinedTextField(name, { name = it }, label = { Text(tr("Nombre")) }, singleLine = true)
         },
-        confirmButton = { androidx.compose.material3.TextButton(onClick = { onSave(name.trim()) }, enabled = name.isNotBlank()) { Text("Guardar") } },
-        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { onSave(name.trim()) }, enabled = name.isNotBlank()) { Text(tr("Guardar")) } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text(tr("Cancelar")) } },
     )
 }
 
@@ -429,22 +430,22 @@ private fun TemplateNameDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) 
 private fun SummaryCard(exp: Expediente, count: Int) {
     // una línea (número, fotos, consentimiento); al tocarla, las notas y el álbum
     var open by remember { mutableStateOf(false) }
-    androidx.compose.material3.OutlinedCard(Modifier.fillMaxWidth().clickable(onClickLabel = if (open) "Ocultar detalles" else "Ver detalles") { open = !open }) {
+    androidx.compose.material3.OutlinedCard(Modifier.fillMaxWidth().clickable(onClickLabel = if (open) tr("Ocultar detalles") else tr("Ver detalles")) { open = !open }) {
         Column(Modifier.padding(horizontal = Md3Spacing.s3, vertical = Md3Spacing.s2), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(if (exp.consent) Icons.Default.Verified else Icons.Default.Warning,
-                    if (exp.consent) "Consentimiento registrado" else "Consentimiento no registrado", Modifier.size(18.dp),
+                    if (exp.consent) tr("Consentimiento registrado") else tr("Consentimiento no registrado"), Modifier.size(18.dp),
                     tint = if (exp.consent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                Text(listOfNotNull(exp.recordNumber.takeIf { it.isNotBlank() }?.let { "Exp. $it" }, "$count fotos", "creado el ${formatDate(exp.createdAt)}")
+                Text(listOfNotNull(exp.recordNumber.takeIf { it.isNotBlank() }?.let { tr("Exp. %1\$s", it) }, tr("%1\$d fotos", count), tr("creado el %1\$s", formatDate(exp.createdAt)))
                     .joinToString(" · "), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(start = 6.dp))
                 Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (exp.notes.isNotBlank()) Text(exp.notes, style = MaterialTheme.typography.bodySmall, maxLines = if (open) 20 else 1,
                 overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (open) {
-                Text(if (exp.consent) "Consentimiento registrado" else "Consentimiento no registrado", style = MaterialTheme.typography.bodySmall,
+                Text(if (exp.consent) tr("Consentimiento registrado") else tr("Consentimiento no registrado"), style = MaterialTheme.typography.bodySmall,
                     color = if (exp.consent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                Text("Álbum en la galería: Pictures/PhotoMed/${exp.id}", style = MaterialTheme.typography.bodySmall,
+                Text(tr("Álbum en la galería: %1\$s", "Pictures/PhotoMed/${exp.id}"), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -463,10 +464,10 @@ private fun ZoneCard(zone: Zone, photos: List<Photo>, order: Int? = null, select
         modifier = Modifier.fillMaxWidth()
             .clip(CardDefaults.shape)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick,
-                onClickLabel = if (selecting) (if (order != null) "Quitar de la secuencia" else "Añadir a la secuencia") else "Abrir",
-                onLongClickLabel = "Elegir varias zonas")
+                onClickLabel = if (selecting) (if (order != null) tr("Quitar de la secuencia") else tr("Añadir a la secuencia")) else tr("Abrir"),
+                onLongClickLabel = tr("Elegir varias zonas"))
             .semantics {
-                contentDescription = "${zone.label}, ${photos.size} fotografías" + (order?.let { ", número $it de la secuencia" } ?: "")
+                contentDescription = tr("%1\$s, %2\$d fotografías", zone.label, photos.size) + (order?.let { tr(", número %1\$d de la secuencia", it) } ?: "")
             },
     ) {
         Box(
@@ -499,7 +500,7 @@ private fun ZoneCard(zone: Zone, photos: List<Photo>, order: Int? = null, select
             Text(zone.label, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    last?.let { "Última: ${formatDate(it.takenAt)}" } ?: "Sin fotos",
+                    last?.let { tr("Última: %1\$s", formatDate(it.takenAt)) } ?: tr("Sin fotos"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

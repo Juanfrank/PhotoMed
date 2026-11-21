@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import com.photomed.app.data.Photo
 import com.photomed.app.data.PhotoMetadata
+import com.photomed.app.i18n.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -41,6 +42,6 @@ suspend fun sharePhotos(context: Context, photos: List<Photo>, anonymize: Boolea
     else Intent(Intent.ACTION_SEND_MULTIPLE).apply { putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris)) }
     intent.type = "image/jpeg"
     intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    context.startActivity(Intent.createChooser(intent, if (anonymize) "Compartir (anonimizada)" else "Compartir"))
+    context.startActivity(Intent.createChooser(intent, if (anonymize) tr("Compartir (anonimizada)") else tr("Compartir")))
     return uris.size == photos.size
 }
