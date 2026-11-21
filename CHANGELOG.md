@@ -2,6 +2,14 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.37 — 21 de noviembre de 2026
+
+- **Tabla de medidas compacta** (visor y Comparar): sin interlineado ni relleno entre filas; cada
+  fila con el alto justo de su texto (una línea, o dos con varias fotos: línea y medida); letra un punto
+  menor; los nombres largos acaban en «…» en vez de partirse; cabecera del panel más baja.
+- **Altura máxima de la tabla: 20 % de la pantalla** (antes 42–45 %), en vertical. En horizontal sigue
+  ocupando la columna de la izquierda.
+
 ## 2.36 — 21 de noviembre de 2026
 
 - **La tabla de medidas se filtra a lo seleccionado en la foto**: al tocar una línea, la tabla muestra

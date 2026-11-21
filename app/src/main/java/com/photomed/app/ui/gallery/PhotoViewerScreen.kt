@@ -498,7 +498,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 topControls()
                 photoArea(Modifier.weight(1f).fillMaxWidth())
             if (!wide && metricsSheet && showLayers && !fullscreen)
-                metricsPanel(Modifier.fillMaxWidth().heightIn(max = (conf.screenHeightDp * 0.45f).dp))
+                metricsPanel(Modifier.fillMaxWidth().heightIn(max = (conf.screenHeightDp * 0.20f).dp))
                 bottomControls()
             }
         }

@@ -259,9 +259,10 @@ fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
     androidx.compose.material3.Surface(modifier, color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 2.dp) {
         Column(Modifier.fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Medidas", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Cerrar las medidas") }
+            // cabecera baja: el panel tiene poco alto (20 % de la pantalla) y es casi todo filas
+            Row(Modifier.fillMaxWidth().height(32.dp).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Medidas", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Close, "Cerrar las medidas", Modifier.size(20.dp)) }
             }
             HorizontalDivider()
             Column(Modifier.padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
@@ -357,8 +358,8 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
         if (rows.isEmpty()) continue
         val area = group == 1
         Text(listOf("Arrugas y surcos", "Ojeras", "Rasgos")[group], style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp))
-        Column(Modifier.horizontalScroll(scrolls[group]).padding(top = 4.dp)) {
+            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
+        Column(Modifier.horizontalScroll(scrolls[group])) {
             if (group == 2) {
                 // rasgos: una fila por medida
                 val featCells = listOf("Rasgo · medida") + (if (single) listOf("Valor") else columns.map { it.first.replace(", ", "\n") } + "Δ")
@@ -419,8 +420,11 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
             val nAct = listOfNotNull(edit, revert, onDelete).size
             val (fw, vw) = widthsFor(specs.firstOrNull()?.cells?.size ?: 2, 40.dp * nAct)
             // alto de fila según el tamaño de letra del sistema (accesibilidad): sin recortar el texto
-            val rowH = ROW_H * androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceIn(1f, 2f)
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+            // alto de cada fila justo para su texto (sin interlineado): una línea, o dos (línea y medida)
+            val fs = androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceIn(1f, 2f)
+            fun rowHOf(r: RowSpec) = (ROW_LINE * (if (r.header) 2 else r.cells.maxOf { it.count { ch -> ch == '\n' } + 1 }) + 2.dp) * fs
+            val btn = (ROW_LINE + 2.dp) * fs
+            Row(Modifier.fillMaxWidth()) {
                 Column(Modifier.weight(1f).horizontalScroll(scrolls[group])) {
                     var owner: AnnotLine? = null
                     specs.forEach { r -> if (r.line != null) owner = r.line; if (r.header) owner = null
@@ -429,7 +433,7 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
                         val rowKey = r.measure?.let { if (it == 1) WIDTH_KEY else null }
                         val isSel = !r.header && o?.metrics?.name != null && o.metrics.name == selName &&
                             (selectedKey == null || r.measure == null || rowKey == selectedKey)
-                        TableRow(r.cells, header = r.header, line = r.line, fixedHeight = rowH,
+                        TableRow(r.cells, header = r.header, line = r.line, fixedHeight = rowHOf(r),
                             onClick = if (r.header || o == null) null else onSelectLine?.let { f -> { f(o, rowKey?.takeIf { o.guides.any { g -> g.key == it } }) } },
                             highlight = isSel, bring = if (isSel && (r.line != null || rowKey == selectedKey)) bring else null, firstW = fw, valueW = vw,
                             // una foto: la celda del ancho selecciona solo el tramo del ancho
@@ -441,20 +445,20 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
                 }
                 if (nAct > 0) Column(Modifier.width(40.dp * nAct)) {
                     specs.forEach { r ->
-                        Row(Modifier.height(rowH).width(40.dp * nAct), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.height(rowHOf(r)).width(40.dp * nAct), verticalAlignment = Alignment.CenterVertically) {
                             val n = r.deleteName
                             if (edit != null) androidx.compose.foundation.layout.Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
-                                if (n != null) IconButton(onClick = { edit(n) }, modifier = Modifier.size(36.dp)) {
-                                    Icon(Icons.Default.Edit, "Volver a trazar $n", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                                if (n != null) IconButton(onClick = { edit(n) }, modifier = Modifier.size(btn)) {
+                                    Icon(Icons.Default.Edit, "Volver a trazar $n", Modifier.size(minOf(20.dp, btn - 4.dp)), tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                             if (revert != null) androidx.compose.foundation.layout.Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
-                                if (n != null && n in traces.edited) IconButton(onClick = { revert(n) }, modifier = Modifier.size(36.dp)) {
-                                    Icon(Icons.AutoMirrored.Filled.Undo, "Revertir el trazado de $n", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                                if (n != null && n in traces.edited) IconButton(onClick = { revert(n) }, modifier = Modifier.size(btn)) {
+                                    Icon(Icons.AutoMirrored.Filled.Undo, "Revertir el trazado de $n", Modifier.size(minOf(20.dp, btn - 4.dp)), tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                             if (onDelete != null) androidx.compose.foundation.layout.Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
-                                n?.let { DeleteLineButton(it, if (single) emptyList() else r.deletePhotos) { c -> onDelete(it, if (single) (c ?: 0) else c) } }
+                                n?.let { DeleteLineButton(it, if (single) emptyList() else r.deletePhotos, btn) { c -> onDelete(it, if (single) (c ?: 0) else c) } }
                             }
                         }
                         if (r.divider) HorizontalDivider()
@@ -485,7 +489,8 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
 }
 
 /** Alto fijo de las filas de arrugas, surcos y ojeras (alinea las cifras con la columna fija de eliminar). */
-private val ROW_H = 46.dp
+/** Alto de una línea de texto de la tabla (bodyMedium sin interlineado). */
+private val ROW_LINE = 15.dp
 
 /** Fila de la tabla preparada (celdas, línea, eliminar). */
 private class RowSpec(val cells: List<String>, val header: Boolean = false, val line: AnnotLine? = null, val deleteName: String? = null,
@@ -497,6 +502,12 @@ private class RowSpec(val cells: List<String>, val header: Boolean = false, val 
 private const val WIDTH_KEY = "Ancho (a media profundidad)"
 
 /** Fila de la tabla: texto con contraste alto (cifras en negrita y color de primer plano). */
+/** Texto sin interlineado extra (tabla compacta): alto de línea = tamaño de letra, sin relleno de la fuente. */
+private fun tight(st: androidx.compose.ui.text.TextStyle) = st.copy(lineHeight = st.fontSize,
+    lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+        androidx.compose.ui.text.style.LineHeightStyle.Trim.Both),
+    platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false))
+
 @Composable
 private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLine? = null,
                      /** Acción al final de la fila (eliminar la línea). */
@@ -512,7 +523,7 @@ private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLi
                      onCellClick: ((Int) -> Unit)? = null,
                      /** Muestra del trazo en una celda (índice, estilo). */
                      swatchCell: Pair<Int, Int>? = null) {
-    Row((if (fixedHeight != null) Modifier.height(fixedHeight) else Modifier.padding(vertical = 3.dp))
+    Row((if (fixedHeight != null) Modifier.height(fixedHeight) else Modifier)
         .then(if (highlight) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) else Modifier)
         .then(if (bring != null) Modifier.bringIntoViewRequester(bring) else Modifier)
         .then(if (onClick != null) Modifier.clickable(onClickLabel = "Ver en la foto", role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) else Modifier)
@@ -525,11 +536,19 @@ private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLi
                 if (i == 0 && swatch != null) { GuideSwatch(swatch, Modifier.size(26.dp, 11.dp)); Spacer(Modifier.width(4.dp)) }
                 if (swatchCell?.first == i && !(i == 0 && swatch != null)) { GuideSwatch(swatchCell.second, Modifier.size(22.dp, 10.dp)); Spacer(Modifier.width(3.dp)) }
                 if (i == 0 && line != null) Canvas(Modifier.size(9.dp)) { drawCircle(com.photomed.app.ui.camera.lineColor(line)) }
-                Text(c, style = if (header) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium,
-                    fontWeight = when { header -> FontWeight.Bold; i > 0 -> FontWeight.SemiBold; else -> FontWeight.Normal },
-                    color = if (header || i > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
-                    textAlign = if (i == 0) TextAlign.Start else TextAlign.End,
-                    modifier = Modifier.padding(start = if (i == 0 && line != null) 6.dp else 0.dp))
+                val st = tight(if (header) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodySmall)
+                val fw = when { header -> FontWeight.Bold; i > 0 -> FontWeight.SemiBold; else -> FontWeight.Normal }
+                val col = if (header || i > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f)
+                val pad = Modifier.padding(start = if (i == 0 && line != null) 6.dp else 0.dp)
+                // cabecera: puede ocupar dos renglones; filas: cada renglón en una línea (los nombres largos acaban en «…»)
+                if (header) Text(c, style = st, fontWeight = fw, color = col, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    textAlign = if (i == 0) TextAlign.Start else TextAlign.End, modifier = pad)
+                else Column(pad, horizontalAlignment = if (i == 0) Alignment.Start else Alignment.End) {
+                    c.split('\n').forEach { t ->
+                        Text(t, style = st, fontWeight = fw, color = col, maxLines = 1, softWrap = false,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = if (i == 0) TextAlign.Start else TextAlign.End)
+                    }
+                }
             }
         }
         action?.invoke()
@@ -541,11 +560,11 @@ private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLi
  * fecha de las fotos donde está), un menú para elegir en cuál o en todas.
  */
 @Composable
-private fun DeleteLineButton(name: String, photos: List<Pair<Int, String>>, onDelete: (Int?) -> Unit) {
+private fun DeleteLineButton(name: String, photos: List<Pair<Int, String>>, size: Dp = 36.dp, onDelete: (Int?) -> Unit) {
     var menu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.foundation.layout.Box {
-        IconButton(onClick = { if (photos.isEmpty()) onDelete(null) else menu = true }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Default.Delete, "Eliminar $name (falso positivo)", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+        IconButton(onClick = { if (photos.isEmpty()) onDelete(null) else menu = true }, modifier = Modifier.size(size)) {
+            Icon(Icons.Default.Delete, "Eliminar $name (falso positivo)", Modifier.size(minOf(20.dp, size - 4.dp)), tint = MaterialTheme.colorScheme.error)
         }
         androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             photos.forEach { (i, d) -> androidx.compose.material3.DropdownMenuItem(text = { Text("En la foto ${i + 1} · ${d.replace("\n", " ")}") },

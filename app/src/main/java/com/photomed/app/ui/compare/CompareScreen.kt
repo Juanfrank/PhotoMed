@@ -736,7 +736,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             androidx.compose.animation.AnimatedVisibility(panelOpen || seq == null) {
             Column {
             if (!wide && metricsSheet && showLayers && seq != null)
-                metricsPanel(seq, Modifier.fillMaxWidth().heightIn(max = (conf.screenHeightDp * 0.42f).dp))
+                metricsPanel(seq, Modifier.fillMaxWidth().heightIn(max = (conf.screenHeightDp * 0.20f).dp))
 
             // Controles bajo las fotos: se ocultan a los 3 s sin tocar (fotos más grandes); un toque los recupera
             androidx.compose.animation.AnimatedVisibility(controlsVisible || seq == null) {
