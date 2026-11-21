@@ -16,7 +16,6 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.hasScrollAction
 import androidx.test.core.app.ApplicationProvider
 import com.photomed.app.data.Expediente
-import com.photomed.app.data.SessionTemplates
 import com.photomed.app.data.Zone
 import com.photomed.app.ui.camera.HintCues
 import com.photomed.app.ui.expediente.ExpedienteContent
@@ -48,13 +47,19 @@ class SequenceFlowTest {
     }
 
     @Test
-    fun templatesPersist() {
-        SessionTemplates.save(prefs, com.photomed.app.data.SessionTemplate("Mi control", listOf(Zone.LIPS, Zone.FACE_FRONTAL)))
-        val all = SessionTemplates.load(prefs)
-        assertEquals(listOf(Zone.LIPS, Zone.FACE_FRONTAL), all.first { it.name == "Mi control" }.zones)
-        SessionTemplates.delete(prefs, "Mi control")
-        assertTrue(SessionTemplates.load(prefs).none { it.name == "Mi control" })
-        assertTrue(SessionTemplates.BUILT_IN.size >= 4)
+    fun oldTemplatesBecomeProtocols() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        java.io.File(ctx.filesDir, "protocolos").deleteRecursively()
+        prefs.edit().putString("session_templates", """[{"name":"Mi control","zones":["labios","rostro_frontal"]}]""").commit()
+        com.photomed.app.data.BuiltInProtocols.seed(ctx)
+        val all = com.photomed.app.data.Protocols.list(ctx)
+        val mine = all.first { it.name == "Mi control" }
+        assertEquals(listOf(Zone.LIPS, Zone.FACE_FRONTAL), mine.steps.map { it.zone })
+        // valores por defecto: disparo automático y luz del rostro
+        assertTrue(mine.steps.all { it.autoCapture == true })
+        assertEquals(com.photomed.app.data.ProtocolDefaults.MIN_LIGHT, mine.steps[1].minLight)
+        assertTrue(all.size >= com.photomed.app.data.BuiltInProtocols.ALL.size + 1)
+        assertEquals(null, prefs.getString("session_templates", null))
     }
 
     @Test
@@ -83,20 +88,24 @@ class SequenceFlowTest {
     }
 
     @Test
-    fun templateSelectsZonesAndCanBeSaved() {
-        var started: List<Zone>? = null
+    fun selectedZonesCanBeSavedAsProtocol() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        java.io.File(ctx.filesDir, "protocolos").deleteRecursively()
         compose.setContent { PhotoMedTheme(darkTheme = false) {
-            ExpedienteContent(exp, emptyList(), SnackbarHostState(), {}, {}, {}, {}, {}, onSequence = { started = it })
+            ExpedienteContent(exp, emptyList(), SnackbarHostState(), {}, {}, {}, {}, {}, onSequence = { })
         } }
-        compose.onNodeWithText("Rostro 5 vistas", substring = true).performClick()
-        compose.onNodeWithText("5 zonas").assertExists()
-        compose.onNodeWithContentDescription("Guardar como plantilla").performClick()
+        val grid = compose.onNode(hasScrollAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(
+            androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange))
+        grid.performScrollToNode(hasContentDescription("Labios", substring = true))
+        compose.onNodeWithContentDescription("Labios", substring = true).performTouchInput { longClick() }
+        grid.performScrollToNode(hasContentDescription("Rostro frontal", substring = true))
+        compose.onNodeWithContentDescription("Rostro frontal", substring = true).performClick()
+        compose.onNodeWithContentDescription("Guardar como protocolo").performClick()
         compose.onNodeWithText("Nombre").performTextInput("Control mensual")
         compose.onNodeWithText("Guardar").performClick()
         compose.waitForIdle()
-        assertTrue(SessionTemplates.custom(prefs).any { it.name == "Control mensual" && it.zones.size == 5 })
-        compose.onNodeWithText("Iniciar secuencia de fotos (5)", useUnmergedTree = true).performClick()
-        assertEquals(Zone.FACE_FRONTAL, started!!.first())
+        val p = com.photomed.app.data.Protocols.list(ctx).first { it.name == "Control mensual" }
+        assertEquals(listOf(Zone.LIPS, Zone.FACE_FRONTAL), p.steps.map { it.zone })
     }
 
     @Test

@@ -4,6 +4,9 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -99,7 +102,7 @@ fun ProtocolLibraryScreen(onEdit: (String) -> Unit, onApply: (String, Protocol) 
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Protocolos") }, actions = {
+            TopAppBar(title = { com.photomed.app.ui.components.AppSectionTitle("Protocolos") }, actions = {
                 IconButton(onClick = { importer.launch(arrayOf("application/json", "application/octet-stream", "*/*")) }) {
                     Icon(Icons.Default.FileOpen, "Importar un protocolo")
                 }
@@ -177,7 +180,8 @@ fun ExpedientePicker(title: String, onDismiss: () -> Unit, onPick: (Expediente) 
                 val shown = all.filter { q.isBlank() || it.patientName.contains(q, true) || it.recordNumber.contains(q, true) }
                 LazyColumn(Modifier.height(320.dp)) {
                     items(shown, key = { it.id }) { e ->
-                        ListItem(headlineContent = { Text(e.patientName.ifBlank { "(sin nombre)" }) },
+                        ListItem(leadingContent = { PatientThumb(e) },
+                            headlineContent = { Text(e.patientName.ifBlank { "(sin nombre)" }) },
                             supportingContent = { Text(listOfNotNull(e.recordNumber.takeIf { it.isNotBlank() }?.let { "Exp. $it" }, "${e.photoCount} fotos").joinToString(" · ")) },
                             modifier = Modifier.clickable { onPick(e) })
                         HorizontalDivider()
@@ -186,4 +190,24 @@ fun ExpedientePicker(title: String, onDismiss: () -> Unit, onPick: (Expediente) 
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
+}
+
+/**
+ * Miniatura del paciente como en la pestaña Expedientes: la última foto de la cara (solo ángulos
+ * faciales) o, si no hay, sus iniciales.
+ */
+@Composable
+fun PatientThumb(e: Expediente, width: androidx.compose.ui.unit.Dp = 40.dp) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val repo = LocalRepository.current
+    val face by produceState<com.photomed.app.data.Photo?>(null, e.id) {
+        value = withContext(Dispatchers.IO) { runCatching { com.photomed.app.data.ExpedienteSummaries.of(context, repo, e).lastFace }.getOrNull() }
+    }
+    androidx.compose.foundation.layout.Box(Modifier.width(width).aspectRatio(3f / 4f).clip(MaterialTheme.shapes.small),
+        contentAlignment = androidx.compose.ui.Alignment.Center) {
+        val f = face
+        if (f != null) coil.compose.AsyncImage(com.photomed.app.ui.photoModel(context, f.uri), "Foto del paciente",
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        else com.photomed.app.ui.components.Avatar(e.patientName, width)
+    }
 }

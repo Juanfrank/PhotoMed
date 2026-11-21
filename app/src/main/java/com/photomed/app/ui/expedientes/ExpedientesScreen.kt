@@ -159,33 +159,15 @@ fun ExpedientesContent(
 ) {
     var query by rememberSaveable { mutableStateOf(initialQuery) }
     var menu by remember { mutableStateOf(false) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val listState = rememberLazyListState()
     val fabExpanded by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            // barra pequeña con el buscador dentro (el título grande ocupaba ~150 px; la pestaña ya dice dónde se está)
+            // logo y nombre de la aplicación, y la sección; el buscador va debajo, en el contenido
+            // (dentro de la barra quedaba recortado por arriba)
             androidx.compose.material3.TopAppBar(
-                title = {
-                    if (expedientes.isNullOrEmpty()) Text("Expedientes")
-                    else TextField(
-                        value = query, onValueChange = { query = it },
-                        leadingIcon = { Icon(Icons.Default.Search, null) },
-                        trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Borrar búsqueda") } },
-                        placeholder = { Text("Buscar paciente o n.º", maxLines = 1) },
-                        singleLine = true, shape = CircleShape,
-                        textStyle = MaterialTheme.typography.bodyLarge,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                        ),
-                        modifier = Modifier.fillMaxWidth().padding(end = 4.dp).semantics { contentDescription = "Buscar paciente o número de expediente" },
-                    )
-                },
+                title = { com.photomed.app.ui.components.AppSectionTitle("Expedientes") },
                 actions = {
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
@@ -208,7 +190,6 @@ fun ExpedientesContent(
                         }
                     }
                 },
-                scrollBehavior = scrollBehavior,
             )
         },
         floatingActionButton = {
@@ -240,7 +221,7 @@ fun ExpedientesContent(
                 )
                 return@Column
             }
-            ExpedientesTable(list, summaries, query, { query = it }, listState, onOpen, showSearch = false)
+            ExpedientesTable(list, summaries, query, { query = it }, listState, onOpen)
         }
     }
 }
@@ -279,7 +260,7 @@ fun ExpedientesTable(list: List<Expediente>, summaries: Map<String, com.photomed
             trailingIcon = {
                 if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Default.Close, "Borrar búsqueda") }
             },
-            placeholder = { Text("Buscar nombre o n.º de expediente") },
+            placeholder = { Text("Buscar paciente o n.º de expediente", maxLines = 1) },
             singleLine = true,
             shape = CircleShape,
             colors = TextFieldDefaults.colors(
@@ -288,7 +269,8 @@ fun ExpedientesTable(list: List<Expediente>, summaries: Map<String, com.photomed
                 focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                 unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
             ),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact, vertical = Md3Spacing.s2),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact, vertical = Md3Spacing.s2)
+                .semantics { contentDescription = "Buscar paciente o número de expediente" },
         )
         androidx.compose.foundation.layout.Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Md3Spacing.marginCompact),

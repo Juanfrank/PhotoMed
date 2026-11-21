@@ -5,7 +5,6 @@ import com.photomed.app.align.Detector
 import com.photomed.app.align.MatchStatus
 import com.photomed.app.align.Standardization
 import com.photomed.app.align.ZoneAlignment
-import com.photomed.app.data.SessionTemplates
 import com.photomed.app.data.Zone
 import com.photomed.app.data.ZoneCategory
 import com.photomed.app.ui.camera.HintCues
@@ -24,7 +23,7 @@ class ScalpZoneTest {
         val spec = ZoneAlignment.of(z)
         assertEquals(Detector.NONE, spec.detector)
         assertTrue(spec.contours.isNotEmpty())
-        assertTrue(SessionTemplates.BUILT_IN.any { Zone.SCALP_VERTEX in it.zones })
+        assertTrue(com.photomed.app.data.BuiltInProtocols.ALL.any { Zone.SCALP_VERTEX in it.second })
     }
 
     @Test

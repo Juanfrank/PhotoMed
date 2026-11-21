@@ -2,6 +2,30 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.46 — 21 de noviembre de 2026
+
+- **Pantallas principales** (Expedientes y Protocolos) con el logo y el nombre de la app y debajo la
+  sección. El buscador de expedientes pasa bajo la barra: ya no queda recortado por arriba.
+- **Protocolos: luz por defecto** en cada toma nueva de rostro (luz mínima 35 % y diferencia entre
+  mejillas máx. 15 %). Al usar una foto como referencia se mide su luz y la toma pide esa misma luz
+  (±15 puntos; mejillas con 8 puntos de margen).
+- **Miniatura de la referencia** en cada toma: la foto si está en el expediente elegido o, si no
+  (protocolo importado), un esquema con sus contornos y surcos.
+- **Tomas plegables** en el editor de protocolos, con un resumen de una línea.
+- **Selector de expediente** de las fotos de referencia con la miniatura de cada paciente (la misma de
+  la pestaña Expedientes).
+- **Disparo automático activado por defecto** (Ajustes, cámara y tomas nuevas de protocolos).
+- **Disparo automático más seguro**: desde el disparo hasta que la foto está lista para guardarse se
+  vigila que la cara siga en el encuadre y la posición; si se pierde, la foto se cancela y se pide al
+  paciente que se mantenga quieto. El aviso de enfoque ya no retrasa el disparo.
+- **Plantillas de sesión → protocolos**: todo es un protocolo. Las plantillas predefinidas aparecen
+  como protocolos (editables) y las propias se convierten solas; las zonas elegidas manteniendo
+  pulsado se guardan como protocolo.
+- **GIF**: ahora hay cuadros 100 % «antes» y 100 % «después» (sin franja ni línea) y se reproduce de
+  ida y vuelta: al repetirse en bucle no se nota el salto. La vista previa sigue el mismo guion.
+- **Exportar en MP4** (H.264), con el mismo guion de ida y vuelta y los mismos tiempos.
+- **Menú de exportación**: cambiar de opción ya no lo devuelve arriba.
+
 ## 2.45 — 21 de noviembre de 2026
 
 - **Sensibilidad exhaustiva** de la detección de arrugas (Ajustes): además busca surcos accesorios junto

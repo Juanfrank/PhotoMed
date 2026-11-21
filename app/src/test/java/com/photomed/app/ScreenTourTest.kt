@@ -118,7 +118,7 @@ class ScreenTourTest {
         val z = Zone.FACE_FRONTAL
         show { com.photomed.app.ui.HomeScreen({}, {}, {}, {}, { _, _ -> }) }
         waitFor("Carlos"); shot("01_inicio_expedientes", 3000)
-        compose.onNodeWithText("Protocolos").performClick(); shot("02_inicio_protocolos")
+        compose.onNode(androidx.compose.ui.test.hasText("Protocolos") and androidx.compose.ui.test.hasClickAction()).performClick(); shot("02_inicio_protocolos")
         show { com.photomed.app.ui.expediente.ExpedienteScreen(exp.id, {}, {}, {}) }
         waitFor("María"); shot("03_expediente")
         show { com.photomed.app.ui.gallery.ZoneGalleryScreen(exp.id, z, {}, {}, {}, {}) }

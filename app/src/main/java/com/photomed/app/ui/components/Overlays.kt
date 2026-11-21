@@ -15,6 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 
 /**
  * Pantalla completa dentro de la ventana principal (no un Dialog): recibe los insets reales del
@@ -43,5 +47,23 @@ fun SafeBottomSheet(onDismiss: () -> Unit, expanded: Boolean = false, content: @
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, contentWindowInsets = { WindowInsets(0) }) {
         content()
         Spacer(Modifier.height(nav))
+    }
+}
+
+/**
+ * Título de las pantallas principales: logo y nombre de la aplicación, y debajo la sección
+ * (Expedientes, Protocolos). Va en el `title` de una TopAppBar.
+ */
+@Composable
+fun AppSectionTitle(section: String) {
+    androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        modifier = androidx.compose.ui.Modifier.semantics(mergeDescendants = true) {}) {
+        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.photomed.app.R.drawable.logo_app), "Logo de PhotoMed",
+            Modifier.size(36.dp))
+        androidx.compose.foundation.layout.Column(Modifier.padding(start = 10.dp)) {
+            androidx.compose.material3.Text("PhotoMed", style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.primary, maxLines = 1)
+            androidx.compose.material3.Text(section, style = androidx.compose.material3.MaterialTheme.typography.titleLarge, maxLines = 1)
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.photomed.app.ui.camera
 
+import com.photomed.app.align.isFaceZone
 import androidx.compose.ui.graphics.asImageBitmap
 import android.Manifest
 import androidx.compose.foundation.selection.toggleable
@@ -270,7 +271,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var lastNear by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var liveMatch by remember { mutableStateOf(true) }
     val prefs = remember { context.getSharedPreferences("photomed", android.content.Context.MODE_PRIVATE) }
-    var autoCapture by remember { mutableStateOf(step?.autoCapture ?: prefs.getBoolean("auto_capture", false)) }
+    var autoCapture by remember { mutableStateOf(step?.autoCapture ?: prefs.getBoolean("auto_capture", true)) }
     /** Vibración (y sonido al coincidir) según el grado de coincidencia. */
     var feedback by remember { mutableStateOf(prefs.getBoolean("guide_feedback", true)) }
     /** Disparo automático también "casi" alineado (≥ 80 %): la alineación fina se hace en Comparar. */
@@ -675,7 +676,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         }
     }
 
-    fun capture() {
+    /**
+     * Toma la foto. Con [stillOk] (disparo automático) se vigila en cada cuadro en vivo que la cara siga
+     * en el encuadre y la posición pedidos desde el disparo hasta que la foto está lista para guardarse;
+     * si se pierde (más de ~0,3 s seguidos), se cancela, se borra y se pide al paciente que no se mueva.
+     */
+    fun capture(stillOk: (() -> Boolean)? = null) {
         val e = exp ?: return
         if (capturing || reviewName != null) return
         if (reliefHi) { reliefCapture(); return }
@@ -701,6 +707,17 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             // flash de pantalla en ráfaga: la pantalla sigue en blanco de la primera a la última toma
             val holdScreen = shots > 1 && effectiveFlash == ImageCapture.FLASH_MODE_SCREEN
             if (holdScreen) screenFlash.hold()
+            var moved = false
+            val watch = stillOk?.let { ok -> launch {
+                var lostSince = 0L
+                while (true) {
+                    val now = System.currentTimeMillis()
+                    if (ok()) lostSince = 0L
+                    else if (lostSince == 0L) lostSince = now
+                    else if (now - lostSince > 300) { moved = true; break }
+                    kotlinx.coroutines.delay(40)
+                }
+            } }
             val files = ArrayList<File>()
             try {
                 for (k in 0 until shots) {
@@ -713,11 +730,20 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 if (holdScreen) screenFlash.release()
             }
             if (files.isEmpty()) {
+                watch?.cancel()
                 capturing = false
                 snackbar.showSnackbar("Error al capturar")
                 return@launch
             }
             val best = if (files.size == 1) files[0] else files.maxBy { scoreOf(it) }
+            watch?.cancel()
+            if (moved) {
+                files.forEach { it.delete() }
+                capturing = false
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                snackbar.showSnackbar("Foto cancelada: la cara se salió del encuadre o de la posición. Manténgase quieto hasta que se guarde.")
+                return@launch
+            }
             files.filter { it !== best }.forEach { it.delete() }
             // la línea del pelo se mide después de guardar (en segundo plano, sin omitirla nunca)
             val conds = if (depthMm == null) conditions else conditions + ("DepthSensorCm" to "%.1f".format(java.util.Locale.US, depthMm / 10))
@@ -816,8 +842,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             }
             if (readyNow(live?.eval) && !capturing) {
                 autoArmed = false
-                if (focused == false) snackbar.showSnackbar("Enfoque no confirmado: se tomó la foto igualmente")
-                capture()
+                if (focused == false) scope.launch { snackbar.showSnackbar("Enfoque no confirmado: se tomó la foto igualmente") }
+                capture(stillOk = { readyNow(live?.eval) })
             }
         }
     }
@@ -1397,7 +1423,6 @@ fun MatchSettingsContent(
 
 /** Cuadro de análisis enderezado (rotación del sensor) y recortado al encuadre 3:4 del viewport. */
 /** Zona del rostro (puntos faciales): admite relieve y escala por el iris. */
-private fun com.photomed.app.data.Zone.isFaceZone() = com.photomed.app.align.ZoneAlignment.of(this).detector == com.photomed.app.align.Detector.FACE
 
 private fun ImageProxy.toUprightCrop(width: Int): Bitmap {
     val full = toBitmap()

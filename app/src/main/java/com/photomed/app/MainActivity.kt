@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
         AppUpgrade.onStart(applicationContext)
         // sensibilidad de la detección de arrugas elegida en los ajustes
         com.photomed.app.align.WrinkleTuning.load(applicationContext)
+        runCatching { com.photomed.app.data.BuiltInProtocols.seed(applicationContext) }
         enableEdgeToEdge()
         val repository = PhotoRepository.create(applicationContext)
         // Versión 1 guardaba las fotos en almacenamiento privado: se mueven a la galería.

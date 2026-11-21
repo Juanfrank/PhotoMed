@@ -27,17 +27,26 @@ object ProtocolReference {
                 val bmp = ImageOps.load34(context, photo.uri, 360)
                 LiveMatcher(photo.zone, context).use { m ->
                     m.setReference(bmp)
-                    Triple(m.referenceDetection, m.referenceHairline, m.referenceProfile)
+                    val d0 = m.referenceDetection
+                    // luz del rostro en la foto (como la mide la cámara en vivo)
+                    val light = if (photo.zone.isFaceZone() && d0.points.isNotEmpty()) {
+                        val px = IntArray(bmp.width * bmp.height).also { bmp.getPixels(it, 0, bmp.width, 0, 0, bmp.width, bmp.height) }
+                        Standardization.lighting(px, bmp.width, bmp.height, d0.points)
+                    } else null
+                    Triple(d0, m.referenceHairline, m.referenceProfile) to light
                 }
             }
         }
-        val (d, hair, profile) = det
+        val (d, hair, profile) = det.first
+        val light = det.second
         // 2) contornos y surcos: los confirmados de la foto o, si no hay, los del análisis
         val lines = runCatching { linesOf(context, photo) }.getOrDefault(emptyList())
         val cond = withContext(Dispatchers.IO) { runCatching { repo.readInfo(photo)?.conditions }.getOrNull() }.orEmpty()
         if (d.points.isEmpty() && profile == null && lines.isEmpty()) return null
         return ProtocolRef(d.points, d.yaw, d.pitch, d.roll, d.gaze, hair, profile, lines,
-            cond["DistanceCm"]?.toFloatOrNull(), cond["Zoom"]?.toFloatOrNull(), photo.takenAt)
+            cond["DistanceCm"]?.toFloatOrNull(), cond["Zoom"]?.toFloatOrNull(), photo.takenAt,
+            light = light?.face?.takeIf { it > 0f },
+            lightAsym = light?.let { l -> maxOf(l.leftCheek, l.rightCheek).takeIf { it > 0f }?.let { m -> kotlin.math.abs(l.leftCheek - l.rightCheek) / m } })
     }
 
     private suspend fun linesOf(context: Context, photo: Photo): List<RefLine> {

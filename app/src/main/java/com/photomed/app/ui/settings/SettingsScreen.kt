@@ -46,7 +46,7 @@ import androidx.compose.material3.Checkbox
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("photomed", Context.MODE_PRIVATE) }
-    var auto by remember { mutableStateOf(prefs.getBoolean("auto_capture", false)) }
+    var auto by remember { mutableStateOf(prefs.getBoolean("auto_capture", true)) }
     var threshold by remember { mutableFloatStateOf(prefs.getFloat("match_threshold_v2", LiveMatch.DEFAULT_THRESHOLD)) }
     var zoom by remember { mutableStateOf(prefs.getBoolean("zoom_assist", true)) }
     var mirror by remember { mutableStateOf(prefs.getBoolean("mirror_front", true)) }

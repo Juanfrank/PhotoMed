@@ -1,5 +1,6 @@
 package com.photomed.app.data
 
+import com.photomed.app.align.isFaceZone
 import com.photomed.app.align.Pt
 import org.json.JSONArray
 import org.json.JSONObject
@@ -24,6 +25,30 @@ data class Protocol(
 ) {
     /** Total de fotos pedidas (suma de las cantidades de cada paso). */
     val totalShots: Int get() = steps.sumOf { it.count }
+}
+
+/** Valores por defecto de luz de una toma nueva (rostro). */
+object ProtocolDefaults {
+    /** Luz mínima en el rostro (como el aviso «Poca luz» de la estandarización). */
+    const val MIN_LIGHT = 0.35f
+    /** Diferencia máxima de luz entre mejillas. */
+    const val MAX_LIGHT_ASYM = 0.15f
+
+    /** Toma nueva con la coincidencia, la luz y el disparo automático por defecto. */
+    fun step(zone: Zone, expression: FacialExpression = FacialExpression.NEUTRAL, ref: ProtocolRef? = null, threshold: Float? = null) =
+        withRefLight(ProtocolStep(zone = zone, expression = expression, threshold = threshold, autoCapture = true,
+            minLight = MIN_LIGHT.takeIf { zone.isFaceZone() }, maxLightAsym = MAX_LIGHT_ASYM.takeIf { zone.isFaceZone() }, ref = ref))
+
+    /**
+     * Ajusta la luz pedida a la de la referencia, si se midió: mínima y máxima ±15 puntos alrededor de
+     * la luz de la foto y diferencia entre mejillas con 8 puntos de margen sobre la de la foto.
+     */
+    fun withRefLight(s: ProtocolStep): ProtocolStep {
+        val l = s.ref?.light ?: return s
+        val a = s.ref.lightAsym
+        return s.copy(minLight = (l - 0.15f).coerceIn(0.1f, 0.8f), maxLight = (l + 0.15f).coerceIn(0.3f, 0.98f),
+            maxLightAsym = a?.let { (it + 0.08f).coerceIn(0.08f, 0.4f) } ?: s.maxLightAsym ?: MAX_LIGHT_ASYM)
+    }
 }
 
 /** Una toma (o varias iguales) del protocolo. Los campos null usan el ajuste del teléfono. */
@@ -77,6 +102,9 @@ data class ProtocolRef(
     val zoom: Float? = null,
     /** Fecha de la foto de la que sale (solo informativa). */
     val sourceTakenAt: Long? = null,
+    /** Luz medida en el rostro de la foto (luminancia media 0..1) y diferencia relativa entre mejillas. */
+    val light: Float? = null,
+    val lightAsym: Float? = null,
 )
 
 /** Línea de la referencia: capa (contorno, surcos…), nombre de la medida si tiene, puntos y si es cerrada. */
@@ -123,6 +151,7 @@ object ProtocolJson {
         })
         f.distanceCm?.let { put("distanceCm", r(it)) }; f.zoom?.let { put("zoom", r(it)) }
         f.sourceTakenAt?.let { put("sourceTakenAt", it) }
+        f.light?.let { put("light", r(it)) }; f.lightAsym?.let { put("lightAsymmetry", r(it)) }
     }
 
     /** Lee un protocolo; error con un mensaje para el usuario si el archivo no lo es o no se entiende. */
@@ -159,5 +188,6 @@ object ProtocolJson {
         o.optJSONArray("gaze")?.let(::ptOf), o.optJSONArray("hairline")?.let(::ptsOf), o.optJSONObject("profile")?.let(::ptMapOf),
         o.optJSONArray("lines")?.let { a -> (0 until a.length()).map { i -> a.getJSONObject(i).let { l ->
             RefLine(l.optString("layer"), l.optString("name").ifBlank { null }, ptsOf(l.getJSONArray("points")), l.optBoolean("closed")) } } }.orEmpty(),
-        f(o, "distanceCm"), f(o, "zoom"), o.takeIf { it.has("sourceTakenAt") }?.optLong("sourceTakenAt"))
+        f(o, "distanceCm"), f(o, "zoom"), o.takeIf { it.has("sourceTakenAt") }?.optLong("sourceTakenAt"),
+        f(o, "light")?.coerceIn(0f, 1f), f(o, "lightAsymmetry")?.coerceIn(0f, 1f))
 }

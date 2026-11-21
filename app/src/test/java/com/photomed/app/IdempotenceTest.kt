@@ -22,8 +22,6 @@ import com.photomed.app.data.FilePhotoStore
 import com.photomed.app.data.ImportItem
 import com.photomed.app.data.PhotoImport
 import com.photomed.app.data.PhotoRepository
-import com.photomed.app.data.SessionTemplate
-import com.photomed.app.data.SessionTemplates
 import com.photomed.app.data.Zone
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -94,10 +92,12 @@ class IdempotenceTest {
         PhotoEdits.set(ctx, uri, e); PhotoEdits.set(ctx, uri, e)
         PhotoEdits.clearCache()
         sameEdit(e, PhotoEdits.of(ctx, uri))
-        val prefs = ctx.getSharedPreferences("t", Context.MODE_PRIVATE)
-        val t = SessionTemplate("Mía", listOf(Zone.FACE_FRONTAL, Zone.LIPS))
-        SessionTemplates.save(prefs, t); SessionTemplates.save(prefs, t)
-        assertEquals(1, SessionTemplates.custom(prefs).count { it.name == "Mía" })
+        // sembrar los protocolos predefinidos dos veces no los duplica
+        val prefs = ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE)
+        com.photomed.app.data.BuiltInProtocols.seed(ctx)
+        prefs.edit().remove("protocols_builtin_v1").commit()
+        com.photomed.app.data.BuiltInProtocols.seed(ctx)
+        assertEquals(1, com.photomed.app.data.Protocols.list(ctx).count { it.name == "Rostro 5 vistas" })
     }
 
     @Test fun cropAndCanonicalKeysAreIdempotent() {

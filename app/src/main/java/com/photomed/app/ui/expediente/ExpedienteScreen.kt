@@ -265,7 +265,9 @@ fun ExpedienteContent(
     /** Zonas elegidas para la secuencia, en el orden en que se eligieron (mantener presionado para empezar). */
     var selection by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(listOf<String>()) }
     val selecting = selection.isNotEmpty()
-    var templates by remember { mutableStateOf(com.photomed.app.data.SessionTemplates.load(prefs)) }
+    val scope = rememberCoroutineScope()
+    /** Protocolos guardados desde aquí (para refrescar la lista). */
+    var savedProtocols by remember { mutableStateOf(0) }
     /** Categorías desplegadas por el usuario (las zonas sin fotos van plegadas). */
     var openCats by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(setOf<String>()) }
     var naming by remember { mutableStateOf(false) }
@@ -281,7 +283,7 @@ fun ExpedienteContent(
                 title = { Text("${selection.size} zona" + if (selection.size == 1) "" else "s") },
                 navigationIcon = { IconButton(onClick = { selection = emptyList() }) { Icon(Icons.Default.Close, "Cancelar selección") } },
                 actions = {
-                    IconButton(onClick = { naming = true }) { Icon(Icons.Default.BookmarkAdd, "Guardar como plantilla") }
+                    IconButton(onClick = { naming = true }) { Icon(Icons.Default.BookmarkAdd, "Guardar como protocolo") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
             ) else MediumTopAppBar(
@@ -326,7 +328,7 @@ fun ExpedienteContent(
         snackbarHost = {
             androidx.compose.foundation.layout.Column {
                 com.photomed.app.ui.components.CoachMark("expediente_seleccion", Icons.Default.TouchApp,
-                    "Mantenga pulsada una zona o una plantilla para elegir varias e iniciar una secuencia de fotos.")
+                    "Mantenga pulsada una zona para elegir varias: inicie una secuencia de fotos o guárdela como protocolo.")
                 SnackbarHost(snackbar)
             }
         },
@@ -342,27 +344,19 @@ fun ExpedienteContent(
             if (exp != null) {
                 item(span = { GridItemSpan(maxLineSpan) }) { SummaryCard(exp, photos.size) }
             }
-            // iniciar una sesión: plantillas y protocolos, plegados si el expediente ya tiene fotos
+            // iniciar una sesión: protocolos (los predefinidos incluidos), plegados si el expediente ya tiene fotos
             item(span = { GridItemSpan(maxLineSpan) }, key = "sesion") {
                 Row(Modifier.fillMaxWidth().clickable(onClickLabel = if (sessionOpen) "Plegar" else "Desplegar") { sessionOpenUser = !sessionOpen }
                     .padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
-                    Text("Iniciar sesión de fotos (plantillas y protocolos)", style = MaterialTheme.typography.titleSmall,
+                    Text("Iniciar sesión de fotos (protocolos)", style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f).padding(start = 6.dp))
                     Icon(if (sessionOpen) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null)
                 }
             }
-            if (sessionOpen || selecting) item(span = { GridItemSpan(maxLineSpan) }) {
-                TemplatesRow(templates, selection,
-                    onPick = { t -> selection = t.zones.map { it.id } },
-                    onDelete = { t ->
-                        com.photomed.app.data.SessionTemplates.delete(prefs, t.name)
-                        templates = com.photomed.app.data.SessionTemplates.load(prefs)
-                    })
-            }
             if (sessionOpen) item(span = { GridItemSpan(maxLineSpan) }, key = "protocolos") {
                 com.photomed.app.ui.protocol.ProtocolsSection(exp, snackbar, photoVersion, repo, onStart = onProtocol, onEdit = onEditProtocol,
-                    onPhotosImported = onPhotosImported, onImportFile = onImportProtocol, listVersion = protocolsVersion)
+                    onPhotosImported = onPhotosImported, onImportFile = onImportProtocol, listVersion = protocolsVersion + savedProtocols)
             }
             // Primero las zonas con fotos; el resto, por categoría en secciones plegables
             // (abiertas si el expediente aún no tiene fotos o si hay zonas suyas seleccionadas)
@@ -394,8 +388,12 @@ fun ExpedienteContent(
     }
     if (naming) TemplateNameDialog(onDismiss = { naming = false }) { name ->
         naming = false
-        com.photomed.app.data.SessionTemplates.save(prefs, com.photomed.app.data.SessionTemplate(name, selection.mapNotNull { Zone.fromId(it) }))
-        templates = com.photomed.app.data.SessionTemplates.load(prefs)
+        // la selección de zonas se guarda como protocolo (una toma por zona, en el orden elegido)
+        com.photomed.app.data.Protocols.save(context, com.photomed.app.data.BuiltInProtocols.of(name, selection.mapNotNull { Zone.fromId(it) }))
+        savedProtocols++
+        selection = emptyList()
+        sessionOpenUser = true
+        scope.launch { snackbar.showSnackbar("Protocolo «$name» guardado") }
     }
 }
 
@@ -418,46 +416,13 @@ private fun TemplateNameDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) 
     var name by remember { mutableStateOf("") }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Guardar plantilla") },
+        title = { Text("Guardar como protocolo") },
         text = {
             androidx.compose.material3.OutlinedTextField(name, { name = it }, label = { Text("Nombre") }, singleLine = true)
         },
         confirmButton = { androidx.compose.material3.TextButton(onClick = { onSave(name.trim()) }, enabled = name.isNotBlank()) { Text("Guardar") } },
         dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
-}
-
-/**
- * Plantillas de sesión: tocar una elige sus zonas (se puede ajustar dejando presionado y tocando
- * zonas); mantener presionada una plantilla propia la elimina.
- */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-@Composable
-private fun TemplatesRow(templates: List<com.photomed.app.data.SessionTemplate>, selection: List<String>,
-                         onPick: (com.photomed.app.data.SessionTemplate) -> Unit, onDelete: (com.photomed.app.data.SessionTemplate) -> Unit) {
-    Column {
-        SectionHeader("Plantillas de sesión · mantenga presionada una zona para elegir varias")
-        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
-            items(templates.size) { i ->
-                val t = templates[i]
-                val active = selection == t.zones.map { it.id }
-                // ficha propia: toque elige la plantilla; mantener presionada una propia la elimina
-                androidx.compose.material3.Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = if (active) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, if (active) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline),
-                    modifier = Modifier.height(32.dp).clip(MaterialTheme.shapes.small)
-                        .combinedClickable(onClick = { onPick(t) }, onLongClick = if (t.builtIn) null else ({ onDelete(t) }),
-                            onClickLabel = "Elegir plantilla", onLongClickLabel = if (t.builtIn) null else "Eliminar plantilla"),
-                ) {
-                    Row(Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if (t.builtIn) Icons.Default.PhotoLibrary else Icons.Default.Bookmark, null, Modifier.size(18.dp))
-                        Text("  ${t.name} · ${t.zones.size}", style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable
