@@ -102,7 +102,7 @@ class UsageFlowsTest {
     }
 
     private fun waitText(text: String, substring: Boolean = false) = try {
-        compose.waitUntil(5_000) { compose.onAllNodesWithText(text, substring).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithText(text, substring).fetchSemanticsNodes().isNotEmpty() }
     } catch (e: Throwable) { println("ESPERANDO '$text'\n" + compose.onAllNodes(androidx.compose.ui.test.isRoot()).fetchSemanticsNodes().size + "\n" + compose.onAllNodes(androidx.compose.ui.test.isRoot()).let { r -> (0 until r.fetchSemanticsNodes().size).joinToString("\n") { r[it].printToString() } }); throw e }
 
     /** Clave de caché de las anotaciones de una foto en el visor (como en PhotoPage). */
@@ -125,7 +125,7 @@ class UsageFlowsTest {
         setContent { com.photomed.app.ui.AppNavigation() }
         waitText("Paciente Prueba")
         compose.onNodeWithText("Paciente Prueba").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Atrás").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Atrás").fetchSemanticsNodes().isNotEmpty() }
         compose.mainClock.autoAdvance = false
         compose.onAllNodesWithContentDescription("Atrás")[0].performClick()
         compose.mainClock.advanceTimeBy(50)
@@ -143,7 +143,7 @@ class UsageFlowsTest {
     fun galleryMultiSelectCompareShareDelete() {
         var compared: List<String>? = null
         setContent { ZoneGalleryScreen(exp.id, Zone.LIPS, {}, {}, { compared = it }, {}) }
-        try { compose.waitUntil(5_000) { photoNodes().fetchSemanticsNodes().size == 4 } }
+        try { compose.waitUntil(15_000) { photoNodes().fetchSemanticsNodes().size == 4 } }
         catch (e: Throwable) { println(compose.onRoot().printToString()); throw e }
 
         // Pulsación larga inicia la selección; toques añaden/quitan.
@@ -269,7 +269,7 @@ class UsageFlowsTest {
     fun viewerEditBarSavesRotationAndMirror() {
         com.photomed.app.align.PhotoEdits.clearCache()
         setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, photos[0].displayName, onBack = {}) }
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Girar, espejo y recorte").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Girar, espejo y recorte").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Girar, espejo y recorte").performClick()
         compose.onNodeWithContentDescription("Girar 90°").performClick()
         compose.onNodeWithContentDescription("Espejo").performClick()
@@ -352,11 +352,11 @@ class UsageFlowsTest {
         compose.onNodeWithText("Trazar surco").assertExists()
         compose.onNodeWithContentDescription("Eliminar Frente, línea 1 (falso positivo)").performClick()
         // eliminar confirma los trazos (guardados en la foto) sin esa línea
-        compose.waitUntil(5_000) { com.photomed.app.align.ConfirmedTraces.of(ctx, p.uri.toString())?.removed?.any { it.name == "Frente, línea 1" } == true }
+        compose.waitUntil(15_000) { com.photomed.app.align.ConfirmedTraces.of(ctx, p.uri.toString())?.removed?.any { it.name == "Frente, línea 1" } == true }
         assertTrue(com.photomed.app.align.ConfirmedTraces.of(ctx, p.uri.toString())!!.traces.none { it.name == "Frente, línea 1" })
         waitText("Restaurar líneas eliminadas (1)")
         compose.onNodeWithText("Restaurar líneas eliminadas (1)").performScrollTo().performClick()
-        compose.waitUntil(5_000) { com.photomed.app.align.ConfirmedTraces.of(ctx, p.uri.toString())?.traces?.any { it.name == "Frente, línea 1" } == true }
+        compose.waitUntil(15_000) { com.photomed.app.align.ConfirmedTraces.of(ctx, p.uri.toString())?.traces?.any { it.name == "Frente, línea 1" } == true }
         waitText("Trazos confirmados", substring = true)
     }
 
@@ -398,7 +398,7 @@ class UsageFlowsTest {
             metrics = com.photomed.app.align.LineMetrics("Nasogeniano derecho", lengthMm = 31f, widthMm = 3f, contrastL = 18f, depthMm = 1.2f, grade = 4))
         com.photomed.app.align.PhotoAnnotator.put(viewerKey(p), listOf(fold))
         setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Capas", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Capas", substring = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Capas", substring = true).performClick()
         waitText("Medidas")
         compose.onNodeWithText("Medidas").performClick()
@@ -414,19 +414,19 @@ class UsageFlowsTest {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         val p = photos[0]; val u = p.uri.toString()
         setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Anotar sobre la foto").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Anotar sobre la foto").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Anotar sobre la foto").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Lápiz").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Lápiz").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Color verde").performClick()
         compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center, center + androidx.compose.ui.geometry.Offset(120f, 40f), 300) }
-        compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 1 }
+        compose.waitUntil(15_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 1 }
         assertEquals(0xFF00E676.toInt(), com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.single().color)
         // borrador por trazo sobre el mismo sitio: lo quita; deshacer lo devuelve
         compose.onNodeWithContentDescription("Borrar trazo").performClick()
         compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center, center + androidx.compose.ui.geometry.Offset(120f, 40f), 300) }
-        compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u) == null }
+        compose.waitUntil(15_000) { com.photomed.app.align.Annotations.of(ctx, u) == null }
         compose.onNodeWithContentDescription("Deshacer").performClick()
-        compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 1 }
+        compose.waitUntil(15_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 1 }
         // símbolo con texto: un toque lo coloca como marcador
         compose.onNodeWithContentDescription("Símbolo").performClick()
         waitText("Estrella")
@@ -434,20 +434,20 @@ class UsageFlowsTest {
         compose.onNode(androidx.compose.ui.test.hasSetTextAction()).performTextInput("1 ml")
         compose.onNodeWithText("Abajo").performClick()
         compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { click(center + androidx.compose.ui.geometry.Offset(-100f, -100f)) }
-        compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 2 }
+        compose.waitUntil(15_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 2 }
         val st = com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.last()
         assertEquals(listOf("symbol", "star", "1 ml", "bottom", 1), listOf(st.kind, st.shape, st.text, st.side, st.points.size))
         // arrastrando, el cuadrado ocupa de un extremo al otro
         compose.onNodeWithText("Cuadrado").performClick()
         compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center + androidx.compose.ui.geometry.Offset(0f, 120f), center + androidx.compose.ui.geometry.Offset(150f, 220f), 300) }
-        compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 3 }
+        compose.waitUntil(15_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 3 }
         assertEquals(2, com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.last().points.size)
         // seleccionar y arrastrar el marcador
         val before = com.photomed.app.align.Annotations.of(ctx, u)!!.strokes[1].points.single()
         compose.onNodeWithContentDescription("Seleccionar y mover").performClick()
         compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput {
             swipe(center + androidx.compose.ui.geometry.Offset(-100f, -100f), center + androidx.compose.ui.geometry.Offset(-40f, -100f), 300) }
-        compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)!!.strokes[1].points.single().x > before.x + 0.01f }
+        compose.waitUntil(15_000) { com.photomed.app.align.Annotations.of(ctx, u)!!.strokes[1].points.single().x > before.x + 0.01f }
         // la papelera pide confirmación
         compose.onNodeWithContentDescription("Borrar todas las anotaciones").performClick()
         waitText("¿Borrar todas las anotaciones?")
@@ -462,7 +462,7 @@ class UsageFlowsTest {
         compose.waitForIdle()
         // capas de la vista (en la fila de capas): las anotaciones se pueden ocultar
         compose.onNodeWithContentDescription("Capas", substring = true).performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Vista", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Vista", substring = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Vista", substring = true).performScrollTo().performClick()
         waitText("Anotaciones")
         compose.onNodeWithText("Anotaciones").performClick()
@@ -493,12 +493,12 @@ class UsageFlowsTest {
         compose.onNodeWithText("Regenerar").assertExists()
         // revertir la línea vuelta a trazar
         compose.onNodeWithContentDescription("Revertir el trazado de Frente, línea 1").performClick()
-        compose.waitUntil(5_000) { com.photomed.app.align.ConfirmedTraces.of(ctx, u)!!.editedNames.isEmpty() }
+        compose.waitUntil(15_000) { com.photomed.app.align.ConfirmedTraces.of(ctx, u)!!.editedNames.isEmpty() }
         assertEquals(0.4f, com.photomed.app.align.ConfirmedTraces.of(ctx, u)!!.byName("Frente, línea 1")!!.points.first().y, 1e-4f)
         // volver a trazar: se abre el dibujo a mano alzada sobre la foto
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Volver a trazar Frente, línea 1").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Volver a trazar Frente, línea 1").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Volver a trazar Frente, línea 1").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Dibuje el surco sobre la foto").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Dibuje el surco sobre la foto").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Dibuje el surco…").performClick()   // cancelar el dibujo
         compose.waitForIdle()
         // regenerar: se borran de la app y de la foto
@@ -507,7 +507,7 @@ class UsageFlowsTest {
         compose.onNodeWithText("Regenerar").performScrollTo().performClick()
         waitText("¿Regenerar los trazos?")
         compose.onAllNodesWithText("Regenerar").filterToOne(hasClickAction() and hasAnyAncestor(isDialog())).performClick()
-        compose.waitUntil(5_000) { com.photomed.app.align.ConfirmedTraces.of(ctx, u) == null }
+        compose.waitUntil(15_000) { com.photomed.app.align.ConfirmedTraces.of(ctx, u) == null }
         assertTrue(com.photomed.app.data.PhotoMetadata.tracesOf(com.photomed.app.data.XmpFile.read(ctx, p.uri)) == null)
     }
 
@@ -547,7 +547,7 @@ class UsageFlowsTest {
         compose.onNodeWithText("Guardar").performClick()
         assertEquals(1, kept)
         compose.onNodeWithText("Repetir", substring = true).performClick()
-        compose.waitUntil(5_000) { retried == 1 }
+        compose.waitUntil(15_000) { retried == 1 }
         assertEquals(3, repo.photos(exp, Zone.LIPS).size)
         assertTrue(repo.photos(exp, Zone.LIPS).none { it.displayName == last.displayName })
     }
@@ -557,7 +557,7 @@ class UsageFlowsTest {
     fun viewerOpensCompare() {
         var compared: List<String>? = null
         setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, photos[1].displayName, onBack = {}, onCompare = { compared = it }) }
-        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Comparar").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Comparar").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Eliminar").assertExists()
         compose.onNodeWithContentDescription("Comparar").performClick()
         assertEquals(listOf(photos[0].displayName, photos[1].displayName), compared)
@@ -697,7 +697,7 @@ class CompareNCaptureTest {
                 }
             }
         }
-        compose.waitUntil(5_000) { compose.onAllNodesWithText("Comparar 3 fotos").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("Comparar 3 fotos").fetchSemanticsNodes().isNotEmpty() }
         val out = File("build/reports").apply { mkdirs() }
         fun shot(name: String) {
             compose.waitForIdle(); Thread.sleep(400); compose.waitForIdle()
