@@ -3,15 +3,19 @@ package com.photomed.app.align
 import android.content.Context
 import android.graphics.Bitmap
 import com.photomed.app.data.Zone
+import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trn
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /** Capas de anotación estética que se pueden mostrar sobre una foto (visor y comparar). */
-enum class AnnotLayer(val label: String) {
-    CONTOUR("Contorno"), HAIRLINE("Línea del pelo"), EYES("Ojos y cejas"), NOSE("Nariz"), LIPS("Labios"), FOLDS("Surcos"),
-    FOREHEAD("Frente"), GLABELLA("Ceño"), CROWS_FEET("Patas de gallo"), DARK_CIRCLES("Ojeras"), EYE_BAGS("Bolsas palpebrales"),
-    JAWLINE("Línea mandibular"), PAPADA("Papada"),
-    INFRAORBITAL("Líneas infraorbitarias"), PERIORAL("Líneas periorales"),
+enum class AnnotLayer(private val es: String) {
+    CONTOUR(trn("Contorno")), HAIRLINE(trn("Línea del pelo")), EYES(trn("Ojos y cejas")), NOSE(trn("Nariz")), LIPS(trn("Labios")), FOLDS(trn("Surcos")),
+    FOREHEAD(trn("Frente")), GLABELLA(trn("Ceño")), CROWS_FEET(trn("Patas de gallo")), DARK_CIRCLES(trn("Ojeras")), EYE_BAGS(trn("Bolsas palpebrales")),
+    JAWLINE(trn("Línea mandibular")), PAPADA(trn("Papada")),
+    INFRAORBITAL(trn("Líneas infraorbitarias")), PERIORAL(trn("Líneas periorales"));
+
+    val label: String get() = tr(es)
 }
 
 /** Una línea de anotación (x del ancho, y en unidades del ancho). [estimated]: posición estimada, no medida. */
@@ -97,7 +101,7 @@ object FaceAnnotations {
             // casi todo sobre vello: no se mide (sería el borde de la barba, no un surco)
             if (covered > 0.35f) return l.copy(estimated = true)
             return l.copy(metrics = LineMeasure.line("$name (${if (s < 0) "izquierda" else "derecha"} de la imagen)", l.points, lum, scale,
-                halfMm = if (name == "Nasogeniano") 5f else 4f).copy(note = if (covered > 0.1f) "Parcialmente sobre barba o bigote" else null))
+                halfMm = if (name == "Nasogeniano") 5f else 4f).copy(note = if (covered > 0.1f) trn("Parcialmente sobre barba o bigote") else null))
         }
         val oval = g("oval_", 36)
         if (alaL != null && alaR != null && upTop != null) {
@@ -302,12 +306,12 @@ object FaceAnnotations {
             names += name
             val half = if (p.layer == AnnotLayer.FOLDS) 4f else 2f
             out += AnnotLine(p.layer, r.points, false, metrics = LineMeasure.line(name, r.points, lum, sc, halfMm = half, relief = extras?.relief)
-                .copy(note = "Hallada con la foto anterior como referencia"))
+                .copy(note = trn("Hallada con la foto anterior como referencia")))
         }
         added.forEachIndexed { i, pts ->
             if (pts.size < 2) return@forEachIndexed
             out += AnnotLine(AnnotLayer.FOLDS, pts, false, metrics = LineMeasure.line("Surco añadido ${i + 1}", pts, lum, sc, halfMm = 4f, relief = extras?.relief)
-                .copy(note = "Trazado a mano en una zona elegida"))
+                .copy(note = trn("Trazado a mano en una zona elegida")))
         }
         return out
     }
@@ -908,7 +912,7 @@ class PhotoAnnotator(private val context: Context) {
                         priors: List<PriorLine> = emptyList(),
                         /** Foto cuya memoria de líneas se guarda (para las fotos posteriores); null = no guardar. */
                         memoryUri: String? = null): Pair<List<AnnotLine>, String?> =
-        if (!enabled) emptyList<AnnotLine>() to "Análisis no disponible"
+        if (!enabled) emptyList<AnnotLine>() to tr("Análisis no disponible")
         else analyzeSplit(bmp, zone, extras, user, priors, memoryUri)
 
     /** Lo que dan los modelos nativos para una cara: malla con su recorte y segmentación, o puntos de ML Kit. */
@@ -942,7 +946,7 @@ class PhotoAnnotator(private val context: Context) {
                     NativeFace(mesh, c, b, labels, profileMask = pm)
                 } else {
                     val pts = mlkitPoints(bmp)
-                    val err = MediaPipeFace.lastError?.let { " (detalle: $it)" } ?: ""
+                    val err = MediaPipeFace.lastError?.let { tr(" (detalle: %1\$s)", it) } ?: ""
                     val labels = if (pts.size >= LiveDecision.MIN_POINTS) HairSkinSegmenter.createOrNull(context)?.use { it.labels(bmp) } else null
                     NativeFace(labels = labels, points = pts, err = err, profileMask = pm)
                 }
@@ -960,8 +964,8 @@ class PhotoAnnotator(private val context: Context) {
                 // falsos positivos eliminados por el usuario
                 val lines = all.filter { l -> l.metrics?.name?.let { it in user?.dismissed.orEmpty() } != true }
                 if (memoryUri != null) LineMemory.save(context, memoryUri, mesh, lines)
-                val note = if (lines.none { it.metrics != null }) "No se encontraron arrugas ni surcos medibles en esta foto (piel lisa, " +
-                    "poca resolución de la cara o luz muy plana)." else beardNote(info)
+                val note = if (lines.none { it.metrics != null }) tr("No se encontraron arrugas ni surcos medibles en esta foto (piel lisa, " +
+                    "poca resolución de la cara o luz muy plana).") else beardNote(info)
                 // de perfil: además, el cuello y la papada por la silueta (la papada de frente no aplica)
                 val withProf = if (prof.isEmpty()) lines else lines.filter { it.layer != AnnotLayer.PAPADA } + prof
                 return@withContext withProf to note
@@ -975,19 +979,19 @@ class PhotoAnnotator(private val context: Context) {
                 val info = HashMap<String, Float>()
                 val lines = FaceAnnotations.face(pts, labels, lumOf(bmp), labOf(bmp), info)
                     .filter { l -> l.metrics?.name?.let { it in user?.dismissed.orEmpty() } != true }
-                return@withContext lines to ("No se pudo obtener la malla facial completa$err: solo se miden los surcos " +
-                    "(nasogeniano, marioneta, valle lagrimal); frente, ceño, patas de gallo y ojeras necesitan la malla." +
+                return@withContext lines to (tr("No se pudo obtener la malla facial completa%1\$s: solo se miden los surcos " +
+                    "(nasogeniano, marioneta, valle lagrimal); frente, ceño, patas de gallo y ojeras necesitan la malla.", err) +
                     (beardNote(info)?.let { " $it" } ?: ""))
             }
-            if (prof.isNotEmpty()) prof to "Perfil: sin malla facial; el cuello y la papada se miden por la silueta."
-            else emptyList<AnnotLine>() to "No se detectó ninguna cara en la foto$err."
+            if (prof.isNotEmpty()) prof to tr("Perfil: sin malla facial; el cuello y la papada se miden por la silueta.")
+            else emptyList<AnnotLine>() to tr("No se detectó ninguna cara en la foto%1\$s.", err)
         }
     }
 
     /** Zonas corporales: contorno con el segmentador nativo (dentro de la puerta). */
     private suspend fun analyzeGated(bmp: Bitmap, zone: Zone): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val mask = BodyRegion.of(zone, bmp) { b -> SubjectSegmenter().use { it.segment(b) } }
-        (mask?.let { FaceAnnotations.body(it) } ?: emptyList()) to "Las medidas de arrugas y surcos son solo para zonas del rostro."
+        (mask?.let { FaceAnnotations.body(it) } ?: emptyList()) to tr("Las medidas de arrugas y surcos son solo para zonas del rostro.")
     }
 
     /**
@@ -1000,8 +1004,8 @@ class PhotoAnnotator(private val context: Context) {
 
     /** Aviso si hay barba o bigote: los surcos de la zona solo se trazan sobre la piel visible. */
     private fun beardNote(info: Map<String, Float>): String? = info["vello"]?.takeIf { it >= 0.08f }?.let {
-        "Barba o bigote en ${(it * 100).roundToInt()} % de la parte inferior de la cara: los surcos de esa zona se trazan y " +
-            "miden solo sobre la piel visible (las líneas marcadas con ✱ son parciales)."
+        tr("Barba o bigote en %1\$d %% de la parte inferior de la cara: los surcos de esa zona se trazan y " +
+            "miden solo sobre la piel visible (las líneas marcadas con ✱ son parciales).", (it * 100).roundToInt())
     }
 
     private fun labOf(bmp: Bitmap): LabImage {
@@ -1067,7 +1071,7 @@ class PhotoAnnotator(private val context: Context) {
         if (first != null) return first
         // 3) marco ampliado
         return MediaPipeFace.withShared(context) { mp -> meshPadded(mp, scaled(bmp, 1024)) }
-            .also { if (it == null && MediaPipeFace.lastError == null) MediaPipeFace.lastError = "MediaPipe no encontró la cara" }
+            .also { if (it == null && MediaPipeFace.lastError == null) MediaPipeFace.lastError = tr("MediaPipe no encontró la cara") }
     }
 
     /** Malla con la foto centrada en un lienzo 1,8 veces mayor (la cara cabe entera en el detector). */
@@ -1162,10 +1166,13 @@ object WrinkleTuning {
     /** Exigencia extra (puntuación) para los candidatos libres por zona. */
     @Volatile var freeBias: Map<String, Float> = mapOf("frente" to 1.0f, "perioral" to 1.8f, "ceño" to 0.2f, "patas" to 0.2f, "infraorbital" to 0f, "surcos" to 0.6f)
     /** Sensibilidad elegida en los ajustes. */
-    enum class Level(val label: String, val desc: String) {
-        CONSERVATIVE("Conservadora", "Menos líneas, casi todas seguras (más precisión)."),
-        BALANCED("Equilibrada", "Recomendada: equilibrio entre precisión y líneas encontradas."),
-        EXHAUSTIVE("Exhaustiva", "Más líneas: surcos accesorios, más frente y bajo los ojos (más hallazgos, algunos falsos)."),
+    enum class Level(private val labelEs: String, private val descEs: String) {
+        CONSERVATIVE(trn("Conservadora"), trn("Menos líneas, casi todas seguras (más precisión).")),
+        BALANCED(trn("Equilibrada"), trn("Recomendada: equilibrio entre precisión y líneas encontradas.")),
+        EXHAUSTIVE(trn("Exhaustiva"), trn("Más líneas: surcos accesorios, más frente y bajo los ojos (más hallazgos, algunos falsos).")),
+        ;
+        val label: String get() = tr(labelEs)
+        val desc: String get() = tr(descEs)
     }
     const val PREF = "wrinkle_sensitivity"
 

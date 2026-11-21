@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import sys
+sys.dont_write_bytecode = True
 """Extrae los textos traducibles del código a recursos Android.
 
 Busca `tr("…")` y `trn("…")` (literales simples, o varios unidos con `+`) en app/src/main/java y
@@ -115,7 +117,7 @@ def main():
         keys[k] = s
     write(RES / "values/strings_i18n.xml", sorted(((fnv_key(s), s) for s in found), key=lambda e: e[0]))
     status = 0
-    for lang_dir in sorted(p for p in CATALOGS.iterdir() if p.is_dir()):
+    for lang_dir in sorted(p for p in CATALOGS.iterdir() if p.is_dir() and re.fullmatch(r"[a-z]{2,3}(-r[A-Z]{2})?", p.name)):
         cat = {}
         for j in sorted(lang_dir.glob("*.json")):
             try:

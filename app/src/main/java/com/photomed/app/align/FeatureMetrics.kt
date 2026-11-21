@@ -1,5 +1,7 @@
 package com.photomed.app.align
 
+import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trn
 import kotlin.math.atan2
 import kotlin.math.hypot
 
@@ -69,32 +71,32 @@ object FeatureMetrics {
     }
 
     fun upperLipM(mesh: List<Pt>, mm: Float, scale: String) = B(mm).run {
-        dist("Ancho (comisuras), mm", "ancho", mesh[61], mesh[291])
-        dist("Alto en el centro, mm", "alto", mesh[0], mesh[13])
-        value("Área del bermellón, mm²", LineMeasure.area(upperLipPoly(mesh)) * mm * mm)
-        dist("Filtrum (subnasal → labio), mm", "filtrum", mesh[2], mesh[0])
+        dist(trn("Ancho (comisuras), mm"), "ancho", mesh[61], mesh[291])
+        dist(trn("Alto en el centro, mm"), "alto", mesh[0], mesh[13])
+        value(trn("Área del bermellón, mm²"), LineMeasure.area(upperLipPoly(mesh)) * mm * mm)
+        dist(trn("Filtrum (subnasal → labio), mm"), "filtrum", mesh[2], mesh[0])
         // arco de Cupido: picos (37, 267) frente al centro (0), hacia arriba
-        value("Arco de Cupido (pico − centro), mm", ((d(mesh[37], mesh[17]) + d(mesh[267], mesh[17])) / 2 - d(mesh[0], mesh[17])) * mm)
-        build("Labio superior", scale)
+        value(trn("Arco de Cupido (pico − centro), mm"), ((d(mesh[37], mesh[17]) + d(mesh[267], mesh[17])) / 2 - d(mesh[0], mesh[17])) * mm)
+        build(trn("Labio superior"), scale)
     }
 
     fun lowerLipM(mesh: List<Pt>, mm: Float, scale: String) = B(mm).run {
         val hu = d(mesh[0], mesh[13]); val hl = d(mesh[14], mesh[17])
-        dist("Alto en el centro, mm", "alto", mesh[14], mesh[17])
-        value("Área del bermellón, mm²", LineMeasure.area(lowerLipPoly(mesh)) * mm * mm)
-        value("Proporción inferior / superior", if (hu > 1e-5f) hl / hu else 0f)
-        build("Labio inferior", scale)
+        dist(trn("Alto en el centro, mm"), "alto", mesh[14], mesh[17])
+        value(trn("Área del bermellón, mm²"), LineMeasure.area(lowerLipPoly(mesh)) * mm * mm)
+        value(trn("Proporción inferior / superior"), if (hu > 1e-5f) hl / hu else 0f)
+        build(trn("Labio inferior"), scale)
     }
 
     fun eyeM(mesh: List<Pt>, right: Boolean, mm: Float, scale: String) = B(mm).run {
         val a = Axes(mesh)
         val (inner, outer, top, bottom) = if (right) listOf(133, 33, 159, 145) else listOf(362, 263, 386, 374)
-        dist("Ancho hendidura, mm", "ancho", mesh[inner], mesh[outer])
-        dist("Alto hendidura, mm", "alto", mesh[top], mesh[bottom])
+        dist(trn("Ancho hendidura, mm"), "ancho", mesh[inner], mesh[outer])
+        dist(trn("Alto hendidura, mm"), "alto", mesh[top], mesh[bottom])
         // inclinación cantal: canto externo sobre el interno (en el eje de la cara)
         val du = kotlin.math.abs(a.u(mesh[outer]) - a.u(mesh[inner])); val dv = a.v(mesh[outer]) - a.v(mesh[inner])
-        value("Inclinación cantal, °", Math.toDegrees(atan2(dv.toDouble(), du.toDouble())).toFloat())
-        build("Ojo ${if (right) "derecho" else "izquierdo"}", scale)
+        value(trn("Inclinación cantal, °"), Math.toDegrees(atan2(dv.toDouble(), du.toDouble())).toFloat())
+        build(if (right) trn("Ojo derecho") else trn("Ojo izquierdo"), scale)
     }
 
     private val BROW_TOP_R = intArrayOf(70, 63, 105, 66, 107)
@@ -118,59 +120,59 @@ object FeatureMetrics {
         val a = Axes(mesh)
         val pts = (if (right) BROW_TOP_R else BROW_TOP_L).map { mesh[it] }
         val pupil = if (right) a.r else a.l
-        value("Longitud, mm", LineMeasure.length(pts) * mm)
+        value(trn("Longitud, mm"), LineMeasure.length(pts) * mm)
         // altura en la vertical de la pupila (el centro de la ceja lo marca el del ojo)
         val side = pts.map { a.u(it) to a.v(it) }.sortedBy { it.first }
         vAt(side, a.u(pupil))?.let { vb ->
             val h = (vb - a.v(pupil)) * mm
-            value("Altura sobre la pupila, mm", h)
-            guide("altura", h, pupil, a.at(a.u(pupil), vb), "Altura sobre la pupila, mm")
+            value(trn("Altura sobre la pupila, mm"), h)
+            guide("altura", h, pupil, a.at(a.u(pupil), vb), trn("Altura sobre la pupila, mm"))
         }
-        build("Ceja ${if (right) "derecha" else "izquierda"}", scale)
+        build(if (right) trn("Ceja derecha") else trn("Ceja izquierda"), scale)
     }
 
     fun noseM(mesh: List<Pt>, mm: Float, scale: String) = B(mm).run {
-        dist("Ancho alar, mm", "ancho alar", mesh[98], mesh[327])
-        dist("Ancho del puente (raíz), mm", "puente", mesh[122], mesh[351])
-        dist("Ancho del dorso (mitad), mm", "dorso", mesh[196], mesh[419])
-        dist("Longitud del dorso (raíz → punta), mm", "longitud", mesh[6], mesh[1])
-        dist("Alto (entre los ojos → subnasal), mm", "alto", mesh[168], mesh[2])
-        build("Nariz", scale)
+        dist(trn("Ancho alar, mm"), "ancho alar", mesh[98], mesh[327])
+        dist(trn("Ancho del puente (raíz), mm"), "puente", mesh[122], mesh[351])
+        dist(trn("Ancho del dorso (mitad), mm"), "dorso", mesh[196], mesh[419])
+        dist(trn("Longitud del dorso (raíz → punta), mm"), "longitud", mesh[6], mesh[1])
+        dist(trn("Alto (entre los ojos → subnasal), mm"), "alto", mesh[168], mesh[2])
+        build(trn("Nariz"), scale)
     }
 
     fun contourM(mesh: List<Pt>, mm: Float, scale: String, hair: List<Pt>? = null) = B(mm).run {
         val a = Axes(mesh)
-        dist("Ancho de la cara, mm", "ancho", mesh[234], mesh[454])
+        dist(trn("Ancho de la cara, mm"), "ancho", mesh[234], mesh[454])
         // tercios en la línea media, perpendiculares a la línea de los ojos
         val uc = a.u(mesh[2])
         val vb = vAt(browTop(mesh, a), a.u(a.o)) ?: intArrayOf(107, 336).maxOf { a.v(mesh[it]) }
         val mid = (vb - a.v(mesh[2])) * mm; val low = (a.v(mesh[2]) - a.v(mesh[152])) * mm
         // tercio superior (línea del pelo → cejas), si se ve la línea del pelo
         val up = hair?.takeIf { it.size >= 3 }?.let { h -> vAt(h.map { a.u(it) to a.v(it) }.sortedBy { it.first }, uc) }
-            ?.let { vh -> ((vh - vb) * mm).takeIf { it > 0f }?.also { guide("tercio superior", it, a.at(uc, vh), a.at(uc, vb), "Tercio superior (pelo → cejas), mm") } }
-        up?.let { value("Tercio superior (pelo → cejas), mm", it) }
-        value("Tercio medio (cejas → subnasal), mm", mid); guide("tercio medio", mid, a.at(uc, vb), mesh[2], "Tercio medio (cejas → subnasal), mm")
-        value("Tercio inferior (subnasal → mentón), mm", low); guide("tercio inferior", low, mesh[2], a.at(uc, a.v(mesh[152])), "Tercio inferior (subnasal → mentón), mm")
+            ?.let { vh -> ((vh - vb) * mm).takeIf { it > 0f }?.also { guide("tercio superior", it, a.at(uc, vh), a.at(uc, vb), trn("Tercio superior (pelo → cejas), mm")) } }
+        up?.let { value(trn("Tercio superior (pelo → cejas), mm"), it) }
+        value(trn("Tercio medio (cejas → subnasal), mm"), mid); guide("tercio medio", mid, a.at(uc, vb), mesh[2], trn("Tercio medio (cejas → subnasal), mm"))
+        value(trn("Tercio inferior (subnasal → mentón), mm"), low); guide("tercio inferior", low, mesh[2], a.at(uc, a.v(mesh[152])), trn("Tercio inferior (subnasal → mentón), mm"))
         // proporción de los tercios (ideal: un tercio cada uno, 33 %)
         val total = (up ?: 0f) + mid + low
         if (up != null && total > 0f) {
-            value("Tercio superior (ideal 33 %), %", up / total * 100f)
-            value("Tercio medio (ideal 33 %), %", mid / total * 100f)
-            value("Tercio inferior (ideal 33 %), %", low / total * 100f)
-        } else if (low > 0f) value("Tercio medio / inferior (ideal 1)", mid / low)
+            value(trn("Tercio superior (ideal 33 %), %"), up / total * 100f)
+            value(trn("Tercio medio (ideal 33 %), %"), mid / total * 100f)
+            value(trn("Tercio inferior (ideal 33 %), %"), low / total * 100f)
+        } else if (low > 0f) value(trn("Tercio medio / inferior (ideal 1)"), mid / low)
         // tercio inferior: subnasal → estomion (labio superior) frente a estomion → mentón (ideal 1 : 2)
         val sto = Pt((mesh[13].x + mesh[14].x) / 2, (mesh[13].y + mesh[14].y) / 2)
         val snSto = (a.v(mesh[2]) - a.v(sto)) * mm; val stoMe = (a.v(sto) - a.v(mesh[152])) * mm
         if (snSto > 0f && stoMe > 0f) {
-            value("Subnasal → estomion, mm", snSto); guide("labio sup.", snSto, mesh[2], a.at(uc, a.v(sto)), "Subnasal → estomion, mm")
-            value("Estomion → mentón, mm", stoMe); guide("labio inf. y mentón", stoMe, a.at(uc, a.v(sto)), a.at(uc, a.v(mesh[152])), "Estomion → mentón, mm")
-            value("Estomion → mentón / subnasal → estomion (ideal 2)", stoMe / snSto)
+            value(trn("Subnasal → estomion, mm"), snSto); guide("labio sup.", snSto, mesh[2], a.at(uc, a.v(sto)), trn("Subnasal → estomion, mm"))
+            value(trn("Estomion → mentón, mm"), stoMe); guide("labio inf. y mentón", stoMe, a.at(uc, a.v(sto)), a.at(uc, a.v(mesh[152])), trn("Estomion → mentón, mm"))
+            value(trn("Estomion → mentón / subnasal → estomion (ideal 2)"), stoMe / snSto)
         }
         // índice facial (antropometría): altura nasion → mentón / ancho bicigomático × 100
         val faceW = d(mesh[234], mesh[454]); val faceH = d(mesh[168], mesh[152])
         if (faceW > 1e-5f) {
-            guide("altura facial", faceH * mm, mesh[168], mesh[152], "Altura facial (nasion → mentón), mm")
-            value("Altura facial (nasion → mentón), mm", faceH * mm)
+            guide("altura facial", faceH * mm, mesh[168], mesh[152], trn("Altura facial (nasion → mentón), mm"))
+            value(trn("Altura facial (nasion → mentón), mm"), faceH * mm)
             value(FACIAL_INDEX, faceH / faceW * 100f)
         }
         // de frente: quintos (ancho de cada ojo, entre los ojos y de cada canto externo al borde) y mandíbula
@@ -178,19 +180,21 @@ object FeatureMetrics {
             val vEye = (a.v(mesh[33]) + a.v(mesh[263]) + a.v(mesh[133]) + a.v(mesh[362])) / 4
             val cuts = listOf(mesh[234], mesh[33], mesh[133], mesh[362], mesh[263], mesh[454]).map { a.u(it) }.sorted()
             val wTot = (cuts.last() - cuts.first()).coerceAtLeast(1e-5f)
-            listOf("Quinto 1 (borde → canto externo)", "Quinto 2 (ojo)", "Quinto 3 (entre los ojos)", "Quinto 4 (ojo)", "Quinto 5 (canto externo → borde)")
-                .forEachIndexed { i, name ->
+            listOf(trn("Quinto 1 (borde → canto externo) (ideal 20 %), %"), trn("Quinto 2 (ojo) (ideal 20 %), %"),
+                trn("Quinto 3 (entre los ojos) (ideal 20 %), %"), trn("Quinto 4 (ojo) (ideal 20 %), %"),
+                trn("Quinto 5 (canto externo → borde) (ideal 20 %), %"))
+                .forEachIndexed { i, label ->
                     val w = cuts[i + 1] - cuts[i]
-                    value("$name (ideal 20 %), %", w / wTot * 100f)
-                    guide("quinto ${i + 1}", w * mm, a.at(cuts[i], vEye), a.at(cuts[i + 1], vEye), "$name (ideal 20 %), %")
+                    value(label, w / wTot * 100f)
+                    guide("quinto ${i + 1}", w * mm, a.at(cuts[i], vEye), a.at(cuts[i + 1], vEye), label)
                 }
             // ancho mandibular (bigonial aproximado: ángulo de la mandíbula en la malla) frente al bicigomático
             val big = d(mesh[172], mesh[397])
-            guide("bigonial", big * mm, mesh[172], mesh[397], "Ancho mandibular (bigonial aprox.), mm")
-            value("Ancho mandibular (bigonial aprox.), mm", big * mm)
-            if (faceW > 1e-5f) value("Bigonial / bicigomático, %", big / faceW * 100f)
+            guide("bigonial", big * mm, mesh[172], mesh[397], trn("Ancho mandibular (bigonial aprox.), mm"))
+            value(trn("Ancho mandibular (bigonial aprox.), mm"), big * mm)
+            if (faceW > 1e-5f) value(trn("Bigonial / bicigomático, %"), big / faceW * 100f)
         }
-        build("Contorno facial", scale)
+        build(trn("Contorno facial"), scale)
     }
 
     /** ¿Vista de frente? (la punta nasal equidista de los dos bordes de la cara, ± 20 %). */
@@ -200,15 +204,15 @@ object FeatureMetrics {
     }
 
     /** Etiqueta del índice facial (el valor se muestra con su tipo, ver [facialType]). */
-    const val FACIAL_INDEX = "Índice facial aprox. (nasion → mentón / ancho facial × 100)"
+    val FACIAL_INDEX = trn("Índice facial aprox. (nasion → mentón / ancho facial × 100)")
 
     /** Tipo facial por el índice facial (clasificación de Martin–Saller, sin distinción por sexo). */
     fun facialType(i: Float) = when {
-        i < 80f -> "hipereuriprosopo (muy ancho)"
-        i < 85f -> "euriprosopo (ancho)"
-        i < 90f -> "mesoprosopo (medio)"
-        i < 95f -> "leptoprosopo (largo)"
-        else -> "hiperleptoprosopo (muy largo)"
+        i < 80f -> tr("hipereuriprosopo (muy ancho)")
+        i < 85f -> tr("euriprosopo (ancho)")
+        i < 90f -> tr("mesoprosopo (medio)")
+        i < 95f -> tr("leptoprosopo (largo)")
+        else -> tr("hiperleptoprosopo (muy largo)")
     }
 
     /**
@@ -233,20 +237,20 @@ object FeatureMetrics {
             b.guide(short, v, a.at(u, vb), a.at(u, vh), label)    // ceja → pelo
             return v
         }
-        val center = column(a.o, "frente", "Frente central (cejas → pelo), mm")
-        val pr = column(a.r, "frente der.", "Sobre la ceja derecha (vertical de la pupila), mm")
-        val pl = column(a.l, "frente izq.", "Sobre la ceja izquierda (vertical de la pupila), mm")
-        val tr = column(mesh[33], "cola der.", "Sobre la cola de la ceja derecha (canto externo), mm")
-        val tl = column(mesh[263], "cola izq.", "Sobre la cola de la ceja izquierda (canto externo), mm")
-        center?.let { b.value("Frente central (cejas → pelo), mm", it) }
-        pr?.let { b.value("Sobre la ceja derecha (vertical de la pupila), mm", it) }
-        pl?.let { b.value("Sobre la ceja izquierda (vertical de la pupila), mm", it) }
-        tr?.let { b.value("Sobre la cola de la ceja derecha (canto externo), mm", it) }
-        tl?.let { b.value("Sobre la cola de la ceja izquierda (canto externo), mm", it) }
-        if (center != null && tr != null) b.value("Entrada temporal derecha, mm", tr - center)
-        if (center != null && tl != null) b.value("Entrada temporal izquierda, mm", tl - center)
-        center?.let { b.value("Frente central / interpupilar", it / (a.ipd * mm)) }
-        return if (b.f.isEmpty()) null else b.build("Línea del pelo", scale)
+        val center = column(a.o, "frente", trn("Frente central (cejas → pelo), mm"))
+        val pr = column(a.r, "frente der.", trn("Sobre la ceja derecha (vertical de la pupila), mm"))
+        val pl = column(a.l, "frente izq.", trn("Sobre la ceja izquierda (vertical de la pupila), mm"))
+        val tr = column(mesh[33], "cola der.", trn("Sobre la cola de la ceja derecha (canto externo), mm"))
+        val tl = column(mesh[263], "cola izq.", trn("Sobre la cola de la ceja izquierda (canto externo), mm"))
+        center?.let { b.value(trn("Frente central (cejas → pelo), mm"), it) }
+        pr?.let { b.value(trn("Sobre la ceja derecha (vertical de la pupila), mm"), it) }
+        pl?.let { b.value(trn("Sobre la ceja izquierda (vertical de la pupila), mm"), it) }
+        tr?.let { b.value(trn("Sobre la cola de la ceja derecha (canto externo), mm"), it) }
+        tl?.let { b.value(trn("Sobre la cola de la ceja izquierda (canto externo), mm"), it) }
+        if (center != null && tr != null) b.value(trn("Entrada temporal derecha, mm"), tr - center)
+        if (center != null && tl != null) b.value(trn("Entrada temporal izquierda, mm"), tl - center)
+        center?.let { b.value(trn("Frente central / interpupilar"), it / (a.ipd * mm)) }
+        return if (b.f.isEmpty()) null else b.build(trn("Línea del pelo"), scale)
     }
 
     // compatibilidad: solo las medidas
