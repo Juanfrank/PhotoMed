@@ -109,9 +109,11 @@ object JawContour {
         }
         // suavizado solo con los puntos medidos (los que no tienen borde claro no arrastran a 0)
         val n36 = 36
+        // suavizado ligero (mediana de 5 contra bordes sueltos y media 1-2-1): conserva el ángulo de la
+        // mandíbula y las formas irregulares (antes, una media de 5 puntos los redondeaba)
         val med = FloatArray(n36) { i -> if (i !in sides) 0f else (-2..2).map { offs[(i + it + n36) % n36] }.filter { !it.isNaN() }
             .let { v -> if (v.isEmpty()) 0f else v.sorted()[v.size / 2] } }
-        val sm = FloatArray(n36) { i -> if (i !in sides) 0f else (-2..2).map { med[(i + it + n36) % n36] * (3 - kotlin.math.abs(it)) }.sum() / 9f }
+        val sm = FloatArray(n36) { i -> if (i !in sides) 0f else (-1..1).map { med[(i + it + n36) % n36] * (2 - kotlin.math.abs(it)) }.sum() / 4f }
         val out = snapped.toMutableMap()
         for (i in sides) {
             val o = oval[i]; val n = normal(i) ?: continue

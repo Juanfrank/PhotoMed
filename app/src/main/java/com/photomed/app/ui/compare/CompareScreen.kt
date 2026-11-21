@@ -191,9 +191,15 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     // eliminar líneas (falsos positivos): vuelve a analizar
     var userVersion by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var regenerate by remember { mutableStateOf(false) }
+    // lo que se ve (líneas y anotaciones de cada foto), para exportarlo igual
+    var annotsNow by remember { mutableStateOf<Map<String, List<com.photomed.app.align.AnnotLine>>>(emptyMap()) }
+    var inksNow by remember { mutableStateOf<Map<String, List<com.photomed.app.align.InkStroke>>>(emptyMap()) }
+    // igualar el color de la piel automáticamente tras alinear (por defecto, sí)
+    var autoColor by remember { mutableStateOf(prefs.getBoolean("compare_auto_color", true)) }
     // capas de la vista, línea seleccionada en la tabla y tamaño de la celda (para centrarla)
     val viewLayers = rememberViewLayers()
     var selLine by remember { mutableStateOf<String?>(null) }
+    var selKey by remember { mutableStateOf<String?>(null) }
     val cellSize = remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
     // panel bajo las fotos (alineación, filtros, miniaturas, medidas) desplegado o plegado (se recuerda)
     var panelOpen by remember { mutableStateOf(prefs.getBoolean("compare_panel_open", true)) }
@@ -342,6 +348,19 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             alignProgress = null
             useAligned = true
             val res = out.values
+            // color de la piel igualado a la referencia, tras alinear
+            var colorNote = ""
+            if (autoColor && res.isNotEmpty()) {
+                alignProgress = "Igualando el color…"
+                val adj = s.drop(1).mapNotNull { p ->
+                    runCatching { autoColorAdjust(context, aligner, s[0], p) }
+                        .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                        .getOrNull()?.let { p.key to it }
+                }.toMap()
+                if (alignToken != token) return@launch
+                if (adj.isNotEmpty()) { colorAdjusts = adj; colorNote = " · color igualado" }
+                alignProgress = null
+            }
             val msg = when {
                 failed != null && res.isEmpty() -> "No se pudo alinear: ${failed?.message}"
                 s.size == 2 -> res.first().let { a ->
@@ -349,7 +368,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 }
                 else -> "Alineadas ${res.size} fotos a la referencia (${formatDate(s[0].takenAt)})"
             }
-            snackbar.showSnackbar(msg)
+            snackbar.showSnackbar(msg + colorNote)
         }
     }
 
@@ -440,9 +459,10 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         val inks: Map<String, List<com.photomed.app.align.InkStroke>> = seq?.associate { p ->
             p.key to key("i" + p.key) { rememberPhotoInk(p.uri, resultOf(p)?.keystoneDeg ?: 0f, viewLayers.value.notes).value.orEmpty() }
         }.orEmpty()
+        androidx.compose.runtime.SideEffect { annotsNow = annots; inksNow = inks }
         val view = CompareView(viewRot, viewMirror, if (viewLayers.value.diagram) layers else emptySet(),
             models.mapNotNull { (k, m) -> annots[k]?.let { m to it } }.toMap(), annotAlpha.value,
-            view = viewLayers.value, ink = models.mapNotNull { (k, m) -> inks[k]?.let { m to it } }.toMap(), selected = selLine)
+            view = viewLayers.value, ink = models.mapNotNull { (k, m) -> inks[k]?.let { m to it } }.toMap(), selected = selLine, selectedKey = selKey)
         if (all != null && photos.size < 2) {
             EmptyState(Icons.Default.Compare, "Se necesitan dos fotografías",
                 "Tome al menos dos fotografías de una zona para compararlas.", Modifier.padding(padding))
@@ -611,7 +631,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
 
             // asa para plegar o desplegar todo lo que hay bajo las fotos (menos la línea de tiempo)
             if (seq != null) Row(
-                Modifier.fillMaxWidth().clickable(onClickLabel = if (panelOpen) "Plegar los controles" else "Desplegar los controles") {
+                Modifier.fillMaxWidth().heightIn(min = 40.dp).clickable(onClickLabel = if (panelOpen) "Plegar los controles" else "Desplegar los controles") {
                     panelOpen = !panelOpen; prefs.edit().putBoolean("compare_panel_open", panelOpen).apply()
                 }.padding(horizontal = Md3Spacing.marginCompact),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
@@ -626,6 +646,14 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             Column {
             // tabla de medidas: debajo de las fotos, sin taparlas
             if (metricsSheet && showLayers && seq != null) {
+                // eliminadas y confirmadas de las fotos comparadas (lectura fuera del hilo principal)
+                val traceSummary by androidx.compose.runtime.produceState(0 to false, seqKeys, userVersion) {
+                    value = withContext(Dispatchers.IO) {
+                        seq.sumOf { p -> com.photomed.app.align.ConfirmedTraces.of(context, p.uri.toString())?.removed?.size
+                            ?: com.photomed.app.align.AnnotUserEdits.of(context, p.uri.toString()).dismissed.size } to
+                            seq.all { com.photomed.app.align.ConfirmedTraces.of(context, it.uri.toString()) != null }
+                    }
+                }
                 val stamps = stampLabels(seq.map { it.takenAt })
                 MetricsPanel(seq.mapIndexed { i, p -> stamps[i] to annots[p.key].orEmpty() }, layersState.value,
                     onClose = { metricsSheet = false }, loading = seq.any { annots[it.key] == null },
@@ -633,19 +661,18 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     onShowLayers = { layersState.value = it },
                     selected = selLine?.let { n -> seq.firstNotNullOfOrNull { p -> annots[p.key]?.firstOrNull { it.metrics?.name == n } } },
                     // fila tocada: la línea se selecciona en todas las fotos y el zoom la centra
-                    onSelectLine = { l ->
-                        selLine = l.metrics?.name
+                    onSelectLine = { l, key ->
+                        selLine = l.metrics?.name; selKey = key
                         if (l.layer !in layersState.value) layersState.value = layersState.value + l.layer
-                        zoom = focusZoom(l, cellSize.value, zoom)
+                        zoom = focusZoom(l, cellSize.value, zoom, key)
                     },
+                    selectedKey = selKey,
                     // eliminar (falso positivo): los trazos de esa foto quedan confirmados sin la línea
                     onDelete = { name, col ->
                         val ps = if (col == null) seq else listOfNotNull(seq.getOrNull(col))
                         mutateTraces(ps, { previousOf(it) }) { com.photomed.app.align.ConfirmedTraces.remove(it, name) }
                     },
-                    dismissedCount = remember(seqKeys, userVersion) { seq.sumOf { p ->
-                        com.photomed.app.align.ConfirmedTraces.of(context, p.uri.toString())?.removed?.size
-                            ?: com.photomed.app.align.AnnotUserEdits.of(context, p.uri.toString()).dismissed.size } },
+                    dismissedCount = traceSummary.first,
                     onRestore = {
                         seq.forEach { p -> if (com.photomed.app.align.ConfirmedTraces.of(context, p.uri.toString()) == null)
                             com.photomed.app.align.AnnotUserEdits.restore(context, p.uri.toString()) }
@@ -653,8 +680,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                             com.photomed.app.align.ConfirmedTraces.restore(it) }
                     },
                     traces = run {
-                        val allConfirmed = remember(seqKeys, userVersion) { seq.all { com.photomed.app.align.ConfirmedTraces.of(context, it.uri.toString()) != null } }
-                        TraceActions(confirmed = allConfirmed, onConfirm = { mutateTraces(seq, { previousOf(it) }) { it } },
+                        TraceActions(confirmed = traceSummary.second, onConfirm = { mutateTraces(seq, { previousOf(it) }) { it } },
                             onRegenerate = { regenerate = true })
                     },
                     modifier = Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.42f).dp))
@@ -848,6 +874,10 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 }
                 // Color
                 SectionTitle("Color de la piel")
+                SheetSwitch("Igualar el color automáticamente al alinear", autoColor,
+                    "Tras la alineación automática, el color de la piel de cada foto se iguala al de la referencia.") {
+                    autoColor = it; prefs.edit().putBoolean("compare_auto_color", it).apply()
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
                     if (colorAdjusts.isEmpty()) {
                         androidx.compose.material3.OutlinedButton(onClick = { settings = false; colorDialog = true }, enabled = seq != null) {
@@ -915,14 +945,12 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
 
     if (exportSheet && seq != null) {
         val shown = seq.mapNotNull { p -> resultOf(p)?.let { p.key to it } }.toMap()
-        // anotaciones ya calculadas (caché) para dibujarlas en lo exportado
-        val exportAnnots = seq.mapNotNull { p ->
-            com.photomed.app.align.PhotoAnnotator.cached("34|${p.uri}|${com.photomed.app.align.PhotoEdits.of(context, p.uri.toString()).hashCode()}")?.let { base ->
-                val phi = shown[p.key]?.keystoneDeg ?: 0f
-                p.key to (if (phi == 0f) base else base.map { l -> l.mapped { com.photomed.app.align.Perspective.mapPt(it, phi) } })
-            }
-        }.toMap()
+        // las mismas líneas y anotaciones que se ven (ya en la foto corregida en perspectiva)
+        val exportAnnots = annotsNow
+        val exportInk = inksNow
+        val diagram = if (showLayers) layersState.value else emptySet()
         ExportSheet(
+            initialView = viewLayers.value,
             count = seq.size, aligned = shown.isNotEmpty(), colorMatched = colorAdjusts.isNotEmpty(), cropped = crop != null,
             onDismiss = { exportSheet = false },
             // vista previa del GIF: las fotos ajustadas (alineación, recorte, color) en tamaño reducido
@@ -931,9 +959,10 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 seq.mapIndexed { i, p ->
                     val d = labels[i]
                     CompareExport.render(context, p, shown[p.key], colorAdjusts[p.key], width = 300, crop = effectiveCrop(),
-                        annots = exportAnnots[p.key], layers = if (showLayers) layersState.value else emptySet(),
-                        orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror), annotAlpha = annotAlpha.value) to
-                        (if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d")
+                        annots = exportAnnots[p.key], layers = diagram,
+                        orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror), annotAlpha = annotAlpha.value,
+                        view = viewLayers.value, ink = exportInk[p.key].orEmpty()) to
+                        (if (!viewLayers.value.overlay) "" else if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d")
                 }
             },
             onExport = { ch, toGallery, progress ->
@@ -945,8 +974,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     individual = ch.kind == ExportKind.INDIVIDUAL, grid = ch.kind == ExportKind.GRID, anonymize = anonymize, dir = dir,
                     onProgress = progress, side = ch.kind == ExportKind.SIDE, gif = ch.gif.takeIf { ch.kind == ExportKind.GIF },
                     gifTiming = ch.timing, crop = effectiveCrop(), labels = stampLabels(seq.map { it.takenAt }), order = order,
-                    annots = exportAnnots, layers = if (showLayers) layersState.value else emptySet(), annotAlpha = annotAlpha.value,
-                    orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror))
+                    annots = exportAnnots, layers = diagram, annotAlpha = annotAlpha.value,
+                    orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror), view = ch.view, ink = exportInk)
                 when {
                     r.files.isEmpty() -> "No se pudo exportar ninguna imagen"
                     toGallery && e != null -> {
@@ -1031,10 +1060,10 @@ private fun PhotoCell(model: Any, label: String, t: Similarity?, zoom: ZoomState
  * Zoom que centra la línea [l] (unidades del ancho de la foto 3:4) en una celda de [cell] px; amplía
  * si es pequeña (sin reducir el zoom actual).
  */
-fun focusZoom(l: com.photomed.app.align.AnnotLine, cell: androidx.compose.ui.unit.IntSize, current: ZoomState): ZoomState {
+fun focusZoom(l: com.photomed.app.align.AnnotLine, cell: androidx.compose.ui.unit.IntSize, current: ZoomState, key: String? = null): ZoomState {
     if (cell.width == 0 || l.points.isEmpty()) return current
     val w = cell.width.toFloat(); val h = cell.height.toFloat()
-    val pts = l.points + l.guides.flatMap { listOf(it.a, it.b) }
+    val pts = l.guides.filter { key != null && it.key == key }.flatMap { listOf(it.a, it.b) }.ifEmpty { l.points + l.guides.flatMap { listOf(it.a, it.b) } }
     val x0 = pts.minOf { it.x }; val x1 = pts.maxOf { it.x }; val y0 = pts.minOf { it.y }; val y1 = pts.maxOf { it.y }
     val size = maxOf(x1 - x0, y1 - y0).coerceAtLeast(0.02f) * w
     val s = (minOf(w, h) * 0.5f / size).coerceIn(1f, 4f).coerceAtLeast(current.scale)

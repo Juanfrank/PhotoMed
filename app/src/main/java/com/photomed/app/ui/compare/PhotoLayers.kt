@@ -244,7 +244,8 @@ fun PhotoContent(model: Any, transform: Similarity?, annots: List<AnnotLine>?, l
                  /** Números de las líneas medidas (los mismos en todas las fotos y en la tabla). */
                  numbers: Map<String, Int>? = annots?.let { com.photomed.app.align.MeasureNumbering.of(listOf(it)) },
                  alpha: Float = 0.5f,
-                 showImage: Boolean = true, ink: List<com.photomed.app.align.InkStroke> = emptyList(), selected: String? = null) {
+                 showImage: Boolean = true, ink: List<com.photomed.app.align.InkStroke> = emptyList(), selected: String? = null,
+                 selectedKey: String? = null) {
     Box(modifier.alignedBy(transform)) {
         // capa 1: imagen
         AsyncImage(model, description, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = if (showImage) 1f else 0f })
@@ -262,7 +263,7 @@ fun PhotoContent(model: Any, transform: Similarity?, annots: List<AnnotLine>?, l
                         width = 6.dp.toPx() * k, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
                 }
                 drawAnnotations(annots, layers, k, numbers = numbers, alpha = alpha) { p: Pt -> map(p) }
-                sl?.let { drawMeasureGuides(it, k) { p -> map(p) } }
+                sl?.let { drawMeasureGuides(it, k, { p -> map(p) }, selectedKey) }
             }
             // capa 3: anotaciones
             drawInk(ink, size.width) { p -> map(p) }
@@ -313,6 +314,8 @@ data class CompareView(
     val ink: Map<Any, List<com.photomed.app.align.InkStroke>> = emptyMap(),
     /** Línea seleccionada en la tabla (por nombre): resaltada y con sus tramos en todas las fotos. */
     val selected: String? = null,
+    /** Tramo seleccionado de esa línea (o null). */
+    val selectedKey: String? = null,
 ) {
     /** Proporción (ancho/alto) de cada celda: 3:4, o 4:3 con giro de 90° o 270°. */
     val aspect: Float get() = if (rot % 2 == 1) 4f / 3f else 3f / 4f
@@ -331,6 +334,6 @@ fun ComparePhoto(model: Any, transform: Similarity?, description: String?, layer
     OrientBox(v.rot, v.mirror, modifier.then(if (cell != null) Modifier.onSizeChanged { cell.value = it } else Modifier)) {
         PhotoContent(model, transform, v.annots[model], v.layers, description, layer,
             numbers = com.photomed.app.align.MeasureNumbering.of(v.annots.values.toList()), alpha = v.alpha,
-            showImage = v.view.image, ink = if (v.view.notes) v.ink[model].orEmpty() else emptyList(), selected = v.selected)
+            showImage = v.view.image, ink = if (v.view.notes) v.ink[model].orEmpty() else emptyList(), selected = v.selected, selectedKey = v.selectedKey)
     }
 }

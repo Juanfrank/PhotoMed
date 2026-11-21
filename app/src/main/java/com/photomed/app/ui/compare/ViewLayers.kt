@@ -49,7 +49,7 @@ fun rememberViewLayers(): MutableState<ViewLayers> {
 
 /** Botón con el menú de las cuatro capas (casillas). */
 @Composable
-fun ViewLayersButton(state: MutableState<ViewLayers>, tint: Color = Color.Unspecified) {
+fun ViewLayersButton(state: MutableState<ViewLayers>, tint: Color = androidx.compose.material3.LocalContentColor.current) {
     var open by remember { mutableStateOf(false) }
     val v = state.value
     Box {

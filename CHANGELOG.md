@@ -2,6 +2,30 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.32 — 21 de noviembre de 2026
+
+- **Anotaciones: símbolos y formas**. *Símbolo*: un toque coloca un punto, círculo, triángulo, cuadrado,
+  X, cruz o estrella, con un texto opcional arriba, abajo, a la izquierda o a la derecha (el lado se
+  conserva al girar o espejar la foto). *Formas*: línea, flecha, círculo, rectángulo o elipse,
+  arrastrando de un extremo al otro. El borrador por trazo los quita tocando su contorno.
+- **Exportar con capas**: casillas para la imagen, el diagrama facial, las anotaciones y el overlay
+  (fechas). Corregido: las líneas del diagrama no se exportaban (se buscaban con una clave de caché
+  antigua); ahora se exporta lo mismo que se ve, también las anotaciones.
+- **Deslizador sin fechas superpuestas**: «antes» arriba a la izquierda y «después» abajo a la
+  derecha (también en el GIF de cortinilla).
+- **Igualar el color de la piel al alinear** (interruptor en los ajustes de Comparar, encendido por
+  defecto): tras la alineación automática se iguala el color de cada foto a la referencia.
+- **Tabla de medidas**: cada fila de un rasgo es un tramo y al tocarla se selecciona solo ese tramo
+  (resaltado en la foto y centrado); en arrugas y surcos, la celda del ancho selecciona el tramo del
+  ancho. Las columnas se reparten según el ancho disponible (la primera hasta el 40 %).
+- **Contorno**: en las sienes el borde de la piel se busca en horizontal (antes el contorno se metía
+  hacia dentro); en la mandíbula, menos suavizado para conservar su ángulo y las formas irregulares.
+- **Icono de las capas de la vista** con el color del tema (antes era invisible sobre fondo oscuro).
+- **Rendimiento y errores**: lecturas de trazos confirmados (y del XMP) fuera del hilo principal en
+  el visor y en Comparar; Atrás sale primero de los modos anotar y trazar surco.
+- **Accesibilidad**: filas de la tabla con alto según el tamaño de letra del sistema (no se recortan),
+  colores de anotación y asa de Comparar con área táctil suficiente, celdas con rol de botón.
+
 ## 2.31 — 21 de noviembre de 2026
 
 - **Comparar sin cierres por modelos simultáneos**: la alineación automática y el análisis de cada

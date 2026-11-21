@@ -55,7 +55,11 @@ object CompareExport {
                        /** Números de las líneas (comunes a todas las fotos, como en la tabla). */
                        numbers: Map<String, Int>? = null,
                        /** Opacidad de los trazos y los números (la de la pantalla). */
-                       annotAlpha: Float = 1f): Bitmap {
+                       annotAlpha: Float = 1f,
+                       /** Capas: imagen, diagrama y anotaciones (el overlay son las etiquetas). */
+                       view: ViewLayers = ViewLayers(),
+                       /** Anotaciones (en la foto corregida, como [annots]). */
+                       ink: List<com.photomed.app.align.InkStroke> = emptyList()): Bitmap {
         var bmp = ImageOps.load34(context, photo.uri, width)
         val ks = result?.keystoneDeg ?: 0f
         return withContext(Dispatchers.Default) {
@@ -64,8 +68,17 @@ object CompareExport {
                 val px = IntArray(bmp.width * bmp.height).also { bmp.getPixels(it, 0, bmp.width, 0, 0, bmp.width, bmp.height) }
                 bmp = Bitmap.createBitmap(color.apply(px), bmp.width, bmp.height, Bitmap.Config.ARGB_8888)
             }
-            if (annots != null && layers.isNotEmpty()) bmp = drawAnnotations(bmp, annots, layers,
+            // capa 1: sin la imagen, fondo negro del mismo tamaño
+            if (!view.image) bmp = Bitmap.createBitmap(bmp.width, bmp.height, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.BLACK) }
+            // capa 2: diagrama facial
+            if (view.diagram && annots != null && layers.isNotEmpty()) bmp = drawAnnotations(bmp, annots, layers,
                 numbers ?: com.photomed.app.align.MeasureNumbering.of(listOf(annots)), annotAlpha)
+            // capa 3: anotaciones
+            if (view.notes && ink.isNotEmpty()) {
+                bmp = if (bmp.isMutable) bmp else bmp.copy(Bitmap.Config.ARGB_8888, true)
+                val w = bmp.width.toFloat()
+                com.photomed.app.align.InkRenderer.draw(Canvas(bmp), ink, w, { p -> android.graphics.PointF(p.x * w, p.y * w) }, textScale = w / 400f)
+            }
             val out = transformed(bmp, withCrop(result?.transform, crop))
             if (orient == null || orient.isIdentity) out else orient.copy(crop = null).apply(out)
         }
@@ -150,6 +163,7 @@ object CompareExport {
         images.forEachIndexed { i, (b, label) ->
             val x = gap + (i % cols) * (cellW + gap); val y = gap + (i / cols) * (cellH + gap)
             c.drawBitmap(b, null, RectF(x.toFloat(), y.toFloat(), (x + cellW).toFloat(), (y + cellH).toFloat()), img)
+            if (label.isEmpty()) return@forEachIndexed
             val pad = cellW * 0.02f
             val tw = text.measureText(label)
             c.drawRoundRect(RectF(x + pad, y + pad, x + pad * 3 + tw, y + pad * 3 + text.textSize), pad, pad, pill)
@@ -194,10 +208,13 @@ object CompareExport {
         val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = w * 0.045f; typeface = Typeface.DEFAULT_BOLD }
         val pill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x99000000.toInt() }
         fun label(s: String, right: Boolean) {
+            if (s.isEmpty()) return
             val pad = w * 0.02f; val tw = text.measureText(s)
+            // la segunda («después») abajo a la derecha: no se superpone con la primera
             val x0 = if (right) w - pad * 3 - tw else pad
-            c.drawRoundRect(RectF(x0, pad, x0 + pad * 2 + tw, pad * 3 + text.textSize), pad, pad, pill)
-            c.drawText(s, x0 + pad, pad * 1.6f + text.textSize, text)
+            val y0 = if (right) h - pad * 3 - text.textSize else pad
+            c.drawRoundRect(RectF(x0, y0, x0 + pad * 2 + tw, y0 + pad * 2 + text.textSize), pad, pad, pill)
+            c.drawText(s, x0 + pad, y0 + pad * 0.6f + text.textSize, text)
         }
         val dst = RectF(0f, 0f, w.toFloat(), h.toFloat())
         val img = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -268,6 +285,9 @@ object CompareExport {
         orient: com.photomed.app.align.ImageEdit? = null,
         /** Orden de presentación (índices de [seq]) para la cuadrícula y lado a lado. */
         order: List<Int>? = null,
+        /** Capas de la imagen exportada (sin overlay: sin etiquetas de fecha). */
+        view: ViewLayers = ViewLayers(),
+        ink: Map<String, List<com.photomed.app.align.InkStroke>> = emptyMap(),
     ): Result {
         dir.mkdirs()
         val files = mutableListOf<File>(); var failed = 0
@@ -277,10 +297,11 @@ object CompareExport {
         seq.forEachIndexed { i, p ->
             coroutineContext.ensureActive()
             onProgress(i, seq.size)
-            val b = runCatching { render(context, p, results[p.key], colors[p.key], crop = crop, annots = annots[p.key], layers = layers, orient = orient, numbers = numbers, annotAlpha = annotAlpha) }.getOrNull()
+            val b = runCatching { render(context, p, results[p.key], colors[p.key], crop = crop, annots = annots[p.key], layers = layers, orient = orient, numbers = numbers, annotAlpha = annotAlpha,
+                view = view, ink = ink[p.key].orEmpty()) }.getOrNull()
             if (b == null) { failed++; return@forEachIndexed }
             val d = labels?.getOrNull(i) ?: formatDate(p.takenAt)
-            val label = if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d"
+            val label = if (!view.overlay) "" else if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d"
             rendered += (if (grid || side || gif != null) Bitmap.createScaledBitmap(b, 540, 540 * b.height / b.width, true) else b) to label
             if (individual) withContext(Dispatchers.IO) {
                 val name = if (anonymize) anonymizedName(p, i + 1).removeSuffix(".jpg") + "_ajustada.jpg"

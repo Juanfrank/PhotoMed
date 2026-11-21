@@ -16,7 +16,21 @@ import kotlin.math.roundToInt
  * foto original (x, y normalizadas 0..1, como los trazos confirmados, ver [TraceMap]); [width] en
  * fracción del ancho de la original; [erase] = borrador tipo pintura (quita lo dibujado debajo).
  */
-data class InkStroke(val color: Int, val width: Float, val points: List<Pt>, val erase: Boolean = false)
+data class InkStroke(val color: Int, val width: Float, val points: List<Pt>, val erase: Boolean = false,
+                     /** "free" (mano alzada), "symbol" (una forma en un punto, con texto opcional) o "shape" (forma de un extremo a otro). */
+                     val kind: String = FREE,
+                     /** Símbolo ([SYMBOLS]) o forma ([SHAPES]). */
+                     val shape: String? = null,
+                     /** Texto del símbolo y lado donde va: "top", "bottom", "left", "right". */
+                     val text: String? = null, val side: String? = null,
+                     /** Tamaño del símbolo (fracción del ancho, como [width]). */
+                     val size: Float = 0f) {
+    companion object {
+        const val FREE = "free"; const val SYMBOL = "symbol"; const val SHAPE = "shape"
+        val SYMBOLS = listOf("dot", "circle", "triangle", "square", "x", "plus", "star")
+        val SHAPES = listOf("line", "arrow", "circle", "rect", "ellipse")
+    }
+}
 
 /** Anotaciones de una foto; [baseAspect]: alto / ancho de la original. */
 data class InkSet(val baseAspect: Float, val strokes: List<InkStroke> = emptyList()) {
@@ -26,8 +40,19 @@ data class InkSet(val baseAspect: Float, val strokes: List<InkStroke> = emptyLis
         // grosor: un segmento horizontal de ese ancho en la original, medido en el encuadre
         val p0 = s.points.firstOrNull() ?: Pt(0.5f, 0.5f)
         val (a, b) = TraceMap.toView(e, baseAspect, frame, listOf(p0, Pt(p0.x + s.width, p0.y)))
-        s.copy(points = pts, width = hypot(b.x - a.x, b.y - a.y))
+        val k = hypot(b.x - a.x, b.y - a.y) / s.width.coerceAtLeast(1e-6f)
+        s.copy(points = pts, width = s.width * k, size = s.size * k, side = s.side?.let { rotateSide(it, e) })
     }
+}
+
+/** Lado del texto de un símbolo tras girar / espejar la foto (el texto queda del mismo lado del punto). */
+fun rotateSide(side: String, e: ImageEdit): String {
+    val order = listOf("top", "right", "bottom", "left")
+    var i = order.indexOf(side).takeIf { it >= 0 } ?: return side
+    i = (i + e.rot % 4) % 4
+    var out = order[i]
+    if (e.mirror) out = when (out) { "left" -> "right"; "right" -> "left"; else -> out }
+    return out
 }
 
 /**
@@ -43,7 +68,12 @@ object Annotations {
     fun write(s: InkSet): String = JSONObject().put("v", 1).put("aspect", s.baseAspect.toDouble()).put("strokes", JSONArray().apply {
         s.strokes.forEach { k ->
             put(JSONObject().put("c", k.color).put("w", (k.width * 100000f).roundToInt() / 100000.0).put("e", k.erase)
-                .put("p", JSONArray().apply { k.points.forEach { put((it.x * 10000f).roundToInt() / 10000.0); put((it.y * 10000f).roundToInt() / 10000.0) } }))
+                .put("p", JSONArray().apply { k.points.forEach { put((it.x * 10000f).roundToInt() / 10000.0); put((it.y * 10000f).roundToInt() / 10000.0) } })
+                .apply {
+                    if (k.kind != InkStroke.FREE) put("k", k.kind)
+                    k.shape?.let { put("s", it) }; k.text?.let { put("t", it) }; k.side?.let { put("d", it) }
+                    if (k.size > 0f) put("z", (k.size * 100000f).roundToInt() / 100000.0)
+                })
         }
     }).toString()
 
@@ -52,7 +82,8 @@ object Annotations {
         InkSet(o.getDouble("aspect").toFloat(), (0 until a.length()).map { i ->
             val k = a.getJSONObject(i); val p = k.getJSONArray("p")
             InkStroke(k.getInt("c"), k.getDouble("w").toFloat(), (0 until p.length() / 2).map { j -> Pt(p.getDouble(2 * j).toFloat(), p.getDouble(2 * j + 1).toFloat()) },
-                k.optBoolean("e"))
+                k.optBoolean("e"), k.optString("k", InkStroke.FREE), k.optString("s").ifEmpty { null }, k.optString("t").ifEmpty { null },
+                k.optString("d").ifEmpty { null }, k.optDouble("z", 0.0).toFloat())
         })
     }.getOrNull()
 
@@ -87,7 +118,8 @@ object Annotations {
             return hypot(q.x - (a.x + vx * t), q.y - (a.y + vy * t))
         }
         fun touches(k: InkStroke): Boolean {
-            val pts = k.points.map(::iso); val qs = path.map(::iso); val lim = radius + k.width / 2
+            val pts = InkRenderer.outline(k).map(::iso); val qs = path.map(::iso)
+            val lim = radius + (if (k.kind == InkStroke.SYMBOL) maxOf(k.size, k.width) else k.width) / 2
             return qs.any { q -> if (pts.size == 1) hypot(q.x - pts[0].x, q.y - pts[0].y) < lim
                 else (1 until pts.size).any { segDist(q, pts[it - 1], pts[it]) < lim } }
         }

@@ -157,10 +157,15 @@ object HairSkin {
         val offs = FloatArray(36) { Float.NaN }
         for (i in 0 until 36) {
             val o = oval[i]
-            // frente: la decide la línea de implantación, no el óvalo
-            if (o.y < top + (bottom - top) * 0.22f) { offs[i] = 0f; continue }
+            val upper = o.y < top + (bottom - top) * 0.38f
+            val lateral = kotlin.math.abs(o.x - cx) > 0.25f * faceW
+            // frente (centro): la decide la línea de implantación, no el óvalo
+            if (upper && !lateral) { offs[i] = 0f; continue }
             val n = hypot(o.x - cx, o.y - cy).takeIf { it > 1e-5f } ?: continue
-            val nx = (o.x - cx) / n; val ny = (o.y - cy) / n
+            // sienes: el borde de la piel se busca en horizontal (con la dirección radial desde el centro de
+            // la cara, en diagonal, el contorno se metía hacia dentro de la sien)
+            val nx = if (upper) kotlin.math.sign(o.x - cx) else (o.x - cx) / n
+            val ny = if (upper) 0f else (o.y - cy) / n
             val lower = o.y > mouthY
             fun inside(c: Int) = if (lower) c == FaceLabels.FACE_SKIN || c == FaceLabels.HAIR else c == FaceLabels.FACE_SKIN
             val r = MAX_SNAP * faceW; val step = 1f / w
@@ -184,7 +189,9 @@ object HairSkin {
         for (i in 0 until 36) {
             val o = oval[i]
             val n = hypot(o.x - cx, o.y - cy).takeIf { it > 1e-5f } ?: continue
-            out["oval_$i"] = Pt(o.x + (o.x - cx) / n * sm[i], o.y + (o.y - cy) / n * sm[i])
+            val upper = o.y < top + (bottom - top) * 0.38f
+            out["oval_$i"] = if (upper) Pt(o.x + kotlin.math.sign(o.x - cx) * sm[i], o.y)
+                else Pt(o.x + (o.x - cx) / n * sm[i], o.y + (o.y - cy) / n * sm[i])
         }
         return out
     }

@@ -24,6 +24,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasAnyAncestor
@@ -404,6 +405,22 @@ class UsageFlowsTest {
         compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u) == null }
         compose.onNodeWithContentDescription("Deshacer").performClick()
         compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 1 }
+        // símbolo con texto: un toque lo coloca
+        compose.onNodeWithText("Símbolo").performClick()
+        waitText("Estrella")
+        compose.onNodeWithText("Estrella").performClick()
+        compose.onNode(androidx.compose.ui.test.hasSetTextAction()).performTextInput("Relleno 1 ml")
+        compose.onNodeWithText("Abajo").performClick()
+        compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { click(center) }
+        compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 2 }
+        val st = com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.last()
+        assertEquals(listOf("symbol", "star", "Relleno 1 ml", "bottom"), listOf(st.kind, st.shape, st.text, st.side))
+        // forma arrastrada: un rectángulo de un extremo a otro
+        compose.onNodeWithText("Formas").performClick()
+        compose.onNodeWithText("Rectángulo").performClick()
+        compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center, center + androidx.compose.ui.geometry.Offset(150f, 100f), 300) }
+        compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 3 }
+        assertEquals("rect", com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.last().shape)
         compose.onAllNodesWithContentDescription("Terminar de anotar")[0].performClick()
         // capas de la vista: las anotaciones se pueden ocultar
         compose.onNodeWithContentDescription("Vista", substring = true).performClick()

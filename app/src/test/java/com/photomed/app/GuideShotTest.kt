@@ -43,7 +43,7 @@ class GuideShotTest {
         paparazzi.snapshot {
             com.photomed.app.ui.theme.PhotoMedTheme(darkTheme = false) {
                 Column(Modifier.background(Color.White)) {
-                    Canvas(Modifier.width(400.dp).height(400.dp).background(Color(0xFF8D6E63))) { drawMeasureGuides(line, 1f) { p -> Offset(p.x * size.width, p.y * size.width) } }
+                    Canvas(Modifier.width(400.dp).height(400.dp).background(Color(0xFF8D6E63))) { drawMeasureGuides(line, 1f, { p -> Offset(p.x * size.width, p.y * size.width) }) }
                     com.photomed.app.ui.compare.MetricsCard(line, onTable = {}, onClose = {}, modifier = Modifier.fillMaxWidth())
                 }
             }

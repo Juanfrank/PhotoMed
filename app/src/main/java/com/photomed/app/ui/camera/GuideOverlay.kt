@@ -787,9 +787,15 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGuideSegment(a: Offset,
  */
 fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMeasureGuides(
     line: com.photomed.app.align.AnnotLine, @Suppress("UNUSED_PARAMETER") k: Float, map: (com.photomed.app.align.Pt) -> Offset,
+    /** Tramo seleccionado (fila de la ficha): se dibuja solo ese, resaltado; null = todos. */
+    focusKey: String? = null,
 ) {
     val idx = guideStyleIndices(line)
-    line.guides.forEachIndexed { i, g -> drawGuideSegment(map(g.a), map(g.b), idx[i]) }
+    line.guides.forEachIndexed { i, g ->
+        if (focusKey != null && g.key != focusKey) return@forEachIndexed
+        if (focusKey != null) drawLine(Color(0xFFFFD54F).copy(alpha = 0.55f), map(g.a), map(g.b), strokeWidth = 9.dp.toPx(), cap = StrokeCap.Round)
+        drawGuideSegment(map(g.a), map(g.b), idx[i])
+    }
 }
 
 /**
@@ -827,19 +833,8 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawInk(
     strokes: List<com.photomed.app.align.InkStroke>, unit: Float, map: (com.photomed.app.align.Pt) -> Offset,
 ) {
     if (strokes.isEmpty()) return
+    val k = density
     drawIntoCanvas { c ->
-        c.saveLayer(androidx.compose.ui.geometry.Rect(Offset.Zero, size), androidx.compose.ui.graphics.Paint())
-        for (s in strokes) {
-            if (s.points.isEmpty()) continue
-            val w = (s.width * unit).coerceAtLeast(1f)
-            val col = if (s.erase) Color.Black else Color(s.color)
-            val blend = if (s.erase) androidx.compose.ui.graphics.BlendMode.Clear else androidx.compose.ui.graphics.BlendMode.SrcOver
-            if (s.points.size == 1) { drawCircle(col, w / 2, map(s.points[0]), blendMode = blend); continue }
-            val path = androidx.compose.ui.graphics.Path().apply {
-                val p0 = map(s.points[0]); moveTo(p0.x, p0.y); s.points.drop(1).forEach { val p = map(it); lineTo(p.x, p.y) }
-            }
-            drawPath(path, col, style = Stroke(w, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round), blendMode = blend)
-        }
-        c.restore()
+        com.photomed.app.align.InkRenderer.draw(c.nativeCanvas, strokes, unit, { p -> val o = map(p); android.graphics.PointF(o.x, o.y) }, textScale = k)
     }
 }

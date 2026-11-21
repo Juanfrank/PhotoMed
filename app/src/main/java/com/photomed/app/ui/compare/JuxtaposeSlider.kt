@@ -118,8 +118,9 @@ fun JuxtaposeSlider(
             drawPath(right, Color.White)
         }
 
+        // antes arriba y después abajo: no se superponen aunque las fechas sean largas o la foto estrecha
         Label(beforeLabel, Modifier.align(Alignment.TopStart))
-        Label(afterLabel, Modifier.align(Alignment.TopEnd))
+        Label(afterLabel, Modifier.align(Alignment.BottomEnd))
     }
 }
 

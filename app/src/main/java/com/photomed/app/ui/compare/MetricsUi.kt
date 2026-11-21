@@ -238,9 +238,11 @@ fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
                  onDelete: ((String, Int?) -> Unit)? = null, dismissedCount: Int = 0, onRestore: (() -> Unit)? = null,
                  traces: TraceActions? = null,
                  /** Tocar una fila selecciona su línea en la foto (y muestra lo que se mide). */
-                 onSelectLine: ((AnnotLine) -> Unit)? = null,
+                 onSelectLine: ((AnnotLine, String?) -> Unit)? = null,
                  /** Línea seleccionada en la foto: su fila se resalta y se desplaza hasta verse. */
-                 selected: AnnotLine? = null) {
+                 selected: AnnotLine? = null,
+                 /** Tramo seleccionado de esa línea (fila de la ficha), o null para la línea entera. */
+                 selectedKey: String? = null) {
     androidx.compose.material3.Surface(modifier, color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 2.dp) {
         Column(Modifier.fillMaxWidth()) {
@@ -250,7 +252,7 @@ fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
             }
             HorizontalDivider()
             Column(Modifier.padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
-                MetricsContent(columns, layers, loading, note, onShowLayers, onDelete, dismissedCount, onRestore, traces, onSelectLine, selected)
+                MetricsContent(columns, layers, loading, note, onShowLayers, onDelete, dismissedCount, onRestore, traces, onSelectLine, selected, selectedKey)
             }
         }
     }
@@ -261,7 +263,24 @@ fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
 fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>,
                    loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null,
                    onDelete: ((String, Int?) -> Unit)? = null, dismissedCount: Int = 0, onRestore: (() -> Unit)? = null,
-                   traces: TraceActions? = null, onSelectLine: ((AnnotLine) -> Unit)? = null, selected: AnnotLine? = null) {
+                   traces: TraceActions? = null, onSelectLine: ((AnnotLine, String?) -> Unit)? = null, selected: AnnotLine? = null,
+                   selectedKey: String? = null) = androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+    // reparto del ancho disponible: la primera columna hasta el 40 %, las cifras se reparten el resto
+    val avail = maxWidth
+    fun widthsFor(cells: Int, actions: Dp = 0.dp): Pair<Dp, Dp> {
+        val first = (avail * 0.40f).coerceIn(120.dp, 230.dp)
+        val v = if (cells <= 1) 72.dp else ((avail - first - actions - 4.dp) / (cells - 1)).coerceIn(58.dp, 110.dp)
+        return first to v
+    }
+    Column { MetricsBody(columns, layers, loading, note, onShowLayers, onDelete, dismissedCount, onRestore, traces, onSelectLine, selected, selectedKey, ::widthsFor) }
+}
+
+@Composable
+private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>,
+                        loading: Boolean, note: String?, onShowLayers: ((Set<AnnotLayer>) -> Unit)?,
+                        onDelete: ((String, Int?) -> Unit)?, dismissedCount: Int, onRestore: (() -> Unit)?,
+                        traces: TraceActions?, onSelectLine: ((AnnotLine, String?) -> Unit)?, selected: AnnotLine?, selectedKey: String?,
+                        widthsFor: (Int, Dp) -> Pair<Dp, Dp>) {
     val selName = selected?.metrics?.name
     // la fila de la línea seleccionada se trae a la vista (en vertical y en horizontal)
     val bring = androidx.compose.runtime.remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
@@ -317,19 +336,23 @@ fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Ann
         Column(Modifier.horizontalScroll(scrolls[group]).padding(top = 4.dp)) {
             if (group == 2) {
                 // rasgos: una fila por medida
-                TableRow(listOf("Rasgo · medida") + (if (single) listOf("Valor") else columns.map { it.first.replace(", ", "\n") } + "Δ"), header = true)
+                val featCells = listOf("Rasgo · medida") + (if (single) listOf("Valor") else columns.map { it.first.replace(", ", "\n") } + "Δ")
+                val (fw, vw) = widthsFor(featCells.size, 0.dp)
+                TableRow(featCells, header = true, firstW = fw, valueW = vw)
                 rows.forEach { (name, v) ->
                     val labels = v.second.firstNotNullOfOrNull { it }?.features?.map { it.first }.orEmpty()
                     labels.forEachIndexed { i, lab ->
                         val vals = v.second.map { m -> m?.features?.firstOrNull { it.first == lab }?.second }
                         val first = vals.firstOrNull { it != null }; val last = vals.lastOrNull { it != null }
                         val delta = if (!single && first != null && last != null && vals.count { it != null } >= 2) last - first else null
-                        val isSel = name == selName
+                        val key = lab.substringBeforeLast(",")
+                        val isSel = name == selName && (selectedKey == null || selectedKey == key)
+                        // cada fila es un tramo: al tocarla se selecciona solo ese tramo
                         TableRow(listOf(if (i == 0) "${label(name, v)}\n${lab}" else "   $lab") + vals.map { it?.let { x -> featureValue(lab, x) } ?: "—" } +
-                            (if (single) emptyList() else listOf(signed(delta, if (lab.endsWith("mm²")) 0 else 1))), line = if (i == 0) v.first else null, wide = true,
-                            onClick = onSelectLine?.let { f -> { f(v.first) } }, highlight = isSel,
-                            swatch = if (isSel) selStyles[lab.substringBeforeLast(",")] else null,
-                            bring = if (isSel && i == 0) bring else null)
+                            (if (single) emptyList() else listOf(signed(delta, if (lab.endsWith("mm²")) 0 else 1))), line = if (i == 0) v.first else null,
+                            onClick = onSelectLine?.let { f -> { f(v.first, key.takeIf { k -> v.first.guides.any { it.key == k } }) } }, highlight = isSel,
+                            swatch = if (name == selName) selStyles[key] else null,
+                            bring = if (isSel && (i == 0 || selectedKey == key)) bring else null, firstW = fw, valueW = vw)
                     }
                     HorizontalDivider()
                 }
@@ -359,28 +382,39 @@ fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Ann
                             vals.map { fmt(i, it, area) } + signed(delta, if (!area && i == 2) 2 else 1), line = if (i == 0) v.first else null,
                             deleteName = if (i == 0) name else null,
                             deletePhotos = if (i == 0) columns.mapIndexedNotNull { ci, col -> if (v.second[ci] != null) ci to col.first else null } else emptyList(),
-                            divider = i == cols.size - 1)
+                            divider = i == cols.size - 1, measure = if (area) null else i)
                     }
                 }
             }
+            // acciones fijas a la derecha: volver a trazar, revertir y eliminar
+            val edit = traces?.onEdit?.takeIf { single && !area }
+            val revert = traces?.onRevert?.takeIf { single && !area && traces.edited.isNotEmpty() }
+            val nAct = listOfNotNull(edit, revert, onDelete).size
+            val (fw, vw) = widthsFor(specs.firstOrNull()?.cells?.size ?: 2, 40.dp * nAct)
+            // alto de fila según el tamaño de letra del sistema (accesibilidad): sin recortar el texto
+            val rowH = ROW_H * androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceIn(1f, 2f)
             Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
                 Column(Modifier.weight(1f).horizontalScroll(scrolls[group])) {
                     var owner: AnnotLine? = null
                     specs.forEach { r -> if (r.line != null) owner = r.line; if (r.header) owner = null
                         val o = owner
-                        val isSel = !r.header && o?.metrics?.name != null && o.metrics.name == selName
-                        TableRow(r.cells, header = r.header, line = r.line, fixedHeight = ROW_H,
-                            onClick = if (r.header || o == null) null else onSelectLine?.let { f -> { f(o) } }, highlight = isSel,
-                            bring = if (isSel && r.line != null) bring else null)
+                        // tramo de la fila (en la tabla de varias fotos, una fila por medida)
+                        val rowKey = r.measure?.let { if (it == 1) WIDTH_KEY else null }
+                        val isSel = !r.header && o?.metrics?.name != null && o.metrics.name == selName &&
+                            (selectedKey == null || r.measure == null || rowKey == selectedKey)
+                        TableRow(r.cells, header = r.header, line = r.line, fixedHeight = rowH,
+                            onClick = if (r.header || o == null) null else onSelectLine?.let { f -> { f(o, rowKey?.takeIf { o.guides.any { g -> g.key == it } }) } },
+                            highlight = isSel, bring = if (isSel && (r.line != null || rowKey == selectedKey)) bring else null, firstW = fw, valueW = vw,
+                            // una foto: la celda del ancho selecciona solo el tramo del ancho
+                            onCellClick = if (single && !area && !r.header && o != null && onSelectLine != null && o.guides.any { it.key == WIDTH_KEY })
+                                { c -> onSelectLine(o, if (c == 2) WIDTH_KEY else null) } else null,
+                            swatchCell = if (single && !area && o?.metrics?.name == selName && o != null) selStyles[WIDTH_KEY]?.let { 2 to it } else
+                                if (!single && rowKey != null && o?.metrics?.name == selName) selStyles[rowKey]?.let { 0 to it } else null)
                         if (r.divider) HorizontalDivider() }
                 }
-                // acciones fijas a la derecha: volver a trazar, revertir y eliminar
-                val edit = traces?.onEdit?.takeIf { single && !area }
-                val revert = traces?.onRevert?.takeIf { single && !area && traces.edited.isNotEmpty() }
-                val nAct = listOfNotNull(edit, revert, onDelete).size
                 if (nAct > 0) Column(Modifier.width(40.dp * nAct)) {
                     specs.forEach { r ->
-                        Row(Modifier.height(ROW_H).width(40.dp * nAct), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.height(rowH).width(40.dp * nAct), verticalAlignment = Alignment.CenterVertically) {
                             val n = r.deleteName
                             if (edit != null) androidx.compose.foundation.layout.Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
                                 if (n != null) IconButton(onClick = { edit(n) }, modifier = Modifier.size(36.dp)) {
@@ -428,28 +462,41 @@ private val ROW_H = 46.dp
 
 /** Fila de la tabla preparada (celdas, línea, eliminar). */
 private class RowSpec(val cells: List<String>, val header: Boolean = false, val line: AnnotLine? = null, val deleteName: String? = null,
-                      val deletePhotos: List<Pair<Int, String>> = emptyList(), val divider: Boolean = false)
+                      val deletePhotos: List<Pair<Int, String>> = emptyList(), val divider: Boolean = false,
+                      /** Índice de la medida (columna de [LINE_COLS]) en la tabla de varias fotos. */
+                      val measure: Int? = null)
+
+/** Fila de la ficha del tramo del ancho de una arruga o surco. */
+private const val WIDTH_KEY = "Ancho (a media profundidad)"
 
 /** Fila de la tabla: texto con contraste alto (cifras en negrita y color de primer plano). */
 @Composable
-private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLine? = null, wide: Boolean = false,
+private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLine? = null,
                      /** Acción al final de la fila (eliminar la línea). */
                      action: (@Composable () -> Unit)? = null, fixedHeight: Dp? = null, onClick: (() -> Unit)? = null,
                      /** Fila de la línea seleccionada (fondo resaltado). */
                      highlight: Boolean = false,
                      /** Estilo del trazo de esta medida en la foto (muestra delante del texto). */
                      swatch: Int? = null,
-                     bring: androidx.compose.foundation.relocation.BringIntoViewRequester? = null) {
+                     bring: androidx.compose.foundation.relocation.BringIntoViewRequester? = null,
+                     /** Anchos de la primera columna y de las cifras (reparto del espacio). */
+                     firstW: Dp = 170.dp, valueW: Dp = 72.dp,
+                     /** Toque en una celda concreta (índice); si no, [onClick]. */
+                     onCellClick: ((Int) -> Unit)? = null,
+                     /** Muestra del trazo en una celda (índice, estilo). */
+                     swatchCell: Pair<Int, Int>? = null) {
     Row((if (fixedHeight != null) Modifier.height(fixedHeight) else Modifier.padding(vertical = 3.dp))
         .then(if (highlight) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) else Modifier)
         .then(if (bring != null) Modifier.bringIntoViewRequester(bring) else Modifier)
-        .then(if (onClick != null) Modifier.clickable(onClickLabel = "Ver en la foto", onClick = onClick) else Modifier)
+        .then(if (onClick != null) Modifier.clickable(onClickLabel = "Ver en la foto", role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) else Modifier)
         .semantics { if (highlight) selected = true },
         verticalAlignment = Alignment.CenterVertically) {
         cells.forEachIndexed { i, c ->
-            val w: Dp = if (i == 0) (if (wide) 210.dp else 170.dp) else 72.dp
-            Row(Modifier.width(w), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = if (i == 0) Arrangement.Start else Arrangement.End) {
+            val w: Dp = if (i == 0) firstW else valueW
+            Row(Modifier.width(w).then(if (onCellClick != null) Modifier.clickable(onClickLabel = "Ver en la foto") { onCellClick(i) } else Modifier),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = if (i == 0) Arrangement.Start else Arrangement.End) {
                 if (i == 0 && swatch != null) { GuideSwatch(swatch, Modifier.size(26.dp, 11.dp)); Spacer(Modifier.width(4.dp)) }
+                if (swatchCell?.first == i && !(i == 0 && swatch != null)) { GuideSwatch(swatchCell.second, Modifier.size(22.dp, 10.dp)); Spacer(Modifier.width(3.dp)) }
                 if (i == 0 && line != null) Canvas(Modifier.size(9.dp)) { drawCircle(com.photomed.app.ui.camera.lineColor(line)) }
                 Text(c, style = if (header) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium,
                     fontWeight = when { header -> FontWeight.Bold; i > 0 -> FontWeight.SemiBold; else -> FontWeight.Normal },

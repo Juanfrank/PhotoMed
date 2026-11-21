@@ -64,6 +64,8 @@ data class ExportChoice(
     val gif: CompareExport.GifMode = CompareExport.GifMode.SLIDE,
     val timing: CompareExport.GifTiming = CompareExport.GifTiming(),
     val anonymize: Boolean = true,
+    /** Capas que lleva la imagen exportada. */
+    val view: ViewLayers = ViewLayers(),
 )
 
 /**
@@ -76,6 +78,8 @@ data class ExportChoice(
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ExportSheet(
+    /** Capas de la vista actual (las de la exportación empiezan igual). */
+    initialView: ViewLayers = ViewLayers(),
     count: Int,
     aligned: Boolean,
     colorMatched: Boolean,
@@ -91,6 +95,7 @@ fun ExportSheet(
     var holdS by remember { mutableStateOf(1.2f) }
     var transS by remember { mutableStateOf(0.7f) }
     var anonymize by remember { mutableStateOf(true) }
+    var view by remember { mutableStateOf(initialView) }
     var progress by remember { mutableStateOf<Float?>(null) }
     val timing = CompareExport.GifTiming((holdS * 1000).roundToInt(), (transS * 1000).roundToInt())
 
@@ -99,7 +104,7 @@ fun ExportSheet(
         progress = 0f
         scope.launch {
             val msg = runCatching {
-                onExport(ExportChoice(kind, gifMode, timing, anonymize), toGallery) { i, n -> progress = if (n > 0) i / n.toFloat() else 1f }
+                onExport(ExportChoice(kind, gifMode, timing, anonymize, view), toGallery) { i, n -> progress = if (n > 0) i / n.toFloat() else 1f }
             }.getOrElse { "No se pudo exportar: ${it.message ?: it.javaClass.simpleName}" }
             progress = null
             msg?.let(onMessage)
@@ -149,6 +154,20 @@ fun ExportSheet(
                 Slider(transS, { transS = (it * 10).roundToInt() / 10f }, valueRange = 0f..3f,
                     modifier = Modifier.semantics { contentDescription = "Tiempo de transición" })
                 GifPreview(loadPreview, gifMode, timing, Modifier.align(Alignment.CenterHorizontally))
+            }
+            // capas de la imagen exportada
+            Text("Capas en la imagen", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
+            listOf(
+                Triple("Imagen", view.image) { b: Boolean -> view.copy(image = b) },
+                Triple("Diagrama facial (contornos y números)", view.diagram) { b: Boolean -> view.copy(diagram = b) },
+                Triple("Anotaciones", view.notes) { b: Boolean -> view.copy(notes = b) },
+                Triple("Overlay (fechas y rótulos)", view.overlay) { b: Boolean -> view.copy(overlay = b) },
+            ).forEach { (label, on, set) ->
+                Row(Modifier.fillMaxWidth().toggleable(on, role = Role.Checkbox) { view = set(it) }.padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Checkbox(checked = on, onCheckedChange = null)
+                    Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
+                }
             }
             Row(Modifier.fillMaxWidth().toggleable(anonymize, role = Role.Switch) { anonymize = it }.padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically) {
