@@ -183,7 +183,7 @@ object ConfirmedTraces {
         val f = file(context, uri)
         synchronized(mem) { mem[uri]?.let { (stamp, s) -> if (stamp == f.lastModified()) return s } }
         val s = if (f.exists()) TraceJson.read(f.readText())
-            else PhotoMetadata.tracesOf(XmpFile.read(context, Uri.parse(uri)))?.let { j -> TraceJson.read(j)?.also { f.writeText(j) } }
+            else PhotoMetadata.tracesOf(XmpFile.read(context, Uri.parse(uri)))?.let { j -> TraceJson.read(j)?.also { AtomicFile.write(f, j) } }
         synchronized(mem) { mem[uri] = f.lastModified() to s }
         return s
     }
@@ -195,7 +195,7 @@ object ConfirmedTraces {
     fun save(context: Context, uri: String, s: TraceSet): Boolean {
         val json = TraceJson.write(s)
         val f = file(context, uri)
-        f.writeText(json)
+        AtomicFile.write(f, json)
         // marca de tiempo distinta aunque se guarde dos veces en el mismo milisegundo (claves de caché)
         f.setLastModified(maxOf(System.currentTimeMillis(), (mem[uri]?.first ?: 0L) + 1000))
         synchronized(mem) { mem[uri] = f.lastModified() to s }

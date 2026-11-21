@@ -27,7 +27,8 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class InkShapesTest {
     private val sym = InkStroke(Color.RED, 0.01f, listOf(Pt(0.5f, 0.5f)), kind = InkStroke.SYMBOL, shape = "triangle", text = "Bótox 4U", side = "top", size = 0.06f)
-    private val circle = InkStroke(Color.GREEN, 0.01f, listOf(Pt(0.2f, 0.2f), Pt(0.4f, 0.4f)), kind = InkStroke.SHAPE, shape = "circle")
+    // círculo arrastrado: de una esquina a la otra del recuadro (centro 0,3; radio 0,1)
+    private val circle = InkStroke(Color.GREEN, 0.01f, listOf(Pt(0.2f, 0.2f), Pt(0.4f, 0.4f)), kind = InkStroke.SYMBOL, shape = "circle")
 
     @Test fun savedWithTheirKindTextAndSide() {
         val back = Annotations.read(Annotations.write(InkSet(4f / 3f, listOf(sym, circle))))!!
@@ -45,20 +46,27 @@ class InkShapesTest {
 
     @Test fun strokeEraserTouchesShapeOutlines() {
         val s = InkSet(1f, listOf(sym, circle))
-        // un toque sobre el borde del círculo (centro 0,3; radio ~0,14) lo quita; en su centro, no
-        assertEquals(2, Annotations.eraseStrokes(s, listOf(Pt(0.3f, 0.3f)), 0.005f).strokes.size)
-        assertEquals(listOf(sym), Annotations.eraseStrokes(s, listOf(Pt(0.3f + 0.1414f, 0.3f)), 0.01f).strokes)
+        // tocando el borde del círculo o su interior se quita
+        assertEquals(listOf(sym), Annotations.eraseStrokes(s, listOf(Pt(0.4f, 0.3f)), 0.01f).strokes)
+        assertEquals(listOf(sym), Annotations.eraseStrokes(s, listOf(Pt(0.3f, 0.3f)), 0.005f).strokes)
+        // el borrador rápido (dos puntos lejanos) cruza una línea fina: se mide como segmento, no por sus puntos
+        val line = InkStroke(Color.BLUE, 0.004f, listOf(Pt(0.1f, 0.8f), Pt(0.9f, 0.8f)), kind = InkStroke.SYMBOL, shape = "line")
+        assertEquals(emptyList<InkStroke>(), Annotations.eraseStrokes(InkSet(1f, listOf(line)), listOf(Pt(0.5f, 0.7f), Pt(0.5f, 0.9f)), 0.002f).strokes)
+        // las formas de 2.32 se leen como símbolos arrastrados
+        val legacy = """{"v":1,"aspect":1,"strokes":[{"c":-1,"w":0.01,"e":false,"p":[0.1,0.1,0.3,0.2],"k":"shape","s":"rect"}]}"""
+        assertEquals(listOf("symbol", "square"), Annotations.read(legacy)!!.strokes.single().let { listOf(it.kind, it.shape) })
         // el símbolo se borra tocándolo
         assertEquals(listOf(circle), Annotations.eraseStrokes(s, listOf(Pt(0.51f, 0.5f)), 0.005f).strokes)
     }
 
     @Test fun drawsSymbolsShapesAndText() {
         val b = Bitmap.createBitmap(400, 400, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GRAY) }
-        val shapes = InkStroke.SHAPES.mapIndexed { i, sh -> InkStroke(Color.BLUE, 0.01f, listOf(Pt(0.05f, 0.05f + i * 0.08f), Pt(0.3f, 0.1f + i * 0.08f)), kind = InkStroke.SHAPE, shape = sh) }
-        val syms = InkStroke.SYMBOLS.mapIndexed { i, sh -> sym.copy(points = listOf(Pt(0.6f, 0.1f + i * 0.12f)), shape = sh, text = if (i % 2 == 0) "x$i" else null) }
+        val shapes = listOf("line", "arrow", "circle", "square", "star").mapIndexed { i, sh -> InkStroke(Color.BLUE, 0.01f, listOf(Pt(0.05f, 0.05f + i * 0.08f), Pt(0.3f, 0.1f + i * 0.08f)), kind = InkStroke.SYMBOL, shape = sh) }
+        val syms = InkStroke.SYMBOLS.take(7).mapIndexed { i, sh -> sym.copy(points = listOf(Pt(0.6f, 0.1f + i * 0.12f)), shape = sh, side = "right", text = if (i % 2 == 0) "x$i" else null) }
         InkRenderer.draw(Canvas(b), shapes + syms, 400f, { p -> PointF(p.x * 400, p.y * 400) })
-        // el triángulo rojo en su sitio; el texto (fondo oscuro) encima del símbolo
-        assertNotEquals(Color.GRAY, b.getPixel(240, ((0.1f + 2 * 0.12f) * 400).toInt() - 8))
+        // el texto va en la misma línea que el marcador, a su lado (sin fondo: blanco sobre gris)
+        val y = (0.1f * 400).toInt()
+        assertTrue((250 until 400).any { x -> b.getPixel(x, y + 2).let { Color.red(it) > 230 && Color.green(it) > 230 && Color.blue(it) > 230 } })
         assertTrue((0 until 400).any { x -> Color.red(b.getPixel(x, 40)) > 200 && Color.green(b.getPixel(x, 40)) < 80 })
     }
 }

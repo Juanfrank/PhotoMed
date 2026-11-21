@@ -3,6 +3,9 @@ package com.photomed.app.ui.compare
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -85,7 +88,8 @@ fun ExportSheet(
     colorMatched: Boolean,
     onDismiss: () -> Unit,
     cropped: Boolean = false,
-    loadPreview: suspend () -> List<Pair<android.graphics.Bitmap, String>> = { emptyList() },
+    /** Fotos ajustadas en tamaño reducido con su etiqueta, con las capas [ViewLayers] dadas (vista previa). */
+    loadPreview: suspend (ViewLayers) -> List<Pair<android.graphics.Bitmap, String>> = { emptyList() },
     onExport: suspend (choice: ExportChoice, toGallery: Boolean, progress: (Int, Int) -> Unit) -> String?,
     onMessage: (String) -> Unit,
 ) {
@@ -153,7 +157,6 @@ fun ExportSheet(
                     style = MaterialTheme.typography.bodyMedium)
                 Slider(transS, { transS = (it * 10).roundToInt() / 10f }, valueRange = 0f..3f,
                     modifier = Modifier.semantics { contentDescription = "Tiempo de transición" })
-                GifPreview(loadPreview, gifMode, timing, Modifier.align(Alignment.CenterHorizontally))
             }
             // capas de la imagen exportada
             Text("Capas en la imagen", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
@@ -169,6 +172,12 @@ fun ExportSheet(
                     Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
                 }
             }
+            // vista previa de la opción elegida, con las capas elegidas
+            val previewImgs by androidx.compose.runtime.produceState<List<Pair<android.graphics.Bitmap, String>>?>(null, view) {
+                value = null
+                value = runCatching { loadPreview(view) }.getOrDefault(emptyList())
+            }
+            ExportPreview(kind, previewImgs, gifMode, timing, Modifier.align(Alignment.CenterHorizontally).padding(vertical = 4.dp))
             Row(Modifier.fillMaxWidth().toggleable(anonymize, role = Role.Switch) { anonymize = it }.padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -197,11 +206,34 @@ fun ExportSheet(
  * tiempos, ver [CompareExport.gifStateAt]), sin codificarlo.
  */
 @Composable
-fun GifPreview(load: suspend () -> List<Pair<android.graphics.Bitmap, String>>, mode: CompareExport.GifMode,
-               timing: CompareExport.GifTiming, modifier: Modifier = Modifier) {
-    val images by androidx.compose.runtime.produceState<List<Pair<android.graphics.Bitmap, String>>?>(null) {
-        value = runCatching { load() }.getOrDefault(emptyList())
+fun ExportPreview(kind: ExportKind, images: List<Pair<android.graphics.Bitmap, String>>?, mode: CompareExport.GifMode,
+                  timing: CompareExport.GifTiming, modifier: Modifier = Modifier) {
+    if (kind == ExportKind.GIF) { GifPreview(images, mode, timing, modifier); return }
+    // fotos sueltas: la primera; cuadrícula y lado a lado: la composición tal como se exporta
+    val bmp = androidx.compose.runtime.remember(images, kind) {
+        val imgs = images ?: return@remember null
+        if (imgs.isEmpty()) return@remember null
+        when (kind) {
+            ExportKind.INDIVIDUAL -> imgs.first().first
+            ExportKind.GRID -> CompareExport.composite(imgs, cellW = 300)
+            else -> CompareExport.composite(imgs, cellW = 300, cols0 = imgs.size)
+        }
     }
+    Box(modifier.heightIn(max = 260.dp).widthIn(max = 320.dp).clip(MaterialTheme.shapes.small)
+        .background(androidx.compose.ui.graphics.Color.Black)
+        .semantics { contentDescription = "Vista previa de la exportación" }, contentAlignment = Alignment.Center) {
+        when {
+            images == null -> CircularProgressIndicator(Modifier.padding(24.dp).size(28.dp))
+            bmp == null -> Text("Sin vista previa", color = androidx.compose.ui.graphics.Color.White, modifier = Modifier.padding(24.dp))
+            else -> androidx.compose.foundation.Image(bmp.asImageBitmap(), null,
+                Modifier.aspectRatio(bmp.width / bmp.height.toFloat()), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+        }
+    }
+}
+
+@Composable
+fun GifPreview(images: List<Pair<android.graphics.Bitmap, String>>?, mode: CompareExport.GifMode,
+               timing: CompareExport.GifTiming, modifier: Modifier = Modifier) {
     var timeMs by remember { mutableStateOf(0L) }
     androidx.compose.runtime.LaunchedEffect(mode, timing) {
         timeMs = 0L

@@ -50,6 +50,12 @@ data class AlignOptions(
     val gaze: Boolean = true,
     val beforeOutline: List<Pt>? = null,
     val afterOutline: List<Pt>? = null,
+    /**
+     * Surcos y arrugas ya analizados de cada foto (encuadre 3:4, sin perspectiva): los del mismo nombre en
+     * las dos se suman como puntos de correspondencia (más precisión en la zona media e inferior).
+     */
+    val beforeLines: List<AnnotLine>? = null,
+    val afterLines: List<AnnotLine>? = null,
 ) {
     companion object {
         const val PREF_POINTS = "align_points"
@@ -85,7 +91,11 @@ class Aligner(private val context: Context) {
             } else Detection.EMPTY to Detection.EMPTY
             ensureActive()
             // Puntos tapados (flequillo, gafas oscuras, mano…) en cualquiera de las dos fotos: fuera
-            val (bD, aD) = if (spec.detector == Detector.FACE && options.points) withoutOccluded(bDet, aDet0, b, a0) else bDet to aDet0
+            val (bD0, aD0) = if (spec.detector == Detector.FACE && options.points) withoutOccluded(bDet, aDet0, b, a0) else bDet to aDet0
+            // surcos analizados en las dos fotos: puntos de correspondencia adicionales
+            val (bD, aD) = foldPairs(options.beforeLines, options.afterLines).let { (fb, fa) ->
+                if (fb.isEmpty()) bD0 to aD0 else bD0.copy(points = bD0.points + fb) to aD0.copy(points = aD0.points + fa)
+            }
             SubjectSegmenter().use { seg ->
                 alignCore(spec, b, a0, bD, aD, manualKeystone, options, { bmp -> autoMask(spec, bmp) },
                     bodyOf = { bmp -> BodyRegion.of(zone, bmp) { seg.segment(it) } })
@@ -174,7 +184,7 @@ class Aligner(private val context: Context) {
         val (phi, src) = manualKeystone?.let { it to "manual" } ?: estimateKeystone(spec, b, a0, bPts, aPts0, options, maskOf)
         val a = ImageOps.correctPerspective(a0, phi, Perspective.DEFAULT_FOCAL)
         val aPts = aPts0.mapValues { Perspective.mapPt(it.value, phi) }
-        val lm = if (options.points) landmarkTransform(spec.landmarks, bPts, aPts) else null
+        val lm = if (options.points) landmarkTransform(spec.landmarks + bPts.keys.filter { it.startsWith(FOLD_KEY) }, bPts, aPts) else null
         val gb = bDet.gaze.takeIf { options.gaze }
         val ga = aDet0.gaze.takeIf { options.gaze }
         val method = when {
@@ -255,4 +265,25 @@ fun faceSkinMask(points: Map<String, Pt>, w: Int, h: Int): BooleanArray? {
         for (i in skin.data.indices) if (d.data[i]) skin.data[i] = false
     }
     return skin.data.takeIf { d -> d.count { it } > 200 }
+}
+
+/** Prefijo de los puntos de surcos usados para alinear. */
+const val FOLD_KEY = "fold:"
+
+/**
+ * Puntos de correspondencia de los surcos con el mismo nombre en las dos fotos: 5 puntos a 10–90 % de
+ * su longitud (los añadidos a mano y los rasgos no cuentan). Mismas coordenadas que las líneas.
+ */
+fun foldPairs(before: List<AnnotLine>?, after: List<AnnotLine>?): Pair<Map<String, Pt>, Map<String, Pt>> {
+    if (before == null || after == null) return emptyMap<String, Pt>() to emptyMap()
+    fun usable(l: AnnotLine) = l.layer == AnnotLayer.FOLDS && !l.estimated && l.points.size >= 3 &&
+        l.metrics?.name?.let { !it.startsWith("Surco añadido") } == true
+    val a = after.filter(::usable).associateBy { it.metrics!!.name }
+    val fb = HashMap<String, Pt>(); val fa = HashMap<String, Pt>()
+    for (lb in before.filter(::usable)) {
+        val la = a[lb.metrics!!.name] ?: continue
+        val pb = FreehandTrace.resample(lb.points, 11); val pa = FreehandTrace.resample(la.points, 11)
+        for (k in 1..9 step 2) { fb["$FOLD_KEY${lb.metrics.name}:$k"] = pb[k]; fa["$FOLD_KEY${lb.metrics.name}:$k"] = pa[k] }
+    }
+    return fb to fa
 }

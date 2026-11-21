@@ -153,11 +153,17 @@ object HairSkin {
         val faceW = oval.maxOf { it.x } - oval.minOf { it.x }
         val top = oval.minOf { it.y }; val bottom = oval.maxOf { it.y }
         val mouthY = p["lip_upper_top_5"]?.y ?: (top + (bottom - top) * 0.7f)
+        // franja de las orejas: de los ojos a la base de la nariz (el borde de la piel ahí puede ser la oreja)
+        val eyeY = listOfNotNull(p[Landmarks.EYE_L], p[Landmarks.EYE_R]).map { it.y }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+            ?: (top + (bottom - top) * 0.4f)
+        val noseY = p["nose_bottom_1"]?.y ?: (top + (bottom - top) * 0.62f)
         fun lab(q: Pt) = labels[(q.x * w).roundToInt(), (q.y * w).roundToInt()]
         val offs = FloatArray(36) { Float.NaN }
         for (i in 0 until 36) {
             val o = oval[i]
-            val upper = o.y < top + (bottom - top) * 0.38f
+            // sienes (por encima de los ojos): borde en horizontal
+            val upper = o.y < minOf(top + (bottom - top) * 0.38f, eyeY)
+            val ear = o.y in eyeY..noseY
             val lateral = kotlin.math.abs(o.x - cx) > 0.25f * faceW
             // frente (centro): la decide la línea de implantación, no el óvalo
             if (upper && !lateral) { offs[i] = 0f; continue }
@@ -172,7 +178,9 @@ object HairSkin {
             var best: Float? = null
             var d = -r
             var prevIn = inside(lab(Pt(o.x + nx * d, o.y + ny * d)))
-            while (d <= r) {
+            // a la altura de las orejas, como mucho un 1,5 % del ancho hacia fuera (no se sigue la oreja)
+            val maxOut = if (ear) EAR_OUT * faceW else r
+            while (d <= minOf(r, maxOut)) {
                 val cin = inside(lab(Pt(o.x + nx * d, o.y + ny * d)))
                 if (prevIn && !cin && (best == null || kotlin.math.abs(d) < kotlin.math.abs(best))) best = d
                 prevIn = cin; d += step
@@ -189,7 +197,7 @@ object HairSkin {
         for (i in 0 until 36) {
             val o = oval[i]
             val n = hypot(o.x - cx, o.y - cy).takeIf { it > 1e-5f } ?: continue
-            val upper = o.y < top + (bottom - top) * 0.38f
+            val upper = o.y < minOf(top + (bottom - top) * 0.38f, eyeY)
             out["oval_$i"] = if (upper) Pt(o.x + kotlin.math.sign(o.x - cx) * sm[i], o.y)
                 else Pt(o.x + (o.x - cx) / n * sm[i], o.y + (o.y - cy) / n * sm[i])
         }
@@ -197,6 +205,8 @@ object HairSkin {
     }
 
     const val MAX_SNAP = 0.08f
+    /** Máximo hacia fuera a la altura de las orejas (fracción del ancho de la cara). */
+    const val EAR_OUT = 0.015f
 
     /**
      * Puntos tapados en una foto: rasgos interiores (ojos, nariz, labios, pupilas, comisuras) que

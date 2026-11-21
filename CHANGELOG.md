@@ -2,6 +2,36 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.33 — 21 de noviembre de 2026
+
+- **Comparar se alinea solo al abrir** (interruptor en los ajustes, activo por defecto); antes solo
+  lo hacía con fotos tomadas «casi alineadas». La alineación espera al análisis de arrugas y usa los
+  surcos con el mismo nombre en las dos fotos (nasogeniano, marioneta, valle lagrimal) como puntos de
+  correspondencia, además de los de la cara; los que no encajan se descartan.
+- **Símbolos** (las formas pasan a ser símbolos): punto, círculo, triángulo, cuadrado, X, cruz,
+  estrella, línea y flecha. Un toque crea un marcador del tamaño elegido; arrastrando ocupa de un
+  extremo al otro (cuadrado → rectángulo, círculo → elipse…). Las formas guardadas en 2.32 se
+  convierten solas.
+- **Texto de los símbolos**: sin fondo (con un contorno fino para leerse), más pequeño y en la misma
+  línea que el símbolo, pegado al borde del lado elegido sin cortarlo; **Auto** elige el lado que no se
+  superpone con otras anotaciones. En las flechas va en el origen; en las líneas, encima o debajo con
+  su mismo ángulo.
+- **Herramientas de anotación en una barra flotante vertical** sobre la foto (un icono por opción):
+  lápiz, símbolo, **seleccionar y mover** (arrastrar un trazo o símbolo), borrar trazo, goma,
+  deshacer, borrar todo (pide confirmación) y terminar. Los ajustes de cada herramienta, abajo.
+- **Borrador por trazo** corregido: mide contra la forma completa (segmentos y contorno, y el
+  interior de los símbolos con área) y toma el recorrido del borrador como segmentos (antes solo sus
+  puntos, y un trazo fino podía quedar sin borrar).
+- **Visor**: el botón de las capas de la vista sale de la barra (que tapaba el de regresar) y pasa a
+  la fila de capas (chip «Vista»); botón de **pantalla completa** semitransparente arriba a la derecha
+  de la foto (oculta las barras de la app y del sistema).
+- **Exportar**: vista previa de cualquier opción (foto, cuadrícula, lado a lado, GIF), con las capas
+  elegidas.
+- **Corregido**: al guardar una anotación o un trazo confirmado, el archivo quedaba vacío un instante
+  y una lectura simultánea los daba por perdidos; ahora se escriben de forma atómica.
+- **Contorno sin orejas**: a la altura de las orejas (de los ojos a la base de la nariz) el borde se
+  limita a un 1,5 % del ancho de la cara hacia fuera; las sienes, solo por encima de los ojos.
+
 ## 2.32 — 21 de noviembre de 2026
 
 - **Anotaciones: símbolos y formas**. *Símbolo*: un toque coloca un punto, círculo, triángulo, cuadrado,

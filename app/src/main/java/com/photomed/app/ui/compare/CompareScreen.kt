@@ -196,6 +196,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     var inksNow by remember { mutableStateOf<Map<String, List<com.photomed.app.align.InkStroke>>>(emptyMap()) }
     // igualar el color de la piel automáticamente tras alinear (por defecto, sí)
     var autoColor by remember { mutableStateOf(prefs.getBoolean("compare_auto_color", true)) }
+    var autoAlign by remember { mutableStateOf(prefs.getBoolean("compare_auto_align", true)) }
     // capas de la vista, línea seleccionada en la tabla y tamaño de la celda (para centrarla)
     val viewLayers = rememberViewLayers()
     var selLine by remember { mutableStateOf<String?>(null) }
@@ -332,13 +333,29 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         val token = ++alignToken
         alignJob = scope.launch {
             prev?.cancelAndJoin()
+            // los surcos analizados de cada foto ayudan a alinear: se espera al análisis (si está en marcha)
+            val allPhotos = derive().photos
+            fun prevOf(p: com.photomed.app.data.Photo) = allPhotos.filter { it.zone == p.zone && it.expression == p.expression && it.takenAt < p.takenAt }
+                .sortedByDescending { it.takenAt }.map { it.uri.toString() }
+            val lines = HashMap<String, List<com.photomed.app.align.AnnotLine>>()
+            if (showLayers && com.photomed.app.align.PhotoAnnotator.enabled) {
+                alignProgress = "Esperando el análisis de arrugas…"
+                kotlinx.coroutines.withTimeoutOrNull(25_000) {
+                    while (true) {
+                        s.forEach { p -> if (p.key !in lines) withContext(Dispatchers.IO) { photoBaseLines(context, p.uri, prevOf(p)) }?.let { lines[p.key] = it } }
+                        if (lines.size == s.size) break
+                        kotlinx.coroutines.delay(400)
+                    }
+                }
+            }
             val out = mutableMapOf<String, AlignmentResult>()
             var failed: Throwable? = null
             for (i in 1 until s.size) {
                 alignProgress = if (s.size > 2) "Alineando ${i}/${s.size - 1}…" else "Alineando…"
                 val r = runCatching {
                     aligner.auto(s[0].zone, s[0].uri, s[i].uri, manualK,
-                        opts.copy(beforeOutline = outlines[s[0].key], afterOutline = outlines[s[i].key]))
+                        opts.copy(beforeOutline = outlines[s[0].key], afterOutline = outlines[s[i].key],
+                            beforeLines = lines[s[0].key], afterLines = lines[s[i].key]))
                 }
                 r.exceptionOrNull()?.let { if (it is kotlinx.coroutines.CancellationException) throw it }
                 r.onSuccess { out[s[i].key] = it }.onFailure { failed = it }
@@ -380,8 +397,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         }
     }
 
-    LaunchedEffect(nearCaptured, seqKeys) {
-        if (nearCaptured && seqKeys.size >= 2 && alignedFor != seqKeys && alignJob?.isActive != true) runAlign()
+    // al entrar (y al cambiar la selección) se alinea solo, si la opción está activa (por defecto, sí)
+    LaunchedEffect(nearCaptured, seqKeys, autoAlign) {
+        if (((autoAlign && com.photomed.app.align.PhotoAnnotator.enabled) || nearCaptured) && seqKeys.size >= 2 && alignedFor != seqKeys && alignJob?.isActive != true) runAlign()
     }
 
     Scaffold(
@@ -836,6 +854,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 Text("Ajustes de comparación", style = MaterialTheme.typography.titleLarge)
                 // Alineación
                 SectionTitle("Alineación automática")
+                SheetSwitch("Alinear al abrir la comparación", autoAlign, "Alinea las fotos en cuanto se abre o cambia la selección.") {
+                    autoAlign = it; prefs.edit().putBoolean("compare_auto_align", it).apply()
+                }
                 SheetSwitch("Usar puntos anatómicos", options.points) { setOption(options.copy(points = it)) }
                 SheetSwitch("Usar contornos", options.contours) { setOption(options.copy(contours = it)) }
                 SheetSwitch("Usar mirada (gaze)", options.gaze) { setOption(options.copy(gaze = it)) }
@@ -954,15 +975,15 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             count = seq.size, aligned = shown.isNotEmpty(), colorMatched = colorAdjusts.isNotEmpty(), cropped = crop != null,
             onDismiss = { exportSheet = false },
             // vista previa del GIF: las fotos ajustadas (alineación, recorte, color) en tamaño reducido
-            loadPreview = {
+            loadPreview = { pv ->
                 val labels = stampLabels(seq.map { it.takenAt })
                 seq.mapIndexed { i, p ->
                     val d = labels[i]
                     CompareExport.render(context, p, shown[p.key], colorAdjusts[p.key], width = 300, crop = effectiveCrop(),
                         annots = exportAnnots[p.key], layers = diagram,
                         orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror), annotAlpha = annotAlpha.value,
-                        view = viewLayers.value, ink = exportInk[p.key].orEmpty()) to
-                        (if (!viewLayers.value.overlay) "" else if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d")
+                        view = pv, ink = exportInk[p.key].orEmpty()) to
+                        (if (!pv.overlay) "" else if (seq.size == 2) (if (i == 0) "Antes · " else "Después · ") + d else "${i + 1} · $d")
                 }
             },
             onExport = { ch, toGallery, progress ->

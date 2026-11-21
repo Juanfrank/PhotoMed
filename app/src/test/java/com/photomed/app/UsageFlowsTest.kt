@@ -394,36 +394,54 @@ class UsageFlowsTest {
         setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
         compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Anotar sobre la foto").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Anotar sobre la foto").performClick()
-        waitText("Lápiz")
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Lápiz").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Color verde").performClick()
         compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center, center + androidx.compose.ui.geometry.Offset(120f, 40f), 300) }
         compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 1 }
         assertEquals(0xFF00E676.toInt(), com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.single().color)
         // borrador por trazo sobre el mismo sitio: lo quita; deshacer lo devuelve
-        compose.onNodeWithText("Borrar trazo").performClick()
+        compose.onNodeWithContentDescription("Borrar trazo").performClick()
         compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center, center + androidx.compose.ui.geometry.Offset(120f, 40f), 300) }
         compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u) == null }
         compose.onNodeWithContentDescription("Deshacer").performClick()
         compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 1 }
-        // símbolo con texto: un toque lo coloca
-        compose.onNodeWithText("Símbolo").performClick()
+        // símbolo con texto: un toque lo coloca como marcador
+        compose.onNodeWithContentDescription("Símbolo").performClick()
         waitText("Estrella")
         compose.onNodeWithText("Estrella").performClick()
-        compose.onNode(androidx.compose.ui.test.hasSetTextAction()).performTextInput("Relleno 1 ml")
+        compose.onNode(androidx.compose.ui.test.hasSetTextAction()).performTextInput("1 ml")
         compose.onNodeWithText("Abajo").performClick()
-        compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { click(center) }
+        compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { click(center + androidx.compose.ui.geometry.Offset(-100f, -100f)) }
         compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 2 }
         val st = com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.last()
-        assertEquals(listOf("symbol", "star", "Relleno 1 ml", "bottom"), listOf(st.kind, st.shape, st.text, st.side))
-        // forma arrastrada: un rectángulo de un extremo a otro
-        compose.onNodeWithText("Formas").performClick()
-        compose.onNodeWithText("Rectángulo").performClick()
-        compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center, center + androidx.compose.ui.geometry.Offset(150f, 100f), 300) }
+        assertEquals(listOf("symbol", "star", "1 ml", "bottom", 1), listOf(st.kind, st.shape, st.text, st.side, st.points.size))
+        // arrastrando, el cuadrado ocupa de un extremo al otro
+        compose.onNodeWithText("Cuadrado").performClick()
+        compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center + androidx.compose.ui.geometry.Offset(0f, 120f), center + androidx.compose.ui.geometry.Offset(150f, 220f), 300) }
         compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 3 }
-        assertEquals("rect", com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.last().shape)
+        assertEquals(2, com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.last().points.size)
+        // seleccionar y arrastrar el marcador
+        val before = com.photomed.app.align.Annotations.of(ctx, u)!!.strokes[1].points.single()
+        compose.onNodeWithContentDescription("Seleccionar y mover").performClick()
+        compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput {
+            swipe(center + androidx.compose.ui.geometry.Offset(-100f, -100f), center + androidx.compose.ui.geometry.Offset(-40f, -100f), 300) }
+        compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)!!.strokes[1].points.single().x > before.x + 0.01f }
+        // la papelera pide confirmación
+        compose.onNodeWithContentDescription("Borrar todas las anotaciones").performClick()
+        waitText("¿Borrar todas las anotaciones?")
+        compose.onNodeWithText("Cancelar").performClick()
+        assertEquals(3, com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.size)
         compose.onAllNodesWithContentDescription("Terminar de anotar")[0].performClick()
-        // capas de la vista: las anotaciones se pueden ocultar
-        compose.onNodeWithContentDescription("Vista", substring = true).performClick()
+        // pantalla completa: sin la barra de arriba
+        compose.onNodeWithContentDescription("Pantalla completa").performClick()
+        compose.waitForIdle()
+        assertTrue(compose.onAllNodesWithContentDescription("Anotar sobre la foto").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithContentDescription("Salir de pantalla completa").performClick()
+        compose.waitForIdle()
+        // capas de la vista (en la fila de capas): las anotaciones se pueden ocultar
+        compose.onNodeWithContentDescription("Capas", substring = true).performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Vista", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Vista", substring = true).performScrollTo().performClick()
         waitText("Anotaciones")
         compose.onNodeWithText("Anotaciones").performClick()
         compose.waitForIdle()

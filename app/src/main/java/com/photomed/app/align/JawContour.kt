@@ -74,8 +74,11 @@ object JawContour {
             //    voto 3 × 3 para no seguir pelos sueltos): la transición dentro → fuera más cercana a la malla.
             //    Bajo el mentón, solo si no baja más de 2,5 % (si no, es el cuello sin barba: se usa la sombra)
             val segD = labels?.let { l -> segEdge(l, o, n, faceW, noseY) }
-            if (segD != null && (!(n.y > 0.6f) || segD <= 0.025f * faceW)) { offs[i] = segD; continue }
-            val dMin = -IN * faceW; val dMax = (if (chin) 0.02f else OUT) * faceW
+            // a la altura de las orejas (por encima de la base de la nariz) el borde de la piel puede ser la
+            // oreja: como mucho un 1,5 % del ancho hacia fuera
+            val earBand = o.y < noseY
+            if (segD != null && (!(n.y > 0.6f) || segD <= 0.025f * faceW) && (!earBand || segD <= HairSkin.EAR_OUT * faceW)) { offs[i] = segD; continue }
+            val dMin = -IN * faceW; val dMax = (if (chin) 0.02f else if (earBand) HairSkin.EAR_OUT else OUT) * faceW
             val h = 2.5f * step * k
             // color de la propia cara junto a este punto (10–14 % hacia dentro: piel o barba)
             val ref = if (lab == null) null else listOf(0.10f, 0.12f, 0.14f).mapNotNull { f -> labAt(Pt(o.x - n.x * f * faceW, o.y - n.y * f * faceW)) }

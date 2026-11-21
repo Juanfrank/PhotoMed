@@ -38,6 +38,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.CompareArrows
@@ -120,6 +122,17 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     // capas de la vista y anotaciones (dibujo de planificación)
     val viewLayers = com.photomed.app.ui.compare.rememberViewLayers()
     var inking by remember { mutableStateOf(false) }
+    // pantalla completa: solo la foto (sin barras de la app ni del sistema)
+    var fullscreen by remember { mutableStateOf(false) }
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.DisposableEffect(fullscreen) {
+        val w = (view.context as? android.app.Activity)?.window
+        val ctl = w?.let { androidx.core.view.WindowCompat.getInsetsController(it, view) }
+        if (fullscreen) { ctl?.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            ctl?.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars()) }
+        else ctl?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        onDispose { ctl?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars()) }
+    }
     var inkStyle by remember { mutableStateOf(InkStyle()) }
     var inkVersion by remember { mutableIntStateOf(0) }
     val inkUndo = remember { androidx.compose.runtime.mutableStateMapOf<String, List<com.photomed.app.align.InkSet>>() }
@@ -160,7 +173,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     }
     if (review != null) androidx.activity.compose.BackHandler(onBack = review.onKeep)
     // Atrás sale primero de los modos de dibujo (anotar, trazar surco)
-    androidx.activity.compose.BackHandler(enabled = inking || tracing) { inking = false; tracing = false }
+    androidx.activity.compose.BackHandler(enabled = inking || tracing || fullscreen) { if (fullscreen) fullscreen = false else { inking = false; tracing = false } }
     /** Comparar: la foto actual y la anterior con la misma expresión (si la hay). */
     /** Cambia los trazos confirmados de [ph] (si no los hay, primero se confirman los mostrados) y los guarda. */
     fun mutateTraces(ph: Photo, change: (com.photomed.app.align.TraceSet) -> com.photomed.app.align.TraceSet) {
@@ -229,11 +242,15 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 val wOrig = kotlin.math.hypot(b.x - a.x, (b.y - a.y) * old.baseAspect)
                 val next = when (st.tool) {
                     InkTool.PEN -> old.copy(strokes = old.strokes + com.photomed.app.align.InkStroke(st.color, wOrig, orig))
-                    InkTool.SYMBOL -> old.copy(strokes = old.strokes + com.photomed.app.align.InkStroke(st.color, wOrig, listOf(orig.last()),
-                        kind = com.photomed.app.align.InkStroke.SYMBOL, shape = st.symbol, text = st.text.trim().ifEmpty { null },
-                        side = sideInOriginal(st.side, e), size = wOrig * 6f))
-                    InkTool.SHAPE -> if (orig.size < 2) old else old.copy(strokes = old.strokes + com.photomed.app.align.InkStroke(st.color, wOrig,
-                        listOf(orig.first(), orig.last()), kind = com.photomed.app.align.InkStroke.SHAPE, shape = st.shape))
+                    InkTool.SYMBOL -> {
+                        // un toque: marcador del tamaño elegido; arrastrando: de un extremo al otro
+                        val dragged = path.maxOf { kotlin.math.hypot(it.x - path[0].x, it.y - path[0].y) } > 0.02f
+                        old.copy(strokes = old.strokes + com.photomed.app.align.InkStroke(st.color, wOrig,
+                            if (dragged) listOf(orig.first(), orig.last()) else listOf(orig.last()),
+                            kind = com.photomed.app.align.InkStroke.SYMBOL, shape = st.symbol, text = st.text.trim().ifEmpty { null },
+                            side = if (st.side == "auto") "auto" else sideInOriginal(st.side, e), size = wOrig * 6f))
+                    }
+                    InkTool.SELECT -> old
                     InkTool.ERASE_PAINT -> if (old.strokes.isEmpty()) old else old.copy(strokes = old.strokes + com.photomed.app.align.InkStroke(0, wOrig, orig, erase = true))
                     InkTool.ERASE_STROKE -> com.photomed.app.align.Annotations.eraseStrokes(old, orig, wOrig / 2)
                 }
@@ -245,13 +262,33 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
         }
     }
 
+    /** Mover el trazo [idx] (seleccionar) [delta] en la foto editada (unidades del ancho). */
+    fun inkMove(ph: Photo, idx: Int, delta: com.photomed.app.align.Pt) {
+        val u = ph.uri.toString()
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching {
+                val e = com.photomed.app.align.PhotoEdits.of(context, u)
+                val old = com.photomed.app.align.Annotations.of(context, u) ?: return@runCatching
+                val view = old.inView(e, com.photomed.app.align.TraceFrame.FULL)
+                if (idx !in view.indices) return@runCatching
+                val moved = view[idx].points.map { com.photomed.app.align.Pt(it.x + delta.x, it.y + delta.y) }
+                val orig = com.photomed.app.align.TraceMap.fromView(e, old.baseAspect, com.photomed.app.align.TraceFrame.FULL, moved)
+                val next = old.copy(strokes = old.strokes.toMutableList().also { it[idx] = it[idx].copy(points = orig) })
+                inkUndo[u] = (inkUndo[u].orEmpty() + old).takeLast(30)
+                com.photomed.app.align.Annotations.save(context, u, next)
+            }.onFailure { com.photomed.app.CrashLog.write("Mover una anotación", it) } }
+            inkVersion++
+        }
+    }
+
     fun compareNames(p: Photo): List<String> =
         listOfNotNull(all.filter { it.takenAt < p.takenAt && it.expression == p.expression }.maxByOrNull { it.takenAt }?.displayName, p.displayName)
 
     Scaffold(
         containerColor = Color.Black,
         topBar = {
-            TopAppBar(
+            // pantalla completa: sin barra (solo la foto y el botón para salir)
+            if (!fullscreen) TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black.copy(alpha = 0.6f)),
                 title = {
                     Column {
@@ -265,7 +302,6 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     if (onCompare != null) IconButton(onClick = { onCompare(compareNames(current)) }) {
                         Icon(Icons.Default.CompareArrows, "Comparar")
                     }
-                    com.photomed.app.ui.compare.ViewLayersButton(viewLayers)
                     IconButton(onClick = { inking = !inking; if (inking) { tracing = false; viewLayers.value = viewLayers.value.copy(notes = true) } }) {
                         Icon(Icons.Default.Draw, if (inking) "Terminar de anotar" else "Anotar sobre la foto")
                     }
@@ -315,12 +351,12 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     ) { padding ->
         androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().padding(padding).background(Color.Black)) {
             // selector de capas (arrugas, rasgos…) encima de la foto
-            if (showLayers) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
+            if (showLayers && !fullscreen) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
                 Modifier.fillMaxWidth().padding(vertical = 4.dp), onMetrics = { metricsSheet = !metricsSheet },
                 onTrace = { traceTarget = null; tracing = !tracing
                     if (tracing) scope.launch { snackbar.showSnackbar("Dibuje sobre el surco: una línea por donde se ve, o rodee el área") } },
-                tracing = tracing)
-            if (showLayers) com.photomed.app.ui.compare.OpacitySlider(annotAlpha.value, { annotAlpha.value = it },
+                tracing = tracing, viewLayers = viewLayers)
+            if (showLayers && !fullscreen) com.photomed.app.ui.compare.OpacitySlider(annotAlpha.value, { annotAlpha.value = it },
                 Modifier.fillMaxWidth().padding(horizontal = 12.dp), light = true)
             // análisis en curso: barra de proceso visible
             val analyzing = showLayers && annotsByUri[current.uri.toString()] == null || traceBusy
@@ -338,6 +374,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     showImage = viewLayers.value.image, showInk = viewLayers.value.notes, inkVersion = inkVersion,
                     ink = if (inking && page == pager.currentPage) inkStyle else null,
                     onInk = { path, aE -> inkPath(ph, path, aE) },
+                    onInkMove = { idx, d -> inkMove(ph, idx, d) },
                     selected = selected, selectedKey = selectedKey, analyze = showLayers, alpha = annotAlpha.value,
                     focusTick = if (page == pager.currentPage) focusTick else 0,
                     // referencia: fotos anteriores de la misma zona (la más reciente primero)
@@ -360,9 +397,31 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                         if (note != null) notesByUri[list[page].uri.toString()] = note else notesByUri.remove(list[page].uri.toString())
                     })
             }
+                // herramientas de anotación: barra flotante vertical, un icono por opción
+                if (inking) InkRail(inkStyle, { inkStyle = it }, canUndo = inkUndo[current.uri.toString()].orEmpty().isNotEmpty(),
+                    onUndo = {
+                        val u = current.uri.toString(); val st = inkUndo[u].orEmpty()
+                        st.lastOrNull()?.let { prev -> inkUndo[u] = st.dropLast(1)
+                            scope.launch { withContext(Dispatchers.IO) { com.photomed.app.align.Annotations.save(context, u, prev) }; inkVersion++ } }
+                    },
+                    onClear = {
+                        val u = current.uri.toString()
+                        scope.launch {
+                            withContext(Dispatchers.IO) { com.photomed.app.align.Annotations.of(context, u)?.let { old ->
+                                inkUndo[u] = inkUndo[u].orEmpty() + old; com.photomed.app.align.Annotations.save(context, u, old.copy(strokes = emptyList())) } }
+                            inkVersion++
+                        }
+                    },
+                        onDone = { inking = false }, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp))
+                // pantalla completa: botón semitransparente arriba a la derecha de la foto
+                IconButton(onClick = { fullscreen = !fullscreen },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.Black.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape)) {
+                    Icon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                        if (fullscreen) "Salir de pantalla completa" else "Pantalla completa", tint = Color.White.copy(alpha = 0.9f))
+                }
             }
             // tabla de medidas: debajo de la foto, sin taparla
-            if (metricsSheet && showLayers) {
+            if (metricsSheet && showLayers && !fullscreen) {
                 val u = current.uri.toString()
                 val lines = annotsByUri[u]
                 // lectura de los trazos confirmados fuera del hilo principal (puede leer el XMP de la foto)
@@ -391,21 +450,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     selected = selected, selectedKey = selectedKey,
                     modifier = Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.45f).dp))
             }
-            if (inking) InkToolbar(inkStyle, { inkStyle = it }, canUndo = inkUndo[current.uri.toString()].orEmpty().isNotEmpty(),
-                onUndo = {
-                    val u = current.uri.toString(); val st = inkUndo[u].orEmpty()
-                    st.lastOrNull()?.let { prev -> inkUndo[u] = st.dropLast(1)
-                        scope.launch { withContext(Dispatchers.IO) { com.photomed.app.align.Annotations.save(context, u, prev) }; inkVersion++ } }
-                },
-                onClear = {
-                    val u = current.uri.toString()
-                    scope.launch {
-                        withContext(Dispatchers.IO) { com.photomed.app.align.Annotations.of(context, u)?.let { old ->
-                            inkUndo[u] = inkUndo[u].orEmpty() + old; com.photomed.app.align.Annotations.save(context, u, old.copy(strokes = emptyList())) } }
-                        inkVersion++
-                    }
-                },
-                onDone = { inking = false }, modifier = Modifier.fillMaxWidth().navigationBarsPadding())
+            if (inking && !fullscreen) InkOptions(inkStyle, { inkStyle = it }, Modifier.fillMaxWidth().navigationBarsPadding())
             if (editing) androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))) {
                 // la edición se lee al pulsar (no la de la última composición) para encadenar giro, espejo…
                 fun now() = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
@@ -543,6 +588,8 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                       /** Anotando con este estilo (null = no): un dedo dibuja. */
                       ink: InkStyle? = null,
                       onInk: (List<com.photomed.app.align.Pt>, Float) -> Unit = { _, _ -> },
+                      /** Seleccionar: mover el trazo (índice) un desplazamiento (foto editada, unidades del ancho). */
+                      onInkMove: (Int, com.photomed.app.align.Pt) -> Unit = { _, _ -> },
                       /** Analizar la foto (panel de capas abierto), aunque no haya capas encendidas: la tabla lo necesita. */
                       analyze: Boolean = layers.isNotEmpty(),
                       /** Opacidad de los trazos y números. */
@@ -685,34 +732,59 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
         // anotar: un dedo dibuja (el trazo se ve mientras se dibuja); la foto no se mueve
         if (ink != null && b != null) {
             val path = remember { androidx.compose.runtime.mutableStateListOf<androidx.compose.ui.geometry.Offset>() }
+            // seleccionar: trazo tocado y desplazamiento (unidades del ancho de la foto)
+            var picked by remember { mutableIntStateOf(-1) }
+            var moveBy by remember { mutableStateOf(com.photomed.app.align.Pt(0f, 0f)) }
+            val inkNow = androidx.compose.runtime.rememberUpdatedState(inkLines)
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()
                 .semantics { contentDescription = "Dibuje sobre la foto" }
                 .pointerInput(b, ink) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
                         down.consume()   // un toque al anotar no selecciona líneas
+                        val sw = size.width.toFloat(); val sh = size.height.toFloat()
+                        fun toPhoto(o: androidx.compose.ui.geometry.Offset) = screenToPhoto(o.x, o.y, sw, sh, b.width, b.height, scale, offset.x, offset.y)
+                        if (ink.tool == InkTool.SELECT) {
+                            val q0 = toPhoto(down.position)
+                            val wImg = minOf(sw, sh * b.width / b.height.toFloat()) * scale
+                            picked = com.photomed.app.align.Annotations.hit(inkNow.value, q0, 18.dp.toPx() / wImg)
+                            if (picked < 0) return@awaitEachGesture
+                            drag(down.id) { ch -> val q = toPhoto(ch.position); moveBy = com.photomed.app.align.Pt(q.x - q0.x, q.y - q0.y); ch.consume() }
+                            if (kotlin.math.hypot(moveBy.x, moveBy.y) > 1e-4f) onInkMove(picked, moveBy)
+                            picked = -1; moveBy = com.photomed.app.align.Pt(0f, 0f)
+                            return@awaitEachGesture
+                        }
                         path.clear(); path += down.position
                         drag(down.id) { ch -> path += ch.position; ch.consume() }
-                        if (path.isNotEmpty()) {
-                            val sw = size.width.toFloat(); val sh = size.height.toFloat()
-                            onInk(path.map { o -> screenToPhoto(o.x, o.y, sw, sh, b.width, b.height, scale, offset.x, offset.y) }, b.height / b.width.toFloat())
-                        }
+                        if (path.isNotEmpty()) onInk(path.map(::toPhoto), b.height / b.width.toFloat())
                         path.clear()
                     }
                 }) {
-                if (path.isNotEmpty() && ink.tool in setOf(InkTool.SYMBOL, InkTool.SHAPE)) {
-                    // vista previa del símbolo o la forma (en píxeles de la pantalla)
-                    val ia = b.width / b.height.toFloat()
-                    val wImg = minOf(size.width, size.height * ia) * scale
-                    val st = if (ink.tool == InkTool.SYMBOL) com.photomed.app.align.InkStroke(ink.color, ink.width, listOf(com.photomed.app.align.Pt(path.last().x, path.last().y)),
+                val ia = b.width / b.height.toFloat()
+                val wImg = minOf(size.width, size.height * ia) * scale
+                // de la foto (unidades del ancho) a la pantalla, con el zoom y el desplazamiento
+                val w0 = minOf(size.width, size.height * ia); val h0 = w0 / ia
+                fun toScreen(p: com.photomed.app.align.Pt) = android.graphics.PointF(
+                    size.width / 2 + ((size.width - w0) / 2 + p.x * w0 - size.width / 2) * scale + offset.x,
+                    size.height / 2 + ((size.height - h0) / 2 + p.y * w0 - size.height / 2) * scale + offset.y)
+                if (ink.tool == InkTool.SELECT && picked in inkLines.indices) {
+                    // el trazo elegido, movido, con un recuadro discontinuo
+                    val st = inkLines[picked]
+                    val mv = { p: com.photomed.app.align.Pt -> toScreen(com.photomed.app.align.Pt(p.x + moveBy.x, p.y + moveBy.y)) }
+                    drawIntoCanvas { c -> com.photomed.app.align.InkRenderer.drawOne(c.nativeCanvas, st, wImg, mv) }
+                    val o = com.photomed.app.align.InkRenderer.outline(st).map(mv)
+                    val r = st.size * wImg / 2
+                    drawRect(Color.White, androidx.compose.ui.geometry.Offset(o.minOf { it.x } - r - 6f, o.minOf { it.y } - r - 6f),
+                        androidx.compose.ui.geometry.Size(o.maxOf { it.x } - o.minOf { it.x } + 2 * r + 12f, o.maxOf { it.y } - o.minOf { it.y } + 2 * r + 12f),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 6f))))
+                } else if (path.isNotEmpty() && ink.tool == InkTool.SYMBOL) {
+                    // vista previa del símbolo: marcador con un toque, de un extremo al otro arrastrando
+                    val dragged = path.maxOf { kotlin.math.hypot(it.x - path[0].x, it.y - path[0].y) } > 0.02f * wImg
+                    val pts = if (dragged) listOf(path.first(), path.last()) else listOf(path.last())
+                    val st = com.photomed.app.align.InkStroke(ink.color, ink.width, pts.map { com.photomed.app.align.Pt(it.x, it.y) },
                         kind = com.photomed.app.align.InkStroke.SYMBOL, shape = ink.symbol, text = ink.text.ifBlank { null }, side = ink.side, size = ink.symbolSize)
-                        else com.photomed.app.align.InkStroke(ink.color, ink.width, listOf(com.photomed.app.align.Pt(path.first().x, path.first().y),
-                            com.photomed.app.align.Pt(path.last().x, path.last().y)), kind = com.photomed.app.align.InkStroke.SHAPE, shape = ink.shape)
-                    drawIntoCanvas { c -> com.photomed.app.align.InkRenderer.drawOne(c.nativeCanvas, st.copy(width = st.width, size = st.size), wImg,
-                        { q -> android.graphics.PointF(q.x, q.y) }, density) }
+                    drawIntoCanvas { c -> com.photomed.app.align.InkRenderer.draw(c.nativeCanvas, listOf(st), wImg, { q -> android.graphics.PointF(q.x, q.y) }, density) }
                 } else if (path.isNotEmpty()) {
-                    val ia = b.width / b.height.toFloat()
-                    val wImg = minOf(size.width, size.height * ia) * scale
                     val sw = (ink.width * wImg).coerceAtLeast(2f)
                     val p = androidx.compose.ui.graphics.Path().apply { moveTo(path[0].x, path[0].y); path.drop(1).forEach { lineTo(it.x, it.y) } }
                     val col = if (ink.tool == InkTool.PEN) Color(ink.color) else Color.White.copy(alpha = 0.45f)

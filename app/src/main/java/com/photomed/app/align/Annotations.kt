@@ -17,18 +17,19 @@ import kotlin.math.roundToInt
  * fracción del ancho de la original; [erase] = borrador tipo pintura (quita lo dibujado debajo).
  */
 data class InkStroke(val color: Int, val width: Float, val points: List<Pt>, val erase: Boolean = false,
-                     /** "free" (mano alzada), "symbol" (una forma en un punto, con texto opcional) o "shape" (forma de un extremo a otro). */
+                     /** "free" (mano alzada) o "symbol" (marcador en un punto o, arrastrado, de un extremo a otro; con texto opcional). */
                      val kind: String = FREE,
-                     /** Símbolo ([SYMBOLS]) o forma ([SHAPES]). */
+                     /** Símbolo ([SYMBOLS]). */
                      val shape: String? = null,
                      /** Texto del símbolo y lado donde va: "top", "bottom", "left", "right". */
                      val text: String? = null, val side: String? = null,
                      /** Tamaño del símbolo (fracción del ancho, como [width]). */
                      val size: Float = 0f) {
     companion object {
-        const val FREE = "free"; const val SYMBOL = "symbol"; const val SHAPE = "shape"
-        val SYMBOLS = listOf("dot", "circle", "triangle", "square", "x", "plus", "star")
-        val SHAPES = listOf("line", "arrow", "circle", "rect", "ellipse")
+        const val FREE = "free"; const val SYMBOL = "symbol"
+        /** Antiguas «formas» (2.32): se leen como símbolos arrastrados. */
+        const val LEGACY_SHAPE = "shape"
+        val SYMBOLS = listOf("dot", "circle", "triangle", "square", "x", "plus", "star", "line", "arrow")
     }
 }
 
@@ -81,8 +82,24 @@ object Annotations {
         val o = JSONObject(json); val a = o.getJSONArray("strokes")
         InkSet(o.getDouble("aspect").toFloat(), (0 until a.length()).map { i ->
             val k = a.getJSONObject(i); val p = k.getJSONArray("p")
-            InkStroke(k.getInt("c"), k.getDouble("w").toFloat(), (0 until p.length() / 2).map { j -> Pt(p.getDouble(2 * j).toFloat(), p.getDouble(2 * j + 1).toFloat()) },
-                k.optBoolean("e"), k.optString("k", InkStroke.FREE), k.optString("s").ifEmpty { null }, k.optString("t").ifEmpty { null },
+            val pts = (0 until p.length() / 2).map { j -> Pt(p.getDouble(2 * j).toFloat(), p.getDouble(2 * j + 1).toFloat()) }
+            val kind = k.optString("k", InkStroke.FREE); val shape = k.optString("s").ifEmpty { null }
+            if (kind == InkStroke.LEGACY_SHAPE) {
+                // formas de 2.32 → símbolos arrastrados (círculo por diámetro → su recuadro; rectángulo → cuadrado; elipse → círculo)
+                val (sym, sp) = when (shape) {
+                    "rect" -> "square" to pts
+                    "ellipse" -> "circle" to pts
+                    "circle" -> "circle" to if (pts.size >= 2) {
+                        val cx = (pts.first().x + pts.last().x) / 2; val cy = (pts.first().y + pts.last().y) / 2
+                        val r = hypot(pts.last().x - pts.first().x, pts.last().y - pts.first().y) / 2
+                        listOf(Pt(cx - r, cy - r), Pt(cx + r, cy + r))
+                    } else pts
+                    else -> (shape ?: "line") to pts
+                }
+                InkStroke(k.getInt("c"), k.getDouble("w").toFloat(), sp, k.optBoolean("e"), InkStroke.SYMBOL, sym)
+            } else
+            InkStroke(k.getInt("c"), k.getDouble("w").toFloat(), pts,
+                k.optBoolean("e"), kind, shape, k.optString("t").ifEmpty { null },
                 k.optString("d").ifEmpty { null }, k.optDouble("z", 0.0).toFloat())
         })
     }.getOrNull()
@@ -91,7 +108,7 @@ object Annotations {
         val f = file(context, uri)
         if (f.exists()) return read(f.readText())
         // otra instalación: del XMP de la foto
-        return PhotoMetadata.attrOf(XmpFile.read(context, Uri.parse(uri)), "Ink")?.let { j -> read(j)?.also { f.writeText(j) } }
+        return PhotoMetadata.attrOf(XmpFile.read(context, Uri.parse(uri)), "Ink")?.let { j -> read(j)?.also { AtomicFile.write(f, j) } }
     }
 
     fun tag(context: Context, uri: String) = file(context, uri).let { if (it.exists()) "${it.lastModified()}-${it.length()}" else "-" }
@@ -104,25 +121,58 @@ object Annotations {
             return XmpFile.update(context, Uri.parse(uri)) { PhotoMetadata.withAttr(it, "Ink", null) }
         }
         val json = write(s)
-        f.writeText(json)
+        AtomicFile.write(f, json)
         return json.length <= XMP_MAX && XmpFile.update(context, Uri.parse(uri)) { PhotoMetadata.withAttr(it, "Ink", json) }
     }
 
-    /** Borrador por trazo: quita los trazos de lápiz que toca [path] (en la original; [radius] en fracción del ancho). */
-    fun eraseStrokes(s: InkSet, path: List<Pt>, radius: Float): InkSet {
-        // distancias en unidades del ancho de la original (y × alto/ancho), a los segmentos del trazo
-        fun iso(p: Pt) = Pt(p.x, p.y * s.baseAspect)
-        fun segDist(q: Pt, a: Pt, b: Pt): Float {
-            val vx = b.x - a.x; val vy = b.y - a.y; val l2 = vx * vx + vy * vy
-            val t = if (l2 < 1e-12f) 0f else (((q.x - a.x) * vx + (q.y - a.y) * vy) / l2).coerceIn(0f, 1f)
-            return hypot(q.x - (a.x + vx * t), q.y - (a.y + vy * t))
+    /**
+     * Borrador por trazo: quita los trazos que toca [path] (en la original; [radius] en fracción del
+     * ancho). Se mide contra la forma completa (segmentos del trazo y del contorno del símbolo, y su
+     * interior si tiene área), y el recorrido del borrador como segmentos (no solo sus puntos).
+     */
+    fun eraseStrokes(s: InkSet, path: List<Pt>, radius: Float): InkSet =
+        s.copy(strokes = s.strokes.filterNot { k -> !k.erase && touches(k, path, radius, s.baseAspect) })
+
+    /** ¿El recorrido [path] toca el trazo [k]? (coordenadas de la original; [aspect]: alto / ancho). */
+    fun touches(k: InkStroke, path: List<Pt>, radius: Float, aspect: Float): Boolean {
+        fun iso(p: Pt) = Pt(p.x, p.y * aspect)
+        val pts = InkRenderer.outline(k).map(::iso); val qs = path.map(::iso)
+        if (pts.isEmpty() || qs.isEmpty()) return false
+        val lim = radius + (if (k.kind == InkStroke.SYMBOL && pts.size == 1) maxOf(k.size, k.width) else k.width) / 2
+        val a = if (pts.size == 1) listOf(pts[0] to pts[0]) else pts.zipWithNext()
+        val b = if (qs.size == 1) listOf(qs[0] to qs[0]) else qs.zipWithNext()
+        if (a.any { (p0, p1) -> b.any { (q0, q1) -> Geo.segSeg(p0, p1, q0, q1) < lim } }) return true
+        // dentro de un símbolo con área (cuadrado, círculo…)
+        return InkRenderer.isArea(k) && pts.size > 2 && qs.any { Geo.inside(it, pts) }
+    }
+
+    /** Índice del trazo que toca el punto [q] (el de encima primero), o -1. Coordenadas de [strokes]. */
+    fun hit(strokes: List<InkStroke>, q: Pt, radius: Float, aspect: Float = 1f): Int =
+        strokes.indices.reversed().firstOrNull { !strokes[it].erase && touches(strokes[it], listOf(q), radius, aspect) } ?: -1
+}
+
+/** Geometría de segmentos para el borrador y la selección. */
+object Geo {
+    fun segPoint(p: Pt, a: Pt, b: Pt): Float {
+        val vx = b.x - a.x; val vy = b.y - a.y; val l2 = vx * vx + vy * vy
+        val t = if (l2 < 1e-12f) 0f else (((p.x - a.x) * vx + (p.y - a.y) * vy) / l2).coerceIn(0f, 1f)
+        return hypot(p.x - (a.x + vx * t), p.y - (a.y + vy * t))
+    }
+
+    /** Distancia mínima entre los segmentos ab y cd (0 si se cruzan). */
+    fun segSeg(a: Pt, b: Pt, c: Pt, d: Pt): Float {
+        fun cross(o: Pt, p: Pt, q: Pt) = (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x)
+        val d1 = cross(c, d, a); val d2 = cross(c, d, b); val d3 = cross(a, b, c); val d4 = cross(a, b, d)
+        if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return 0f
+        return minOf(minOf(segPoint(a, c, d), segPoint(b, c, d)), minOf(segPoint(c, a, b), segPoint(d, a, b)))
+    }
+
+    fun inside(q: Pt, poly: List<Pt>): Boolean {
+        var c = false; var j = poly.size - 1
+        for (i in poly.indices) {
+            if ((poly[i].y > q.y) != (poly[j].y > q.y) && q.x < (poly[j].x - poly[i].x) * (q.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x) c = !c
+            j = i
         }
-        fun touches(k: InkStroke): Boolean {
-            val pts = InkRenderer.outline(k).map(::iso); val qs = path.map(::iso)
-            val lim = radius + (if (k.kind == InkStroke.SYMBOL) maxOf(k.size, k.width) else k.width) / 2
-            return qs.any { q -> if (pts.size == 1) hypot(q.x - pts[0].x, q.y - pts[0].y) < lim
-                else (1 until pts.size).any { segDist(q, pts[it - 1], pts[it]) < lim } }
-        }
-        return s.copy(strokes = s.strokes.filterNot { k -> !k.erase && touches(k) })
+        return c
     }
 }

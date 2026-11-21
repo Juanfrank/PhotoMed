@@ -117,7 +117,9 @@ fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, mod
                /** Si se da, primer chip «Medidas» (tabla de longitud, ancho, profundidad y grado). */
                onMetrics: (() -> Unit)? = null,
                /** Si se da, chip «Trazar surco» (dibujar a mano alzada el surco que falta). */
-               onTrace: (() -> Unit)? = null, tracing: Boolean = false) {
+               onTrace: (() -> Unit)? = null, tracing: Boolean = false,
+               /** Si se da, chip «Vista» con las cuatro capas (imagen, diagrama, anotaciones, overlay). */
+               viewLayers: MutableState<ViewLayers>? = null) {
     Row(modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically) {
         if (onMetrics != null) androidx.compose.material3.AssistChip(onClick = onMetrics, label = { Text("Medidas") },
@@ -126,6 +128,7 @@ fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, mod
             leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.Gesture, null, Modifier.size(18.dp)) })
         LayerMenu("Contorno externo", OUTER_LAYERS, layers, onChange)
         LayerMenu("Contorno interno", INNER_LAYERS, layers, onChange)
+        if (viewLayers != null) ViewLayersButton(viewLayers)
     }
 }
 
