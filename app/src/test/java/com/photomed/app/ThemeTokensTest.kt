@@ -10,7 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Verifica el tema contra los tokens de Juanfrank/MD y los requisitos de contraste WCAG. */
+/** Verifica el tema contra los tokens oficiales de Material Design 3 y los requisitos de contraste WCAG. */
 class ThemeTokensTest {
     private fun contrast(a: Color, b: Color): Double {
         val la = a.luminance() + 0.05

@@ -74,8 +74,10 @@ Autor: **Juan Medina** · juanfrank11@gmail.com · [Licencia comercial de pago](
 - Datos del expediente en almacenamiento privado; fotos en la galería.
 
 ## Diseño (Material Design 3)
-El tema se genera desde los tokens del repositorio [Juanfrank/MD](https://github.com/Juanfrank/MD)
-(`docs/material3/tokens.json`, `@material/web` v0_192): 49 roles de color en claro y oscuro, escala
+El tema se genera desde los tokens oficiales de Material Design 3 publicados por Google en
+[Material Web](https://github.com/material-components/material-web) (`@material/web`, tokens v0_192;
+especificación en [m3.material.io](https://m3.material.io)), con las paletas de color tomadas del
+logo (`tools/md3/brand_palette.py`): 49 roles de color en claro y oscuro (y modo oscuro elegible), escala
 tipográfica, formas, elevación, movimiento, capas de estado y retícula de 4/8 dp.
 
 ```bash

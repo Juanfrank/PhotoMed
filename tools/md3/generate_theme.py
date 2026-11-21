@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Genera app/src/main/java/com/photomed/app/ui/theme/Md3Tokens.kt a partir de tokens.json.
 
-tokens.json proviene del repositorio github.com/Juanfrank/MD (docs/material3/tokens.json,
-tokens oficiales de @material/web). Uso:
+tokens.json son los tokens oficiales de Material Design 3 publicados por Google en Material Web
+(github.com/material-components/material-web, paquete @material/web, tokens v0_192; especificación en
+m3.material.io). Las paletas de color se sustituyen por las del logo (brand_palette.py). Uso:
 
     python3 tools/md3/generate_theme.py [ruta/tokens.json]
 """
@@ -52,7 +53,7 @@ weights = {
 L = []
 w = L.append
 w("// ARCHIVO GENERADO por tools/md3/generate_theme.py — no editar a mano.")
-w(f"// Fuente: Juanfrank/MD docs/material3/tokens.json ({t.get('source', '')}).")
+w(f"// Fuente: tokens oficiales de Material Design 3, Material Web ({t.get('source', '')}).")
 w("// Paletas de color: las del logo (tools/md3/brand_palette.py).")
 w("@file:Suppress(\"unused\", \"MagicNumber\")")
 w("")

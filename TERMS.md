@@ -51,7 +51,7 @@ que usted genera son suyos o de sus pacientes, según corresponda. Los contornos
 derivan de **Open Pain Illustration** (Digital Health Zurich / Universidad de Zúrich), con licencia
 CC BY 4.0 (<https://creativecommons.org/licenses/by/4.0/>), adaptados (recorte, extracción de trazos,
 recoloreado y vistas oblicua y lateral derivadas). El tema visual
-sigue los tokens de Material Design 3 (repositorio Juanfrank/MD, derivados de `@material/web`).
+sigue los tokens oficiales de Material Design 3 (Material Web, `@material/web`, de Google, licencia Apache 2.0).
 Los componentes de terceros (AndroidX, Jetpack Compose, CameraX, Coil, Google ML Kit, MediaPipe) se rigen por
 sus propias licencias y términos.
 

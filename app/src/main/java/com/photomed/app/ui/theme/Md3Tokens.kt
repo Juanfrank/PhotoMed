@@ -1,5 +1,5 @@
 // ARCHIVO GENERADO por tools/md3/generate_theme.py — no editar a mano.
-// Fuente: Juanfrank/MD docs/material3/tokens.json (@material/web tokens v0_192).
+// Fuente: tokens oficiales de Material Design 3, Material Web (@material/web tokens v0_192).
 // Paletas de color: las del logo (tools/md3/brand_palette.py).
 @file:Suppress("unused", "MagicNumber")
 
