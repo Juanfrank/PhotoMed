@@ -137,7 +137,7 @@ class ProtocolTest {
         var started: Protocol? = null
         setContent {
             if (editing) com.photomed.app.ui.protocol.ProtocolEditorScreen(exp.id, null, onBack = {})
-            else com.photomed.app.ui.protocol.ProtocolsSection(exp, androidx.compose.material3.SnackbarHostState(), 0,
+            else com.photomed.app.ui.protocol.ProtocolsSection(exp, androidx.compose.material3.SnackbarHostState(), 0, repo,
                 onStart = { started = it }, onEdit = { _, _ -> })
         }
         compose.onNodeWithText("Nombre del protocolo").performTextInput("Control facial")

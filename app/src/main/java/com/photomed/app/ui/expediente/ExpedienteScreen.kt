@@ -129,6 +129,19 @@ fun ExpedienteScreen(
         }
     }
 
+    // protocolos: importar un protocolo (.json) o un paquete de resultados (.zip)
+    var protocolsVersion by remember { mutableIntStateOf(0) }
+    val protocolPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            importBusy = "Importando…"
+            val (msg, photosIn) = com.photomed.app.ui.protocol.importProtocolFile(context, repo, exp, uri)
+            importBusy = null
+            protocolsVersion++
+            if (photosIn) reload++
+            snackbar.showSnackbar(msg)
+        }
+    }
     LaunchedEffect(reload) {
         val (e, list) = withContext(Dispatchers.IO) {
             val e = repo.getExpediente(expId)
@@ -149,7 +162,9 @@ fun ExpedienteScreen(
         onBack = onBack, onZone = onZone, onCompare = onCompare,
         onEdit = { editing = true }, onDelete = { confirmDelete = true },
         onSequence = onSequence,
-        onProtocol = onProtocol, onEditProtocol = onEditProtocol, photoVersion = reload, onPhotosImported = { reload++ },
+        onProtocol = onProtocol, onEditProtocol = onEditProtocol, photoVersion = reload, onPhotosImported = { reload++ }, repo = repo,
+        onImportProtocol = { protocolPicker.launch(arrayOf("application/json", "application/zip", "application/octet-stream", "*/*")) },
+        protocolsVersion = protocolsVersion,
         onImport = {
             picker.launch(androidx.activity.result.PickVisualMediaRequest(
                 androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -239,6 +254,9 @@ fun ExpedienteContent(
     onEditProtocol: (String, List<String>) -> Unit = { _, _ -> },
     photoVersion: Int = 0,
     onPhotosImported: () -> Unit = {},
+    repo: com.photomed.app.data.PhotoRepository? = null,
+    onImportProtocol: (() -> Unit)? = null,
+    protocolsVersion: Int = 0,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var menu by remember { mutableStateOf(false) }
@@ -330,8 +348,8 @@ fun ExpedienteContent(
                     })
             }
             item(span = { GridItemSpan(maxLineSpan) }, key = "protocolos") {
-                com.photomed.app.ui.protocol.ProtocolsSection(exp, snackbar, photoVersion, onStart = onProtocol, onEdit = onEditProtocol,
-                    onPhotosImported = onPhotosImported)
+                com.photomed.app.ui.protocol.ProtocolsSection(exp, snackbar, photoVersion, repo, onStart = onProtocol, onEdit = onEditProtocol,
+                    onPhotosImported = onPhotosImported, onImportFile = onImportProtocol, listVersion = protocolsVersion)
             }
             // Primero las zonas con fotos; el resto, por categoría en secciones plegables
             // (abiertas si el expediente aún no tiene fotos o si hay zonas suyas seleccionadas)

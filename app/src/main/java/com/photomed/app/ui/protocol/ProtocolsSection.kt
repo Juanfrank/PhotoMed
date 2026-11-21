@@ -50,7 +50,6 @@ import com.photomed.app.data.Expediente
 import com.photomed.app.data.Protocol
 import com.photomed.app.data.ProtocolResults
 import com.photomed.app.data.Protocols
-import com.photomed.app.ui.LocalRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,17 +60,30 @@ import kotlinx.coroutines.withContext
  */
 @Composable
 fun ProtocolsSection(exp: Expediente?, snackbar: SnackbarHostState, photoVersion: Int,
+                     /** Repositorio de fotos (null en las vistas de prueba: sin recuento ni resultados). */
+                     repo: com.photomed.app.data.PhotoRepository?,
                      onStart: (Protocol) -> Unit, onEdit: (String, List<String>) -> Unit,
                      /** Tras importar fotos de resultados (para recargar el expediente). */
-                     onPhotosImported: () -> Unit = {}) {
+                     onPhotosImported: () -> Unit = {},
+                     /** Abrir el selector de archivos (protocolo o resultados); null = sin importar (vistas de prueba). */
+                     onImportFile: (() -> Unit)? = null,
+                     /** Cambia al importar o crear protocolos fuera de la sección (recarga la lista). */
+                     listVersion: Int = 0) {
     val context = LocalContext.current
-    val repo = LocalRepository.current
     val scope = rememberCoroutineScope()
     var version by remember { mutableIntStateOf(0) }
-    val list by produceState(emptyList<Protocol>(), version) { value = withContext(Dispatchers.IO) { Protocols.list(context) } }
+    // al volver del editor (u otra pantalla), la lista se recarga
+    val owner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(owner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) version++ }
+        owner.lifecycle.addObserver(obs)
+        onDispose { owner.lifecycle.removeObserver(obs) }
+    }
+    val list by produceState(emptyList<Protocol>(), version, listVersion) { value = withContext(Dispatchers.IO) { Protocols.list(context) } }
     // fotos tomadas con cada protocolo en este expediente
     val taken by produceState(emptyMap<String, Int>(), list, exp?.id, photoVersion) {
         val e = exp ?: return@produceState
+        val repo = repo ?: return@produceState
         value = withContext(Dispatchers.IO) {
             val counts = HashMap<String, Int>()
             repo.photos(e).forEach { p -> repo.readInfo(p)?.conditions?.get(ProtocolResults.KEY_ID)?.let { counts[it] = (counts[it] ?: 0) + 1 } }
@@ -81,32 +93,9 @@ fun ProtocolsSection(exp: Expediente?, snackbar: SnackbarHostState, photoVersion
     var confirmDelete by remember { mutableStateOf<Protocol?>(null) }
     var busy by remember { mutableStateOf(false) }
 
-    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            busy = true
-            val name = withContext(Dispatchers.IO) { displayName(context, uri) }.orEmpty()
-            val type = context.contentResolver.getType(uri).orEmpty()
-            val zip = name.lowercase().endsWith(".zip") || type.contains("zip")
-            val msg = runCatching {
-                withContext(Dispatchers.IO) {
-                    if (zip) {
-                        val e = exp ?: error("Abra un expediente para importar resultados")
-                        val r = ProtocolResults.importZip(context, repo, e, uri)
-                        "Resultados importados: ${r.photos} fotos" + (r.protocol?.let { " del protocolo «${it.name}»" } ?: "") +
-                            if (r.duplicates > 0) " (${r.duplicates} ya estaban)" else ""
-                    } else "Protocolo «${Protocols.import(context, uri).name}» importado"
-                }
-            }.getOrElse { it.message ?: "No se pudo importar el archivo" }
-            busy = false
-            version++
-            if (zip) onPhotosImported()
-            snackbar.showSnackbar(msg)
-        }
-    }
-
     fun shareResults(p: Protocol, anonymize: Boolean) {
         val e = exp ?: return
+        val repo = repo ?: return
         scope.launch {
             busy = true
             val f = runCatching { withContext(Dispatchers.IO) { ProtocolResults.buildZip(context, repo, e, p, anonymize) } }.getOrNull()
@@ -125,7 +114,7 @@ fun ProtocolsSection(exp: Expediente?, snackbar: SnackbarHostState, photoVersion
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Protocolos de fotos", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f))
-            TextButton(onClick = { importer.launch(arrayOf("application/json", "application/zip", "application/octet-stream", "*/*")) }, enabled = !busy) {
+            if (onImportFile != null) TextButton(onClick = onImportFile, enabled = !busy) {
                 Icon(Icons.Default.FileOpen, null); Spacer(Modifier.width(4.dp)); Text("Importar")
             }
             TextButton(onClick = { onEdit("new", emptyList()) }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text("Nuevo") }
@@ -175,6 +164,25 @@ fun ProtocolsSection(exp: Expediente?, snackbar: SnackbarHostState, photoVersion
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancelar") } })
     }
 }
+
+/**
+ * Importa un archivo elegido: un paquete de resultados (`.zip`, al expediente [exp]) o un protocolo.
+ * Devuelve el mensaje para el usuario y si entraron fotos.
+ */
+suspend fun importProtocolFile(context: android.content.Context, repo: com.photomed.app.data.PhotoRepository, exp: Expediente?, uri: Uri): Pair<String, Boolean> =
+    withContext(Dispatchers.IO) {
+        val name = displayName(context, uri).orEmpty()
+        val type = context.contentResolver.getType(uri).orEmpty()
+        val zip = name.lowercase().endsWith(".zip") || type.contains("zip")
+        runCatching {
+            if (zip) {
+                val e = exp ?: error("Abra un expediente para importar resultados")
+                val r = ProtocolResults.importZip(context, repo, e, uri)
+                ("Resultados importados: ${r.photos} fotos" + (r.protocol?.let { " del protocolo «${it.name}»" } ?: "") +
+                    if (r.duplicates > 0) " (${r.duplicates} ya estaban)" else "") to (r.photos > 0)
+            } else ("Protocolo «${Protocols.import(context, uri).name}» importado") to false
+        }.getOrElse { (it.message ?: "No se pudo importar el archivo") to false }
+    }
 
 private fun displayName(context: android.content.Context, uri: Uri): String? = runCatching {
     context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
