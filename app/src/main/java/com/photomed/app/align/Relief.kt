@@ -197,7 +197,7 @@ object ReliefStore {
     fun delete(context: Context, uri: String) {
         reliefFile(context, uri).delete(); metaFile(context, uri).delete()
         // y las líneas recordadas y las correcciones del usuario de esa foto
-        LineMemory.delete(context, uri); AnnotUserEdits.delete(context, uri)
+        LineMemory.delete(context, uri); AnnotUserEdits.delete(context, uri); ConfirmedTraces.forget(context, uri)
     }
 
     /** Uri del relieve (para cargarlo con la misma edición y recorte que la foto) o null. */

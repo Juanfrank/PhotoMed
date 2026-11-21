@@ -721,6 +721,14 @@ class PhotoAnnotator(private val context: Context) {
         (mask?.let { FaceAnnotations.body(it) } ?: emptyList()) to "Las medidas de arrugas y surcos son solo para zonas del rostro."
     }
 
+    /**
+     * Medidas de un trazo hecho a mano ([pts] en coordenadas de [bmp], unidades de su ancho), con la
+     * misma escala y método que las líneas detectadas. null si no se pueden medir (sin cara).
+     */
+    suspend fun measureTrace(bmp: Bitmap, zone: Zone, extras: MeasureExtras?, pts: List<Pt>): LineMetrics? =
+        analyze(bmp, zone, extras, user = AnnotUserEdit(added = listOf(pts))).first
+            .firstOrNull { it.metrics?.name == "Surco añadido 1" }?.metrics
+
     /** Aviso si hay barba o bigote: los surcos de la zona solo se trazan sobre la piel visible. */
     private fun beardNote(info: Map<String, Float>): String? = info["vello"]?.takeIf { it >= 0.08f }?.let {
         "Barba o bigote en ${(it * 100).roundToInt()} % de la parte inferior de la cara: los surcos de esa zona se trazan y " +

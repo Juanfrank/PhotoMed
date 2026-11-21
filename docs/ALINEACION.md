@@ -622,3 +622,29 @@ ceja; como la altura de la frente se mide desde la ceja, el error pasa a la lín
 La foto se guarda al disparar (para no perderla si se cierra la app) y se abre el visor en modo
 revisión sobre la cámara: Guardar la conserva; Repetir la elimina del álbum y del expediente. El
 estado de la cámara (zona, expresión, zoom, ajustes) se conserva; el análisis en vivo se detiene.
+
+## Trazos confirmados (2.23; `ConfirmedTraces.kt`)
+
+- **Coordenadas**: cada trazo se guarda en la foto original sin editar, con x e y normalizadas (0..1)
+  por su ancho y su alto. `TraceMap` lo lleva a lo que se ve: giro de 90° ((x, y) → (1 − y, x) por
+  paso), espejo (x → 1 − x) y recorte; después, el encuadre del visor (foto completa, unidades del
+  ancho) o el de Comparar (3:4 centrado). Al revés para guardar lo que el usuario dibuja. El zoom y el
+  desplazamiento del visor se deshacen al convertir el toque (`screenToPhoto`); la corrección de
+  perspectiva y la alineación de Comparar se aplican encima, como al resto de la foto.
+- **Contenido**: capa, puntos, cerrado/relleno, medidas (longitud, ancho, profundidad, grado, color,
+  rasgos), origen (detectado, añadido, editado) y la versión anterior de una línea vuelta a trazar;
+  además, las eliminadas (para restaurarlas) y la proporción de la foto original.
+- **Dónde**: JSON compacto en el XMP de la foto (`pm:Traces`, junto a los datos del paciente; se
+  reescriben solo los metadatos) y copia en la app. Si la galería no deja reescribir la foto, queda en
+  la app y se avisa. Sin copia en la app (otra instalación), se recupera del XMP.
+- **Reproducibilidad**: con trazos confirmados no se vuelve a analizar la foto (las cifras no cambian
+  con nuevas versiones del detector). «Regenerar» los borra de la foto y de la app y vuelve a analizar.
+
+## Trazado a mano alzada (2.23; `FreehandTrace`)
+
+- **Línea**: se remuestrea y suaviza; se busca el valle de sombra en un pasillo estrecho a lo largo de
+  ella (±6 % de su longitud, umbral concesivo) y se acepta si cubre al menos la mitad del trazo. Si no,
+  se guarda el trazo del usuario (marcado como tal). Error mediano en la prueba: < 2 px.
+- **Área**: si el trazo vuelve cerca de su inicio y encierra superficie, se busca el surco dentro del
+  rectángulo que la contiene (`RegionTrace`) y se conserva lo que cae dentro.
+- Las medidas se calculan con el mismo análisis que las líneas detectadas (escala del iris o sensor).

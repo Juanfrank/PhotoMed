@@ -37,6 +37,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Check
@@ -185,6 +190,25 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     var metricsSheet by remember { mutableStateOf(false) }
     // eliminar líneas (falsos positivos): vuelve a analizar
     var userVersion by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var regenerate by remember { mutableStateOf(false) }
+    // panel bajo las fotos (alineación, filtros, miniaturas, medidas) desplegado o plegado (se recuerda)
+    var panelOpen by remember { mutableStateOf(prefs.getBoolean("compare_panel_open", true)) }
+    /** Cambia los trazos confirmados de [ps] (los que no los tienen, primero se confirman como se ven) y los guarda. */
+    fun mutateTraces(ps: List<com.photomed.app.data.Photo>, previous: (com.photomed.app.data.Photo) -> List<String>,
+                     change: (com.photomed.app.align.TraceSet) -> com.photomed.app.align.TraceSet) {
+        scope.launch {
+            var failed = 0
+            withContext(Dispatchers.IO) {
+                ps.forEach { p ->
+                    val base = photoBaseLines(context, p.uri, previous(p)) ?: return@forEach
+                    val set = com.photomed.app.align.ConfirmedTraces.ensure(context, p.uri, base, com.photomed.app.align.TraceFrame.C34)
+                    if (!com.photomed.app.align.ConfirmedTraces.save(context, p.uri.toString(), change(set))) failed++
+                }
+            }
+            userVersion++
+            if (failed > 0) snackbar.showSnackbar("Trazos guardados en la app; no se pudieron escribir en $failed foto(s)")
+        }
+    }
     // opacidad de los trazos y números (se recuerda; empieza en 50 %)
     val annotAlpha = rememberAnnotAlpha()
     var viewRot by remember { mutableStateOf(0) }
@@ -553,24 +577,6 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
 
             }
 
-            // tabla de medidas: debajo de las fotos, sin taparlas
-            if (metricsSheet && showLayers && seq != null) {
-                val stamps = stampLabels(seq.map { it.takenAt })
-                MetricsPanel(seq.mapIndexed { i, p -> stamps[i] to annots[p.key].orEmpty() }, layersState.value,
-                    onClose = { metricsSheet = false }, loading = seq.any { annots[it.key] == null },
-                    note = seq.firstNotNullOfOrNull { photoAnnotationNote(context, it.uri, previousOf(it)) },
-                    onShowLayers = { layersState.value = it },
-                    onDelete = { name, col ->
-                        (if (col == null) seq else listOfNotNull(seq.getOrNull(col))).forEach { p ->
-                            com.photomed.app.align.AnnotUserEdits.dismiss(context, p.uri.toString(), name)
-                        }
-                        userVersion++
-                    },
-                    dismissedCount = remember(seqKeys, userVersion) { seq.sumOf { com.photomed.app.align.AnnotUserEdits.of(context, it.uri.toString()).dismissed.size } },
-                    onRestore = { seq.forEach { com.photomed.app.align.AnnotUserEdits.restore(context, it.uri.toString()) }; userVersion++ },
-                    modifier = Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.42f).dp))
-            }
-
             // Línea de tiempo (fundido, o deslizador con más de dos fotos): recorre 1→2→…→N.
             if (seq != null && (mode == Mode.FADE || (mode == Mode.SLIDER && n > 2))) {
                 Column(Modifier.padding(horizontal = Md3Spacing.marginCompact)) {
@@ -590,6 +596,50 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                         }
                     }
                 }
+            }
+
+            // asa para plegar o desplegar todo lo que hay bajo las fotos (menos la línea de tiempo)
+            if (seq != null) Row(
+                Modifier.fillMaxWidth().clickable(onClickLabel = if (panelOpen) "Plegar los controles" else "Desplegar los controles") {
+                    panelOpen = !panelOpen; prefs.edit().putBoolean("compare_panel_open", panelOpen).apply()
+                }.padding(horizontal = Md3Spacing.marginCompact),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(if (panelOpen) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
+                    if (panelOpen) "Plegar los controles" else "Desplegar los controles", Modifier.size(22.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (panelOpen) "Ocultar controles" else "Mostrar controles", style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            androidx.compose.animation.AnimatedVisibility(panelOpen || seq == null) {
+            Column {
+            // tabla de medidas: debajo de las fotos, sin taparlas
+            if (metricsSheet && showLayers && seq != null) {
+                val stamps = stampLabels(seq.map { it.takenAt })
+                MetricsPanel(seq.mapIndexed { i, p -> stamps[i] to annots[p.key].orEmpty() }, layersState.value,
+                    onClose = { metricsSheet = false }, loading = seq.any { annots[it.key] == null },
+                    note = seq.firstNotNullOfOrNull { photoAnnotationNote(context, it.uri, previousOf(it)) },
+                    onShowLayers = { layersState.value = it },
+                    // eliminar (falso positivo): los trazos de esa foto quedan confirmados sin la línea
+                    onDelete = { name, col ->
+                        val ps = if (col == null) seq else listOfNotNull(seq.getOrNull(col))
+                        mutateTraces(ps, { previousOf(it) }) { com.photomed.app.align.ConfirmedTraces.remove(it, name) }
+                    },
+                    dismissedCount = remember(seqKeys, userVersion) { seq.sumOf { p ->
+                        com.photomed.app.align.ConfirmedTraces.of(context, p.uri.toString())?.removed?.size
+                            ?: com.photomed.app.align.AnnotUserEdits.of(context, p.uri.toString()).dismissed.size } },
+                    onRestore = {
+                        seq.forEach { p -> if (com.photomed.app.align.ConfirmedTraces.of(context, p.uri.toString()) == null)
+                            com.photomed.app.align.AnnotUserEdits.restore(context, p.uri.toString()) }
+                        mutateTraces(seq.filter { com.photomed.app.align.ConfirmedTraces.of(context, it.uri.toString()) != null }, { previousOf(it) }) {
+                            com.photomed.app.align.ConfirmedTraces.restore(it) }
+                    },
+                    traces = run {
+                        val allConfirmed = remember(seqKeys, userVersion) { seq.all { com.photomed.app.align.ConfirmedTraces.of(context, it.uri.toString()) != null } }
+                        TraceActions(confirmed = allConfirmed, onConfirm = { mutateTraces(seq, { previousOf(it) }) { it } },
+                            onRegenerate = { regenerate = true })
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.42f).dp))
             }
 
             // Controles bajo las fotos: se ocultan a los 3 s sin tocar (fotos más grandes); un toque los recupera
@@ -618,32 +668,25 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                             Modifier.weight(1f).toggleable(useAligned, role = Role.Switch) { useAligned = it },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(if (n > 2) "Alineadas a la foto 1 · ${alignments.size}/${n - 1}" + (alignProgress?.let { " · $it" } ?: "")
-                                    else "Alineado", style = MaterialTheme.typography.labelLarge)
-                                res?.let { AlignmentDetails(it, if (n > 2) "Foto ${s.indexOf(target) + 1}: " else "") }
-                            }
+                            Text(if (n > 2) "Alineadas a la foto 1 · ${alignments.size}/${n - 1}" + (alignProgress?.let { " · $it" } ?: "")
+                                else "Alineado", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
                             Switch(checked = useAligned, onCheckedChange = null)
                         }
                     }
-                }
-                val gazeIssues = if (validAlign && options.gaze) s.drop(1).mapIndexedNotNull { i, p ->
-                    alignments[p.key]?.gazeHint?.let { h -> if (n > 2) "Foto ${i + 2}: $h" else h }
-                } else emptyList()
-                hairlineInfo?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = Md3Spacing.marginCompact))
-                }
-                (listOfNotNull(conditionsWarning) + gazeIssues).forEach {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.padding(horizontal = Md3Spacing.marginCompact))
-                }
-                if (s.map { it.zone }.distinct().size > 1) {
-                    Text(
-                        "Atención: zonas distintas (${s.map { it.zone.label }.distinct().joinToString(" / ")})",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = Md3Spacing.marginCompact),
-                    )
+                    // detalles de la alineación y avisos: detrás del botón de información (ocupaban mucho)
+                    val gazeIssues = if (validAlign && options.gaze) s.drop(1).mapIndexedNotNull { i, p ->
+                        alignments[p.key]?.gazeHint?.let { h -> if (n > 2) "Foto ${i + 2}: $h" else h }
+                    } else emptyList()
+                    val zoneWarn = if (s.map { it.zone }.distinct().size > 1) "Atención: zonas distintas (${s.map { it.zone.label }.distinct().joinToString(" / ")})" else null
+                    val warnings = listOfNotNull(conditionsWarning, zoneWarn) + gazeIssues
+                    if (res != null || hairlineInfo != null || warnings.isNotEmpty()) AlignmentInfoButton(warnings.isNotEmpty()) {
+                        res?.let { AlignmentDetails(it, if (n > 2) "Foto ${s.indexOf(target) + 1}: " else "") }
+                        hairlineInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        listOfNotNull(conditionsWarning).plus(gazeIssues).forEach {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+                        }
+                        zoneWarn?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                    }
                 }
             }
 
@@ -721,7 +764,21 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             }
             }
             }
+            }
+            }
         }
+    }
+
+    if (regenerate) {
+        androidx.compose.material3.AlertDialog(onDismissRequest = { regenerate = false },
+            title = { Text("¿Regenerar los trazos?") },
+            text = { Text("Se borrarán los trazos confirmados de las fotos comparadas (también de sus metadatos) y se volverán a analizar.") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = {
+                regenerate = false
+                val ps = derive().seq.orEmpty()
+                scope.launch { withContext(Dispatchers.IO) { ps.forEach { com.photomed.app.align.ConfirmedTraces.clear(context, it.uri.toString()) } }; userVersion++ }
+            }) { Text("Regenerar") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { regenerate = false }) { Text("Cancelar") } })
     }
 
     if (settings) {
@@ -946,6 +1003,27 @@ private fun PhotoCell(model: Any, label: String, t: Similarity?, zoom: ZoomState
             scaleX = zoom.scale; scaleY = zoom.scale; translationX = zoom.offset.x; translationY = zoom.offset.y
         })
         Label(label, Modifier.align(Alignment.TopStart))
+    }
+}
+
+/**
+ * Botón de información de la alineación: los detalles (método, escala, giro, coincidencia por rasgo,
+ * frente) y los avisos se muestran en un globo al tocarlo. Con avisos, el icono va en color de aviso.
+ */
+@Composable
+private fun AlignmentInfoButton(warn: Boolean, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(if (warn) Icons.Default.Warning else Icons.Default.Info, "Detalles de la alineación",
+                tint = if (warn) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            Column(Modifier.widthIn(max = 320.dp).padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Alineación", style = MaterialTheme.typography.titleSmall)
+                content()
+            }
+        }
     }
 }
 

@@ -161,6 +161,31 @@ object PhotoMetadata {
 </x:xmpmeta>
 <?xpacket end="w"?>"""
 
+    /**
+     * XMP con los trazos confirmados ([json], ver ConfirmedTraces) en `pm:Traces`; null los quita. Si
+     * no hay XMP, se crea uno mínimo con el espacio `pm:`.
+     */
+    fun withTraces(xmp: String?, json: String?): String {
+        val base = xmp?.takeIf { it.contains("rdf:Description") } ?: """<?xpacket begin="${'\uFEFF'}" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:pm="$NS"/>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>"""
+        var out = base.replace(Regex("""\s*pm:Traces="[^"]*""""), "")
+        if (json != null) {
+            val attr = "\n    pm:Traces=\"${esc(json)}\""
+            out = if (out.contains("xmlns:pm=")) Regex("""xmlns:pm="[^"]*"""").replace(out) { it.value + attr }
+            else out.replaceFirst("rdf:about=\"\"", "rdf:about=\"\"\n    xmlns:pm=\"$NS\"$attr")
+        }
+        return out
+    }
+
+    /** Trazos confirmados (JSON) del XMP, o null. */
+    fun tracesOf(xmp: String?): String? = xmp?.let { Regex("""pm:Traces="([^"]*)"""").find(it)?.groupValues?.get(1)?.let(::unesc) }
+
     fun parseXmp(xmp: String): PhotoInfo? {
         fun attr(name: String): String? = Regex("""pm:$name="([^"]*)"""").find(xmp)?.groupValues?.get(1)?.let(::unesc)
         val zone = attr("Zone") ?: return null

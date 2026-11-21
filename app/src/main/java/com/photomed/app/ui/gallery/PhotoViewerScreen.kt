@@ -110,6 +110,12 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     // correcciones del usuario: versión (vuelve a analizar) y modo «trazar surco»
     var userVersion by remember { mutableIntStateOf(0) }
     var tracing by remember { mutableStateOf(false) }
+    // trazado a mano: null = añadir un surco nuevo; nombre = volver a trazar esa línea
+    var traceTarget by remember { mutableStateOf<String?>(null) }
+    var traceBusy by remember { mutableStateOf(false) }
+    var confirmRegen by remember { mutableStateOf(false) }
+    // si el último guardado pudo escribirse en el XMP de la foto
+    val savedInPhoto = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
     // opacidad de los trazos y números (se recuerda; empieza en 50 %)
     val annotAlpha = com.photomed.app.ui.compare.rememberAnnotAlpha()
     // líneas analizadas de cada foto (para la tabla) y motivo si no hay medidas
@@ -132,6 +138,59 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     }
     if (review != null) androidx.activity.compose.BackHandler(onBack = review.onKeep)
     /** Comparar: la foto actual y la anterior con la misma expresión (si la hay). */
+    /** Cambia los trazos confirmados de [ph] (si no los hay, primero se confirman los mostrados) y los guarda. */
+    fun mutateTraces(ph: Photo, change: (com.photomed.app.align.TraceSet) -> com.photomed.app.align.TraceSet) {
+        val u = ph.uri.toString()
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                val set = com.photomed.app.align.ConfirmedTraces.ensure(context, ph.uri, annotsByUri[u].orEmpty(), com.photomed.app.align.TraceFrame.FULL)
+                com.photomed.app.align.ConfirmedTraces.save(context, u, change(set))
+            }
+            savedInPhoto[u] = ok
+            userVersion++
+        }
+    }
+
+    /** Trazo a mano alzada ([path] en la foto con su edición, unidades del ancho): surco nuevo o [target] de nuevo. */
+    fun tracePath(ph: Photo, path: List<com.photomed.app.align.Pt>, target: String?) {
+        val u = ph.uri.toString()
+        scope.launch {
+            traceBusy = true
+            try {
+                val e = com.photomed.app.align.PhotoEdits.of(context, u)
+                val out = withContext(Dispatchers.Default) { runCatching {
+                    val bmp = com.photomed.app.align.ImageOps.loadFull(context, ph.uri, 1600, e)
+                    val r = com.photomed.app.align.FreehandTrace.trace(bmp, path) ?: return@runCatching null
+                    val m = if (!com.photomed.app.align.PhotoAnnotator.enabled) null else com.photomed.app.align.PhotoAnnotator(context.applicationContext)
+                        .measureTrace(bmp, zone, com.photomed.app.align.PhotoAnnotator.extrasFor(context, ph.uri, 1600, crop34 = false), r.points)
+                    Triple(r, m, bmp.height / bmp.width.toFloat())
+                }.getOrNull() }
+                if (out == null) { snackbar.showSnackbar("No se pudo trazar ahí; dibuje una línea sobre el surco o rodéelo"); return@launch }
+                val (r, m, aE) = out
+                val ok = withContext(Dispatchers.IO) {
+                    val set = com.photomed.app.align.ConfirmedTraces.of(context, u)
+                        ?: com.photomed.app.align.ConfirmedTraces.fromLines(annotsByUri[u].orEmpty(), e, aE, com.photomed.app.align.TraceFrame.FULL)
+                    val orig = com.photomed.app.align.TraceMap.fromView(e, set.baseAspect, com.photomed.app.align.TraceFrame.FULL, r.points)
+                    val note = if (r.snapped) "Trazado a mano (ajustado a la sombra de la piel)" else "Trazado a mano (sin sombra clara: se usa el trazo)"
+                    val next = if (target != null && set.byName(target) != null) com.photomed.app.align.ConfirmedTraces.replace(set, target, orig, m)
+                        else {
+                            val name = com.photomed.app.align.ConfirmedTraces.nextAddedName(set)
+                            com.photomed.app.align.ConfirmedTraces.add(set, com.photomed.app.align.StoredTrace(com.photomed.app.align.AnnotLayer.FOLDS, orig,
+                                closed = false, filled = false, estimated = false,
+                                metrics = (m ?: com.photomed.app.align.LineMetrics("x")).copy(name = name, note = note), origin = "añadido"))
+                        }
+                    com.photomed.app.align.ConfirmedTraces.save(context, u, next)
+                }
+                savedInPhoto[u] = ok
+                if (com.photomed.app.align.AnnotLayer.FOLDS !in layersState.value) layersState.value = layersState.value + com.photomed.app.align.AnnotLayer.FOLDS
+                userVersion++
+                snackbar.showSnackbar((if (target != null) "«$target» trazado de nuevo" else "Surco añadido") +
+                    (if (!r.snapped) " (se usó su trazo: no se halló una sombra clara)" else "") +
+                    (if (!ok) " · guardado en la app (no se pudo escribir en la foto)" else ""))
+            } finally { traceBusy = false }
+        }
+    }
+
     fun compareNames(p: Photo): List<String> =
         listOfNotNull(all.filter { it.takenAt < p.takenAt && it.expression == p.expression }.maxByOrNull { it.takenAt }?.displayName, p.displayName)
 
@@ -200,16 +259,17 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
             // selector de capas (arrugas, rasgos…) encima de la foto
             if (showLayers) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
                 Modifier.fillMaxWidth().padding(vertical = 4.dp), onMetrics = { metricsSheet = !metricsSheet },
-                onTrace = { tracing = !tracing; if (tracing) scope.launch { snackbar.showSnackbar("Arrastre un rectángulo sobre el surco que falta") } },
+                onTrace = { traceTarget = null; tracing = !tracing
+                    if (tracing) scope.launch { snackbar.showSnackbar("Dibuje sobre el surco: una línea por donde se ve, o rodee el área") } },
                 tracing = tracing)
             if (showLayers) com.photomed.app.ui.compare.OpacitySlider(annotAlpha.value, { annotAlpha.value = it },
                 Modifier.fillMaxWidth().padding(horizontal = 12.dp), light = true)
             // análisis en curso: barra de proceso visible
-            val analyzing = showLayers && annotsByUri[current.uri.toString()] == null
+            val analyzing = showLayers && annotsByUri[current.uri.toString()] == null || traceBusy
             if (analyzing) androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f).semantics { contentDescription = "Analizando arrugas y rasgos" })
-                Text("Analizando arrugas y rasgos…", color = Color.White, style = MaterialTheme.typography.labelMedium,
+                Text(if (traceBusy) "Trazando y midiendo el surco…" else "Analizando arrugas y rasgos…", color = Color.White, style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(start = 10.dp))
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -222,22 +282,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     // (solo con la misma expresión: las arrugas dinámicas aparecen con el gesto)
                     previous = all.filter { it.takenAt < ph.takenAt && it.expression == ph.expression }.sortedByDescending { it.takenAt }.map { it.uri.toString() },
                     userVersion = userVersion, tracing = tracing && page == pager.currentPage,
-                    onTraceRect = { rect, aspect ->
-                        tracing = false
-                        scope.launch {
-                            val e = com.photomed.app.align.PhotoEdits.of(context, ph.uri.toString())
-                            val pts = withContext(Dispatchers.Default) { runCatching {
-                                com.photomed.app.align.RegionTrace.trace(com.photomed.app.align.ImageOps.loadFull(context, ph.uri, 1600, e), rect)
-                            }.getOrNull() }
-                            if (pts == null) snackbar.showSnackbar("No se encontró un surco en esa zona; pruebe con un rectángulo más ajustado a él")
-                            else {
-                                com.photomed.app.align.AnnotUserEdits.add(context, ph.uri.toString(), pts, e.hashCode(), aspect)
-                                if (com.photomed.app.align.AnnotLayer.FOLDS !in layersState.value) layersState.value = layersState.value + com.photomed.app.align.AnnotLayer.FOLDS
-                                userVersion++
-                                snackbar.showSnackbar("Surco añadido")
-                            }
-                        }
-                    },
+                    onTracePath = { path -> tracing = false; tracePath(ph, path, traceTarget); traceTarget = null },
                     onSelect = { hit ->
                         selected = hit
                         // toque sin línea medida y ninguna capa de arrugas visible: cómo verlas
@@ -263,19 +308,25 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
             if (metricsSheet && showLayers) {
                 val u = current.uri.toString()
                 val lines = annotsByUri[u]
-                val dismissed = remember(u, userVersion) { com.photomed.app.align.AnnotUserEdits.of(context, u).dismissed.size }
+                val set = remember(u, userVersion) { com.photomed.app.align.ConfirmedTraces.of(context, u) }
+                val dismissed = set?.removed?.size ?: remember(u, userVersion) { com.photomed.app.align.AnnotUserEdits.of(context, u).dismissed.size }
                 com.photomed.app.ui.compare.MetricsPanel(listOf(formatDateTime(current.takenAt) to lines.orEmpty()), layersState.value,
                     onClose = { metricsSheet = false }, loading = lines == null, note = notesByUri[u],
                     onShowLayers = { layersState.value = it },
-                    onDelete = { name, _ ->
-                        // trazo añadido a mano: se quita; detectado: se marca como falso positivo
-                        val added = Regex("Surco añadido (\\d+)").matchEntire(name)?.groupValues?.get(1)?.toIntOrNull()
-                        if (added != null) com.photomed.app.align.AnnotUserEdits.removeAdded(context, u, added - 1)
-                        else com.photomed.app.align.AnnotUserEdits.dismiss(context, u, name)
-                        selected = null; userVersion++
-                    },
+                    // eliminar (falso positivo): los trazos quedan confirmados sin esa línea
+                    onDelete = { name, _ -> selected = null; mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.remove(it, name) } },
                     dismissedCount = dismissed,
-                    onRestore = { com.photomed.app.align.AnnotUserEdits.restore(context, u); userVersion++ },
+                    onRestore = {
+                        if (set != null) mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.restore(it) }
+                        else { com.photomed.app.align.AnnotUserEdits.restore(context, u); userVersion++ }
+                    },
+                    traces = com.photomed.app.ui.compare.TraceActions(confirmed = set != null,
+                        onConfirm = { mutateTraces(current) { it } },
+                        onRegenerate = { confirmRegen = true },
+                        onEdit = { name -> traceTarget = name; tracing = true; metricsSheet = false
+                            scope.launch { snackbar.showSnackbar("Vuelva a dibujar «$name»: una línea por donde se ve, o rodee el área") } },
+                        onRevert = { name -> mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.revert(it, name) } },
+                        edited = set?.editedNames.orEmpty(), savedInPhoto = savedInPhoto[u] != false),
                     modifier = Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.45f).dp))
             }
             if (editing) androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))) {
@@ -311,6 +362,24 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     }
 
     LaunchedEffect(pager.currentPage) { selected = null }
+    if (confirmRegen) {
+        ConfirmDialog(
+            title = "¿Regenerar los trazos?",
+            text = "Se borrarán los trazos confirmados de esta foto (también de sus metadatos), con sus ediciones y " +
+                "surcos añadidos, y se volverá a analizar.",
+            confirmLabel = "Regenerar",
+            icon = Icons.Default.Replay,
+            onDismiss = { confirmRegen = false },
+            onConfirm = {
+                confirmRegen = false
+                val ph = current
+                scope.launch {
+                    withContext(Dispatchers.IO) { com.photomed.app.align.ConfirmedTraces.clear(context, ph.uri.toString()) }
+                    annotsByUri.remove(ph.uri.toString()); selected = null; userVersion++
+                }
+            },
+        )
+    }
     if (confirmDelete) {
         ConfirmDialog(
             title = "¿Eliminar fotografía?",
@@ -379,9 +448,9 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                       previous: List<String> = emptyList(),
                       /** Cambia al eliminar o añadir líneas (vuelve a analizar). */
                       userVersion: Int = 0,
-                      /** Modo «trazar surco»: arrastrar un rectángulo sobre la foto; devuelve la zona (unidades del ancho). */
+                      /** Modo «trazar surco»: dibujar a mano alzada; devuelve el trazo (foto editada, unidades del ancho). */
                       tracing: Boolean = false,
-                      onTraceRect: (FloatArray, Float) -> Unit = { _, _ -> },
+                      onTracePath: (List<com.photomed.app.align.Pt>) -> Unit = {},
                       onAnalyzed: (List<com.photomed.app.align.AnnotLine>, String?) -> Unit = { _, _ -> }) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val edit = remember(photo.uri, version) { com.photomed.app.align.PhotoEdits.of(context, photo.uri.toString()) }
@@ -391,6 +460,12 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
     val annots by androidx.compose.runtime.produceState<List<com.photomed.app.align.AnnotLine>?>(null, photo.uri, edit, analyze, userVersion) {
         if (!analyze) return@produceState
         val u = photo.uri.toString()
+        // trazos confirmados (guardados en la foto): se muestran tal cual, sin volver a analizar
+        val confirmed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.ConfirmedTraces.of(context, u) }
+        if (confirmed != null) {
+            value = confirmed.lines(edit, com.photomed.app.align.TraceFrame.FULL)
+            onAnalyzed(value.orEmpty(), null); return@produceState
+        }
         val user = com.photomed.app.align.AnnotUserEdits.of(context, u).let { e -> if (e.editHash != edit.hashCode()) e.copy(added = emptyList()) else e }
         val key = "full|$u|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, u)}|" +
             "${com.photomed.app.align.AnnotUserEdits.tag(context, u)}|${com.photomed.app.align.LineMemory.tag(context, previous)}"
@@ -465,37 +540,31 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                 drawAnnotations(a, layers, k, numbers = com.photomed.app.align.MeasureNumbering.of(listOf(a)), alpha = alpha) { p -> map(p) }
             }
         }
-        // trazar un surco: rectángulo arrastrado sobre la foto (sin zoom)
+        // trazar un surco a mano alzada: el trazo se ve mientras se dibuja (con o sin zoom)
         if (tracing && b != null) {
-            var start by remember { mutableStateOf<androidx.compose.ui.geometry.Offset?>(null) }
-            var end by remember { mutableStateOf<androidx.compose.ui.geometry.Offset?>(null) }
+            val path = remember { androidx.compose.runtime.mutableStateListOf<androidx.compose.ui.geometry.Offset>() }
             androidx.compose.foundation.Canvas(Modifier.fillMaxSize()
-                .semantics { contentDescription = "Zona donde buscar el surco" }
+                .semantics { contentDescription = "Dibuje el surco sobre la foto" }
                 .pointerInput(b) {
-                    // rectángulo desde el primer toque hasta donde se suelta
                     awaitEachGesture {
                         val down = awaitFirstDown()
-                        start = down.position; end = down.position
-                        drag(down.id) { ch -> end = ch.position; ch.consume() }
-                        val s0 = start; val e0 = end
-                        if (s0 != null && e0 != null && (kotlin.math.abs(e0.x - s0.x) > 8f || kotlin.math.abs(e0.y - s0.y) > 8f)) {
-                            // de la pantalla a la foto, deshaciendo el zoom y el desplazamiento (antes se
-                            // ignoraban: con la foto ampliada, el surco se buscaba en otro sitio)
+                        path.clear(); path += down.position
+                        drag(down.id) { ch -> path += ch.position; ch.consume() }
+                        if (path.size >= 2) {
+                            // de la pantalla a la foto, deshaciendo el zoom y el desplazamiento
                             val sw = size.width.toFloat(); val sh = size.height.toFloat()
-                            val a0 = screenToPhoto(s0.x, s0.y, sw, sh, b.width, b.height, scale, offset.x, offset.y)
-                            val a1 = screenToPhoto(e0.x, e0.y, sw, sh, b.width, b.height, scale, offset.x, offset.y)
-                            onTraceRect(floatArrayOf(a0.x, a0.y, a1.x, a1.y), b.height / b.width.toFloat())
+                            onTracePath(path.map { o -> screenToPhoto(o.x, o.y, sw, sh, b.width, b.height, scale, offset.x, offset.y) })
                         }
-                        start = null; end = null
+                        path.clear()
                     }
                 }) {
-                val s0 = start; val e0 = end
-                drawRect(Color.Black.copy(alpha = 0.25f))
-                if (s0 != null && e0 != null) {
-                    val tl = androidx.compose.ui.geometry.Offset(minOf(s0.x, e0.x), minOf(s0.y, e0.y))
-                    val sz = androidx.compose.ui.geometry.Size(kotlin.math.abs(e0.x - s0.x), kotlin.math.abs(e0.y - s0.y))
-                    drawRect(Color(0xFFFFAB40), tl, sz, style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx(),
-                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f, 6f))))
+                drawRect(Color.Black.copy(alpha = 0.2f))
+                if (path.size >= 2) {
+                    val p = androidx.compose.ui.graphics.Path().apply { moveTo(path[0].x, path[0].y); path.drop(1).forEach { lineTo(it.x, it.y) } }
+                    drawPath(p, Color.Black.copy(alpha = 0.6f), style = androidx.compose.ui.graphics.drawscope.Stroke(6.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                    drawPath(p, Color(0xFFFFAB40), style = androidx.compose.ui.graphics.drawscope.Stroke(3.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
                 }
             }
         }

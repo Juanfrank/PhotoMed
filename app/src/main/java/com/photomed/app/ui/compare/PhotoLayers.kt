@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Gesture
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -25,6 +26,8 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -97,31 +100,61 @@ fun rememberAnnotLayers(): MutableState<Set<AnnotLayer>> {
     }
 }
 
-/** Fila de interruptores de las capas (contorno, línea del pelo, ojos, nariz, labios, surcos). */
+/** Capas del contorno externo (silueta de la cara y línea del pelo). */
+val OUTER_LAYERS = listOf(AnnotLayer.CONTOUR, AnnotLayer.HAIRLINE)
+/** Capas del contorno interno: rasgos (ojos y cejas, nariz, labios), arrugas, surcos y ojeras. */
+val INNER_LAYERS = AnnotLayer.entries - OUTER_LAYERS.toSet()
+
+/**
+ * Selector de capas: «Medidas», «Trazar surco» y dos desplegables con casillas, **Contorno externo** y
+ * **Contorno interno**, cada uno con «Seleccionar todos» como primera opción.
+ */
 @Composable
 fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, modifier: Modifier = Modifier,
                /** Si se da, primer chip «Medidas» (tabla de longitud, ancho, profundidad y grado). */
                onMetrics: (() -> Unit)? = null,
-               /** Si se da, chip «Trazar surco» (elegir una zona de la foto para buscar un surco que falta). */
+               /** Si se da, chip «Trazar surco» (dibujar a mano alzada el surco que falta). */
                onTrace: (() -> Unit)? = null, tracing: Boolean = false) {
-    Row(modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically) {
         if (onMetrics != null) androidx.compose.material3.AssistChip(onClick = onMetrics, label = { Text("Medidas") },
             leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.TableChart, null, Modifier.size(18.dp)) })
-        if (onTrace != null) FilterChip(selected = tracing, onClick = onTrace, label = { Text(if (tracing) "Elegir zona…" else "Trazar surco") },
+        if (onTrace != null) FilterChip(selected = tracing, onClick = onTrace, label = { Text(if (tracing) "Dibuje el surco…" else "Trazar surco") },
             leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.Gesture, null, Modifier.size(18.dp)) })
-        // contornos internos (ojos y cejas, nariz, labios) de una vez: se ven solo el contorno y las arrugas
-        val inner = setOf(AnnotLayer.EYES, AnnotLayer.NOSE, AnnotLayer.LIPS)
-        val innerOn = inner.all { it in layers }
-        FilterChip(selected = innerOn, onClick = { onChange(if (innerOn) layers - inner else layers + inner) },
-            label = { Text("Contornos internos") }, colors = FilterChipDefaults.filterChipColors())
-        AnnotLayer.entries.forEach { l ->
-            val on = l in layers
-            FilterChip(
-                selected = on, onClick = { onChange(if (on) layers - l else layers + l) },
-                label = { Text(l.label) },
-                leadingIcon = { Canvas(Modifier.size(10.dp)) { drawCircle(annotColor(l)) } },
-                colors = FilterChipDefaults.filterChipColors(),
-            )
+        LayerMenu("Contorno externo", OUTER_LAYERS, layers, onChange)
+        LayerMenu("Contorno interno", INNER_LAYERS, layers, onChange)
+    }
+}
+
+/** Desplegable con casillas de un grupo de capas; la primera opción marca o desmarca todas. */
+@Composable
+fun LayerMenu(title: String, group: List<AnnotLayer>, layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit) {
+    var open by androidx.compose.runtime.remember { mutableStateOf(false) }
+    val on = group.count { it in layers }
+    Box {
+        FilterChip(selected = on > 0, onClick = { open = true },
+            label = { Text("$title ($on/${group.size})") },
+            trailingIcon = { Icon(androidx.compose.material.icons.Icons.Filled.ArrowDropDown, null, Modifier.size(18.dp)) },
+            modifier = Modifier.semantics { contentDescription = "$title: $on de ${group.size} capas visibles" })
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            val all = on == group.size
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text("Seleccionar todos", fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) },
+                leadingIcon = {
+                    androidx.compose.material3.TriStateCheckbox(
+                        state = when (on) { 0 -> androidx.compose.ui.state.ToggleableState.Off; group.size -> androidx.compose.ui.state.ToggleableState.On
+                            else -> androidx.compose.ui.state.ToggleableState.Indeterminate }, onClick = null)
+                },
+                onClick = { onChange(if (all) layers - group.toSet() else layers + group) })
+            androidx.compose.material3.HorizontalDivider()
+            group.forEach { l ->
+                val checked = l in layers
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text(l.label) },
+                    leadingIcon = { androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = null) },
+                    trailingIcon = { Canvas(Modifier.size(10.dp)) { drawCircle(annotColor(l)) } },
+                    onClick = { onChange(if (checked) layers - l else layers + l) })
+            }
         }
     }
 }
@@ -132,10 +165,23 @@ fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, mod
  */
 /** Motivo (si lo hay) por el que la foto no tiene medidas, tras analizarla. */
 fun photoAnnotationNote(context: Context, uri: Uri, previous: List<String> = emptyList()): String? {
-    val edit = PhotoEdits.of(context, uri.toString()); val u = uri.toString()
-    return PhotoAnnotator.note("34|$uri|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, u)}|" +
-        "${com.photomed.app.align.AnnotUserEdits.tag(context, u)}|${com.photomed.app.align.LineMemory.tag(context, previous)}")
+    if (com.photomed.app.align.ConfirmedTraces.of(context, uri.toString()) != null) return null
+    return PhotoAnnotator.note(key34(context, uri, previous))
 }
+
+private fun key34(context: Context, uri: Uri, previous: List<String>): String {
+    val edit = PhotoEdits.of(context, uri.toString()); val u = uri.toString()
+    return "34|$uri|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, u)}|" +
+        "${com.photomed.app.align.AnnotUserEdits.tag(context, u)}|${com.photomed.app.align.LineMemory.tag(context, previous)}"
+}
+
+/**
+ * Líneas de la foto en su encuadre 3:4 (sin corrección de perspectiva), tal como se analizaron o se
+ * confirmaron; null si aún no se han calculado.
+ */
+fun photoBaseLines(context: Context, uri: Uri, previous: List<String> = emptyList()): List<AnnotLine>? =
+    com.photomed.app.align.ConfirmedTraces.of(context, uri.toString())?.lines(PhotoEdits.of(context, uri.toString()), com.photomed.app.align.TraceFrame.C34)
+        ?: PhotoAnnotator.cached(key34(context, uri, previous))
 
 @Composable
 fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boolean,
@@ -148,11 +194,17 @@ fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boole
     return produceState<List<AnnotLine>?>(null, uri, edit, phiDeg, enabled, userVersion, previous) {
         if (!enabled) { value = null; return@produceState }
         val u = uri.toString()
+        // trazos confirmados (guardados en la foto): se muestran tal cual, sin volver a analizar
+        val confirmed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.ConfirmedTraces.of(context, u) }
+        if (confirmed != null) {
+            val base = confirmed.lines(edit, com.photomed.app.align.TraceFrame.C34)
+            value = base.map { l -> if (phiDeg == 0f) l else l.copy(points = l.points.map { Perspective.mapPt(it, phiDeg) }) }
+            return@produceState
+        }
         val user = com.photomed.app.align.AnnotUserEdits.of(context, u).let { e ->
             // los trazos añadidos están en la foto completa: se llevan al encuadre 3:4 de Comparar
             if (e.editHash != edit.hashCode()) e.copy(added = emptyList()) else e.copy(added = e.addedIn34()) }
-        val key = "34|$uri|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, u)}|" +
-            "${com.photomed.app.align.AnnotUserEdits.tag(context, u)}|${com.photomed.app.align.LineMemory.tag(context, previous)}"
+        val key = key34(context, uri, previous)
         val base = PhotoAnnotator.cached(key) ?: if (!PhotoAnnotator.enabled) emptyList() else runCatching {
             PhotoAnnotator(context.applicationContext).analyze(ImageOps.load34(context, uri, 1080), zone,
                 PhotoAnnotator.extrasFor(context, uri, 1080, crop34 = true),

@@ -17,6 +17,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -175,12 +179,22 @@ fun MetricsSheet(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
     }
 }
 
+/**
+ * Acciones sobre los trazos de una foto (tabla con una sola foto): volver a trazar una línea
+ * ([onEdit]) y revertirlo ([onRevert], solo en [edited]); confirmar los trazos (se guardan en la foto)
+ * o regenerarlos (volver a analizar).
+ */
+class TraceActions(val confirmed: Boolean, val onConfirm: () -> Unit, val onRegenerate: () -> Unit,
+                   val onEdit: ((String) -> Unit)? = null, val onRevert: ((String) -> Unit)? = null,
+                   val edited: Set<String> = emptySet(), val savedInPhoto: Boolean = true)
+
 /** Panel fijo de medidas (debajo de la foto, sin taparla), con su título y botón de cierre. */
 @Composable
 fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>, onClose: () -> Unit, modifier: Modifier = Modifier,
                  loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null,
                  /** Eliminar una línea (falso positivo): nombre y foto (índice de columna; null = en todas). */
-                 onDelete: ((String, Int?) -> Unit)? = null, dismissedCount: Int = 0, onRestore: (() -> Unit)? = null) {
+                 onDelete: ((String, Int?) -> Unit)? = null, dismissedCount: Int = 0, onRestore: (() -> Unit)? = null,
+                 traces: TraceActions? = null) {
     androidx.compose.material3.Surface(modifier, color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 2.dp) {
         Column(Modifier.fillMaxWidth()) {
@@ -190,7 +204,7 @@ fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
             }
             HorizontalDivider()
             Column(Modifier.padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
-                MetricsContent(columns, layers, loading, note, onShowLayers, onDelete, dismissedCount, onRestore)
+                MetricsContent(columns, layers, loading, note, onShowLayers, onDelete, dismissedCount, onRestore, traces)
             }
         }
     }
@@ -200,7 +214,18 @@ fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
 @Composable
 fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>,
                    loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null,
-                   onDelete: ((String, Int?) -> Unit)? = null, dismissedCount: Int = 0, onRestore: (() -> Unit)? = null) {
+                   onDelete: ((String, Int?) -> Unit)? = null, dismissedCount: Int = 0, onRestore: (() -> Unit)? = null,
+                   traces: TraceActions? = null) {
+    // estado de los trazos: confirmados (guardados en la foto, no se vuelven a analizar) o por confirmar
+    if (traces != null && !loading) Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(if (traces.confirmed) Icons.Default.Verified else Icons.Default.Info, null, Modifier.size(18.dp),
+            tint = if (traces.confirmed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if (traces.confirmed) (if (traces.savedInPhoto) "Trazos confirmados: guardados en la foto" else "Trazos confirmados (guardados en la app)")
+            else "Trazos sin confirmar (análisis automático)",
+            style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f).padding(start = 6.dp))
+        if (traces.confirmed) TextButton(onClick = traces.onRegenerate) { Text("Regenerar") }
+        else androidx.compose.material3.FilledTonalButton(onClick = traces.onConfirm) { Text("Confirmar") }
+    }
     // todas las líneas medidas, estén o no visibles sus capas en la foto
     val byName = LinkedHashMap<String, Pair<AnnotLine, MutableList<LineMetrics?>>>()
     columns.forEachIndexed { ci, (_, lines) ->
@@ -284,10 +309,27 @@ fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Ann
                 Column(Modifier.weight(1f).horizontalScroll(scroll)) {
                     specs.forEach { r -> TableRow(r.cells, header = r.header, line = r.line, fixedHeight = ROW_H); if (r.divider) HorizontalDivider() }
                 }
-                if (onDelete != null) Column(Modifier.width(40.dp)) {
+                // acciones fijas a la derecha: volver a trazar, revertir y eliminar
+                val edit = traces?.onEdit?.takeIf { single && !area }
+                val revert = traces?.onRevert?.takeIf { single && !area && traces.edited.isNotEmpty() }
+                val nAct = listOfNotNull(edit, revert, onDelete).size
+                if (nAct > 0) Column(Modifier.width(40.dp * nAct)) {
                     specs.forEach { r ->
-                        androidx.compose.foundation.layout.Box(Modifier.height(ROW_H).width(40.dp), contentAlignment = Alignment.Center) {
-                            r.deleteName?.let { n -> DeleteLineButton(n, if (single) emptyList() else r.deletePhotos) { c -> onDelete(n, if (single) (c ?: 0) else c) } }
+                        Row(Modifier.height(ROW_H).width(40.dp * nAct), verticalAlignment = Alignment.CenterVertically) {
+                            val n = r.deleteName
+                            if (edit != null) androidx.compose.foundation.layout.Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
+                                if (n != null) IconButton(onClick = { edit(n) }, modifier = Modifier.size(36.dp)) {
+                                    Icon(Icons.Default.Edit, "Volver a trazar $n", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                            if (revert != null) androidx.compose.foundation.layout.Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
+                                if (n != null && n in traces.edited) IconButton(onClick = { revert(n) }, modifier = Modifier.size(36.dp)) {
+                                    Icon(Icons.AutoMirrored.Filled.Undo, "Revertir el trazado de $n", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                            if (onDelete != null) androidx.compose.foundation.layout.Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
+                                n?.let { DeleteLineButton(it, if (single) emptyList() else r.deletePhotos) { c -> onDelete(it, if (single) (c ?: 0) else c) } }
+                            }
                         }
                         if (r.divider) HorizontalDivider()
                     }

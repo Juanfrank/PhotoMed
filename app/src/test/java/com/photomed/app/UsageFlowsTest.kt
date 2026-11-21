@@ -23,6 +23,10 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.filterToOne
 import androidx.test.core.app.ApplicationProvider
 import com.photomed.app.align.AlignOptions
 import com.photomed.app.data.Expediente
@@ -273,7 +277,9 @@ class UsageFlowsTest {
         assertTrue(com.photomed.app.align.PhotoEdits.of(ctx, photos[0].uri.toString()).isIdentity)
         // capas: los interruptores aparecen y se recuerdan
         compose.onNodeWithContentDescription("Capas", substring = true).performClick()
-        compose.onNodeWithText("Surcos").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Contorno interno", substring = true).performScrollTo().performClick()
+        waitText("Surcos")
+        compose.onNodeWithText("Surcos").performClick()
         compose.onNodeWithText("Medidas").assertExists()
         compose.waitForIdle()
         assertTrue(ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!.contains("FOLDS"))
@@ -313,7 +319,7 @@ class UsageFlowsTest {
         waitText("Arrugas y surcos")
         // diseño: selector de capas encima de la foto y tabla debajo, sin taparla
         val photoBox = compose.onNodeWithContentDescription("Fotografía", substring = true).fetchSemanticsNode().boundsInRoot
-        val chips = compose.onNodeWithText("Contornos internos").fetchSemanticsNode().boundsInRoot
+        val chips = compose.onNodeWithContentDescription("Contorno interno", substring = true).fetchSemanticsNode().boundsInRoot
         val table = compose.onNodeWithText("Arrugas y surcos").fetchSemanticsNode().boundsInRoot
         assertTrue("chips encima de la foto", chips.bottom <= photoBox.top + 1f)
         assertTrue("tabla debajo de la foto", table.top >= photoBox.bottom - 1f)
@@ -323,25 +329,33 @@ class UsageFlowsTest {
             .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(0.8f) }
         compose.waitForIdle()
         assertEquals(0.8f, ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getFloat("annot_alpha", 0f), 0.01f)
-        // contornos internos (ojos, nariz, labios) de una vez
-        compose.onNodeWithText("Contornos internos").performClick()
+        // contorno interno (rasgos, arrugas, surcos y ojeras): desplegable con casillas y «Seleccionar todos»
+        fun layersNow() = ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!
+        compose.onNodeWithContentDescription("Contorno interno", substring = true).performClick()
+        waitText("Seleccionar todos")
+        compose.onNodeWithText("Seleccionar todos").performClick()
         compose.waitForIdle()
-        val on = ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!
-        assertTrue(on, listOf("EYES", "NOSE", "LIPS").all { it in on })
-        compose.onNodeWithText("Contornos internos").performClick()
+        assertTrue(layersNow(), listOf("EYES", "NOSE", "LIPS", "FOLDS", "FOREHEAD", "GLABELLA", "CROWS_FEET", "DARK_CIRCLES").all { it in layersNow() })
+        assertTrue(layersNow(), "CONTOUR" !in layersNow())
+        compose.onNodeWithText("Seleccionar todos").performClick()
         compose.waitForIdle()
-        val off = ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!
-        assertTrue(off, listOf("EYES", "NOSE", "LIPS").none { it in off } && "FOREHEAD" in off)
+        assertTrue(layersNow(), listOf("EYES", "NOSE", "LIPS", "FOREHEAD").none { it in layersNow() })
+        // una sola capa con su casilla (el menú sigue abierto)
+        compose.onNodeWithText("Frente").performClick()
+        compose.waitForIdle()
+        assertEquals("FOREHEAD", layersNow())
+
         assertTrue(compose.onAllNodesWithText("Frente, línea 1", substring = true).fetchSemanticsNodes().size >= 2) // ficha y tabla
         // eliminar la línea (falso positivo) desde la tabla y restaurarla
         compose.onNodeWithText("Trazar surco").assertExists()
         compose.onNodeWithContentDescription("Eliminar Frente, línea 1 (falso positivo)").performClick()
-        compose.waitForIdle()
-        assertTrue(com.photomed.app.align.AnnotUserEdits.of(ctx, p.uri.toString()).dismissed.contains("Frente, línea 1"))
+        // eliminar confirma los trazos (guardados en la foto) sin esa línea
+        compose.waitUntil(5_000) { com.photomed.app.align.ConfirmedTraces.of(ctx, p.uri.toString())?.removed?.any { it.name == "Frente, línea 1" } == true }
+        assertTrue(com.photomed.app.align.ConfirmedTraces.of(ctx, p.uri.toString())!!.traces.none { it.name == "Frente, línea 1" })
         waitText("Restaurar líneas eliminadas (1)")
         compose.onNodeWithText("Restaurar líneas eliminadas (1)").performScrollTo().performClick()
-        compose.waitForIdle()
-        assertTrue(com.photomed.app.align.AnnotUserEdits.of(ctx, p.uri.toString()).dismissed.isEmpty())
+        compose.waitUntil(5_000) { com.photomed.app.align.ConfirmedTraces.of(ctx, p.uri.toString())?.traces?.any { it.name == "Frente, línea 1" } == true }
+        waitText("Trazos confirmados", substring = true)
     }
 
     /**
@@ -368,6 +382,63 @@ class UsageFlowsTest {
         compose.onNodeWithText("Mostrar en la foto: Surcos").performClick()
         compose.waitForIdle()
         assertTrue(ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!.contains("FOLDS"))
+    }
+
+    /**
+     * Trazos confirmados en el visor: se muestran sin analizar; la línea vuelta a trazar se puede
+     * revertir; «Volver a trazar» abre el dibujo a mano alzada; «Regenerar» los borra de la foto.
+     */
+    @Test
+    fun confirmedTracesEditRevertAndRegenerate() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).edit().putString("annot_layers", "FOREHEAD").commit()
+        val p = photos[0]; val u = p.uri.toString()
+        val line = com.photomed.app.align.StoredTrace(com.photomed.app.align.AnnotLayer.FOREHEAD,
+            listOf(com.photomed.app.align.Pt(0.2f, 0.4f), com.photomed.app.align.Pt(0.6f, 0.42f)), false, false, false,
+            com.photomed.app.align.LineMetrics("Frente, línea 1", lengthMm = 40f, depthMm = 0.3f, grade = 2))
+        var set = com.photomed.app.align.TraceSet(4f / 3f, listOf(line))
+        set = com.photomed.app.align.ConfirmedTraces.replace(set, "Frente, línea 1",
+            listOf(com.photomed.app.align.Pt(0.2f, 0.45f), com.photomed.app.align.Pt(0.6f, 0.47f)), null)
+        com.photomed.app.align.ConfirmedTraces.save(ctx, u, set)
+        setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
+        waitText("Medidas")
+        compose.onNodeWithText("Medidas").performClick()
+        waitText("Trazos confirmados", substring = true)
+        compose.onNodeWithText("Regenerar").assertExists()
+        // revertir la línea vuelta a trazar
+        compose.onNodeWithContentDescription("Revertir el trazado de Frente, línea 1").performClick()
+        compose.waitUntil(5_000) { com.photomed.app.align.ConfirmedTraces.of(ctx, u)!!.editedNames.isEmpty() }
+        assertEquals(0.4f, com.photomed.app.align.ConfirmedTraces.of(ctx, u)!!.byName("Frente, línea 1")!!.points.first().y, 1e-4f)
+        // volver a trazar: se abre el dibujo a mano alzada sobre la foto
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Volver a trazar Frente, línea 1").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Volver a trazar Frente, línea 1").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Dibuje el surco sobre la foto").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Dibuje el surco…").performClick()   // cancelar el dibujo
+        compose.waitForIdle()
+        // regenerar: se borran de la app y de la foto
+        compose.onAllNodesWithText("Medidas").filterToOne(hasClickAction()).performClick()
+        waitText("Regenerar")
+        compose.onNodeWithText("Regenerar").performScrollTo().performClick()
+        waitText("¿Regenerar los trazos?")
+        compose.onAllNodesWithText("Regenerar").filterToOne(hasClickAction() and hasAnyAncestor(isDialog())).performClick()
+        compose.waitUntil(5_000) { com.photomed.app.align.ConfirmedTraces.of(ctx, u) == null }
+        assertTrue(com.photomed.app.data.PhotoMetadata.tracesOf(com.photomed.app.data.XmpFile.read(ctx, p.uri)) == null)
+    }
+
+    /** Comparar: lo que hay bajo las fotos se pliega y se despliega (se recuerda). */
+    @Test
+    fun comparePanelCollapses() {
+        setContent { CompareScreen(exp.id, Zone.LIPS, onBack = {}) }
+        waitText("Ocultar controles")
+        assertTrue(compose.onAllNodes(hasClickLabel()).fetchSemanticsNodes().isNotEmpty())
+        val strip = { compose.onAllNodes(hasContentDescription("Labios", substring = true) and hasClickLabel()).fetchSemanticsNodes().size }
+        assertTrue(strip() > 0)
+        compose.onNodeWithText("Ocultar controles").performClick()
+        waitText("Mostrar controles")
+        compose.waitUntil(3_000) { strip() == 0 }
+        assertFalse(ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("photomed", Context.MODE_PRIVATE).getBoolean("compare_panel_open", true))
+        compose.onNodeWithText("Mostrar controles").performClick()
+        compose.waitUntil(3_000) { strip() > 0 }
     }
 
     /**

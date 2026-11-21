@@ -2,6 +2,25 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.23 — 21 de noviembre de 2026
+
+- **Comparar, más espacio para las fotos**: los detalles de la alineación (método, escala, giro,
+  coincidencia por rasgo, frente) y los avisos pasan a un botón de información (ⓘ, o ⚠ si hay avisos).
+  Todo lo que hay bajo las fotos (alineación, filtros, miniaturas y tabla de medidas) se pliega con
+  «Ocultar controles»; la línea de tiempo queda siempre visible. Se recuerda.
+- **Capas en dos desplegables con casillas**: *Contorno externo* (contorno y línea del pelo) y
+  *Contorno interno* (ojos y cejas, nariz, labios, surcos, frente, ceño, patas de gallo, ojeras), cada
+  uno con «Seleccionar todos» como primera opción. En el visor y en Comparar.
+- **Trazar surco a mano alzada**: en lugar del rectángulo, se dibuja sobre la foto (el trazo se ve):
+  una **línea** por donde se ve el surco (se ajusta a la sombra de la piel; si no la hay, se usa el
+  trazo) o se **rodea un área** (se busca dentro). Funciona con la foto ampliada.
+- **Volver a trazar** una línea desde la tabla de medidas (✎) y **revertirlo** (↶).
+- **Trazos confirmados**: con «Confirmar» (o al eliminar, añadir o volver a trazar) los trazos y sus
+  medidas se guardan en los metadatos XMP de la propia foto (`pm:Traces`) y en la app; desde entonces
+  se muestran tal cual, sin volver a analizar. Solo se recalculan con «Regenerar». Van en coordenadas de
+  la foto original, así que siguen en su sitio al girar, espejar, recortar o ampliar, en el visor y en
+  Comparar.
+
 ## 2.22 — 20 de noviembre de 2026
 
 - **Revisar la foto al capturar**: tras el disparo se abre la foto en el visor (con capas, medidas y
