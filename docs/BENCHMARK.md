@@ -139,7 +139,7 @@ Resultados en la **partición de prueba del artículo** (100 fotos, no usada par
 
 | | 2.42 | **2.43 (equilibrada)** |
 |---|---|---|
-| F1 estricto (píxel a píxel) | 0,234 | **0,281** (+20 %) |
+| F1 estricto (píxel a píxel) | 0,234 | **0,280** (+20 %) |
 | JSI estricto | 0,132 | **0,163** (+23 %) |
 | F1 con tolerancia, 4 regiones originales | 0,48 (P 0,62 / R 0,39) | **0,50** (P 0,60 / R 0,43) |
 | F1 con tolerancia, 6 regiones (con infraorbitaria y perioral) | — | 0,52 (P 0,62 / R 0,46) |
@@ -159,6 +159,10 @@ Por sensibilidad (misma partición):
 | Exhaustiva | 0,55 | 0,48 | 0,51 | 0,275 |
 
 Coste: el análisis de una cara pasa de 342 a 425 ms (3 núcleos de cálculo en la prueba).
+
+Control de falsos positivos en piel joven: en un retrato joven y liso de prueba, la detección libre
+añadía dos «patas de gallo» que eran pestañas y delineado en la cola del ojo; se excluyó esa zona
+(ningún punto a menos de 0,045 del ancho de la cara del canto externo) y el rostro vuelve a 2 líneas.
 
 Lectura: la detección libre y la puntuación mejoran sobre todo el ceño y las patas de gallo, y la capa
 infraorbitaria encuentra lo que los anotadores marcan bajo los ojos (la zona con más arrugas marcadas

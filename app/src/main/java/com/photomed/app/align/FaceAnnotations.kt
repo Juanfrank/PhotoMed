@@ -510,7 +510,9 @@ object FaceAnnotations {
             free.filter { r ->
                 val m = midOf(r); val px = m.x - canthus.x; val py = m.y - canthus.y
                 val along = px * dx + py * dy; val across = kotlin.math.abs(-px * dy + py * dx)
-                along > 0.03f * faceW && hypot(px, py) < 0.2f * faceW && across < 0.15f * faceW
+                // lejos de la cola del ojo (pestañas, delineado): ningún punto a menos de 0,045 de cara del canto
+                along > 0.05f * faceW && hypot(px, py) < 0.2f * faceW && across < 0.15f * faceW &&
+                    r.points.none { hypot(it.x - canthus.x, it.y - canthus.y) < 0.045f * faceW }
             }.filter { acceptedFree(it, "patas", radial(it)) }.forEach { cands += rayCand(it) }
             // rayos separados al menos ~13° entre sí
             nms(cands, 0.022f * faceW, WrinkleTuning.cap(4)).sortedBy { it.v }.forEachIndexed { i, c ->

@@ -76,7 +76,7 @@ class NewFacesAnnotTest {
             val naso = folds.filter { f -> listOf(129, 358).any { i -> kotlin.math.hypot(f.points.first().x - mesh[i].x, f.points.first().y - mesh[i].y) < 0.025f } }
             if (naso.isNotEmpty()) withNaso++
             lines.groupBy { it.layer }.forEach { (l, v) -> counts[l] = (counts[l] ?: 0) + v.size }
-            if (k == "px_1066116") youngFolds = lines.count { it.layer in setOf(AnnotLayer.FOLDS, AnnotLayer.FOREHEAD, AnnotLayer.GLABELLA, AnnotLayer.CROWS_FEET) }
+            if (k == "px_1066116") { youngFolds = lines.count { it.layer in setOf(AnnotLayer.FOLDS, AnnotLayer.FOREHEAD, AnnotLayer.GLABELLA, AnnotLayer.CROWS_FEET) }; println("JOVEN: " + lines.filter { it.layer in setOf(AnnotLayer.FOLDS, AnnotLayer.FOREHEAD, AnnotLayer.GLABELLA, AnnotLayer.CROWS_FEET) }.map { it.layer.name + "/" + it.metrics?.name + "/" + it.metrics?.contrastL }) }
             // diagnóstico de cada pasillo (sin umbrales)
             val faceW = kotlin.math.hypot(mesh[234].x - mesh[454].x, mesh[234].y - mesh[454].y)
             val diag = FaceAnnotations.FOLD_CORRIDORS.joinToString(" ") { (n, idx) ->

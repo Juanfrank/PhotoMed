@@ -12,7 +12,7 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 - **Capas nuevas**: líneas infraorbitarias (bajo el ojo) y periorales (labio superior e inferior).
 - **Sensibilidad de la detección** en Ajustes: conservadora, equilibrada o exhaustiva.
 - **Benchmark repetido** en la partición de prueba del artículo de FFHQ-Wrinkle: F1 estricto 0,234 →
-  0,281 (+20 %), ceño 0,24 → 0,30, patas de gallo 0,40 → 0,45, infraorbitarias 0,61 (ver
+  0,280 (+20 %), ceño 0,24 → 0,30, patas de gallo 0,40 → 0,45, infraorbitarias 0,61 (ver
   `docs/BENCHMARK.md`).
 
 ## 2.42 — 21 de noviembre de 2026
