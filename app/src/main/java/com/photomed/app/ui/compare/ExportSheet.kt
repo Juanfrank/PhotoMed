@@ -244,7 +244,7 @@ fun ExportSheet(
 fun ExportPreview(kind: ExportKind, images: List<Pair<android.graphics.Bitmap, String>>?, mode: CompareExport.GifMode,
                   timing: CompareExport.GifTiming, modifier: Modifier = Modifier,
                   mark: com.photomed.app.export.Watermark.Mark? = null) {
-    if (kind.animated) { GifPreview(images, mode, timing, modifier, mark); return }
+    if (kind.animated) { GifPreview(images, mode, timing, modifier, mark, smooth = kind == ExportKind.MP4); return }
     // fotos sueltas: la primera; cuadrícula y lado a lado: la composición tal como se exporta
     val bmp = androidx.compose.runtime.remember(images, kind, mark?.position) {
         val imgs = images ?: return@remember null
@@ -270,7 +270,9 @@ fun ExportPreview(kind: ExportKind, images: List<Pair<android.graphics.Bitmap, S
 @Composable
 fun GifPreview(images: List<Pair<android.graphics.Bitmap, String>>?, mode: CompareExport.GifMode,
                timing: CompareExport.GifTiming, modifier: Modifier = Modifier,
-               mark: com.photomed.app.export.Watermark.Mark? = null) {
+               mark: com.photomed.app.export.Watermark.Mark? = null,
+               /** Movimiento continuo como el MP4 (si no, los pasos del GIF). */
+               smooth: Boolean = false) {
     var timeMs by remember { mutableStateOf(0L) }
     androidx.compose.runtime.LaunchedEffect(mode, timing) {
         timeMs = 0L
@@ -285,7 +287,8 @@ fun GifPreview(images: List<Pair<android.graphics.Bitmap, String>>?, mode: Compa
             imgs == null -> CircularProgressIndicator(Modifier.size(28.dp))
             imgs.size < 2 -> Text(tr("Sin vista previa"), color = androidx.compose.ui.graphics.Color.White)
             else -> androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                val (i, t) = CompareExport.gifStateAt(timeMs, imgs.size, timing)
+                val (i, t) = if (smooth) CompareExport.smoothStateAt(timeMs.toDouble(), imgs.size, timing)
+                    else CompareExport.gifStateAt(timeMs, imgs.size, timing)
                 val (a, la) = imgs[i]; val (b, lb) = imgs[(i + 1) % imgs.size]
                 drawIntoCanvas { c ->
                     CompareExport.drawGifFrame(c.nativeCanvas, size.width.toInt(), size.height.toInt(), a, b, la, lb, t, mode)

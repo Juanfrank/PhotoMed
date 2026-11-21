@@ -139,25 +139,33 @@ class CompareExtrasTest {
             val holds = s.mapNotNull { full(it) }
             // ida 0..n-1 y vuelta n-2..1: cada extremo una sola vez
             assertEquals((0 until n).toList() + (n - 2 downTo 1).toList(), holds)
-            // continuidad: cada cuadro difiere poco del anterior, incluido el salto del final al principio
+            // continuidad: cada cuadro difiere poco del anterior (con aceleración suave, como mucho
+            // 1,5 veces el paso medio), incluido el salto del final al principio
             val pos = s.map { it.a + it.t }
             for (i in pos.indices) {
                 val d = kotlin.math.abs(pos[(i + 1) % pos.size] - pos[i])
-                assertTrue("salto en $i: $d", d <= 1f / (timing.steps + 1) + 1e-4f)
+                assertTrue("salto en $i: $d", d <= 1.5f / (timing.steps + 1) + 1e-4f)
             }
+            // 25 cuadros por segundo en las transiciones
+            assertTrue(s.filter { it.t != 0f && it.t != 1f }.all { it.ms == 40 })
         }
     }
 
     @Test
-    fun mp4FramesFollowTheSchedule() {
+    fun mp4FramesAreSmooth() {
         val timing = CompareExport.GifTiming(1200, 700)
-        val s = CompareExport.gifSchedule(2, timing)
-        val idx = com.photomed.app.ui.compare.Mp4Encoder.frameIndices(s, 30)
-        assertEquals((s.sumOf { it.ms } * 30 + 500) / 1000, idx.size)
-        // todos los pasos aparecen, en orden; las fotos quietas duran ~1,2 s (36 cuadros)
-        assertEquals(s.indices.toList(), idx.distinct())
-        assertTrue(idx.toList().zipWithNext().all { (a, b) -> b >= a })
-        assertEquals(36.0, idx.count { it == 0 }.toDouble(), 1.0)
+        val states = com.photomed.app.ui.compare.Mp4Encoder.frameStates(2, timing, 30)
+        val total = CompareExport.timeline(2, timing).sumOf { it.ms }
+        assertEquals((total * 30 + 500) / 1000, states.size)
+        // cada cuadro de la transición tiene su propio avance (no se repiten como con los pasos del GIF)
+        val moving = states.filter { it.second != 0f && it.second != 1f }.map { it.second }
+        assertEquals(moving.size, moving.distinct().size)
+        assertTrue(moving.size >= 30)                     // ~0,7 s por sentido a 30 cuadros/s
+        // movimiento continuo y en bucle: sin saltos grandes entre cuadros, ni del último al primero
+        val pos = states.map { it.first + it.second }
+        for (i in pos.indices) assertTrue(kotlin.math.abs(pos[(i + 1) % pos.size] - pos[i]) < 0.12f)
+        // fotos quietas ~1,2 s (36 cuadros) en cada extremo
+        assertEquals(36.0, states.count { it.second == 0f }.toDouble(), 1.0)
         // YUV: blanco y negro en los extremos del rango limitado
         val yuv = com.photomed.app.ui.compare.Mp4Encoder.toI420(IntArray(4) { -1 } + IntArray(4) { 0xFF000000.toInt() }, 4, 2)
         assertEquals(235, yuv[0].toInt() and 0xFF); assertEquals(16, yuv[4].toInt() and 0xFF)

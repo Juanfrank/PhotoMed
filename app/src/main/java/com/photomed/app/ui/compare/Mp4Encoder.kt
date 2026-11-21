@@ -9,36 +9,37 @@ import java.io.File
 
 /**
  * Exportación de la animación como vídeo MP4 (H.264, sin bibliotecas: MediaCodec + MediaMuxer).
- * Mismo guion de ida y vuelta que el GIF ([CompareExport.gifSchedule]): el vídeo dura un ciclo y,
- * repetido por el reproductor, enlaza sin salto. Cuadros constantes a [FPS] (las fotos quietas se
- * repiten; cada cuadro distinto se convierte a YUV una sola vez).
+ * Misma línea de tiempo de ida y vuelta que el GIF ([CompareExport.timeline]): el vídeo dura un ciclo
+ * y, repetido por el reproductor, enlaza sin salto. A [FPS] constantes, cada cuadro con el avance
+ * exacto de su instante (movimiento continuo, sin los pasos del GIF).
  */
 object Mp4Encoder {
     const val FPS = 30
     /** Ancho del vídeo (múltiplo de 16, como piden muchos codificadores). */
     const val WIDTH = 528
 
-    /** Cuadros del vídeo: índice del paso del guion para cada cuadro a [fps] (muestreo en el centro). */
-    fun frameIndices(schedule: List<CompareExport.GifStep>, fps: Int = FPS): IntArray {
-        val total = schedule.sumOf { it.ms }
-        val n = ((total * fps + 500) / 1000).coerceAtLeast(1)
-        val ends = IntArray(schedule.size); var acc = 0
-        schedule.forEachIndexed { i, s -> acc += s.ms; ends[i] = acc }
-        var j = 0
-        return IntArray(n) { k ->
-            val t = ((k + 0.5) * 1000 / fps).toInt()
-            while (j < ends.size - 1 && t >= ends[j]) j++
-            j
-        }
+    /**
+     * Estado (par, avance) de cada cuadro del vídeo a [fps]: muestreo continuo de la línea de tiempo
+     * ([CompareExport.smoothStateAt]), sin los pasos del GIF; el ciclo dura lo mismo que el GIF.
+     */
+    fun frameStates(n: Int, timing: CompareExport.GifTiming, fps: Int = FPS): List<Pair<Int, Float>> {
+        val total = CompareExport.timeline(n, timing).sumOf { it.ms }
+        val count = ((total.toLong() * fps + 500) / 1000).toInt().coerceAtLeast(1)
+        return List(count) { k -> CompareExport.smoothStateAt(k * 1000.0 / fps, n, timing) }
     }
 
     fun encode(images: List<Pair<Bitmap, String>>, mode: CompareExport.GifMode, timing: CompareExport.GifTiming, out: File,
                watermark: com.photomed.app.export.Watermark.Mark? = null) {
         val (w, h) = CompareExport.frameSize(images, WIDTH, 16)
-        val schedule = CompareExport.gifSchedule(images.size, timing)
-        val yuv = ArrayList<ByteArray>()
-        CompareExport.renderFrames(images, mode, timing, w, h, watermark) { px, _ -> yuv += toI420(px, w, h) }
-        val order = frameIndices(schedule)
+        val scaled = images.map { (b, l) -> Bitmap.createScaledBitmap(b, w, h, true) to l }
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val states = frameStates(images.size, timing)
+        // cada estado distinto se pinta y convierte una vez (las fotos quietas se repiten)
+        val cache = HashMap<Pair<Int, Float>, ByteArray>()
+        fun frame(k: Int): ByteArray = cache.getOrPut(states[k]) {
+            CompareExport.paintState(bmp, scaled, states[k].first, states[k].second, mode, watermark)
+            toI420(IntArray(w * h).also { bmp.getPixels(it, 0, w, 0, 0, w, h) }, w, h)
+        }.also { if (states[k].second != 0f && states[k].second != 1f) cache.remove(states[k]) }
 
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, w, h).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
@@ -60,12 +61,12 @@ object Mp4Encoder {
                     val ii = codec.dequeueInputBuffer(10_000)
                     if (ii >= 0) {
                         val pts = next * 1_000_000L / FPS
-                        if (next >= order.size) {
+                        if (next >= states.size) {
                             codec.queueInputBuffer(ii, 0, 0, pts, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                             inputDone = true
                         } else {
                             val image = codec.getInputImage(ii) ?: error("El codificador no da imagen de entrada")
-                            writeI420(yuv[order[next]], w, h, image)
+                            writeI420(frame(next), w, h, image)
                             codec.queueInputBuffer(ii, 0, w * h * 3 / 2, pts, 0)
                             next++
                         }

@@ -181,14 +181,17 @@ object CompareExport {
     }
 
     const val GIF_W = 480
-    /** Duración de cada paso de la transición (≈ 14 cuadros/s). */
-    const val GIF_STEP_MS = 70
+    /**
+     * Duración de cada cuadro de la transición del GIF: 40 ms = 25 cuadros/s (los retardos del GIF van
+     * en centésimas y por debajo de 20 ms varios visores los ralentizan a 100 ms).
+     */
+    const val GIF_STEP_MS = 40
 
     /** Tiempos del GIF: [holdMs] cada foto quieta y [transitionMs] el paso a la siguiente (0 = corte). */
     data class GifTiming(val holdMs: Int = 1200, val transitionMs: Int = 700) {
-        /** Pasos intermedios de la transición. */
-        val steps: Int get() = if (transitionMs <= 0) 0 else (transitionMs / GIF_STEP_MS.toFloat()).roundToInt().coerceIn(2, 30)
-        val stepMs: Int get() = if (steps == 0) 0 else transitionMs / steps
+        /** Cuadros intermedios de la transición en el GIF. */
+        val steps: Int get() = if (transitionMs <= 0) 0 else (transitionMs / GIF_STEP_MS.toFloat()).roundToInt().coerceIn(2, 75)
+        val stepMs: Int get() = if (steps == 0) 0 else GIF_STEP_MS
         /** Duración de un ciclo completo (ida y vuelta) con [n] fotos. */
         fun cycleMs(n: Int) = gifSchedule(n, this).sumOf { it.ms }
     }
@@ -199,32 +202,45 @@ object CompareExport {
      */
     data class GifStep(val a: Int, val t: Float, val ms: Int)
 
+    /** Tramo de la línea de tiempo: par [a] de [from] a [to] (iguales: foto quieta) durante [ms]. */
+    data class Segment(val a: Int, val from: Float, val to: Float, val ms: Int)
+
+    /** Aceleración y frenado suaves (smoothstep): el movimiento no arranca ni para de golpe. */
+    fun ease(u: Float): Float { val x = u.coerceIn(0f, 1f); return x * x * (3f - 2f * x) }
+
     /**
-     * Guion de la animación en ida y vuelta (ping-pong): 1 → 2 → … → n y de vuelta n → … → 2, de modo
-     * que al repetirse en bucle el último cuadro enlaza con el primero sin salto. Cada foto se muestra
-     * quieta y completa [GifTiming.holdMs] (una sola vez por pasada: los extremos no se duplican) y
-     * cada transición tiene [GifTiming.steps] cuadros intermedios estrictamente entre 0 y 1.
+     * Línea de tiempo en ida y vuelta (ping-pong): 1 → 2 → … → n y de vuelta n → … → 2, de modo que al
+     * repetirse en bucle el final enlaza con el principio sin salto. Cada foto se muestra quieta y
+     * completa [GifTiming.holdMs] (una sola vez por pasada: los extremos no se duplican).
+     */
+    fun timeline(n: Int, timing: GifTiming): List<Segment> {
+        if (n < 2) return listOf(Segment(0, 0f, 0f, timing.holdMs.coerceAtLeast(100)))
+        val trans = timing.steps * timing.stepMs
+        val hold = timing.holdMs.coerceAtLeast(if (trans == 0) 100 else 0)
+        fun full(j: Int) = if (j == n - 1) Segment(n - 2, 1f, 1f, hold) else Segment(j, 0f, 0f, hold)
+        val out = ArrayList<Segment>()
+        fun add(s: Segment) { if (s.ms > 0) out += s }
+        for (j in 0 until n - 1) { add(full(j)); add(Segment(j, 0f, 1f, trans)) }          // ida
+        for (j in n - 1 downTo 1) { add(full(j)); add(Segment(j - 1, 1f, 0f, trans)) }     // vuelta
+        return out
+    }
+
+    /**
+     * Guion del GIF: la [timeline] con cada transición en [GifTiming.steps] cuadros de
+     * [GIF_STEP_MS] estrictamente entre 0 y 1, con aceleración y frenado suaves ([ease]).
      */
     fun gifSchedule(n: Int, timing: GifTiming): List<GifStep> {
-        if (n < 2) return listOf(GifStep(0, 0f, timing.holdMs.coerceAtLeast(100)))
-        val hold = timing.holdMs.coerceAtLeast(if (timing.steps == 0) 100 else 0)
-        fun full(j: Int) = if (j == n - 1) GifStep(n - 2, 1f, hold) else GifStep(j, 0f, hold)
         val out = ArrayList<GifStep>()
-        fun add(s: GifStep) { if (s.ms > 0) out += s }
-        for (j in 0 until n - 1) {                                     // ida
-            add(full(j))
-            for (k in 1..timing.steps) add(GifStep(j, k / (timing.steps + 1f), timing.stepMs))
-        }
-        for (j in n - 1 downTo 1) {                                    // vuelta
-            add(full(j))
-            for (k in timing.steps downTo 1) add(GifStep(j - 1, k / (timing.steps + 1f), timing.stepMs))
+        for (sg in timeline(n, timing)) {
+            if (sg.from == sg.to) { out += GifStep(sg.a, sg.from, sg.ms); continue }
+            for (k in 1..timing.steps) out += GifStep(sg.a, sg.from + (sg.to - sg.from) * ease(k / (timing.steps + 1f)), timing.stepMs)
         }
         return out
     }
 
     /**
      * Estado de la animación en el instante [timeMs] (en bucle): par de fotos y avance, según el
-     * mismo guion que el archivo ([gifSchedule]) para que la vista previa sea idéntica.
+     * mismo guion que el GIF ([gifSchedule]) para que la vista previa sea idéntica.
      */
     fun gifStateAt(timeMs: Long, n: Int, timing: GifTiming): Pair<Int, Float> {
         if (n < 2) return 0 to 0f
@@ -233,6 +249,22 @@ object CompareExport {
         var t = (timeMs % total).toInt()
         for (f in s) { if (t < f.ms) return f.a to f.t; t -= f.ms }
         return s.last().a to s.last().t
+    }
+
+    /**
+     * Estado continuo en [timeMs] (vídeo y vista previa del MP4): el avance exacto de ese instante, sin
+     * cuantizar en los pasos del GIF.
+     */
+    fun smoothStateAt(timeMs: Double, n: Int, timing: GifTiming): Pair<Int, Float> {
+        if (n < 2) return 0 to 0f
+        val tl = timeline(n, timing)
+        val total = tl.sumOf { it.ms }.coerceAtLeast(1)
+        var t = ((timeMs % total) + total) % total
+        for (sg in tl) {
+            if (t < sg.ms) return sg.a to (if (sg.from == sg.to) sg.from else sg.from + (sg.to - sg.from) * ease((t / sg.ms).toFloat()))
+            t -= sg.ms
+        }
+        return tl.last().a to tl.last().to
     }
 
     /** Dibuja un cuadro: foto [a] → [b] con avance [t] (fundido o cortinilla) y sus etiquetas. */
@@ -274,6 +306,15 @@ object CompareExport {
         return w to (h0 / align * align).coerceAtLeast(align)
     }
 
+    /** Pinta el estado ([a], [t]) en [bmp] (fotos ya escaladas a su tamaño), con el logo. */
+    fun paintState(bmp: Bitmap, scaled: List<Pair<Bitmap, String>>, a: Int, t: Float, mode: GifMode,
+                   watermark: com.photomed.app.export.Watermark.Mark?) {
+        val w = bmp.width; val h = bmp.height
+        val (ba, la) = scaled[a]; val (bb, lb) = scaled[(a + 1).coerceAtMost(scaled.size - 1)]
+        bmp.eraseColor(android.graphics.Color.BLACK)
+        Canvas(bmp).let { c -> drawGifFrame(c, w, h, ba, bb, la, lb, t, mode); com.photomed.app.export.Watermark.draw(c, w, h, watermark) }
+    }
+
     /** Pinta cada cuadro del guion ([gifSchedule]) a [w]×[h] y lo entrega con su duración. */
     fun renderFrames(images: List<Pair<Bitmap, String>>, mode: GifMode, timing: GifTiming, w: Int, h: Int,
                      watermark: com.photomed.app.export.Watermark.Mark? = null,
@@ -281,9 +322,7 @@ object CompareExport {
         val scaled = images.map { (b, l) -> Bitmap.createScaledBitmap(b, w, h, true) to l }
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         for (s in gifSchedule(scaled.size, timing)) {
-            val (ba, la) = scaled[s.a]; val (bb, lb) = scaled[(s.a + 1).coerceAtMost(scaled.size - 1)]
-            bmp.eraseColor(android.graphics.Color.BLACK)
-            Canvas(bmp).let { c -> drawGifFrame(c, w, h, ba, bb, la, lb, s.t, mode); com.photomed.app.export.Watermark.draw(c, w, h, watermark) }
+            paintState(bmp, scaled, s.a, s.t, mode, watermark)
             sink(IntArray(w * h).also { bmp.getPixels(it, 0, w, 0, 0, w, h) }, s.ms)
         }
     }

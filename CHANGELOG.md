@@ -23,7 +23,10 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
   pulsado se guardan como protocolo.
 - **GIF**: ahora hay cuadros 100 % «antes» y 100 % «después» (sin franja ni línea) y se reproduce de
   ida y vuelta: al repetirse en bucle no se nota el salto. La vista previa sigue el mismo guion.
-- **Exportar en MP4** (H.264), con el mismo guion de ida y vuelta y los mismos tiempos.
+- **Exportar en MP4** (H.264, 30 cuadros/s), con la misma ida y vuelta y los mismos tiempos; cada
+  cuadro con el avance exacto de su instante (movimiento continuo).
+- **Transiciones más fluidas**: el GIF pasa de ~14 a 25 cuadros/s y el movimiento acelera y frena
+  suavemente (antes arrancaba y paraba de golpe y el MP4 repetía los pasos del GIF de forma desigual).
 - **Menú de exportación**: cambiar de opción ya no lo devuelve arriba.
 - **Logo en las exportaciones**: se adjunta en Ajustes (PNG con transparencia recomendado) y la
   esquina se elige al exportar (se recuerda); va en fotos, cuadrículas, GIF y MP4.
