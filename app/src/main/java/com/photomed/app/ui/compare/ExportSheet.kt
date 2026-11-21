@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.layout.fillMaxSize
@@ -60,6 +61,10 @@ enum class ExportKind(val label: String, val needsTwo: Boolean) {
     GRID("Cuadrícula con fechas", true),
     SIDE("Lado a lado (una fila)", true),
     GIF("Animación GIF", true),
+    MP4("Vídeo MP4", true);
+
+    /** Animación (GIF o MP4): mismo guion de ida y vuelta, en bucle sin salto. */
+    val animated: Boolean get() = this == GIF || this == MP4
 }
 
 data class ExportChoice(
@@ -116,9 +121,12 @@ fun ExportSheet(
         }
     }
 
-    SafeBottomSheet(onDismiss = { if (progress == null) onDismiss() }) {
+    // el desplazamiento se conserva al cambiar de opción (hoja siempre expandida y vista previa de
+    // altura fija: el contenido no cambia de tamaño bajo el dedo)
+    val scroll = rememberScrollState()
+    SafeBottomSheet(onDismiss = { if (progress == null) onDismiss() }, expanded = true) {
         Column(Modifier.padding(horizontal = Md3Spacing.s6).padding(bottom = Md3Spacing.s6)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(scroll),
             verticalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
             Text("Exportar imágenes ajustadas", style = MaterialTheme.typography.titleLarge)
             Text(
@@ -141,7 +149,7 @@ fun ExportSheet(
                     }
                 }
             }
-            if (kind == ExportKind.GIF && count >= 2) {
+            if (kind.animated && count >= 2) {
                 androidx.compose.material3.SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     CompareExport.GifMode.entries.forEachIndexed { i, m ->
                         SegmentedButton(
@@ -177,7 +185,12 @@ fun ExportSheet(
                 value = null
                 value = runCatching { loadPreview(view) }.getOrDefault(emptyList())
             }
-            ExportPreview(kind, previewImgs, gifMode, timing, Modifier.align(Alignment.CenterHorizontally).padding(vertical = 4.dp))
+            Box(Modifier.fillMaxWidth().height(272.dp), contentAlignment = Alignment.Center) {
+                ExportPreview(kind, previewImgs, gifMode, timing, Modifier.padding(vertical = 4.dp))
+            }
+            if (kind.animated) Text("Se reproduce de ida y vuelta: al repetirse en bucle no se nota el salto." +
+                (if (kind == ExportKind.MP4) " El vídeo dura un ciclo; la galería o el chat lo repiten." else ""),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.fillMaxWidth().toggleable(anonymize, role = Role.Switch) { anonymize = it }.padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -208,7 +221,7 @@ fun ExportSheet(
 @Composable
 fun ExportPreview(kind: ExportKind, images: List<Pair<android.graphics.Bitmap, String>>?, mode: CompareExport.GifMode,
                   timing: CompareExport.GifTiming, modifier: Modifier = Modifier) {
-    if (kind == ExportKind.GIF) { GifPreview(images, mode, timing, modifier); return }
+    if (kind.animated) { GifPreview(images, mode, timing, modifier); return }
     // fotos sueltas: la primera; cuadrícula y lado a lado: la composición tal como se exporta
     val bmp = androidx.compose.runtime.remember(images, kind) {
         val imgs = images ?: return@remember null
@@ -240,7 +253,7 @@ fun GifPreview(images: List<Pair<android.graphics.Bitmap, String>>?, mode: Compa
         val start = androidx.compose.runtime.withFrameMillis { it }
         while (true) androidx.compose.runtime.withFrameMillis { timeMs = it - start }
     }
-    Box(modifier.width(200.dp).aspectRatio(3f / 4f).clip(MaterialTheme.shapes.small)
+    Box(modifier.width(192.dp).aspectRatio(3f / 4f).clip(MaterialTheme.shapes.small)
         .background(androidx.compose.ui.graphics.Color.Black)
         .semantics { contentDescription = "Vista previa del GIF" }, contentAlignment = Alignment.Center) {
         val imgs = images

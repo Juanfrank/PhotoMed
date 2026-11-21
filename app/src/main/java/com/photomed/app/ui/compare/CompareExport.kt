@@ -184,23 +184,50 @@ object CompareExport {
         /** Pasos intermedios de la transición. */
         val steps: Int get() = if (transitionMs <= 0) 0 else (transitionMs / GIF_STEP_MS.toFloat()).roundToInt().coerceIn(2, 30)
         val stepMs: Int get() = if (steps == 0) 0 else transitionMs / steps
-        /** Duración de un ciclo completo con [n] fotos. */
-        fun cycleMs(n: Int) = n * (holdMs + steps * stepMs)
+        /** Duración de un ciclo completo (ida y vuelta) con [n] fotos. */
+        fun cycleMs(n: Int) = gifSchedule(n, this).sumOf { it.ms }
     }
 
     /**
-     * Estado de la animación en el instante [timeMs] (en bucle): foto actual y avance de la
-     * transición hacia la siguiente (0 = quieta), cuantizado en los mismos pasos que el GIF para que
-     * la vista previa sea idéntica al archivo.
+     * Un cuadro de la animación: par de fotos [a] → [a]+1 con avance [t] (0 = solo [a], 1 = solo la
+     * siguiente, ambas a pantalla completa) y su duración.
+     */
+    data class GifStep(val a: Int, val t: Float, val ms: Int)
+
+    /**
+     * Guion de la animación en ida y vuelta (ping-pong): 1 → 2 → … → n y de vuelta n → … → 2, de modo
+     * que al repetirse en bucle el último cuadro enlaza con el primero sin salto. Cada foto se muestra
+     * quieta y completa [GifTiming.holdMs] (una sola vez por pasada: los extremos no se duplican) y
+     * cada transición tiene [GifTiming.steps] cuadros intermedios estrictamente entre 0 y 1.
+     */
+    fun gifSchedule(n: Int, timing: GifTiming): List<GifStep> {
+        if (n < 2) return listOf(GifStep(0, 0f, timing.holdMs.coerceAtLeast(100)))
+        val hold = timing.holdMs.coerceAtLeast(if (timing.steps == 0) 100 else 0)
+        fun full(j: Int) = if (j == n - 1) GifStep(n - 2, 1f, hold) else GifStep(j, 0f, hold)
+        val out = ArrayList<GifStep>()
+        fun add(s: GifStep) { if (s.ms > 0) out += s }
+        for (j in 0 until n - 1) {                                     // ida
+            add(full(j))
+            for (k in 1..timing.steps) add(GifStep(j, k / (timing.steps + 1f), timing.stepMs))
+        }
+        for (j in n - 1 downTo 1) {                                    // vuelta
+            add(full(j))
+            for (k in timing.steps downTo 1) add(GifStep(j - 1, k / (timing.steps + 1f), timing.stepMs))
+        }
+        return out
+    }
+
+    /**
+     * Estado de la animación en el instante [timeMs] (en bucle): par de fotos y avance, según el
+     * mismo guion que el archivo ([gifSchedule]) para que la vista previa sea idéntica.
      */
     fun gifStateAt(timeMs: Long, n: Int, timing: GifTiming): Pair<Int, Float> {
-        if (n < 1) return 0 to 0f
-        val per = timing.holdMs + timing.steps * timing.stepMs
-        val t = (timeMs % (per.toLong() * n)).toInt()
-        val i = t / per; val r = t % per
-        if (r < timing.holdMs || timing.steps == 0) return i to 0f
-        val k = ((r - timing.holdMs) / timing.stepMs.coerceAtLeast(1)).coerceAtMost(timing.steps - 1) + 1
-        return i to k / (timing.steps + 1f)
+        if (n < 2) return 0 to 0f
+        val s = gifSchedule(n, timing)
+        val total = s.sumOf { it.ms }.coerceAtLeast(1)
+        var t = (timeMs % total).toInt()
+        for (f in s) { if (t < f.ms) return f.a to f.t; t -= f.ms }
+        return s.last().a to s.last().t
     }
 
     /** Dibuja un cuadro: foto [a] → [b] con avance [t] (fundido o cortinilla) y sus etiquetas. */
@@ -218,11 +245,13 @@ object CompareExport {
         }
         val dst = RectF(0f, 0f, w.toFloat(), h.toFloat())
         val img = Paint(Paint.FILTER_BITMAP_FLAG)
+        // extremos: una sola foto completa (sin franja ni línea divisoria)
+        if (t <= 0f) { c.drawBitmap(a, null, dst, img); label(la, false); return }
+        if (t >= 1f) { c.drawBitmap(b, null, dst, img); label(lb, false); return }
         c.drawBitmap(a, null, dst, img)
-        if (t <= 0f) { label(la, false); return }
         when (mode) {
             GifMode.FADE -> {
-                c.drawBitmap(b, null, dst, Paint(Paint.FILTER_BITMAP_FLAG).apply { alpha = (t * 255).toInt() })
+                c.drawBitmap(b, null, dst, Paint(Paint.FILTER_BITMAP_FLAG).apply { alpha = (t * 255).roundToInt() })
                 label(if (t < 0.5f) la else lb, false)
             }
             GifMode.SLIDE -> {
@@ -234,24 +263,30 @@ object CompareExport {
         }
     }
 
-    /**
-     * Cuadros del GIF: cada foto quieta [GifTiming.holdMs] y paso a la siguiente (la última vuelve a
-     * la primera) en [GifTiming.steps] pasos por fundido o cortinilla (como el deslizador).
-     */
-    fun gifFrames(images: List<Pair<Bitmap, String>>, mode: GifMode, timing: GifTiming = GifTiming()): List<Pair<IntArray, Int>> {
-        val w = GIF_W; val h = images.firstOrNull()?.first?.let { w * it.height / it.width } ?: (w * 4 / 3)
+    /** Tamaño de los cuadros para [images] con ancho [w] (alto par, proporción de la primera). */
+    fun frameSize(images: List<Pair<Bitmap, String>>, w: Int, align: Int = 2): Pair<Int, Int> {
+        val h0 = images.firstOrNull()?.first?.let { w * it.height / it.width } ?: (w * 4 / 3)
+        return w to (h0 / align * align).coerceAtLeast(align)
+    }
+
+    /** Pinta cada cuadro del guion ([gifSchedule]) a [w]×[h] y lo entrega con su duración. */
+    fun renderFrames(images: List<Pair<Bitmap, String>>, mode: GifMode, timing: GifTiming, w: Int, h: Int,
+                     sink: (IntArray, Int) -> Unit) {
         val scaled = images.map { (b, l) -> Bitmap.createScaledBitmap(b, w, h, true) to l }
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        for (s in gifSchedule(scaled.size, timing)) {
+            val (ba, la) = scaled[s.a]; val (bb, lb) = scaled[(s.a + 1).coerceAtMost(scaled.size - 1)]
+            bmp.eraseColor(android.graphics.Color.BLACK)
+            drawGifFrame(Canvas(bmp), w, h, ba, bb, la, lb, s.t, mode)
+            sink(IntArray(w * h).also { bmp.getPixels(it, 0, w, 0, 0, w, h) }, s.ms)
+        }
+    }
+
+    /** Cuadros del GIF (ida y vuelta, ver [gifSchedule]) por fundido o cortinilla (como el deslizador). */
+    fun gifFrames(images: List<Pair<Bitmap, String>>, mode: GifMode, timing: GifTiming = GifTiming()): List<Pair<IntArray, Int>> {
+        val (w, h) = frameSize(images, GIF_W)
         val out = ArrayList<Pair<IntArray, Int>>()
-        fun frame(a: Int, t: Float): IntArray {
-            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            val (ba, la) = scaled[a]; val (bb, lb) = scaled[(a + 1) % scaled.size]
-            drawGifFrame(Canvas(bmp), w, h, ba, bb, la, lb, t, mode)
-            return IntArray(w * h).also { bmp.getPixels(it, 0, w, 0, 0, w, h) }
-        }
-        for (i in scaled.indices) {
-            out += frame(i, 0f) to timing.holdMs
-            for (k in 1..timing.steps) out += frame(i, k / (timing.steps + 1f)) to timing.stepMs
-        }
+        renderFrames(images, mode, timing, w, h) { px, ms -> out += px to ms }
         return out
     }
 
@@ -273,6 +308,8 @@ object CompareExport {
         /** Animación GIF (null = no). */
         gif: GifMode? = null,
         gifTiming: GifTiming = GifTiming(),
+        /** La animación como vídeo MP4 (H.264) en lugar de GIF. */
+        mp4: Boolean = false,
         /** Recorte común según la alineación (ver [overlapCrop]). */
         crop: Similarity? = null,
         /** Etiquetas (fecha, y hora si hay fotos del mismo día); por defecto, la fecha. */
@@ -323,14 +360,21 @@ object CompareExport {
         }
         if (gif != null && rendered.size >= 2) {
             coroutineContext.ensureActive()
-            val bytes = withContext(Dispatchers.Default) {
-                val enc = GifEncoder(GIF_W, rendered.first().first.let { GIF_W * it.height / it.width })
-                gifFrames(rendered, gif, gifTiming).forEach { (px, ms) -> enc.add(px, ms) }
-                enc.toByteArray()
-            }
-            withContext(Dispatchers.IO) {
-                val kind = if (gif == GifMode.FADE) "fundido" else "desplazamiento"
-                files += File(dir, "PhotoMed_${zone}_${kind}_${rendered.size}_$stamp.gif").also { it.writeBytes(bytes) }
+            val kind = if (gif == GifMode.FADE) "fundido" else "desplazamiento"
+            if (mp4) {
+                val f = File(dir, "PhotoMed_${zone}_${kind}_${rendered.size}_$stamp.mp4")
+                withContext(Dispatchers.Default) { Mp4Encoder.encode(rendered, gif, gifTiming, f) }
+                files += f
+            } else {
+                val bytes = withContext(Dispatchers.Default) {
+                    val (w, h) = frameSize(rendered, GIF_W)
+                    val enc = GifEncoder(w, h)
+                    renderFrames(rendered, gif, gifTiming, w, h) { px, ms -> enc.add(px, ms) }
+                    enc.toByteArray()
+                }
+                withContext(Dispatchers.IO) {
+                    files += File(dir, "PhotoMed_${zone}_${kind}_${rendered.size}_$stamp.gif").also { it.writeBytes(bytes) }
+                }
             }
         }
         onProgress(seq.size, seq.size)
@@ -347,8 +391,14 @@ object CompareExport {
         if (uris.isEmpty()) return
         val intent = if (uris.size == 1) Intent(Intent.ACTION_SEND).apply { putExtra(Intent.EXTRA_STREAM, uris[0]) }
         else Intent(Intent.ACTION_SEND_MULTIPLE).apply { putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris)) }
-        intent.type = if (files.all { it.extension.equals("gif", true) }) "image/gif"
-            else if (files.any { it.extension.equals("gif", true) }) "image/*" else "image/jpeg"
+        val exts = files.map { it.extension.lowercase() }.toSet()
+        intent.type = when {
+            exts == setOf("mp4") -> "video/mp4"
+            "mp4" in exts -> "*/*"
+            exts == setOf("gif") -> "image/gif"
+            "gif" in exts -> "image/*"
+            else -> "image/jpeg"
+        }
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         context.startActivity(Intent.createChooser(intent, if (anonymize) "Compartir (anonimizada)" else "Compartir"))
     }

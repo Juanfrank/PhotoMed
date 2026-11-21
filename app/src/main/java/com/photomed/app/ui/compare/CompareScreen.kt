@@ -1057,7 +1057,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 val order = displayOrder(seq.map { it.key }, gridOrder, manualOrder).map { k -> seq.indexOfFirst { it.key == k } }
                 val r = CompareExport.build(context, repo, seq, shown, colorAdjusts,
                     individual = ch.kind == ExportKind.INDIVIDUAL, grid = ch.kind == ExportKind.GRID, anonymize = anonymize, dir = dir,
-                    onProgress = progress, side = ch.kind == ExportKind.SIDE, gif = ch.gif.takeIf { ch.kind == ExportKind.GIF },
+                    onProgress = progress, side = ch.kind == ExportKind.SIDE, gif = ch.gif.takeIf { ch.kind.animated }, mp4 = ch.kind == ExportKind.MP4,
                     gifTiming = ch.timing, crop = effectiveCrop(), labels = stampLabels(seq.map { it.takenAt }), order = order,
                     annots = exportAnnots, layers = diagram, annotAlpha = annotAlpha.value,
                     orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror), view = ch.view, ink = exportInk)

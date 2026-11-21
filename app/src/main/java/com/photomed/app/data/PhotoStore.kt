@@ -89,7 +89,11 @@ class MediaStorePhotoStore(private val resolver: ContentResolver) : PhotoStore {
             put(MediaStore.MediaColumns.DATE_TAKEN, dateTaken)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
-        val uri = resolver.insert(collection, values) ?: error("No se pudo crear la imagen en la galería")
+        // los vídeos (MP4 exportados) van en la colección de vídeo, en la misma carpeta del álbum
+        val video = displayName.endsWith(".mp4", true)
+        if (video) values.put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+        val target = if (video) MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) else collection
+        val uri = resolver.insert(target, values) ?: error("No se pudo crear el archivo en la galería")
         try {
             resolver.openOutputStream(uri)!!.use { out -> source.inputStream().use { it.copyTo(out) } }
             resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)

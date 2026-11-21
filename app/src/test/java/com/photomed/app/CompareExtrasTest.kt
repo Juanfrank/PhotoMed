@@ -1,5 +1,6 @@
 package com.photomed.app
 
+import com.photomed.app.ui.compare.CompareExport
 import com.photomed.app.align.Pt
 import com.photomed.app.align.Similarity
 import com.photomed.app.ui.compare.GifEncoder
@@ -113,24 +114,53 @@ class CompareExtrasTest {
 
     @Test
     fun previewTimelineMatchesGifFrames() {
-        // la vista previa usa gifStateAt; el archivo, la lista de cuadros: deben coincidir en todo el ciclo
-        for (timing in listOf(com.photomed.app.ui.compare.CompareExport.GifTiming(1200, 700),
-                              com.photomed.app.ui.compare.CompareExport.GifTiming(500, 0),
-                              com.photomed.app.ui.compare.CompareExport.GifTiming(2000, 2500))) {
-            val n = 3
-            val frames = ArrayList<Triple<Int, Float, Int>>()   // foto, avance, duración (como gifFrames)
-            for (i in 0 until n) {
-                frames += Triple(i, 0f, timing.holdMs)
-                for (k in 1..timing.steps) frames += Triple(i, k / (timing.steps + 1f), timing.stepMs)
-            }
-            assertEquals(timing.cycleMs(n), frames.sumOf { it.third })
-            var t = 0L
-            for ((i, f, d) in frames) {
-                val (pi, pf) = com.photomed.app.ui.compare.CompareExport.gifStateAt(t + d / 2, n, timing)
-                assertEquals(i, pi); assertEquals(f, pf, 1e-4f)
-                t += d
+        // la vista previa usa gifStateAt; el archivo, el guion: deben coincidir en todo el ciclo
+        for (timing in listOf(CompareExport.GifTiming(1200, 700), CompareExport.GifTiming(500, 0), CompareExport.GifTiming(2000, 2500), CompareExport.GifTiming(300, 3000))) {
+            for (n in 2..4) {
+                val s = CompareExport.gifSchedule(n, timing)
+                assertEquals(timing.cycleMs(n), s.sumOf { it.ms })
+                var t = 0L
+                for (f in s) {
+                    val (pi, pf) = CompareExport.gifStateAt(t + f.ms / 2, n, timing)
+                    assertEquals(f.a, pi); assertEquals(f.t, pf, 1e-4f)
+                    t += f.ms
+                }
             }
         }
+    }
+
+    @Test
+    fun gifScheduleIsSeamlessPingPong() {
+        val timing = CompareExport.GifTiming(1200, 700)
+        for (n in 2..4) {
+            val s = CompareExport.gifSchedule(n, timing)
+            // imagen que se ve completa (o null en una transición)
+            fun full(f: CompareExport.GifStep) = when (f.t) { 0f -> f.a; 1f -> f.a + 1; else -> null }
+            val holds = s.mapNotNull { full(it) }
+            // ida 0..n-1 y vuelta n-2..1: cada extremo una sola vez
+            assertEquals((0 until n).toList() + (n - 2 downTo 1).toList(), holds)
+            // continuidad: cada cuadro difiere poco del anterior, incluido el salto del final al principio
+            val pos = s.map { it.a + it.t }
+            for (i in pos.indices) {
+                val d = kotlin.math.abs(pos[(i + 1) % pos.size] - pos[i])
+                assertTrue("salto en $i: $d", d <= 1f / (timing.steps + 1) + 1e-4f)
+            }
+        }
+    }
+
+    @Test
+    fun mp4FramesFollowTheSchedule() {
+        val timing = CompareExport.GifTiming(1200, 700)
+        val s = CompareExport.gifSchedule(2, timing)
+        val idx = com.photomed.app.ui.compare.Mp4Encoder.frameIndices(s, 30)
+        assertEquals((s.sumOf { it.ms } * 30 + 500) / 1000, idx.size)
+        // todos los pasos aparecen, en orden; las fotos quietas duran ~1,2 s (36 cuadros)
+        assertEquals(s.indices.toList(), idx.distinct())
+        assertTrue(idx.toList().zipWithNext().all { (a, b) -> b >= a })
+        assertEquals(36.0, idx.count { it == 0 }.toDouble(), 1.0)
+        // YUV: blanco y negro en los extremos del rango limitado
+        val yuv = com.photomed.app.ui.compare.Mp4Encoder.toI420(IntArray(4) { -1 } + IntArray(4) { 0xFF000000.toInt() }, 4, 2)
+        assertEquals(235, yuv[0].toInt() and 0xFF); assertEquals(16, yuv[4].toInt() and 0xFF)
     }
 
     /** Descodificador GIF mínimo (paleta global, LZW) para verificar el codificador. */

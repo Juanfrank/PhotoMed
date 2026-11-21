@@ -37,9 +37,10 @@ fun navigationBarHeight(): Dp = WindowInsets.navigationBars.asPaddingValues().ca
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SafeBottomSheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+fun SafeBottomSheet(onDismiss: () -> Unit, expanded: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     val nav = navigationBarHeight()
-    ModalBottomSheet(onDismissRequest = onDismiss, contentWindowInsets = { WindowInsets(0) }) {
+    val state = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = expanded)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, contentWindowInsets = { WindowInsets(0) }) {
         content()
         Spacer(Modifier.height(nav))
     }
