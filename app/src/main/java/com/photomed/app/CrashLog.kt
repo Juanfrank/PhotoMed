@@ -1,5 +1,6 @@
 package com.photomed.app
 
+import com.photomed.app.i18n.tr
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -145,8 +146,8 @@ object CrashLog {
         if (files.isEmpty()) return
         val text = files.take(5).joinToString("\n\n──────────\n\n") { it.readText() }
         val i = Intent(Intent.ACTION_SEND).setType("text/plain")
-            .putExtra(Intent.EXTRA_SUBJECT, "PhotoMed: registro de errores")
+            .putExtra(Intent.EXTRA_SUBJECT, tr("PhotoMed: registro de errores"))
             .putExtra(Intent.EXTRA_TEXT, text)
-        context.startActivity(Intent.createChooser(i, "Compartir el registro de errores").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(Intent.createChooser(i, tr("Compartir el registro de errores")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }

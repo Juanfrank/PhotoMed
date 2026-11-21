@@ -1,5 +1,6 @@
 package com.photomed.app.ui.components
 
+import com.photomed.app.i18n.tr
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -58,10 +59,10 @@ fun CropEditor(image: ImageBitmap, aspect: Float?, initial: FloatArray?, onCance
     var fit by remember { mutableStateOf(Rect.Zero) }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-            Text("Recortar", color = Color.White, modifier = Modifier.padding(16.dp))
+            Text(tr("Recortar"), color = Color.White, modifier = Modifier.padding(16.dp))
             Canvas(
                 Modifier.weight(1f).fillMaxWidth().padding(16.dp)
-                    .semantics { contentDescription = "Área de recorte" }
+                    .semantics { contentDescription = tr("Área de recorte") }
                     .pointerInput(aspect) {
                         var mode = -1   // 0..3 esquinas, 4 = mover
                         detectDragGestures(
@@ -116,8 +117,8 @@ fun CropEditor(image: ImageBitmap, aspect: Float?, initial: FloatArray?, onCance
                 listOf(c.topLeft, c.topRight, c.bottomRight, c.bottomLeft).forEach { drawCircle(Color.White, 8.dp.toPx(), it) }
             }
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text("Cancelar") }
-                Button(onClick = { onApply(r.copyOf()) }, modifier = Modifier.weight(1f)) { Text("Aplicar") }
+                OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) { Text(tr("Cancelar")) }
+                Button(onClick = { onApply(r.copyOf()) }, modifier = Modifier.weight(1f)) { Text(tr("Aplicar")) }
             }
         }
     }

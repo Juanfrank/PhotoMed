@@ -1,5 +1,7 @@
 package com.photomed.app.ui.theme
 
+import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trn
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -28,7 +30,12 @@ fun PhotoMedTheme(darkTheme: Boolean = AppTheme.isDark(), content: @Composable (
 }
 
 /** Tema elegido en Ajustes: el del sistema, claro u oscuro. */
-enum class ThemeMode(val label: String) { SYSTEM("Según el sistema"), LIGHT("Claro"), DARK("Oscuro") }
+enum class ThemeMode(private val labelEs: String) {
+    SYSTEM(trn("Según el sistema")), LIGHT(trn("Claro")), DARK(trn("Oscuro"));
+
+    /** Etiqueta en el idioma de la interfaz. */
+    val label: String get() = tr(labelEs)
+}
 
 /** Preferencia de tema (se aplica al instante en toda la app). */
 object AppTheme {

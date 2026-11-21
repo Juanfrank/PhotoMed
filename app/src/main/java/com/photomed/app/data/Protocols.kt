@@ -1,5 +1,6 @@
 package com.photomed.app.data
 
+import com.photomed.app.i18n.tr
 import android.content.Context
 import android.net.Uri
 import com.photomed.app.align.AtomicFile
@@ -27,7 +28,7 @@ object Protocols {
     /** Importa un protocolo (archivo elegido o recibido); si ya existía uno con el mismo id, se reemplaza. */
     fun import(context: Context, uri: Uri): Protocol {
         val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
-            ?: throw IllegalArgumentException("No se pudo leer el archivo.")
+            ?: throw IllegalArgumentException(tr("No se pudo leer el archivo."))
         return ProtocolJson.read(text).also { save(context, it) }
     }
 
@@ -86,7 +87,7 @@ object ProtocolResults {
             val summary = JSONObject().put("format", FORMAT).put("version", 1).put("protocolId", p.id).put("protocol", p.name)
                 .put("createdAt", System.currentTimeMillis()).put("requested", p.totalShots).put("taken", shots.size)
                 .put("steps", JSONArray().apply { p.steps.forEachIndexed { i, s ->
-                    put(JSONObject().put("index", i + 1).put("id", s.id).put("title", s.title).put("requested", s.count)
+                    put(JSONObject().put("index", i + 1).put("id", s.id).put("title", s.titleEs).put("requested", s.count)
                         .put("taken", shots.count { it.second.conditions[KEY_STEP] == s.id })) } })
                 .put("shots", results)
             if (!anonymize) summary.put("patient", JSONObject().put("name", exp.patientName).put("record", exp.recordNumber))
@@ -122,9 +123,9 @@ object ProtocolResults {
                         e = zip.nextEntry
                     }
                 }
-            } ?: throw IllegalArgumentException("No se pudo leer el archivo.")
+            } ?: throw IllegalArgumentException(tr("No se pudo leer el archivo."))
             val res = resultsText?.let { JSONObject(it) }?.takeIf { it.optString("format") == FORMAT }
-                ?: throw IllegalArgumentException("El archivo no es un paquete de resultados de PhotoMed.")
+                ?: throw IllegalArgumentException(tr("El archivo no es un paquete de resultados de PhotoMed."))
             val protocol = protocolText?.let { runCatching { ProtocolJson.read(it) }.getOrNull() }?.also { Protocols.save(context, it) }
             val known = HashSet<String>()
             repo.photos(exp).forEach { p -> repo.readInfo(p)?.conditions?.get("SourceHash")?.let { known += it } }
@@ -146,7 +147,7 @@ object ProtocolResults {
                 val exprTag = s.optString("expression")
                 val expression = FacialExpression.ofTag(exprTag).takeIf { zone.guide in it.guides } ?: FacialExpression.NEUTRAL
                 repo.savePhoto(exp, zone, f, takenAt = t, variant = FacialExpression.variantTag(expression),
-                    conditions = cond + mapOf("Source" to "resultados de protocolo", "SourceHash" to hash, "Expression" to expression.label) +
+                    conditions = cond + mapOf("Source" to "resultados de protocolo", "SourceHash" to hash, "Expression" to expression.labelEs) +
                         (protocol?.let { mapOf(KEY_ID to it.id, KEY_NAME to it.name) } ?: emptyMap()))
                 n++
             }

@@ -1,5 +1,6 @@
 package com.photomed.app.data
 
+import com.photomed.app.i18n.tr
 import com.photomed.app.align.isFaceZone
 import com.photomed.app.align.Pt
 import org.json.JSONArray
@@ -79,6 +80,9 @@ data class ProtocolStep(
 ) {
     val title: String get() = label?.takeIf { it.isNotBlank() }
         ?: (zone.label + if (expression != FacialExpression.NEUTRAL) " · ${expression.label}" else "")
+    /** [title] en español (el que se guarda en `resultados.json`). */
+    val titleEs: String get() = label?.takeIf { it.isNotBlank() }
+        ?: (zone.labelEs + if (expression != FacialExpression.NEUTRAL) " · ${expression.labelEs}" else "")
 }
 
 /**
@@ -156,12 +160,12 @@ object ProtocolJson {
 
     /** Lee un protocolo; error con un mensaje para el usuario si el archivo no lo es o no se entiende. */
     fun read(json: String): Protocol {
-        val o = try { JSONObject(json) } catch (e: Exception) { throw IllegalArgumentException("El archivo no es un protocolo de PhotoMed (JSON no válido).") }
-        if (o.optString("format") != FORMAT) throw IllegalArgumentException("El archivo no es un protocolo de PhotoMed.")
-        if (o.optInt("version", 1) > VERSION) throw IllegalArgumentException("El protocolo es de una versión más nueva de PhotoMed: actualice la app.")
+        val o = try { JSONObject(json) } catch (e: Exception) { throw IllegalArgumentException(tr("El archivo no es un protocolo de PhotoMed (JSON no válido).")) }
+        if (o.optString("format") != FORMAT) throw IllegalArgumentException(tr("El archivo no es un protocolo de PhotoMed."))
+        if (o.optInt("version", 1) > VERSION) throw IllegalArgumentException(tr("El protocolo es de una versión más nueva de PhotoMed: actualice la app."))
         val a = o.optJSONArray("steps") ?: JSONArray()
         val steps = (0 until a.length()).map { i -> step(a.getJSONObject(i), i) }
-        if (steps.isEmpty()) throw IllegalArgumentException("El protocolo no tiene tomas.")
+        if (steps.isEmpty()) throw IllegalArgumentException(tr("El protocolo no tiene tomas."))
         return Protocol(o.optString("id").ifBlank { UUID.randomUUID().toString() }, o.optString("name").ifBlank { "Protocolo" },
             o.optString("author"), o.optString("notes"), o.optLong("createdAt", System.currentTimeMillis()), steps)
     }
@@ -172,7 +176,7 @@ object ProtocolJson {
     private fun ptMapOf(o: JSONObject) = o.keys().asSequence().associateWith { ptOf(o.getJSONArray(it)) }
 
     private fun step(o: JSONObject, i: Int): ProtocolStep {
-        val zone = Zone.fromId(o.optString("zone")) ?: throw IllegalArgumentException("Toma ${i + 1}: zona desconocida «${o.optString("zone")}».")
+        val zone = Zone.fromId(o.optString("zone")) ?: throw IllegalArgumentException(tr("Toma %1\$d: zona desconocida «%2\$s».", i + 1, o.optString("zone")))
         val match = o.optJSONObject("match"); val light = o.optJSONObject("lighting")
         return ProtocolStep(o.optString("id").ifBlank { "s${i + 1}" }, zone, FacialExpression.ofTag(o.optString("expression", "reposo")),
             o.optInt("count", 1).coerceIn(1, 50), o.optString("label").ifBlank { null }, o.optString("instructions").ifBlank { null },

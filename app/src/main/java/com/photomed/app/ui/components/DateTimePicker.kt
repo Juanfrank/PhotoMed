@@ -1,5 +1,6 @@
 package com.photomed.app.ui.components
 
+import com.photomed.app.i18n.tr
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -23,7 +24,7 @@ import java.util.TimeZone
 /** Fecha y hora (dos pasos: calendario y reloj), en la hora local. [initial] y el resultado en ms. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DateTimePickerDialog(initial: Long, onDismiss: () -> Unit, onPick: (Long) -> Unit, title: String = "Fecha de captura") {
+fun DateTimePickerDialog(initial: Long, onDismiss: () -> Unit, onPick: (Long) -> Unit, title: String = tr("Fecha de captura")) {
     val local = remember(initial) { Calendar.getInstance().apply { timeInMillis = initial } }
     // el calendario trabaja en UTC: el mismo día a medianoche UTC
     val utcDay = remember(initial) {
@@ -39,12 +40,12 @@ fun DateTimePickerDialog(initial: Long, onDismiss: () -> Unit, onPick: (Long) ->
     val d = day
     if (d == null) {
         DatePickerDialog(onDismissRequest = onDismiss,
-            confirmButton = { TextButton(onClick = { day = dateState.selectedDateMillis ?: utcDay }) { Text("Siguiente") } },
-            dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }) {
+            confirmButton = { TextButton(onClick = { day = dateState.selectedDateMillis ?: utcDay }) { Text(tr("Siguiente")) } },
+            dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancelar")) } }) {
             DatePicker(dateState, title = { Text(title, modifier = Modifier.padding(start = 24.dp, top = 16.dp)) })
         }
     } else {
-        AlertDialog(onDismissRequest = onDismiss, title = { Text("Hora de captura") },
+        AlertDialog(onDismissRequest = onDismiss, title = { Text(tr("Hora de captura")) },
             text = { TimePicker(timeState) },
             confirmButton = { TextButton(onClick = {
                 val u = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = d }
@@ -54,8 +55,8 @@ fun DateTimePickerDialog(initial: Long, onDismiss: () -> Unit, onPick: (Long) ->
                     set(Calendar.MILLISECOND, local.get(Calendar.MILLISECOND))
                 }.timeInMillis
                 onPick(out)
-            }) { Text("Guardar") } },
-            dismissButton = { TextButton(onClick = { day = null }) { Text("Atrás") } })
+            }) { Text(tr("Guardar")) } },
+            dismissButton = { TextButton(onClick = { day = null }) { Text(tr("Atrás")) } })
     }
 }
 

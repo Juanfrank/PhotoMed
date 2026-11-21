@@ -39,6 +39,7 @@ import com.photomed.app.ui.components.SectionHeader
 import com.photomed.app.ui.theme.Md3Spacing
 import com.photomed.app.align.AlignOptions
 import androidx.compose.material3.Checkbox
+import com.photomed.app.i18n.tr
 
 /** Ajustes globales (mismas preferencias que el panel ⚙ de la cámara). */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,12 +60,12 @@ fun SettingsScreen(onBack: () -> Unit) {
     var sensitivity by remember { mutableStateOf(runCatching { com.photomed.app.align.WrinkleTuning.Level.valueOf(
         prefs.getString(com.photomed.app.align.WrinkleTuning.PREF, "BALANCED")!!) }.getOrDefault(com.photomed.app.align.WrinkleTuning.Level.BALANCED)) }
     Scaffold(topBar = {
-        TopAppBar(title = { Text("Ajustes") },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } })
+        TopAppBar(title = { Text(tr("Ajustes")) },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Atrás")) } })
     }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
             // apariencia: tema claro, oscuro o el del sistema
-            SectionHeader("Apariencia", Modifier.padding(horizontal = Md3Spacing.s6))
+            SectionHeader(tr("Apariencia"), Modifier.padding(horizontal = Md3Spacing.s6))
             com.photomed.app.ui.theme.ThemeMode.entries.forEach { m ->
                 androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth()
                     .selectable(com.photomed.app.ui.theme.AppTheme.mode == m, role = androidx.compose.ui.semantics.Role.RadioButton) {
@@ -87,7 +88,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             )
             HorizontalDivider()
             // idioma de la interfaz (Android 13+: el mismo ajuste que «Idioma de la app» del sistema)
-            SectionHeader(com.photomed.app.i18n.tr("Idioma"), Modifier.padding(horizontal = Md3Spacing.s6))
+            SectionHeader(tr("Idioma"), Modifier.padding(horizontal = Md3Spacing.s6))
             val lang = remember { com.photomed.app.i18n.AppLanguage.current(context) }
             com.photomed.app.i18n.AppLanguage.entries.forEach { l ->
                 androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth()
@@ -95,13 +96,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                         (context.findActivity())?.let { com.photomed.app.i18n.AppLanguage.set(it, l) }
                     }.padding(horizontal = Md3Spacing.s6, vertical = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     androidx.compose.material3.RadioButton(selected = lang == l, onClick = null)
-                    Text(com.photomed.app.i18n.tr(l.label), style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                    Text(tr(l.label), style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.padding(start = 8.dp))
                 }
             }
             HorizontalDivider()
             // sensibilidad de la detección de arrugas y surcos (ver docs/BENCHMARK.md)
-            SectionHeader("Detección de arrugas", Modifier.padding(horizontal = Md3Spacing.s6))
+            SectionHeader(tr("Detección de arrugas"), Modifier.padding(horizontal = Md3Spacing.s6))
             com.photomed.app.align.WrinkleTuning.Level.entries.forEach { lv ->
                 androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth()
                     .selectable(sensitivity == lv, role = androidx.compose.ui.semantics.Role.RadioButton) {
@@ -117,11 +118,11 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
             HorizontalDivider()
-            SectionHeader("Alineación automática (comparar)", Modifier.padding(horizontal = Md3Spacing.s6))
+            SectionHeader(tr("Alineación automática (comparar)"), Modifier.padding(horizontal = Md3Spacing.s6))
             listOf(
-                Triple("Usar puntos anatómicos", "Ojos, cejas, nariz, boca, óvalo; articulaciones en el cuerpo.", AlignOptions.PREF_POINTS),
-                Triple("Usar contornos", "Bordes anatómicos (mandíbula, frente, orejas, silueta) y perspectiva por proporciones.", AlignOptions.PREF_CONTOURS),
-                Triple("Usar mirada (gaze)", "Comprueba que ambas fotos miren en la misma dirección.", AlignOptions.PREF_GAZE),
+                Triple(tr("Usar puntos anatómicos"), tr("Ojos, cejas, nariz, boca, óvalo; articulaciones en el cuerpo."), AlignOptions.PREF_POINTS),
+                Triple(tr("Usar contornos"), tr("Bordes anatómicos (mandíbula, frente, orejas, silueta) y perspectiva por proporciones."), AlignOptions.PREF_CONTOURS),
+                Triple(tr("Usar mirada (gaze)"), tr("Comprueba que ambas fotos miren en la misma dirección."), AlignOptions.PREF_GAZE),
             ).forEach { (title, desc, key) ->
                 val value = when (key) { AlignOptions.PREF_POINTS -> alignPoints; AlignOptions.PREF_CONTOURS -> alignContours; else -> alignGaze }
                 ListItem(
@@ -135,33 +136,33 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
             }
             HorizontalDivider()
-            SectionHeader("Ayudas", Modifier.padding(horizontal = Md3Spacing.s6))
+            SectionHeader(tr("Ayudas"), Modifier.padding(horizontal = Md3Spacing.s6))
             ListItem(
-                headlineContent = { Text("Mostrar las ayudas de primera vez otra vez") },
-                supportingContent = { Text("Indicaciones sobre gestos: pulsación larga, arrastrar, pellizcar…") },
+                headlineContent = { Text(tr("Mostrar las ayudas de primera vez otra vez")) },
+                supportingContent = { Text(tr("Indicaciones sobre gestos: pulsación larga, arrastrar, pellizcar…")) },
                 modifier = Modifier.fillMaxWidth().clickable { com.photomed.app.ui.components.CoachMarks.resetAll(context) },
             )
             HorizontalDivider()
-            SectionHeader("Cámara", Modifier.padding(horizontal = Md3Spacing.s6))
+            SectionHeader(tr("Cámara"), Modifier.padding(horizontal = Md3Spacing.s6))
             ListItem(
-                headlineContent = { Text("Vista en espejo (cámara frontal)") },
-                supportingContent = { Text("Como las cámaras del teléfono. Las fotos se guardan siempre sin espejar.") },
+                headlineContent = { Text(tr("Vista en espejo (cámara frontal)")) },
+                supportingContent = { Text(tr("Como las cámaras del teléfono. Las fotos se guardan siempre sin espejar.")) },
                 trailingContent = { Switch(checked = mirror, onCheckedChange = null) },
                 modifier = Modifier.fillMaxWidth().toggleable(mirror, role = Role.Switch) {
                     mirror = it; prefs.edit().putBoolean("mirror_front", it).apply()
                 },
             )
             HorizontalDivider()
-            SectionHeader("Registro de errores", Modifier.padding(horizontal = Md3Spacing.s6))
+            SectionHeader(tr("Registro de errores"), Modifier.padding(horizontal = Md3Spacing.s6))
             var logs by remember { mutableStateOf(com.photomed.app.CrashLog.all(context)) }
             ListItem(
-                headlineContent = { Text(if (logs.isEmpty()) "Sin errores registrados" else "Compartir el registro (${logs.size})") },
-                supportingContent = { Text(logs.firstOrNull()?.let { "Último: " + it.readLines().getOrNull(1)?.removePrefix("Fecha: ").orEmpty() }
-                    ?: "Si la app se cierra por un error, queda registrado aquí (sin fotos ni datos del paciente).") },
+                headlineContent = { Text(if (logs.isEmpty()) tr("Sin errores registrados") else tr("Compartir el registro (%1\$d)", logs.size)) },
+                supportingContent = { Text(logs.firstOrNull()?.let { tr("Último: %1\$s", it.readLines().getOrNull(1)?.removePrefix("Fecha: ").orEmpty()) }
+                    ?: tr("Si la app se cierra por un error, queda registrado aquí (sin fotos ni datos del paciente).")) },
                 modifier = Modifier.fillMaxWidth().clickable(enabled = logs.isNotEmpty()) { com.photomed.app.CrashLog.share(context, logs) },
             )
             if (logs.isNotEmpty()) ListItem(
-                headlineContent = { Text("Borrar el registro") },
+                headlineContent = { Text(tr("Borrar el registro")) },
                 modifier = Modifier.fillMaxWidth().clickable { com.photomed.app.CrashLog.clear(context); logs = emptyList() },
             )
         }

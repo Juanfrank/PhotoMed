@@ -1,5 +1,6 @@
 package com.photomed.app.ui.components
 
+import com.photomed.app.i18n.tr
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Row
@@ -56,7 +57,7 @@ fun CoachMark(id: String, icon: ImageVector, text: String, modifier: Modifier = 
                 Icon(icon, null, Modifier.size(22.dp))
                 Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                 TextButton(onClick = { visible = false; CoachMarks.markSeen(context, id) }) {
-                    Text("Entendido", color = MaterialTheme.colorScheme.inversePrimary)
+                    Text(tr("Entendido"), color = MaterialTheme.colorScheme.inversePrimary)
                 }
             }
         }

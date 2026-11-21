@@ -1,5 +1,6 @@
 package com.photomed.app.ui.components
 
+import com.photomed.app.i18n.tr
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
@@ -58,7 +59,7 @@ fun SafeBottomSheet(onDismiss: () -> Unit, expanded: Boolean = false, content: @
 fun AppSectionTitle(section: String) {
     androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         modifier = androidx.compose.ui.Modifier.semantics(mergeDescendants = true) {}) {
-        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.photomed.app.R.drawable.logo_app), "Logo de PhotoMed",
+        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.photomed.app.R.drawable.logo_app), tr("Logo de PhotoMed"),
             Modifier.size(36.dp))
         androidx.compose.foundation.layout.Column(Modifier.padding(start = 10.dp)) {
             androidx.compose.material3.Text("PhotoMed", style = androidx.compose.material3.MaterialTheme.typography.labelMedium,

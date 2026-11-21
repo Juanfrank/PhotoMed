@@ -60,17 +60,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.photomed.app.BuildConfig
+import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trn
 import com.photomed.app.ui.components.Avatar
 import com.photomed.app.ui.theme.Md3Spacing
 
 const val AUTHOR = "Juan Medina"
 const val AUTHOR_EMAIL = "juanfrank11@gmail.com"
 
-enum class LegalDoc(val title: String, val asset: String) {
-    PRIVACY("Política de privacidad", "legal/PRIVACY.md"),
-    TERMS("Términos y condiciones", "legal/TERMS.md"),
-    LICENSE("Licencia comercial (de pago)", "legal/LICENSE.md"),
-    CHANGELOG("Novedades (registro de cambios)", "legal/CHANGELOG.md"),
+enum class LegalDoc(private val titleEs: String, val asset: String) {
+    PRIVACY(trn("Política de privacidad"), "legal/PRIVACY.md"),
+    TERMS(trn("Términos y condiciones"), "legal/TERMS.md"),
+    LICENSE(trn("Licencia comercial (de pago)"), "legal/LICENSE.md"),
+    CHANGELOG(trn("Novedades (registro de cambios)"), "legal/CHANGELOG.md");
+
+    /** Título en el idioma de la interfaz. */
+    val title: String get() = tr(titleEs)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,21 +85,21 @@ fun AboutScreen(onBack: () -> Unit, onDoc: (LegalDoc) -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Acerca de y legal") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
+                title = { Text(tr("Acerca de y legal")) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Atrás")) } },
             )
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
             Column(Modifier.fillMaxWidth().padding(Md3Spacing.s6), horizontalAlignment = Alignment.CenterHorizontally) {
-                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.photomed.app.R.drawable.logo_app), "Logo de PhotoMed", Modifier.size(72.dp))
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.photomed.app.R.drawable.logo_app), tr("Logo de PhotoMed"), Modifier.size(72.dp))
                 Spacer(Modifier.size(Md3Spacing.s4))
                 Text("PhotoMed", style = MaterialTheme.typography.headlineSmall)
-                Text("Versión ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium,
+                Text(tr("Versión %1\$s", BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.size(Md3Spacing.s2))
                 Text(
-                    "Fotografía clínica estandarizada para estética médica.",
+                    tr("Fotografía clínica estandarizada para estética médica."),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -102,7 +107,7 @@ fun AboutScreen(onBack: () -> Unit, onDoc: (LegalDoc) -> Unit) {
             ListItem(
                 headlineContent = { Text(AUTHOR) },
                 supportingContent = { Text(AUTHOR_EMAIL) },
-                overlineContent = { Text("Autor") },
+                overlineContent = { Text(tr("Autor")) },
                 leadingContent = { Icon(Icons.Default.Email, null) },
                 modifier = Modifier.clickableItem {
                     context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$AUTHOR_EMAIL")).apply {
@@ -126,17 +131,17 @@ fun AboutScreen(onBack: () -> Unit, onDoc: (LegalDoc) -> Unit) {
                 )
             }
             ListItem(
-                overlineContent = { Text("Diseño") },
+                overlineContent = { Text(tr("Diseño")) },
                 headlineContent = { Text("Material Design 3") },
-                supportingContent = { Text("Tokens de color, tipografía, forma, elevación y movimiento de Juanfrank/MD (@material/web v0_192).") },
+                supportingContent = { Text(tr("Tokens de color, tipografía, forma, elevación y movimiento de Juanfrank/MD (@material/web v0_192).")) },
                 leadingContent = { Icon(Icons.Outlined.Palette, null) },
             )
             ListItem(
-                overlineContent = { Text("Ilustraciones anatómicas") },
+                overlineContent = { Text(tr("Ilustraciones anatómicas")) },
                 headlineContent = { Text("Open Pain Illustration — Digital Health Zurich (CC BY 4.0)") },
                 supportingContent = {
-                    Text("Universidad de Zúrich; JMIR Med Inform 2026;e75737. Adaptadas: recorte por zona, " +
-                        "extracción y recoloreado de trazos; vistas oblicua 45° y lateral derivadas.")
+                    Text(tr("Universidad de Zúrich; JMIR Med Inform 2026;e75737. Adaptadas: recorte por zona, " +
+                        "extracción y recoloreado de trazos; vistas oblicua 45° y lateral derivadas."))
                 },
                 leadingContent = { Icon(Icons.Outlined.Palette, null) },
                 modifier = Modifier.clickableItem {
@@ -144,8 +149,8 @@ fun AboutScreen(onBack: () -> Unit, onDoc: (LegalDoc) -> Unit) {
                 },
             )
             ListItem(
-                overlineContent = { Text("Componentes de terceros") },
-                headlineContent = { Text("AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + modelos Face Landmarker y Selfie Multiclass (Apache 2.0), Google ML Kit (Términos de ML Kit)") },
+                overlineContent = { Text(tr("Componentes de terceros")) },
+                headlineContent = { Text(tr("AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + modelos Face Landmarker y Selfie Multiclass (Apache 2.0), Google ML Kit (Términos de ML Kit)")) },
             )
         }
     }
@@ -162,7 +167,7 @@ fun LegalDocScreen(doc: LegalDoc, onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text(doc.title) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Atrás")) } },
             )
         }
     ) { padding ->
@@ -193,24 +198,24 @@ fun TermsGate(onAccept: () -> Unit) {
                 .verticalScroll(rememberScrollState()).padding(Md3Spacing.s6),
             verticalArrangement = Arrangement.spacedBy(Md3Spacing.s4),
         ) {
-            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.photomed.app.R.drawable.logo_app), "Logo de PhotoMed", Modifier.size(64.dp))
-            Text("Bienvenido a PhotoMed", style = MaterialTheme.typography.headlineMedium,
+            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.photomed.app.R.drawable.logo_app), tr("Logo de PhotoMed"), Modifier.size(64.dp))
+            Text(tr("Bienvenido a PhotoMed"), style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.semantics { heading() })
             Text(
-                "Antes de empezar, revise cómo se tratan las fotografías y los datos de sus pacientes:",
+                tr("Antes de empezar, revise cómo se tratan las fotografías y los datos de sus pacientes:"),
                 style = MaterialTheme.typography.bodyLarge,
             )
             listOf(
-                "Todo se guarda en este teléfono; no hay servidores ni cuentas.",
-                "Las fotos aparecen en la galería, en un álbum por paciente, con sus datos incrustados como metadatos.",
-                "Usted es responsable de obtener el consentimiento informado y de cumplir la normativa de datos de salud.",
-                "Las guías y la alineación automática son ayudas visuales; no es un dispositivo médico.",
+                tr("Todo se guarda en este teléfono; no hay servidores ni cuentas."),
+                tr("Las fotos aparecen en la galería, en un álbum por paciente, con sus datos incrustados como metadatos."),
+                tr("Usted es responsable de obtener el consentimiento informado y de cumplir la normativa de datos de salud."),
+                tr("Las guías y la alineación automática son ayudas visuales; no es un dispositivo médico."),
             ).forEach { line ->
                 Row { Text("•  ", style = MaterialTheme.typography.bodyMedium); Text(line, style = MaterialTheme.typography.bodyMedium) }
             }
             Column {
                 LegalDoc.entries.forEach { doc ->
-                    TextButton(onClick = { open = doc }) { Text("Leer: ${doc.title}") }
+                    TextButton(onClick = { open = doc }) { Text(tr("Leer: %1\$s", doc.title)) }
                 }
             }
             Row(
@@ -219,10 +224,10 @@ fun TermsGate(onAccept: () -> Unit) {
             ) {
                 Checkbox(checked = checked, onCheckedChange = null)
                 Spacer(Modifier.width(Md3Spacing.s3))
-                Text("He leído y acepto los Términos y condiciones y la Política de privacidad.",
+                Text(tr("He leído y acepto los Términos y condiciones y la Política de privacidad."),
                     style = MaterialTheme.typography.bodyMedium)
             }
-            Button(onClick = onAccept, enabled = checked, modifier = Modifier.fillMaxWidth()) { Text("Aceptar y continuar") }
+            Button(onClick = onAccept, enabled = checked, modifier = Modifier.fillMaxWidth()) { Text(tr("Aceptar y continuar")) }
             Text("$AUTHOR · $AUTHOR_EMAIL", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

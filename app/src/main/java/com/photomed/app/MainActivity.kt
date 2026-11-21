@@ -1,5 +1,6 @@
 package com.photomed.app
 
+import com.photomed.app.i18n.tr
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -30,8 +31,8 @@ class MainActivity : ComponentActivity() {
         } ?: return
         lifecycleScope.launch {
             val msg = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                runCatching { "Protocolo «${com.photomed.app.data.Protocols.import(applicationContext, uri).name}» importado: ábralo desde un expediente" }
-                    .getOrElse { it.message ?: "No se pudo importar el archivo" }
+                runCatching { tr("Protocolo «%1\$s» importado: ábralo desde un expediente", com.photomed.app.data.Protocols.import(applicationContext, uri).name) }
+                    .getOrElse { it.message ?: tr("No se pudo importar el archivo") }
             }
             android.widget.Toast.makeText(this@MainActivity, msg, android.widget.Toast.LENGTH_LONG).show()
         }

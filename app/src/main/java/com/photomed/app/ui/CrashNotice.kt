@@ -1,5 +1,6 @@
 package com.photomed.app.ui
 
+import com.photomed.app.i18n.tr
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -19,10 +20,10 @@ fun CrashNotice() {
     if (files.isEmpty()) return
     AlertDialog(
         onDismissRequest = { CrashLog.markSeen(context); files = emptyList() },
-        title = { Text("La app se cerró por un error") },
-        text = { Text("Se guardó un registro del error (${files.size}). Compartirlo ayuda a corregirlo; no incluye fotos ni datos del paciente. " +
-            "También está en Ajustes → Registro de errores.") },
-        confirmButton = { TextButton(onClick = { CrashLog.share(context, files); CrashLog.markSeen(context); files = emptyList() }) { Text("Compartir") } },
-        dismissButton = { TextButton(onClick = { CrashLog.markSeen(context); files = emptyList() }) { Text("Cerrar") } },
+        title = { Text(tr("La app se cerró por un error")) },
+        text = { Text(tr("Se guardó un registro del error (%1\$d). Compartirlo ayuda a corregirlo; no incluye fotos ni datos del paciente. " +
+            "También está en Ajustes → Registro de errores.", files.size)) },
+        confirmButton = { TextButton(onClick = { CrashLog.share(context, files); CrashLog.markSeen(context); files = emptyList() }) { Text(tr("Compartir")) } },
+        dismissButton = { TextButton(onClick = { CrashLog.markSeen(context); files = emptyList() }) { Text(tr("Cerrar")) } },
     )
 }

@@ -1,5 +1,6 @@
 package com.photomed.app.data
 
+import com.photomed.app.i18n.tr
 import android.app.RecoverableSecurityException
 import android.content.ContentResolver
 import android.content.ContentUris
@@ -93,7 +94,7 @@ class MediaStorePhotoStore(private val resolver: ContentResolver) : PhotoStore {
         val video = displayName.endsWith(".mp4", true)
         if (video) values.put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
         val target = if (video) MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) else collection
-        val uri = resolver.insert(target, values) ?: error("No se pudo crear el archivo en la galería")
+        val uri = resolver.insert(target, values) ?: error(tr("No se pudo crear el archivo en la galería"))
         try {
             resolver.openOutputStream(uri)!!.use { out -> source.inputStream().use { it.copyTo(out) } }
             resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
@@ -155,7 +156,7 @@ class FilePhotoStore(
     override fun rename(uri: Uri, displayName: String, dateTaken: Long): Uri {
         val src = File(uri.path!!)
         val dst = File(src.parentFile, displayName)
-        if (dst != src && !src.renameTo(dst)) error("No se pudo renombrar la foto")
+        if (dst != src && !src.renameTo(dst)) error(tr("No se pudo renombrar la foto"))
         dst.setLastModified(dateTaken)
         onChanged(listOf(src.absolutePath, dst.absolutePath))
         return Uri.fromFile(dst)

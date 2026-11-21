@@ -128,7 +128,7 @@ object PhotoImport {
                     out += repo.savePhoto(exp, zone, f, takenAt = t,
                         variant = FacialExpression.variantTag(it.expression.takeIf { e -> zone.guide in e.guides } ?: FacialExpression.NEUTRAL),
                         conditions = mapOf("Source" to "importada", "DateSource" to if (it.dateFromPhoto) "EXIF" else "importación",
-                            "Expression" to it.expression.label) +
+                            "Expression" to it.expression.labelEs) +
                             (hashes[it.uri]?.let { h -> mapOf("SourceHash" to h) } ?: emptyMap()))
                 }
             } finally { f.delete() }

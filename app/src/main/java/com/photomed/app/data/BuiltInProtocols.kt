@@ -1,5 +1,7 @@
 package com.photomed.app.data
 
+import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trn
 import android.content.Context
 import com.photomed.app.align.LiveMatch
 import org.json.JSONArray
@@ -13,14 +15,15 @@ object BuiltInProtocols {
     private const val SEEDED = "protocols_builtin_v1"
     private const val OLD_TEMPLATES = "session_templates"
 
+    /** Nombres en español; al crearlos se guardan en el idioma de la interfaz. */
     val ALL: List<Pair<String, List<Zone>>> = listOf(
-        "Rostro 5 vistas" to listOf(Zone.FACE_FRONTAL, Zone.FACE_OBLIQUE_R, Zone.FACE_OBLIQUE_L, Zone.FACE_PROFILE_R, Zone.FACE_PROFILE_L),
-        "Rostro 3 vistas" to listOf(Zone.FACE_FRONTAL, Zone.FACE_OBLIQUE_R, Zone.FACE_OBLIQUE_L),
-        "Tercios faciales" to listOf(Zone.FOREHEAD, Zone.PERIOCULAR, Zone.LIPS),
-        "Tricología" to listOf(Zone.SCALP_VERTEX, Zone.SCALP_CROWN, Zone.SCALP_PARIETAL_R, Zone.SCALP_PARIETAL_L, Zone.FOREHEAD),
-        "Ojos" to listOf(Zone.EYE_R, Zone.EYE_L, Zone.PERIOCULAR),
-        "Tronco" to listOf(Zone.TORSO_FRONT, Zone.TORSO_SIDE, Zone.TORSO_SIDE_L, Zone.BACK),
-        "Manos y pies" to listOf(Zone.HANDS_DORSAL, Zone.HANDS_PALMAR, Zone.FEET_DORSAL, Zone.FEET_PLANTAR),
+        trn("Rostro 5 vistas") to listOf(Zone.FACE_FRONTAL, Zone.FACE_OBLIQUE_R, Zone.FACE_OBLIQUE_L, Zone.FACE_PROFILE_R, Zone.FACE_PROFILE_L),
+        trn("Rostro 3 vistas") to listOf(Zone.FACE_FRONTAL, Zone.FACE_OBLIQUE_R, Zone.FACE_OBLIQUE_L),
+        trn("Tercios faciales") to listOf(Zone.FOREHEAD, Zone.PERIOCULAR, Zone.LIPS),
+        trn("Tricología") to listOf(Zone.SCALP_VERTEX, Zone.SCALP_CROWN, Zone.SCALP_PARIETAL_R, Zone.SCALP_PARIETAL_L, Zone.FOREHEAD),
+        trn("Ojos") to listOf(Zone.EYE_R, Zone.EYE_L, Zone.PERIOCULAR),
+        trn("Tronco") to listOf(Zone.TORSO_FRONT, Zone.TORSO_SIDE, Zone.TORSO_SIDE_L, Zone.BACK),
+        trn("Manos y pies") to listOf(Zone.HANDS_DORSAL, Zone.HANDS_PALMAR, Zone.FEET_DORSAL, Zone.FEET_PLANTAR),
     )
 
     /** Protocolo de [zones] en orden, una foto por zona, con la coincidencia, la luz y el disparo por defecto. */
@@ -35,7 +38,7 @@ object BuiltInProtocols {
         if (prefs.getBoolean(SEEDED, false)) return
         ALL.forEachIndexed { i, (name, zones) ->
             val id = "predefinido-${i + 1}"
-            if (Protocols.get(context, id) == null) Protocols.save(context, of(name, zones, id))
+            if (Protocols.get(context, id) == null) Protocols.save(context, of(tr(name), zones, id))
         }
         migrate(context, prefs.getString(OLD_TEMPLATES, null))
         prefs.edit().putBoolean(SEEDED, true).remove(OLD_TEMPLATES).apply()

@@ -138,7 +138,7 @@ class PhotoRepository(
     ): Photo {
         PhotoMetadata.write(
             capture,
-            PhotoInfo(exp.patientName, exp.recordNumber, exp.id, zone.id, zone.label, takenAt, exp.consent,
+            PhotoInfo(exp.patientName, exp.recordNumber, exp.id, zone.id, zone.labelEs, takenAt, exp.consent,
                 cameraPitch, roll, focalNorm, conditions),
         )
         val name = "${zone.id}_${variant?.let { "${it}_" } ?: ""}${stampFormat.format(Date(takenAt))}.jpg"

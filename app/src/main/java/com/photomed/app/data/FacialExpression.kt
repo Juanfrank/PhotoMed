@@ -1,6 +1,8 @@
 package com.photomed.app.data
 
 import com.photomed.app.align.AnnotLayer
+import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trn
 
 /**
  * Expresión facial de una foto, para fotografiar las arrugas dinámicas (las que aparecen con la
@@ -14,29 +16,37 @@ import com.photomed.app.align.AnnotLayer
  * produce; [layers]: capas de arrugas que muestra.
  */
 enum class FacialExpression(
-    val tag: String, val label: String, val instruction: String, val muscle: String,
+    val tag: String,
+    /** Etiqueta en español: es la que se guarda en las condiciones de la toma ("Expression"). */
+    val labelEs: String,
+    private val instructionEs: String, private val muscleEs: String,
     val layers: Set<AnnotLayer>, val guides: Set<GuideType>,
 ) {
-    NEUTRAL("reposo", "Reposo", "Cara relajada, labios juntos, mirada al frente", "—", AnnotLayer.entries.toSet(),
+    NEUTRAL("reposo", trn("Reposo"), trn("Cara relajada, labios juntos, mirada al frente"), "—", AnnotLayer.entries.toSet(),
         GuideType.entries.toSet()),
-    SURPRISE("sorpresa", "Sorpresa (cejas arriba)", "Levante las cejas al máximo, como sorprendido", "frontal",
+    SURPRISE("sorpresa", trn("Sorpresa (cejas arriba)"), trn("Levante las cejas al máximo, como sorprendido"), trn("frontal"),
         setOf(AnnotLayer.FOREHEAD), setOf(GuideType.FACE_FRONT, GuideType.FACE_OBLIQUE, GuideType.FOREHEAD)),
-    FROWN("enojo", "Enojo (fruncir el ceño)", "Frunza el ceño con fuerza, como enojado", "corrugador y prócer",
+    FROWN("enojo", trn("Enojo (fruncir el ceño)"), trn("Frunza el ceño con fuerza, como enojado"), trn("corrugador y prócer"),
         setOf(AnnotLayer.GLABELLA), setOf(GuideType.FACE_FRONT, GuideType.FOREHEAD)),
-    SMILE("sonrisa", "Sonrisa máxima", "Sonría al máximo mostrando los dientes", "orbicular de los ojos y cigomáticos",
+    SMILE("sonrisa", trn("Sonrisa máxima"), trn("Sonría al máximo mostrando los dientes"), trn("orbicular de los ojos y cigomáticos"),
         setOf(AnnotLayer.CROWS_FEET, AnnotLayer.FOLDS), setOf(GuideType.FACE_FRONT, GuideType.FACE_OBLIQUE, GuideType.PERIOCULAR, GuideType.EYE, GuideType.LIPS)),
-    SQUINT("ojos_apretados", "Ojos apretados", "Cierre los ojos con fuerza", "orbicular de los ojos",
+    SQUINT("ojos_apretados", trn("Ojos apretados"), trn("Cierre los ojos con fuerza"), trn("orbicular de los ojos"),
         setOf(AnnotLayer.CROWS_FEET), setOf(GuideType.FACE_FRONT, GuideType.FACE_OBLIQUE, GuideType.PERIOCULAR, GuideType.EYE)),
-    NOSE("nariz", "Arrugar la nariz", "Arrugue la nariz, como ante un mal olor", "nasal (líneas nasales)",
+    NOSE("nariz", trn("Arrugar la nariz"), trn("Arrugue la nariz, como ante un mal olor"), trn("nasal (líneas nasales)"),
         setOf(AnnotLayer.GLABELLA, AnnotLayer.NOSE), setOf(GuideType.FACE_FRONT, GuideType.FACE_OBLIQUE)),
-    PUCKER("beso", "Fruncir los labios", "Junte los labios como para dar un beso o silbar", "orbicular de los labios",
+    PUCKER("beso", trn("Fruncir los labios"), trn("Junte los labios como para dar un beso o silbar"), trn("orbicular de los labios"),
         setOf(AnnotLayer.LIPS, AnnotLayer.FOLDS), setOf(GuideType.FACE_FRONT, GuideType.FACE_OBLIQUE, GuideType.LIPS)),
-    SAD("tristeza", "Tristeza (comisuras abajo)", "Baje las comisuras de la boca", "depresor del ángulo de la boca",
+    SAD("tristeza", trn("Tristeza (comisuras abajo)"), trn("Baje las comisuras de la boca"), trn("depresor del ángulo de la boca"),
         setOf(AnnotLayer.FOLDS), setOf(GuideType.FACE_FRONT, GuideType.FACE_OBLIQUE, GuideType.LIPS)),
-    CHIN("menton", "Mentón tenso", "Suba el labio inferior apretando el mentón", "mentoniano",
+    CHIN("menton", trn("Mentón tenso"), trn("Suba el labio inferior apretando el mentón"), trn("mentoniano"),
         setOf(AnnotLayer.LIPS), setOf(GuideType.FACE_FRONT, GuideType.FACE_OBLIQUE, GuideType.LIPS)),
-    NECK("cuello", "Cuello tenso", "Tense el cuello mostrando los dientes inferiores", "platisma",
+    NECK("cuello", trn("Cuello tenso"), trn("Tense el cuello mostrando los dientes inferiores"), trn("platisma"),
         emptySet(), setOf(GuideType.NECK));
+
+    /** Etiqueta, indicación y músculo en el idioma de la interfaz. */
+    val label: String get() = tr(labelEs)
+    val instruction: String get() = tr(instructionEs)
+    val muscle: String get() = if (muscleEs == "—") muscleEs else tr(muscleEs)
 
     companion object {
         /** Expresiones que se pueden elegir en una zona (la de reposo siempre). */

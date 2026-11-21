@@ -1,5 +1,6 @@
 package com.photomed.app.ui
 
+import com.photomed.app.i18n.tr
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,8 +38,8 @@ fun HomeScreen(onOpen: (String) -> Unit, onAbout: () -> Unit, onSettings: () -> 
         androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
             androidx.compose.material3.NavigationRail(Modifier.fillMaxHeight()) {
                 androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-                androidx.compose.material3.NavigationRailItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Icon(Icons.Default.Folder, null) }, label = { Text("Expedientes") })
-                androidx.compose.material3.NavigationRailItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Icon(Icons.Default.PlaylistAddCheck, null) }, label = { Text("Protocolos") })
+                androidx.compose.material3.NavigationRailItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Icon(Icons.Default.Folder, null) }, label = { Text(tr("Expedientes")) })
+                androidx.compose.material3.NavigationRailItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Icon(Icons.Default.PlaylistAddCheck, null) }, label = { Text(tr("Protocolos")) })
                 androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
             }
             Box(Modifier.weight(1f).fillMaxHeight()) { content() }
@@ -47,8 +48,8 @@ fun HomeScreen(onOpen: (String) -> Unit, onAbout: () -> Unit, onSettings: () -> 
     }
     Scaffold(bottomBar = {
         NavigationBar {
-            NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Icon(Icons.Default.Folder, null) }, label = { Text("Expedientes") })
-            NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Icon(Icons.Default.PlaylistAddCheck, null) }, label = { Text("Protocolos") })
+            NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Icon(Icons.Default.Folder, null) }, label = { Text(tr("Expedientes")) })
+            NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Icon(Icons.Default.PlaylistAddCheck, null) }, label = { Text(tr("Protocolos")) })
         }
     }) { pad ->
         Box(Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding()).consumeWindowInsets(pad)) { content() }
