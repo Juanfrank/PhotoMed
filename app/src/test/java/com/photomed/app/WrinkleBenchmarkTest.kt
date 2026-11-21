@@ -71,13 +71,12 @@ class WrinkleBenchmarkTest {
     @Test
     fun sensitivitySweep() {
         assumeTrue(System.getenv("PM_SWEEP") != null)
-        for ((k, kc, cap) in listOf(Triple(1f, 1f, 1f), Triple(0.8f, 0.9f, 1.5f), Triple(0.65f, 0.8f, 2f), Triple(0.5f, 0.7f, 2.5f))) {
-            com.photomed.app.align.WrinkleTuning.k = k; com.photomed.app.align.WrinkleTuning.kc = kc; com.photomed.app.align.WrinkleTuning.capK = cap
-            com.photomed.app.align.PhotoAnnotator.clearCache()
-            println("BENCH SENSIBILIDAD k=$k kc=$kc cap=$cap")
-            bench("wrinkles_test", "sensibilidad $k/$kc/$cap", save = false)
+        for (lv in com.photomed.app.align.WrinkleTuning.Level.entries) {
+            com.photomed.app.align.WrinkleTuning.apply(lv)
+            println("BENCH SENSIBILIDAD ${lv.label}")
+            bench("wrinkles_test", "sensibilidad ${lv.label}", save = false)
         }
-        com.photomed.app.align.WrinkleTuning.k = 1f; com.photomed.app.align.WrinkleTuning.kc = 1f; com.photomed.app.align.WrinkleTuning.capK = 1f
+        com.photomed.app.align.WrinkleTuning.apply(com.photomed.app.align.WrinkleTuning.Level.BALANCED)
     }
 
     private fun bench(name: String, what: String, save: Boolean = true) {
@@ -85,8 +84,9 @@ class WrinkleBenchmarkTest {
         val meshFile = File(dir, "mesh.json")
         assumeTrue("sin datos del benchmark (tools/eval/bench_wrinkles.py)", meshFile.exists())
         val o = JSONObject(meshFile.readText())
-        val regions = listOf("Frente", "Ceño", "Patas de gallo", "Nasogenianos")
-        val acc = regions.associateWith { Acc() } + ("Total (regiones)" to Acc())
+        val regions = listOf("Frente", "Ceño", "Patas de gallo", "Nasogenianos", "Infraorbitaria", "Perioral")
+        val base4 = regions.take(4).toSet()
+        val acc = regions.associateWith { Acc() } + ("Total (4 regiones)" to Acc()) + ("Total (6 regiones)" to Acc())
         val perImage = JSONArray()
         val out = File("build/reports/bench").apply { mkdirs() }
         var n = 0
@@ -108,7 +108,8 @@ class WrinkleBenchmarkTest {
                     Color.red(labPx[y * labBmp.width + x]).toByte()
                 })
             })
-            val wr = lines.filter { it.layer in setOf(AnnotLayer.FOREHEAD, AnnotLayer.GLABELLA, AnnotLayer.CROWS_FEET, AnnotLayer.FOLDS) && !it.estimated }
+            val wr = lines.filter { it.layer in setOf(AnnotLayer.FOREHEAD, AnnotLayer.GLABELLA, AnnotLayer.CROWS_FEET, AnnotLayer.FOLDS,
+                AnnotLayer.INFRAORBITAL, AnnotLayer.PERIORAL) && !it.estimated }
             // trazos del motor como muestras cada píxel
             val samples = ArrayList<Pair<Float, Float>>()
             for (l in wr) for (s in 1 until l.points.size) {
@@ -145,11 +146,19 @@ class WrinkleBenchmarkTest {
                     val dx = (x - cx) * out
                     if (dx in 0.03f * ipd..0.75f * ipd && kotlin.math.abs(y - cy) < 0.45f * ipd) return "Patas de gallo"
                 }
+                // bajo los ojos, entre los cantos
+                for ((a, b) in listOf(33 to 133, 263 to 362)) {
+                    val (ax, ay) = P(a); val (bx, by) = P(b); val cy = (ay + by) / 2
+                    if (x in min(ax, bx)..max(ax, bx) && y in cy + 0.05f * ipd..cy + 0.45f * ipd) return "Infraorbitaria"
+                }
                 val (mlx, mly) = P(61); val (mrx, mry) = P(291); val (_, sy) = P(2)
                 val l = min(mlx, mrx); val r = max(mlx, mrx)
                 val nearMouth = x in l - 0.45f * ipd..r + 0.45f * ipd && y in sy - 0.1f * ipd..max(mly, mry) + 0.45f * ipd
                 val lips = x in l..r && y in sy + 0.1f * ipd..max(mly, mry) + 0.25f * ipd
                 if (nearMouth && !lips && (x < l + 0.05f * ipd || x > r - 0.05f * ipd)) return "Nasogenianos"
+                // alrededor de la boca, sin los labios
+                val (_, ty) = P(0); val (_, by) = P(17)
+                if (x in l + 0.05f * ipd..r - 0.05f * ipd && y in sy + 0.05f * ipd..max(mly, mry) + 0.6f * ipd && y !in ty - 0.02f * ipd..by + 0.02f * ipd) return "Perioral"
                 return null
             }
             val per = regions.associateWith { Acc() }
@@ -157,12 +166,12 @@ class WrinkleBenchmarkTest {
                 val xi = x.toInt(); val yi = y.toInt(); if (xi !in 0 until w || yi !in 0 until h) continue
                 val rg = region(x, y) ?: continue
                 val hit = dGt[yi * w + xi] <= TOL
-                for (a in listOf(acc.getValue(rg), acc.getValue("Total (regiones)"), per.getValue(rg))) { a.pred++; if (hit) a.predIn++ }
+                for (a in listOfNotNull(acc.getValue(rg), acc.getValue("Total (6 regiones)"), acc["Total (4 regiones)"]?.takeIf { rg in base4 }, per.getValue(rg))) { a.pred++; if (hit) a.predIn++ }
             }
             for (i in gt.indices) if (gt[i]) {
                 val rg = region((i % w).toFloat(), (i / w).toFloat()) ?: continue
                 val hit = dPred[i] <= TOL
-                for (a in listOf(acc.getValue(rg), acc.getValue("Total (regiones)"), per.getValue(rg))) { a.gt++; if (hit) a.gtIn++ }
+                for (a in listOfNotNull(acc.getValue(rg), acc.getValue("Total (6 regiones)"), acc["Total (4 regiones)"]?.takeIf { rg in base4 }, per.getValue(rg))) { a.gt++; if (hit) a.gtIn++ }
             }
             n++
             perImage.put(JSONObject().put("id", k).apply { per.forEach { (r, a) -> put(r, JSONObject().put("precision", a.p().toDouble().takeIf { !it.isNaN() }).put("recall", a.r().toDouble().takeIf { !it.isNaN() })) } })

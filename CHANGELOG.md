@@ -2,6 +2,19 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.43 — 21 de noviembre de 2026
+
+- **Arrugas: detección libre** además de los pasillos fijos: mapa de crestas en toda la piel (sin ojos,
+  cejas ni labios), con la luz normalizada, en cualquier orientación.
+- **Puntuación de cada línea candidata** (contraste, fuerza, longitud, orientación esperada en la zona y
+  rectitud) antes de elegir las de cada zona.
+- **Ceño** más preciso: fuera del borde de las cejas y solo líneas casi verticales.
+- **Capas nuevas**: líneas infraorbitarias (bajo el ojo) y periorales (labio superior e inferior).
+- **Sensibilidad de la detección** en Ajustes: conservadora, equilibrada o exhaustiva.
+- **Benchmark repetido** en la partición de prueba del artículo de FFHQ-Wrinkle: F1 estricto 0,234 →
+  0,281 (+20 %), ceño 0,24 → 0,30, patas de gallo 0,40 → 0,45, infraorbitarias 0,61 (ver
+  `docs/BENCHMARK.md`).
+
 ## 2.42 — 21 de noviembre de 2026
 
 - **Visor**: en la barra, Anotar, Pantalla completa, Compartir y ⋯ (Comparar, Girar / espejo /

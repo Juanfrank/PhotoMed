@@ -117,6 +117,56 @@ muestra aleatoria anterior solo compartía 6. Con esa partición:
 8. **Sensibilidad elegible** en la app (conservadora / equilibrada / exhaustiva): el ajuste ya existe
    (`WrinkleTuning`); el usuario elegiría entre menos falsos positivos o encontrar más líneas.
 
+### Mejoras aplicadas (versión 2.43) y benchmark repetido
+
+Implementadas las recomendaciones 1, 2, 3, 4, 6 y 8 (la 5, un modelo entrenado, se omitió por
+decisión del usuario; la 7 necesita fotos clínicas anotadas):
+
+1. **Detección libre** (`WrinkleField`): mapa de crestas multiescala en toda la piel permitida (sin
+   ojos, cejas ni labios), con la luz normalizada; crestas finas conectadas → polilíneas, que se vuelven
+   a seguir con el mismo rastreador de los pasillos.
+2. **Puntuación de candidatos** (pasillos y libres) con rasgos medibles: contraste y fuerza sobre el
+   mínimo de la zona, longitud, acuerdo con la orientación esperada (horizontal en la frente, vertical en
+   el ceño y perioral, radial en las patas de gallo) y rectitud. **Pesos fijados por diseño**, no
+   entrenados: FFHQ-Wrinkle es no comercial, así que solo se usó para evaluar (calibración de umbrales
+   con la muestra aleatoria; resultados con la partición de prueba del artículo, no usada para calibrar).
+3. **Ceño**: búsqueda fuera del borde de las cejas y solo líneas casi verticales (± 30°).
+4. **Capas nuevas**: líneas infraorbitarias y periorales.
+6. **Luz normalizada** en la detección libre (en los pasillos empeoraba: 0,51 → 0,48, se dejó apagada).
+8. **Sensibilidad elegible** en Ajustes: conservadora, equilibrada (por defecto) y exhaustiva.
+
+Resultados en la **partición de prueba del artículo** (100 fotos, no usada para calibrar):
+
+| | 2.42 | **2.43 (equilibrada)** |
+|---|---|---|
+| F1 estricto (píxel a píxel) | 0,234 | **0,281** (+20 %) |
+| JSI estricto | 0,132 | **0,163** (+23 %) |
+| F1 con tolerancia, 4 regiones originales | 0,48 (P 0,62 / R 0,39) | **0,50** (P 0,60 / R 0,43) |
+| F1 con tolerancia, 6 regiones (con infraorbitaria y perioral) | — | 0,52 (P 0,62 / R 0,46) |
+| Frente | 0,59 | 0,58 |
+| Ceño | 0,24 | **0,30** |
+| Patas de gallo | 0,40 | **0,45** |
+| Nasogenianos | 0,49 | 0,49 |
+| Infraorbitaria (nueva) | — | **0,61** |
+| Perioral (nueva) | — | 0,24 (precisión 0,66, exhaustividad 0,15) |
+
+Por sensibilidad (misma partición):
+
+| Sensibilidad | Precisión | Exhaustividad | F1 (6 regiones) | F1 estricto |
+|---|---|---|---|---|
+| Conservadora | 0,66 | 0,41 | 0,51 | 0,270 |
+| **Equilibrada** | 0,62 | 0,46 | 0,52 | **0,281** |
+| Exhaustiva | 0,55 | 0,48 | 0,51 | 0,275 |
+
+Coste: el análisis de una cara pasa de 342 a 425 ms (3 núcleos de cálculo en la prueba).
+
+Lectura: la detección libre y la puntuación mejoran sobre todo el ceño y las patas de gallo, y la capa
+infraorbitaria encuentra lo que los anotadores marcan bajo los ojos (la zona con más arrugas marcadas
+tras la frente). La métrica del artículo mejora un 20 %, pero sigue lejos de un modelo entrenado
+(0,64): el siguiente salto requiere datos propios anotados (recomendaciones 5 y 7). Las líneas
+periorales son escasas en el conjunto y su detección es la menos fiable (por eso solo se muestran con
+alta puntuación).
+
 ## 2. Puntos anatómicos y proporciones: AFW (300-W)
 
 - **Datos**: AFW de [300-W (iBUG)](https://ibug.doc.ic.ac.uk/resources/300-W/): 337 caras con **68 puntos

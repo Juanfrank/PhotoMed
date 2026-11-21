@@ -46,6 +46,8 @@ class MainActivity : ComponentActivity() {
         CrashLog.checkExitReasons(applicationContext)
         // versión nueva: fuera las cachés de la anterior (formatos que pueden haber cambiado)
         AppUpgrade.onStart(applicationContext)
+        // sensibilidad de la detección de arrugas elegida en los ajustes
+        com.photomed.app.align.WrinkleTuning.load(applicationContext)
         enableEdgeToEdge()
         val repository = PhotoRepository.create(applicationContext)
         // Versión 1 guardaba las fotos en almacenamiento privado: se mueven a la galería.

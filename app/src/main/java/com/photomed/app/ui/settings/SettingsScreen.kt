@@ -1,5 +1,6 @@
 package com.photomed.app.ui.settings
 
+import androidx.compose.foundation.selection.selectable
 import kotlinx.coroutines.launch
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.unit.dp
@@ -55,6 +56,8 @@ fun SettingsScreen(onBack: () -> Unit) {
     var alignPoints by remember { mutableStateOf(prefs.getBoolean(AlignOptions.PREF_POINTS, true)) }
     var alignContours by remember { mutableStateOf(prefs.getBoolean(AlignOptions.PREF_CONTOURS, true)) }
     var alignGaze by remember { mutableStateOf(prefs.getBoolean(AlignOptions.PREF_GAZE, true)) }
+    var sensitivity by remember { mutableStateOf(runCatching { com.photomed.app.align.WrinkleTuning.Level.valueOf(
+        prefs.getString(com.photomed.app.align.WrinkleTuning.PREF, "BALANCED")!!) }.getOrDefault(com.photomed.app.align.WrinkleTuning.Level.BALANCED)) }
     Scaffold(topBar = {
         TopAppBar(title = { Text("Ajustes") },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } })
@@ -70,6 +73,23 @@ fun SettingsScreen(onBack: () -> Unit) {
                 nearCapture = nearCapture, onNearCapture = { nearCapture = it; prefs.edit().putBoolean("auto_capture_near", it).apply() },
                 burst = burst, onBurst = { burst = it; prefs.edit().putBoolean("burst", it).apply() },
             )
+            HorizontalDivider()
+            // sensibilidad de la detección de arrugas y surcos (ver docs/BENCHMARK.md)
+            SectionHeader("Detección de arrugas", Modifier.padding(horizontal = Md3Spacing.s6))
+            com.photomed.app.align.WrinkleTuning.Level.entries.forEach { lv ->
+                androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth()
+                    .selectable(sensitivity == lv, role = androidx.compose.ui.semantics.Role.RadioButton) {
+                        sensitivity = lv; prefs.edit().putString(com.photomed.app.align.WrinkleTuning.PREF, lv.name).apply()
+                        com.photomed.app.align.WrinkleTuning.apply(lv)
+                    }.padding(horizontal = Md3Spacing.s6, vertical = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    androidx.compose.material3.RadioButton(selected = sensitivity == lv, onClick = null)
+                    androidx.compose.foundation.layout.Column(Modifier.padding(start = 8.dp)) {
+                        Text(lv.label, style = androidx.compose.material3.MaterialTheme.typography.bodyLarge)
+                        Text(lv.desc, style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
             HorizontalDivider()
             SectionHeader("Alineación automática (comparar)", Modifier.padding(horizontal = Md3Spacing.s6))
             listOf(
