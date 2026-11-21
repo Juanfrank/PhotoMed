@@ -128,7 +128,7 @@ object ReliefCapture {
      * profundidad. Devuelve un mensaje para el usuario.
      */
     suspend fun process(context: Context, frames: List<PsFrame>, photoUri: Uri, focalNorm: Float?, zoom: Float, depthMm: Float?): String =
-        withContext(Dispatchers.Default) {
+        com.photomed.app.align.NativeGate.run("relieve") { withContext(Dispatchers.Default) {
             val full = frames.lastOrNull { it.pattern == Pattern.FULL } ?: return@withContext "Relieve: faltan tomas"
             MediaPipeFace(context).use { mp ->
                 val frameMesh = mp.mesh(full.bmp) ?: return@withContext "Relieve: no se encontró la cara"
@@ -146,13 +146,16 @@ object ReliefCapture {
                     signalRatio = r.signalRatio, validFraction = r.validFraction))
                 "Relieve guardado (${"%.0f".format(r.distanceMm / 10)} cm, ${r.distanceSource})"
             }
-        }
+        } }
 
     /**
      * Escala de una foto normal con el sensor de profundidad: mm por ancho de la foto a la
      * distancia medida (FOV de la cámara) frente a la escala del iris. Solo rostros.
      */
-    suspend fun saveDepthScale(context: Context, photoUri: Uri, depthMm: Float, focalNorm: Float, zoom: Float) = withContext(Dispatchers.Default) {
+    suspend fun saveDepthScale(context: Context, photoUri: Uri, depthMm: Float, focalNorm: Float, zoom: Float) =
+        com.photomed.app.align.NativeGate.run("escala del sensor de profundidad") { saveDepthScaleGated(context, photoUri, depthMm, focalNorm, zoom) }
+
+    private suspend fun saveDepthScaleGated(context: Context, photoUri: Uri, depthMm: Float, focalNorm: Float, zoom: Float) = withContext(Dispatchers.Default) {
         runCatching {
             val photo = ImageOps.loadFull(context, photoUri, 1440, ImageEdit.NONE)
             val mesh = MediaPipeFace(context).use { it.mesh(photo) } ?: return@runCatching

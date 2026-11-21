@@ -284,7 +284,9 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     }
 
     /** Altura de la frente (cejas → línea de implantación) / interpupilar en una foto; null si no se mide. */
-    fun hairlineIpd(photo: Bitmap): Float? = if (!tracksHairline) null else runCatching {
+    fun hairlineIpd(photo: Bitmap): Float? = if (!tracksHairline) null else NativeGate.tryRunBlocking("línea del pelo al capturar", 3000) { hairlineIpdGated(photo) }
+
+    private fun hairlineIpdGated(photo: Bitmap): Float? = runCatching {
         val d = detector.detectFull(spec.detector, photo)
         // cejas ajustadas a la imagen antes de medir la frente
         hairSkin?.labels(photo)?.let { lb ->

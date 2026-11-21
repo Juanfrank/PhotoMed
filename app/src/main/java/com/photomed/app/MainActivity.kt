@@ -19,6 +19,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // ningún cierre silencioso: los errores se guardan y se avisan al volver a abrir
         CrashLog.install(applicationContext)
+        CrashLog.checkExitReasons(applicationContext)
         // versión nueva: fuera las cachés de la anterior (formatos que pueden haber cambiado)
         AppUpgrade.onStart(applicationContext)
         enableEdgeToEdge()

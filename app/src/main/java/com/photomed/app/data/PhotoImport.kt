@@ -51,7 +51,10 @@ object PhotoImport {
     }
 
     /** Fechas y ángulo sugerido (rostro) de las fotos elegidas. [default]: zona si no hay sugerencia. */
-    suspend fun prepare(context: Context, uris: List<Uri>, default: Zone?, detectFaces: Boolean = true): List<ImportItem> = withContext(Dispatchers.Default) {
+    suspend fun prepare(context: Context, uris: List<Uri>, default: Zone?, detectFaces: Boolean = true): List<ImportItem> =
+        com.photomed.app.align.NativeGate.run("importar: ángulo sugerido") { prepareGated(context, uris, default, detectFaces) }
+
+    private suspend fun prepareGated(context: Context, uris: List<Uri>, default: Zone?, detectFaces: Boolean): List<ImportItem> = withContext(Dispatchers.Default) {
         val now = System.currentTimeMillis()
         val mp = if (detectFaces) runCatching { MediaPipeFace(context) }.getOrNull() else null
         try {

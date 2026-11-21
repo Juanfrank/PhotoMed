@@ -727,8 +727,12 @@ class PhotoAnnotator(private val context: Context) {
                         /** Arrugas y surcos de fotos anteriores del paciente, como referencia. */
                         priors: List<PriorLine> = emptyList(),
                         /** Foto cuya memoria de líneas se guarda (para las fotos posteriores); null = no guardar. */
-                        memoryUri: String? = null): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-        if (!enabled) return@withContext emptyList<AnnotLine>() to "Análisis no disponible"
+                        memoryUri: String? = null): Pair<List<AnnotLine>, String?> =
+        if (!enabled) emptyList<AnnotLine>() to "Análisis no disponible"
+        else NativeGate.run("análisis de una foto (${zone.id}, ${bmp.width}×${bmp.height})") { analyzeGated(bmp, zone, extras, user, priors, memoryUri) }
+
+    private suspend fun analyzeGated(bmp: Bitmap, zone: Zone, extras: MeasureExtras?, user: AnnotUserEdit?, priors: List<PriorLine>,
+                                     memoryUri: String?): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val spec = ZoneAlignment.of(zone)
         if (spec.detector == Detector.FACE) {
             // malla completa de MediaPipe (nariz, labios, ojos y pasillos de los surcos con su topología real)

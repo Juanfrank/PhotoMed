@@ -72,7 +72,7 @@ data class AlignOptions(
 class Aligner(private val context: Context) {
 
     suspend fun auto(zone: Zone, before: Uri, after: Uri, manualKeystone: Float? = null,
-                     options: AlignOptions = AlignOptions()): AlignmentResult =
+                     options: AlignOptions = AlignOptions()): AlignmentResult = NativeGate.run("alineación automática (${zone.id})") {
         withContext(Dispatchers.Default) {
             val spec = ZoneAlignment.of(zone)
             val b = ImageOps.load34(context, before, DETECT_W)
@@ -91,6 +91,7 @@ class Aligner(private val context: Context) {
                     bodyOf = { bmp -> BodyRegion.of(zone, bmp) { seg.segment(it) } })
             }
         }
+    }
 
     /**
      * Quita de ambas detecciones los rasgos interiores tapados en alguna de las dos fotos (según la
@@ -108,13 +109,17 @@ class Aligner(private val context: Context) {
     }
 
     /** Medición de contornos para una foto (óvalo facial si hay rostro, si no la silueta del sujeto). */
-    suspend fun autoMask(zone: Zone, uri: Uri, width: Int = MEASURE_W): Pair<Bitmap, Mask?> = withContext(Dispatchers.Default) {
-        val bmp = ImageOps.load34(context, uri, width)
-        bmp to autoMask(ZoneAlignment.of(zone), bmp)
+    suspend fun autoMask(zone: Zone, uri: Uri, width: Int = MEASURE_W): Pair<Bitmap, Mask?> = NativeGate.run("contorno de una foto") {
+        withContext(Dispatchers.Default) {
+            val bmp = ImageOps.load34(context, uri, width)
+            bmp to autoMask(ZoneAlignment.of(zone), bmp)
+        }
     }
 
     /** Región de piel para igualar color: óvalo facial reducido (sin pelo ni fondo) o centro de la silueta. */
-    suspend fun skinMask(zone: Zone, bmp: Bitmap): BooleanArray? = withContext(Dispatchers.Default) {
+    suspend fun skinMask(zone: Zone, bmp: Bitmap): BooleanArray? = NativeGate.run("piel para igualar color") { skinMaskGated(zone, bmp) }
+
+    private suspend fun skinMaskGated(zone: Zone, bmp: Bitmap): BooleanArray? = withContext(Dispatchers.Default) {
         val spec = ZoneAlignment.of(zone)
         if (spec.detector == Detector.FACE) {
             val pts = LandmarkDetector(stream = false, context, FaceEngine.get(context)).use { it.detect(Detector.FACE, bmp) }

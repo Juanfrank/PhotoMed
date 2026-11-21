@@ -2,6 +2,18 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.31 — 21 de noviembre de 2026
+
+- **Comparar sin cierres por modelos simultáneos**: la alineación automática y el análisis de cada
+  foto creaban a la vez varios detectores y segmentadores nativos (MediaPipe, ML Kit); eso agotaba la
+  memoria o fallaba en código nativo, y Android cerraba la app sin pasar por el registro. Ahora todos
+  los modelos nativos de la app se ejecutan de uno en uno (análisis, alineación, contornos, importación,
+  relieve, línea del pelo al capturar).
+- **Registro también de los cierres sin traza de Java**: al volver a abrir la app se consulta a Android
+  el motivo del último cierre (fallo nativo, falta de memoria con la app a la vista, bloqueo) y se
+  guarda con la memoria usada, un extracto del volcado y las últimas acciones de la app (Android 11+).
+  Los registros de errores incluyen también las últimas acciones.
+
 ## 2.30 — 21 de noviembre de 2026
 
 - **Cuatro capas en cada foto** (botón de la vista 👁 en el visor y en Comparar): la **imagen**, el
