@@ -578,17 +578,6 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         } ?: 0f
     }
 
-    /** Altura de la frente (cejas → línea de implantación) / interpupilar de la foto tomada, para el seguimiento tricológico. */
-    suspend fun hairlineOf(file: File): Float? {
-        if (!com.photomed.app.align.HairSkin.appliesTo(zone)) return null
-        val bmp = runCatching { ImageOps.load34(context, android.net.Uri.fromFile(file), 360) }.getOrNull() ?: return null
-        return kotlinx.coroutines.withTimeoutOrNull(4000) {
-            kotlinx.coroutines.suspendCancellableCoroutine<Float?> { c ->
-                pipeline.post { val v = runCatching { pipeline.withEngine { it.hairlineIpd(bmp) } }.getOrNull(); if (c.isActive) c.resume(v) }
-            }
-        }
-    }
-
     /**
      * Medición de relieve: secuencia de la pantalla (oscura, mitades, blanca), foto normal con la
      * pantalla blanca y, en segundo plano, cálculo del relieve sobre la foto guardada.
@@ -679,9 +668,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             }
             val best = if (files.size == 1) files[0] else files.maxBy { scoreOf(it) }
             files.filter { it !== best }.forEach { it.delete() }
-            val hairline = hairlineOf(best)
-            val conds0 = if (hairline == null) conditions else conditions + ("HairlineIpd" to "%.3f".format(java.util.Locale.US, hairline))
-            val conds = if (depthMm == null) conds0 else conds0 + ("DepthSensorCm" to "%.1f".format(java.util.Locale.US, depthMm / 10))
+            // la línea del pelo se mide después de guardar (en segundo plano, sin omitirla nunca)
+            val conds = if (depthMm == null) conditions else conditions + ("DepthSensorCm" to "%.1f".format(java.util.Locale.US, depthMm / 10))
             // Se guarda en el ámbito de la app: termina aunque se cierre la cámara.
             AppScope.launch {
                 val result = runCatching {
@@ -690,6 +678,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                             com.photomed.app.data.FacialExpression.variantTag(expression)).joinToString("_").ifEmpty { null })
                 }.also { best.delete() }
                 if (depthMm != null && focal != null) result.getOrNull()?.let { ReliefCapture.saveDepthScale(context, it.uri, depthMm, focal, zoomNow) }
+                if (com.photomed.app.align.HairSkin.appliesTo(zone)) result.getOrNull()?.let { ph ->
+                    AppScope.launch { com.photomed.app.align.HairlineMeasure.measureAndStore(context, ph.uri) }
+                }
                 scope.launch {
                     capturing = false
                     result.onSuccess {
@@ -746,7 +737,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     // pivote anatómico, espera el resultado y dispara solo si sigue coincidiendo. Una vez por coincidencia.
     // Listo para disparar: coincide, o "casi" (≥ 80 %) si se permite; la alineación fina se hace después.
     fun readyNow(e: com.photomed.app.align.MatchEval?) =
-        e != null && (e.status == MatchStatus.MATCH || (nearCapture && (GuideTone.degree(e) ?: 0f) >= 0.8f))
+        // la expresión pedida es obligatoria (también con «casi alineada»)
+        e != null && e.expressionOk && (e.status == MatchStatus.MATCH || (nearCapture && (GuideTone.degree(e) ?: 0f) >= 0.8f))
     val ready = matchingEnabled && readyNow(live?.eval)
     LaunchedEffect(ready, autoCapture) {
         if (!ready) { autoArmed = true; return@LaunchedEffect }

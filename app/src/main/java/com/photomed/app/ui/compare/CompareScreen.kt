@@ -121,6 +121,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material3.HorizontalDivider
@@ -188,6 +189,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     val layersState = rememberAnnotLayers()
     var showLayers by remember { mutableStateOf(layersState.value.isNotEmpty()) }
     var metricsSheet by remember { mutableStateOf(false) }
+    // horizontal o tableta apaisada: la tabla de medidas va a la derecha de las fotos
+    val conf = androidx.compose.ui.platform.LocalConfiguration.current
+    val wide = conf.screenWidthDp >= 600 && conf.screenWidthDp > conf.screenHeightDp
     // eliminar líneas (falsos positivos): vuelve a analizar
     var userVersion by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var regenerate by remember { mutableStateOf(false) }
@@ -480,7 +484,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         androidx.compose.runtime.SideEffect { annotsNow = annots; inksNow = inks }
         val view = CompareView(viewRot, viewMirror, if (viewLayers.value.diagram) layers else emptySet(),
             models.mapNotNull { (k, m) -> annots[k]?.let { m to it } }.toMap(), annotAlpha.value,
-            view = viewLayers.value, ink = models.mapNotNull { (k, m) -> inks[k]?.let { m to it } }.toMap(), selected = selLine, selectedKey = selKey)
+            view = viewLayers.value, ink = models.mapNotNull { (k, m) -> inks[k]?.let { m to it } }.toMap(), selected = selLine, selectedKey = selKey,
+            // tocar una línea: se selecciona en todas las fotos y la tabla se abre en su fila
+            onSelect = { l -> selLine = l?.metrics?.name; selKey = null; if (l?.metrics != null) metricsSheet = true })
         if (all != null && photos.size < 2) {
             EmptyState(Icons.Default.Compare, "Se necesitan dos fotografías",
                 "Tome al menos dos fotografías de una zona para compararlas.", Modifier.padding(padding))
@@ -520,9 +526,59 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     modifier = Modifier.padding(start = 10.dp))
             }
             // Área de comparación
+            // tabla de medidas: debajo de las fotos (vertical) o a su derecha (horizontal / tableta), sin taparlas
+            @Composable fun metricsPanel(seq: List<Photo>, mod: Modifier) {
+                // eliminadas y confirmadas de las fotos comparadas (lectura fuera del hilo principal)
+                val panelNote by androidx.compose.runtime.produceState<String?>(null, seqKeys, userVersion) {
+                    value = withContext(Dispatchers.IO) { seq.firstNotNullOfOrNull { photoAnnotationNote(context, it.uri, previousOf(it)) } }
+                }
+                val traceSummary by androidx.compose.runtime.produceState(0 to false, seqKeys, userVersion) {
+                    value = withContext(Dispatchers.IO) {
+                        seq.sumOf { p -> com.photomed.app.align.ConfirmedTraces.of(context, p.uri.toString())?.removed?.size
+                            ?: com.photomed.app.align.AnnotUserEdits.of(context, p.uri.toString()).dismissed.size } to
+                            seq.all { com.photomed.app.align.ConfirmedTraces.of(context, it.uri.toString()) != null }
+                    }
+                }
+                val stamps = stampLabels(seq.map { it.takenAt })
+                MetricsPanel(seq.mapIndexed { i, p -> stamps[i] to annots[p.key].orEmpty() }, layersState.value,
+                    onClose = { metricsSheet = false }, loading = seq.any { annots[it.key] == null },
+                    note = panelNote,
+                    onShowLayers = { layersState.value = it },
+                    selected = selLine?.let { n -> seq.firstNotNullOfOrNull { p -> annots[p.key]?.firstOrNull { it.metrics?.name == n } } },
+                    // fila tocada: la línea se selecciona en todas las fotos y el zoom la centra
+                    onSelectLine = { l, key ->
+                        selLine = l.metrics?.name; selKey = key
+                        if (l.layer !in layersState.value) layersState.value = layersState.value + l.layer
+                        zoom = focusZoom(l, cellSize.value, zoom, key)
+                    },
+                    selectedKey = selKey,
+                    // eliminar (falso positivo): los trazos de esa foto quedan confirmados sin la línea
+                    onDelete = { name, col ->
+                        val ps = if (col == null) seq else listOfNotNull(seq.getOrNull(col))
+                        mutateTraces(ps, { previousOf(it) }) { com.photomed.app.align.ConfirmedTraces.remove(it, name) }
+                    },
+                    dismissedCount = traceSummary.first,
+                    onRestore = {
+                        // lectura de los trazos (XMP) fuera del hilo principal
+                        scope.launch {
+                            val confirmed = withContext(Dispatchers.IO) {
+                                seq.filter { p -> (com.photomed.app.align.ConfirmedTraces.of(context, p.uri.toString()) != null).also { c ->
+                                    if (!c) com.photomed.app.align.AnnotUserEdits.restore(context, p.uri.toString()) } }
+                            }
+                            mutateTraces(confirmed, { previousOf(it) }) { com.photomed.app.align.ConfirmedTraces.restore(it) }
+                            userVersion++
+                        }
+                    },
+                    traces = run {
+                        TraceActions(confirmed = traceSummary.second, onConfirm = { mutateTraces(seq, { previousOf(it) }) { it } },
+                            onRegenerate = { regenerate = true })
+                    },
+                    modifier = mod)
+            }
             androidx.compose.runtime.CompositionLocalProvider(LocalCompareView provides view, LocalCellSize provides cellSize) {
+            Row(Modifier.weight(1f).fillMaxWidth()) {
             Box(
-                Modifier.weight(1f).fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact, vertical = Md3Spacing.s2),
+                Modifier.weight(1f).fillMaxHeight().padding(horizontal = Md3Spacing.marginCompact, vertical = Md3Spacing.s2),
                 contentAlignment = Alignment.Center,
             ) {
                 if (seq == null) {
@@ -646,6 +702,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     }
                 }
             }
+            if (wide && metricsSheet && showLayers && seq != null)
+                metricsPanel(seq, Modifier.width(minOf(440, (conf.screenWidthDp * 0.42f).toInt()).dp).fillMaxHeight())
+            }
 
             // asa para plegar o desplegar todo lo que hay bajo las fotos (menos la línea de tiempo)
             if (seq != null) Row(
@@ -662,47 +721,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             }
             androidx.compose.animation.AnimatedVisibility(panelOpen || seq == null) {
             Column {
-            // tabla de medidas: debajo de las fotos, sin taparlas
-            if (metricsSheet && showLayers && seq != null) {
-                // eliminadas y confirmadas de las fotos comparadas (lectura fuera del hilo principal)
-                val traceSummary by androidx.compose.runtime.produceState(0 to false, seqKeys, userVersion) {
-                    value = withContext(Dispatchers.IO) {
-                        seq.sumOf { p -> com.photomed.app.align.ConfirmedTraces.of(context, p.uri.toString())?.removed?.size
-                            ?: com.photomed.app.align.AnnotUserEdits.of(context, p.uri.toString()).dismissed.size } to
-                            seq.all { com.photomed.app.align.ConfirmedTraces.of(context, it.uri.toString()) != null }
-                    }
-                }
-                val stamps = stampLabels(seq.map { it.takenAt })
-                MetricsPanel(seq.mapIndexed { i, p -> stamps[i] to annots[p.key].orEmpty() }, layersState.value,
-                    onClose = { metricsSheet = false }, loading = seq.any { annots[it.key] == null },
-                    note = seq.firstNotNullOfOrNull { photoAnnotationNote(context, it.uri, previousOf(it)) },
-                    onShowLayers = { layersState.value = it },
-                    selected = selLine?.let { n -> seq.firstNotNullOfOrNull { p -> annots[p.key]?.firstOrNull { it.metrics?.name == n } } },
-                    // fila tocada: la línea se selecciona en todas las fotos y el zoom la centra
-                    onSelectLine = { l, key ->
-                        selLine = l.metrics?.name; selKey = key
-                        if (l.layer !in layersState.value) layersState.value = layersState.value + l.layer
-                        zoom = focusZoom(l, cellSize.value, zoom, key)
-                    },
-                    selectedKey = selKey,
-                    // eliminar (falso positivo): los trazos de esa foto quedan confirmados sin la línea
-                    onDelete = { name, col ->
-                        val ps = if (col == null) seq else listOfNotNull(seq.getOrNull(col))
-                        mutateTraces(ps, { previousOf(it) }) { com.photomed.app.align.ConfirmedTraces.remove(it, name) }
-                    },
-                    dismissedCount = traceSummary.first,
-                    onRestore = {
-                        seq.forEach { p -> if (com.photomed.app.align.ConfirmedTraces.of(context, p.uri.toString()) == null)
-                            com.photomed.app.align.AnnotUserEdits.restore(context, p.uri.toString()) }
-                        mutateTraces(seq.filter { com.photomed.app.align.ConfirmedTraces.of(context, it.uri.toString()) != null }, { previousOf(it) }) {
-                            com.photomed.app.align.ConfirmedTraces.restore(it) }
-                    },
-                    traces = run {
-                        TraceActions(confirmed = traceSummary.second, onConfirm = { mutateTraces(seq, { previousOf(it) }) { it } },
-                            onRegenerate = { regenerate = true })
-                    },
-                    modifier = Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.42f).dp))
-            }
+            if (!wide && metricsSheet && showLayers && seq != null)
+                metricsPanel(seq, Modifier.fillMaxWidth().heightIn(max = (conf.screenHeightDp * 0.42f).dp))
 
             // Controles bajo las fotos: se ocultan a los 3 s sin tocar (fotos más grandes); un toque los recupera
             androidx.compose.animation.AnimatedVisibility(controlsVisible || seq == null) {
@@ -753,7 +773,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             }
 
             // con la tabla de medidas abierta, el selector de fotos se oculta (más sitio para la tabla)
-            if (!(metricsSheet && showLayers && seq != null)) Column {
+            if (!(metricsSheet && showLayers && seq != null && !wide)) Column {
             // Filtro por zona
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Md3Spacing.marginCompact),

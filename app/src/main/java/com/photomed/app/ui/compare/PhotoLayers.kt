@@ -1,5 +1,6 @@
 package com.photomed.app.ui.compare
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import android.content.Context
 import android.net.Uri
 import androidx.compose.foundation.Canvas
@@ -52,6 +53,7 @@ import com.photomed.app.ui.camera.drawAnnotations
 import com.photomed.app.ui.camera.drawMeasureGuides
 import com.photomed.app.ui.camera.drawInk
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.pointer.pointerInput
 
 private const val PREF_LAYERS = "annot_layers"
 private const val PREF_ALPHA = "annot_alpha"
@@ -212,7 +214,7 @@ fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boole
                 com.photomed.app.align.GuideMigration.backfill(context, uri, zone)?.let { show(it) }
             return@produceState
         }
-        val user = com.photomed.app.align.AnnotUserEdits.of(context, u).let { e ->
+        val user = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.AnnotUserEdits.of(context, u) }.let { e ->
             // los trazos añadidos están en la foto completa: se llevan al encuadre 3:4 de Comparar
             if (e.editHash != edit.hashCode()) e.copy(added = emptyList()) else e.copy(added = e.addedIn34()) }
         val key = key34(context, uri, previous)
@@ -248,8 +250,17 @@ fun PhotoContent(model: Any, transform: Similarity?, annots: List<AnnotLine>?, l
                  numbers: Map<String, Int>? = annots?.let { com.photomed.app.align.MeasureNumbering.of(listOf(it)) },
                  alpha: Float = 0.5f,
                  showImage: Boolean = true, ink: List<com.photomed.app.align.InkStroke> = emptyList(), selected: String? = null,
-                 selectedKey: String? = null) {
-    Box(modifier.alignedBy(transform)) {
+                 selectedKey: String? = null, onSelect: ((AnnotLine?) -> Unit)? = null) {
+    val annotsNow = androidx.compose.runtime.rememberUpdatedState(annots)
+    val layersNow = androidx.compose.runtime.rememberUpdatedState(layers)
+    Box(modifier.alignedBy(transform).then(if (onSelect != null && layers.isNotEmpty()) Modifier.pointerInput(Unit) {
+        // tocar una línea (también con zoom: las coordenadas ya vienen en la foto) la selecciona
+        detectTapGestures { o ->
+            val a = annotsNow.value ?: return@detectTapGestures
+            val p = Pt(o.x / size.width, o.y / size.width)
+            onSelect(hitLine(a, layersNow.value, p, 24.dp.toPx() / size.width))
+        }
+    } else Modifier)) {
         // capa 1: imagen
         AsyncImage(model, description, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = if (showImage) 1f else 0f })
         Canvas(Modifier.fillMaxSize()) {
@@ -319,6 +330,8 @@ data class CompareView(
     val selected: String? = null,
     /** Tramo seleccionado de esa línea (o null). */
     val selectedKey: String? = null,
+    /** Tocar una línea en una foto la selecciona (null: toque fuera de las líneas). */
+    val onSelect: ((AnnotLine?) -> Unit)? = null,
 ) {
     /** Proporción (ancho/alto) de cada celda: 3:4, o 4:3 con giro de 90° o 270°. */
     val aspect: Float get() = if (rot % 2 == 1) 4f / 3f else 3f / 4f
@@ -337,6 +350,7 @@ fun ComparePhoto(model: Any, transform: Similarity?, description: String?, layer
     OrientBox(v.rot, v.mirror, modifier.then(if (cell != null) Modifier.onSizeChanged { cell.value = it } else Modifier)) {
         PhotoContent(model, transform, v.annots[model], v.layers, description, layer,
             numbers = com.photomed.app.align.MeasureNumbering.of(v.annots.values.toList()), alpha = v.alpha,
-            showImage = v.view.image, ink = if (v.view.notes) v.ink[model].orEmpty() else emptyList(), selected = v.selected, selectedKey = v.selectedKey)
+            showImage = v.view.image, ink = if (v.view.notes) v.ink[model].orEmpty() else emptyList(), selected = v.selected, selectedKey = v.selectedKey,
+            onSelect = v.onSelect)
     }
 }

@@ -130,12 +130,14 @@ object Standardization {
             if (l.face < 0.35f) { hints += "Poca luz en el rostro"; off += 0.5f }
             if (l.face > 0.85f) { hints += "Demasiada luz: sin flash"; off += 0.5f }
         }
+        // la expresión pedida es condición para el disparo automático
+        val expressionOk = ZoneAlignment.of(zone).detector != Detector.FACE || Expression.meets(expression, det.points, det.yaw)
         val status = when {
-            hints.isEmpty() -> MatchStatus.MATCH
+            hints.isEmpty() && expressionOk -> MatchStatus.MATCH
             off <= 2.5f -> MatchStatus.CLOSE
             else -> MatchStatus.FAR
         }
-        return MatchEval(status, (1f - off / 5f).coerceIn(0f, 1f), hints, threshold = 1f,
+        return MatchEval(status, (1f - off / 5f).coerceIn(0f, 1f), hints, expressionOk = expressionOk, threshold = 1f,
             headYawDelta = det.yaw ?: 0f, headPitchDelta = det.pitch ?: 0f, gazeDelta = det.gaze)
     }
 

@@ -98,6 +98,8 @@ data class Expression(val eyes: Float, val mouthOpen: Float, val mouthWidth: Flo
                 com.photomed.app.data.FacialExpression.SMILE -> if (cur.mouthWidth < WIDTH_MAX && cur.smileLift < LIFT_MAX) add("Expresión: sonreír al máximo")
                 com.photomed.app.data.FacialExpression.SQUINT -> if (cur.eyes > EYES_MIN) add("Expresión: apretar los ojos")
                 com.photomed.app.data.FacialExpression.PUCKER -> if (cur.mouthWidth > PUCKER_MAX) add("Expresión: fruncir más los labios")
+                com.photomed.app.data.FacialExpression.FROWN -> if (cur.brows > FROWN_MAX) add("Expresión: fruncir más el ceño (bajar las cejas)")
+                com.photomed.app.data.FacialExpression.SAD -> if (cur.smileLift > SAD_MAX) add("Expresión: bajar las comisuras de la boca")
                 else -> {}
             }
             // salvo con los ojos apretados, los ojos abiertos
@@ -105,6 +107,21 @@ data class Expression(val eyes: Float, val mouthOpen: Float, val mouthWidth: Flo
         }
         /** Labios fruncidos: la boca se estrecha claramente (ancho / interpupilar). */
         const val PUCKER_MAX = 0.62f
+        /** Ceño fruncido: las cejas bajan hacia los ojos (distancia ceja–ojo / interpupilar; en reposo 0,145–0,22). */
+        const val FROWN_MAX = 0.14f
+        /** Tristeza: las comisuras claramente por debajo del centro de la boca (en reposo quedan en ±0,01). */
+        const val SAD_MAX = -0.02f
+
+        /**
+         * ¿Se cumple la expresión pedida? (reposo: siempre). null si no se puede medir (cara girada): en
+         * ese caso no se da por cumplida.
+         */
+        fun meets(e: com.photomed.app.data.FacialExpression, points: Map<String, Pt>, yaw: Float?): Boolean {
+            if (e == com.photomed.app.data.FacialExpression.NEUTRAL || e == com.photomed.app.data.FacialExpression.NECK) return true
+            if (!usable(yaw)) return false
+            val cur = measure(points) ?: return false
+            return target(e, cur).none { it.startsWith("Expresión") && "abrir los ojos" !in it }
+        }
 
         /** Solo se evalúa casi de frente (en perfil los rasgos del lado lejano no son fiables). */
         fun usable(yaw: Float?) = yaw == null || abs(yaw) < 30f

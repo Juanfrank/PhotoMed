@@ -3,6 +3,8 @@ package com.photomed.app
 import com.photomed.app.align.Expression
 import com.photomed.app.align.Pt
 import com.photomed.app.data.Zone
+import com.photomed.app.data.FacialExpression
+import org.junit.Assert.assertFalse
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -61,5 +63,64 @@ class ExpressionTest {
         assertTrue(h.toString(), "Expresión: relajar la sonrisa" in h)
         assertEquals(listOf("Expresión: sonreír como en la referencia"),
             Expression.compare(Expression.measure(cur)!!, Expression.measure(ref)!!))
+    }
+}
+
+/** La expresión pedida es condición de la captura (automática y manual con «listo»). */
+class ExpressionGateTest {
+    private fun faces(res: String): Map<String, Map<String, Pt>> {
+        val json = javaClass.getResourceAsStream(res)?.bufferedReader()?.readText() ?: return emptyMap()
+        val o = JSONObject(json)
+        return o.keys().asSequence().associateWith { k ->
+            val p = o.getJSONObject(k).getJSONObject("pts")
+            p.keys().asSequence().associateWith { kk -> p.getJSONArray(kk).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1).toFloat()) } }
+        }
+    }
+
+    @Test
+    fun requestedExpressionGatesCapture() {
+        val stock = faces("/stock/stock_faces.json")
+        assumeTrue("sin retratos de stock", stock.isNotEmpty())
+        val smiles = listOf("p_1222271", "p_2379004", "p_774909", "u_photo-1580489944761-")
+        val neutral = listOf("u_photo-1438761681033-", "u_photo-1506794778202-", "u_photo-1534528741775-", "p_733872")
+        fun pts(prefix: String) = stock.entries.first { it.key.startsWith(prefix) && it.key.endsWith("_r0") }.value
+        for (n in neutral) {
+            val e = Expression.measure(pts(n))!!
+            println("NEUTRO $n brows=${e.brows} lift=${e.smileLift} width=${e.mouthWidth}")
+            assertTrue(n, Expression.meets(FacialExpression.NEUTRAL, pts(n), 0f))
+            // en reposo no se cumplen la sonrisa máxima, las cejas arriba ni el ceño
+            assertFalse(n, Expression.meets(FacialExpression.SMILE, pts(n), 0f))
+            assertFalse(n, Expression.meets(FacialExpression.SURPRISE, pts(n), 0f))
+            assertFalse(n, Expression.meets(FacialExpression.FROWN, pts(n), 0f))
+            assertFalse(n, Expression.meets(FacialExpression.SAD, pts(n), 0f))
+        }
+        val all = stock.filterKeys { it.endsWith("_r0") }.values.mapNotNull { Expression.measure(it)?.brows }.sorted()
+        println("CEJAS n=${all.size} p5=${all[all.size / 20]} p50=${all[all.size / 2]} min=${all.first()}")
+        for (s in smiles) assertTrue(s, Expression.meets(FacialExpression.SMILE, pts(s), 0f))
+        // de perfil no se puede comprobar: no se da por cumplida
+        assertFalse(Expression.meets(FacialExpression.SMILE, pts(smiles[0]), 60f))
+    }
+}
+
+/** Con referencia, la expresión pedida también es condición: no basta con parecerse a la foto anterior. */
+class ExpressionGateWithReferenceTest {
+    @Test
+    fun smileRequestedBlocksMatchOnRestFace() {
+        val json = javaClass.getResourceAsStream("/stock/stock_faces.json")?.bufferedReader()?.readText()
+        assumeTrue("sin retratos de stock", json != null)
+        val o = JSONObject(json!!)
+        val k = o.keys().asSequence().first { it.startsWith("u_photo-1438761681033-") && it.endsWith("_r0") }
+        val p = o.getJSONObject(k).getJSONObject("pts")
+        val pts = p.keys().asSequence().associateWith { kk -> p.getJSONArray(kk).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1).toFloat()) } }
+        val d = com.photomed.app.align.Detection(pts, 0f, 0f, 0f)
+        val spec = com.photomed.app.align.ZoneAlignment.of(Zone.FACE_FRONTAL)
+        val thr = com.photomed.app.align.LiveMatch.DEFAULT_THRESHOLD
+        val rest = com.photomed.app.align.LiveDecision.evaluate(spec, d, d, thr, wasMatched = false)
+        assertEquals(com.photomed.app.align.MatchStatus.MATCH, rest.status)
+        assertTrue(rest.expressionOk)
+        val smile = com.photomed.app.align.LiveDecision.evaluate(spec, d, d, thr, wasMatched = false, expression = FacialExpression.SMILE)
+        assertFalse(smile.expressionOk)
+        assertTrue(smile.status != com.photomed.app.align.MatchStatus.MATCH)
+        assertTrue(smile.hints.toString(), smile.hints.any { "sonreír" in it })
     }
 }

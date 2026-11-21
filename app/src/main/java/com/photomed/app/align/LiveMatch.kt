@@ -28,6 +28,11 @@ data class MatchEval(
     val headPitchDelta: Float = 0f,
     /** Diferencia de mirada actual − referencia (o mirada absoluta en estandarización). */
     val gazeDelta: Pt? = null,
+    /**
+     * La expresión facial pedida (sorpresa, enojo, sonrisa…) se cumple; si no, no se dispara
+     * automáticamente aunque el encuadre coincida (también con «casi alineada»).
+     */
+    val expressionOk: Boolean = true
 )
 
 /**

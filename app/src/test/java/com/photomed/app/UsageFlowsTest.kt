@@ -365,6 +365,28 @@ class UsageFlowsTest {
      * las medidas y ofrece mostrarlas en la foto. (Antes la tabla salía siempre vacía: no se
      * analizaba la foto sin capas encendidas y solo se listaban las capas visibles.)
      */
+    /** Horizontal / tableta apaisada: la tabla de medidas va a la derecha de la foto, no debajo. */
+    @Test
+    @Config(sdk = [34], qualifiers = "w1200dp-h700dp-land")
+    fun landscapeMetricsPanelBesideThePhoto() {
+        com.photomed.app.align.PhotoEdits.clearCache()
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).edit().putString("annot_layers", "FOREHEAD,FOLDS").commit()
+        val p = photos[0]
+        val forehead = com.photomed.app.align.AnnotLine(com.photomed.app.align.AnnotLayer.FOREHEAD,
+            (0..10).map { com.photomed.app.align.Pt(0.1f + it * 0.08f, 0.5f) }, false,
+            metrics = com.photomed.app.align.LineMetrics("Frente, línea 1", lengthMm = 42f, widthMm = 1.2f, contrastL = 8f, depthMm = 0.31f, grade = 2))
+        com.photomed.app.align.PhotoAnnotator.put(viewerKey(p), listOf(forehead))
+        setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
+        waitText("Medidas")
+        compose.onNodeWithText("Medidas").performClick()
+        waitText("Arrugas y surcos")
+        val photoBox = compose.onNodeWithContentDescription("Fotografía", substring = true).fetchSemanticsNode().boundsInRoot
+        val table = compose.onNodeWithText("Arrugas y surcos").fetchSemanticsNode().boundsInRoot
+        assertTrue("tabla a la derecha de la foto: $photoBox / $table", table.left >= photoBox.right - 1f)
+        assertTrue("la tabla no empuja la foto hacia arriba", table.top < photoBox.bottom)
+    }
+
     @Test
     fun measurementsTableWorksWithWrinkleLayersOff() {
         com.photomed.app.align.PhotoEdits.clearCache()

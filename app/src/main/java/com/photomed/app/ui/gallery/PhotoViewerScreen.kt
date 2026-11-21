@@ -28,6 +28,9 @@ import com.photomed.app.ui.camera.drawInk
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -137,6 +140,9 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     var inkVersion by remember { mutableIntStateOf(0) }
     val inkUndo = remember { androidx.compose.runtime.mutableStateMapOf<String, List<com.photomed.app.align.InkSet>>() }
     var metricsSheet by remember { mutableStateOf(false) }
+    // horizontal o tableta apaisada: la tabla de medidas va a la derecha de la foto
+    val conf = androidx.compose.ui.platform.LocalConfiguration.current
+    val wide = conf.screenWidthDp >= 600 && conf.screenWidthDp > conf.screenHeightDp
     // correcciones del usuario: versión (vuelve a analizar) y modo «trazar surco»
     var userVersion by remember { mutableIntStateOf(0) }
     var tracing by remember { mutableStateOf(false) }
@@ -366,7 +372,38 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 Text(if (traceBusy) "Trazando y midiendo el surco…" else "Analizando arrugas y rasgos…", color = Color.White, style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(start = 10.dp))
             }
-            Box(Modifier.weight(1f).fillMaxWidth()) {
+            // tabla de medidas: debajo de la foto (vertical) o a su derecha (horizontal / tableta), sin taparla
+            @Composable fun metricsPanel(mod: Modifier) {
+                val u = current.uri.toString()
+                val lines = annotsByUri[u]
+                // lectura de los trazos confirmados fuera del hilo principal (puede leer el XMP de la foto)
+                val set by androidx.compose.runtime.produceState<com.photomed.app.align.TraceSet?>(null, u, userVersion) {
+                    value = withContext(Dispatchers.IO) { com.photomed.app.align.ConfirmedTraces.of(context, u) }
+                }
+                val dismissed = set?.removed?.size ?: remember(u, userVersion) { com.photomed.app.align.AnnotUserEdits.of(context, u).dismissed.size }
+                com.photomed.app.ui.compare.MetricsPanel(listOf(formatDateTime(current.takenAt) to lines.orEmpty()), layersState.value,
+                    onClose = { metricsSheet = false }, loading = lines == null, note = notesByUri[u],
+                    onShowLayers = { layersState.value = it },
+                    // eliminar (falso positivo): los trazos quedan confirmados sin esa línea
+                    onDelete = { name, _ -> selected = null; mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.remove(it, name) } },
+                    dismissedCount = dismissed,
+                    onRestore = {
+                        if (set != null) mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.restore(it) }
+                        else { com.photomed.app.align.AnnotUserEdits.restore(context, u); userVersion++ }
+                    },
+                    traces = com.photomed.app.ui.compare.TraceActions(confirmed = set != null,
+                        onConfirm = { mutateTraces(current) { it } },
+                        onRegenerate = { confirmRegen = true },
+                        onEdit = { name -> traceTarget = name; tracing = true; metricsSheet = false
+                            scope.launch { snackbar.showSnackbar("Vuelva a dibujar «$name»: una línea por donde se ve, o rodee el área") } },
+                        onRevert = { name -> mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.revert(it, name) } },
+                        edited = set?.editedNames.orEmpty(), savedInPhoto = savedInPhoto[u] != false),
+                    onSelectLine = { l, key -> selected = l; selectedKey = key; focusTick++; if (l.layer !in layersState.value) layersState.value = layersState.value + l.layer },
+                    selected = selected, selectedKey = selectedKey,
+                    modifier = mod)
+            }
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+            Box(Modifier.weight(1f).fillMaxHeight()) {
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize().background(Color.Black), key = { list[it].key },
                 userScrollEnabled = !cropping && !tracing && !inking) { page ->
                 val ph = list[page]
@@ -420,36 +457,11 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                         if (fullscreen) "Salir de pantalla completa" else "Pantalla completa", tint = Color.White.copy(alpha = 0.9f))
                 }
             }
-            // tabla de medidas: debajo de la foto, sin taparla
-            if (metricsSheet && showLayers && !fullscreen) {
-                val u = current.uri.toString()
-                val lines = annotsByUri[u]
-                // lectura de los trazos confirmados fuera del hilo principal (puede leer el XMP de la foto)
-                val set by androidx.compose.runtime.produceState<com.photomed.app.align.TraceSet?>(null, u, userVersion) {
-                    value = withContext(Dispatchers.IO) { com.photomed.app.align.ConfirmedTraces.of(context, u) }
-                }
-                val dismissed = set?.removed?.size ?: remember(u, userVersion) { com.photomed.app.align.AnnotUserEdits.of(context, u).dismissed.size }
-                com.photomed.app.ui.compare.MetricsPanel(listOf(formatDateTime(current.takenAt) to lines.orEmpty()), layersState.value,
-                    onClose = { metricsSheet = false }, loading = lines == null, note = notesByUri[u],
-                    onShowLayers = { layersState.value = it },
-                    // eliminar (falso positivo): los trazos quedan confirmados sin esa línea
-                    onDelete = { name, _ -> selected = null; mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.remove(it, name) } },
-                    dismissedCount = dismissed,
-                    onRestore = {
-                        if (set != null) mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.restore(it) }
-                        else { com.photomed.app.align.AnnotUserEdits.restore(context, u); userVersion++ }
-                    },
-                    traces = com.photomed.app.ui.compare.TraceActions(confirmed = set != null,
-                        onConfirm = { mutateTraces(current) { it } },
-                        onRegenerate = { confirmRegen = true },
-                        onEdit = { name -> traceTarget = name; tracing = true; metricsSheet = false
-                            scope.launch { snackbar.showSnackbar("Vuelva a dibujar «$name»: una línea por donde se ve, o rodee el área") } },
-                        onRevert = { name -> mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.revert(it, name) } },
-                        edited = set?.editedNames.orEmpty(), savedInPhoto = savedInPhoto[u] != false),
-                    onSelectLine = { l, key -> selected = l; selectedKey = key; focusTick++; if (l.layer !in layersState.value) layersState.value = layersState.value + l.layer },
-                    selected = selected, selectedKey = selectedKey,
-                    modifier = Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.45f).dp))
+            if (wide && metricsSheet && showLayers && !fullscreen)
+                metricsPanel(Modifier.width(minOf(440, (conf.screenWidthDp * 0.42f).toInt()).dp).fillMaxHeight())
             }
+            if (!wide && metricsSheet && showLayers && !fullscreen)
+                metricsPanel(Modifier.fillMaxWidth().heightIn(max = (conf.screenHeightDp * 0.45f).dp))
             if (inking && !fullscreen) InkOptions(inkStyle, { inkStyle = it }, Modifier.fillMaxWidth().navigationBarsPadding())
             if (editing) androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))) {
                 // la edición se lee al pulsar (no la de la última composición) para encadenar giro, espejo…
@@ -625,7 +637,7 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
             }
             return@produceState
         }
-        val user = com.photomed.app.align.AnnotUserEdits.of(context, u).let { e -> if (e.editHash != edit.hashCode()) e.copy(added = emptyList()) else e }
+        val user = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.AnnotUserEdits.of(context, u) }.let { e -> if (e.editHash != edit.hashCode()) e.copy(added = emptyList()) else e }
         val key = "full|$u|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, u)}|" +
             "${com.photomed.app.align.AnnotUserEdits.tag(context, u)}|${com.photomed.app.align.LineMemory.tag(context, previous)}"
         val hit = com.photomed.app.align.PhotoAnnotator.cached(key)

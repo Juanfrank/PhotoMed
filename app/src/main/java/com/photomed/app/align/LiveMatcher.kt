@@ -202,7 +202,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             !(isProfile && rp != null && detected(frame, smooth).also { cur = it }.points.size < LiveDecision.MIN_POINTS)) {
             // Zona con detector y referencia con puntos: solo coincide si el cuadro también los tiene.
             if (cur.points.isEmpty()) cur = detected(frame, smooth)
-            eval = LiveDecision.evaluate(spec, ref, cur, threshold, matched, useGaze)
+            eval = LiveDecision.evaluate(spec, ref, cur, threshold, matched, useGaze, expression = expression)
             drawKeys = spec.landmarks.filter { it in ref.points && it in cur.points }
             method = "puntos anatómicos"; total = drawKeys.size
             last = null
@@ -282,18 +282,6 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         }
         return liveHairline
     }
-
-    /** Altura de la frente (cejas → línea de implantación) / interpupilar en una foto; null si no se mide. */
-    fun hairlineIpd(photo: Bitmap): Float? = if (!tracksHairline) null else NativeGate.tryRunBlocking("línea del pelo al capturar", 3000) { hairlineIpdGated(photo) }
-
-    private fun hairlineIpdGated(photo: Bitmap): Float? = runCatching {
-        val d = detector.detectFull(spec.detector, photo)
-        // cejas ajustadas a la imagen antes de medir la frente
-        hairSkin?.labels(photo)?.let { lb ->
-            val pts = runCatching { BrowRefine.refineKeys(d.points, FaceCrop.lum(photo), lb) }.getOrDefault(d.points)
-            HairSkin.hairline(lb, pts)?.heightIpd
-        }
-    }.getOrNull()
 
     override fun close() { detector.close(); runCatching { segmenterOrNull?.close() }; runCatching { if (hairSkinLazy.isInitialized()) hairSkinLazy.value?.close() } }
 
