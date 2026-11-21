@@ -2,6 +2,16 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.24 — 21 de noviembre de 2026
+
+- **Ojeras mejoradas**: la zona se segmenta por columnas bajo el párpado (sigue la parte oscura real,
+  no un polígono fijo) y se compara con la mejilla de la misma columna, más abajo, lo que compensa la
+  luz lateral. Las gafas, el pelo y el fondo cortan la zona. Medidas: área, ΔL*, ΔE*ab, ITA°, tipo
+  probable (pigmentaria, vascular o estructural; con bolsa, «sombra de la bolsa») e intensidad 0–4.
+- **Bolsas palpebrales** (capa nueva, en *Contorno interno*): relieve claro bajo el párpado con su
+  surco inferior, aceptado solo si forma una curva suave casi paralela al párpado. Medidas: altura
+  (párpado → surco), longitud del surco, relieve (ΔL*), área y grado orientativo 0–3.
+
 ## 2.23 — 21 de noviembre de 2026
 
 - **Comparar, más espacio para las fotos**: los detalles de la alineación (método, escala, giro,

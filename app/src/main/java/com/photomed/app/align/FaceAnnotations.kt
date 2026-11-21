@@ -9,7 +9,7 @@ import kotlin.math.roundToInt
 /** Capas de anotación estética que se pueden mostrar sobre una foto (visor y comparar). */
 enum class AnnotLayer(val label: String) {
     CONTOUR("Contorno"), HAIRLINE("Línea del pelo"), EYES("Ojos y cejas"), NOSE("Nariz"), LIPS("Labios"), FOLDS("Surcos"),
-    FOREHEAD("Frente"), GLABELLA("Ceño"), CROWS_FEET("Patas de gallo"), DARK_CIRCLES("Ojeras"),
+    FOREHEAD("Frente"), GLABELLA("Ceño"), CROWS_FEET("Patas de gallo"), DARK_CIRCLES("Ojeras"), EYE_BAGS("Bolsas palpebrales"),
 }
 
 /** Una línea de anotación (x del ancho, y en unidades del ancho). [estimated]: posición estimada, no medida. */
@@ -297,8 +297,8 @@ object FaceAnnotations {
     /**
      * Arrugas de la frente (horizontales, siguiendo el arco de las cejas, enteras o por mitades), del
      * ceño (verticales entre las cejas en abanico de posiciones e inclinaciones, y horizontales en la
-     * raíz nasal), patas de gallo (abanico de rayos desde el canto externo) y ojeras (zona
-     * infraorbitaria más oscura que la mejilla). Candidatos múltiples con supresión de no máximos.
+     * raíz nasal), patas de gallo (abanico de rayos desde el canto externo) y ojeras y bolsas
+     * palpebrales ([Periorbital]). Candidatos múltiples con supresión de no máximos.
      */
     fun wrinkles(mesh: List<Pt>, lum: GrayImage, labels: FaceLabels?, faceW: Float, lab: LabImage? = null, extras: MeasureExtras? = null): List<AnnotLine> {
         val out = ArrayList<AnnotLine>()
@@ -421,28 +421,9 @@ object FaceAnnotations {
                 out += withMetrics(AnnotLayer.CROWS_FEET, "Pata de gallo $side ${i + 1}", c.res)
             }
         }
-        // ojeras: entre el párpado inferior y el surco palpebromalar, si es más oscura que la mejilla
-        val under = listOf(
-            intArrayOf(33, 7, 163, 144, 145, 153, 154, 155, 133) to intArrayOf(245, 128, 121, 120, 119, 118, 117, 111, 143),
-            intArrayOf(263, 249, 390, 373, 374, 380, 381, 382, 362) to intArrayOf(465, 357, 350, 349, 348, 347, 346, 340, 372),
-        )
-        val cheeks = listOf(50, 280)
-        for ((i, pair) in under.withIndex()) {
-            val poly = pair.first.map { mesh[it] } + pair.second.map { mesh[it] }
-            val region = meanLum(lum, poly) ?: continue
-            val cheek = meanLumDisc(lum, mesh[cheeks[i]], 0.035f * faceW) ?: continue
-            // zona infraorbitaria al menos un 12 % más oscura que la mejilla (sombra o pigmento)
-            if (region < cheek * 0.88f) {
-                val name = "Ojera ${if (i == 0) "derecha" else "izquierda"}"
-                val m = if (lab != null && sc != null) {
-                    val rl = LineMeasure.meanLab(lab, poly); val cl = LineMeasure.meanLabDisc(lab, mesh[cheeks[i]], 0.035f * faceW)
-                    if (rl != null && cl != null) LineMeasure.darkCircle(name, rl, cl, LineMeasure.area(poly), sc) else null
-                } else null
-                out += AnnotLine(AnnotLayer.DARK_CIRCLES, poly, true, filled = true,
-                    metrics = m ?: sc?.let { LineMetrics(name, areaMm2 = LineMeasure.area(poly) * it.first * it.first,
-                        deltaL = LineMeasure.lstar(cheek) - LineMeasure.lstar(region), scale = it.second) })
-            }
-        }
+        // ojeras y bolsas palpebrales bajo cada ojo (ver Periorbital)
+        val pm = Periorbital.maps(lum, lab, faceW * lum.width)
+        for (right in listOf(true, false)) out += runCatching { Periorbital.analyze(mesh, right, pm, labels, faceW, sc) }.getOrDefault(emptyList())
         return out
     }
 

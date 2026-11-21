@@ -38,7 +38,8 @@ class NewFacesAnnotTest {
             AnnotLayer.EYES to Color.rgb(128, 222, 234), AnnotLayer.NOSE to Color.rgb(179, 157, 219),
             AnnotLayer.LIPS to Color.rgb(244, 143, 177), AnnotLayer.FOLDS to Color.rgb(255, 171, 145),
             AnnotLayer.FOREHEAD to Color.rgb(255, 224, 130), AnnotLayer.GLABELLA to Color.rgb(255, 138, 101),
-            AnnotLayer.CROWS_FEET to Color.rgb(165, 214, 167), AnnotLayer.DARK_CIRCLES to Color.rgb(206, 147, 216))
+            AnnotLayer.CROWS_FEET to Color.rgb(165, 214, 167), AnnotLayer.DARK_CIRCLES to Color.rgb(206, 147, 216),
+            AnnotLayer.EYE_BAGS to Color.rgb(128, 203, 196))
         val counts = HashMap<AnnotLayer, Int>()
         val report = StringBuilder()
         var withNaso = 0; var faces = 0; var youngFolds = -1

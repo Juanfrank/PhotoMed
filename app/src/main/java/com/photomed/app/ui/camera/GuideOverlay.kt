@@ -673,6 +673,7 @@ fun annotColor(layer: com.photomed.app.align.AnnotLayer): Color = when (layer) {
     com.photomed.app.align.AnnotLayer.GLABELLA -> Color(0xFFFF8A65)
     com.photomed.app.align.AnnotLayer.CROWS_FEET -> Color(0xFFA5D6A7)
     com.photomed.app.align.AnnotLayer.DARK_CIRCLES -> Color(0xFFCE93D8)
+    com.photomed.app.align.AnnotLayer.EYE_BAGS -> Color(0xFF80CBC4)
 }
 
 /**

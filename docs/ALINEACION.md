@@ -648,3 +648,19 @@ estado de la cámara (zona, expresión, zoom, ajustes) se conserva; el análisis
 - **Área**: si el trazo vuelve cerca de su inicio y encierra superficie, se busca el surco dentro del
   rectángulo que la contiene (`RegionTrace`) y se conserva lo que cae dentro.
 - Las medidas se calculan con el mismo análisis que las líneas detectadas (escala del iris o sensor).
+
+## Ojeras y bolsas palpebrales (2.24; `Periorbital.kt`)
+
+- 15 columnas perpendiculares a la línea de los ojos desde el borde del párpado inferior, con el
+  perfil de L* (CIE) suavizado (σ ≈ 0,5 % y 0,9 % del ancho de la cara).
+- **Ojera**: tramo desde el párpado más oscuro (> 3 L*) que la mejilla de la misma columna (23–30 %
+  del ancho de la cara más abajo); contorno por la mediana entre columnas, ±3 % del ancho. Se acepta con
+  la mitad de las columnas y ΔL* medio ≥ 4. Colorimetría como en la clínica: ΔL* y ΔE*ab de la zona
+  frente a la mejilla; tipo según Huang et al. (pigmentaria, vascular, estructural, mixta).
+  Intensidad 0–4 por ΔE*ab (< 3, < 6, < 9, < 12, ≥ 12), orientativa.
+- **Bolsa** (pseudohernia grasa): en cada columna, un mínimo de L* a 3,5–15 % del ancho de la cara
+  bajo el párpado con un claro encima (≥ 3 L*) y piel más clara debajo (≥ 2,5 L*); el surco debe
+  aparecer en ≥ 60 % de las columnas y ajustarse a una cuadrática (residuo < 1,2 % del ancho). Grado
+  orientativo 0–3 por altura y relieve (no hay una escala fotonumérica validada específica de bolsas;
+  la de Barton gradúa el contorno del párpado inferior y las de ojera hundida —Allergan, Merz— el
+  hundimiento, no la protrusión).
