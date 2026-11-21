@@ -2,6 +2,13 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.26 — 21 de noviembre de 2026
+
+- **Segmentos de medida sin texto sobre la foto**: cada tramo se dibuja con un estilo de trazo propio
+  (puntos, raya y punto, rayas espaciadas, triángulos, cuadros, círculos, raya y dos puntos), con
+  marcas en los extremos. La ficha de la medida muestra la leyenda: la muestra de cada trazo con lo que
+  mide y su valor. Los conectores (p. ej. pupila → ceja) van en punteado fino, sin leyenda.
+
 ## 2.25 — 21 de noviembre de 2026
 
 - **Ojeras y bolsas con forma de media luna**: el borde inferior es una curva ajustada (cuadrática

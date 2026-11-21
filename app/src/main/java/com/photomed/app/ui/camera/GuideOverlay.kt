@@ -727,35 +727,68 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLineNumbers(
     }
 }
 
+/** Número de estilos de trazo distintos para los segmentos medidos de una línea. */
+const val GUIDE_STYLES = 7
+
 /**
- * Segmentos medidos de la línea seleccionada ([com.photomed.app.align.AnnotLine.guides]): línea
- * punteada blanca con sombra, marcas en los extremos y el valor junto al segmento.
+ * Estilo del tramo [i] de los segmentos medidos (sin texto sobre la foto: la ficha de la medida
+ * muestra cada estilo con su valor): puntos, raya y punto, rayas espaciadas, triángulos, cuadrados,
+ * círculos, raya y dos puntos. [u]: unidad de tamaño en px.
+ */
+fun guidePathEffect(i: Int, u: Float): PathEffect = when (i % GUIDE_STYLES) {
+    0 -> PathEffect.dashPathEffect(floatArrayOf(0.01f, 2.6f * u))                         // puntos (con extremo redondo)
+    1 -> PathEffect.dashPathEffect(floatArrayOf(5f * u, 2f * u, 0.01f, 2f * u))           // raya y punto
+    2 -> PathEffect.dashPathEffect(floatArrayOf(7f * u, 5f * u))                          // rayas espaciadas
+    3 -> PathEffect.stampedPathEffect(androidx.compose.ui.graphics.Path().apply {         // triángulos
+        moveTo(-1.6f * u, -1.4f * u); lineTo(1.6f * u, 0f); lineTo(-1.6f * u, 1.4f * u); close() },
+        4.5f * u, 0f, androidx.compose.ui.graphics.StampedPathEffectStyle.Rotate)
+    4 -> PathEffect.stampedPathEffect(androidx.compose.ui.graphics.Path().apply {         // cuadrados
+        addRect(androidx.compose.ui.geometry.Rect(-1.2f * u, -1.2f * u, 1.2f * u, 1.2f * u)) },
+        4.5f * u, 0f, androidx.compose.ui.graphics.StampedPathEffectStyle.Rotate)
+    5 -> PathEffect.stampedPathEffect(androidx.compose.ui.graphics.Path().apply {         // círculos
+        addOval(androidx.compose.ui.geometry.Rect(-1.3f * u, -1.3f * u, 1.3f * u, 1.3f * u)) },
+        4.5f * u, 0f, androidx.compose.ui.graphics.StampedPathEffectStyle.Translate)
+    else -> PathEffect.dashPathEffect(floatArrayOf(5f * u, 1.8f * u, 0.01f, 1.8f * u, 0.01f, 1.8f * u)) // raya y dos puntos
+}
+
+/** Índice de estilo de cada segmento de [line] (los conectores sin texto no gastan estilo: -1). */
+fun guideStyleIndices(line: com.photomed.app.align.AnnotLine): List<Int> {
+    var n = 0
+    return line.guides.map { if (it.label.isEmpty()) -1 else n++ }
+}
+
+/** Un tramo con su estilo: sombra oscura y trazo blanco; [style] -1 = conector fino punteado. */
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGuideSegment(a: Offset, b: Offset, style: Int, color: Color = Color.White) {
+    val u = 1.6f.dp.toPx()
+    if (style < 0) {
+        drawLine(color.copy(alpha = 0.7f), a, b, strokeWidth = 1.dp.toPx(), cap = StrokeCap.Round,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(0.01f, 2f * u)))
+        return
+    }
+    val fx = guidePathEffect(style, u)
+    val stamped = style % GUIDE_STYLES in 3..5
+    val path = androidx.compose.ui.graphics.Path().apply { moveTo(a.x, a.y); lineTo(b.x, b.y) }
+    drawPath(path, Color.Black.copy(alpha = 0.55f), style = Stroke(if (stamped) 1.dp.toPx() else 4.dp.toPx(), cap = StrokeCap.Round, pathEffect = fx))
+    drawPath(path, color, style = Stroke(if (stamped) 0.6f.dp.toPx() else 2.dp.toPx(), cap = StrokeCap.Round, pathEffect = fx))
+    // marcas perpendiculares en los extremos
+    val dx = b.x - a.x; val dy = b.y - a.y; val len = kotlin.math.hypot(dx, dy)
+    if (len < 1f) return
+    val nx = -dy / len * 4.dp.toPx(); val ny = dx / len * 4.dp.toPx()
+    for (p in listOf(a, b)) {
+        drawLine(Color.Black.copy(alpha = 0.55f), Offset(p.x - nx, p.y - ny), Offset(p.x + nx, p.y + ny), strokeWidth = 3.dp.toPx())
+        drawLine(color, Offset(p.x - nx, p.y - ny), Offset(p.x + nx, p.y + ny), strokeWidth = 1.5.dp.toPx())
+    }
+}
+
+/**
+ * Segmentos medidos de la línea seleccionada ([com.photomed.app.align.AnnotLine.guides]), cada tramo
+ * con su estilo de trazo y sin texto sobre la foto (la ficha de la medida lleva la leyenda).
  */
 fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMeasureGuides(
-    line: com.photomed.app.align.AnnotLine, k: Float, map: (com.photomed.app.align.Pt) -> Offset,
+    line: com.photomed.app.align.AnnotLine, @Suppress("UNUSED_PARAMETER") k: Float, map: (com.photomed.app.align.Pt) -> Offset,
 ) {
-    val dash = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx() * k.coerceAtLeast(0.6f), 4.dp.toPx() * k.coerceAtLeast(0.6f)))
-    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.WHITE; textSize = 11.dp.toPx(); typeface = android.graphics.Typeface.DEFAULT_BOLD
-    }
-    val bg = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xD9202020.toInt() }
-    for (g in line.guides) {
-        val a = map(g.a); val b = map(g.b)
-        val dx = b.x - a.x; val dy = b.y - a.y; val len = kotlin.math.hypot(dx, dy)
-        if (len < 1f) continue
-        drawLine(Color.Black.copy(alpha = 0.6f), a, b, strokeWidth = 3.5.dp.toPx(), pathEffect = dash)
-        drawLine(Color.White, a, b, strokeWidth = 1.6.dp.toPx(), pathEffect = dash)
-        // marcas perpendiculares en los extremos
-        val nx = -dy / len * 5.dp.toPx(); val ny = dx / len * 5.dp.toPx()
-        for (p in listOf(a, b)) drawLine(Color.White, Offset(p.x - nx, p.y - ny), Offset(p.x + nx, p.y + ny), strokeWidth = 1.6.dp.toPx())
-        if (g.label.isEmpty()) continue
-        // valor junto al centro del segmento, desplazado a un lado
-        val tw = paint.measureText(g.label); val th = paint.textSize
-        val off = 10.dp.toPx(); val cx = (a.x + b.x) / 2 + (-dy / len) * off; val cy = (a.y + b.y) / 2 + (dx / len) * off
-        val r = android.graphics.RectF(cx - tw / 2 - 4.dp.toPx(), cy - th, cx + tw / 2 + 4.dp.toPx(), cy + th * 0.4f)
-        drawContext.canvas.nativeCanvas.drawRoundRect(r, 4.dp.toPx(), 4.dp.toPx(), bg)
-        drawContext.canvas.nativeCanvas.drawText(g.label, cx - tw / 2, cy, paint)
-    }
+    val idx = guideStyleIndices(line)
+    line.guides.forEachIndexed { i, g -> drawGuideSegment(map(g.a), map(g.b), idx[i]) }
 }
 
 /**

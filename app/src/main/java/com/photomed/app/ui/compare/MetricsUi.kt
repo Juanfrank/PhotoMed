@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
+import com.photomed.app.ui.camera.drawGuideSegment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -132,6 +135,16 @@ private fun insidePoly(q: Pt, poly: List<Pt>): Boolean {
     return c
 }
 
+/** Muestra del estilo de trazo [style] (el mismo que el tramo en la foto), sobre fondo oscuro. */
+@Composable
+fun GuideSwatch(style: Int, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        drawRoundRect(androidx.compose.ui.graphics.Color(0xFF303030), cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()))
+        val pad = 7.dp.toPx()
+        drawGuideSegment(androidx.compose.ui.geometry.Offset(pad, size.height / 2), androidx.compose.ui.geometry.Offset(size.width - pad, size.height / 2), style)
+    }
+}
+
 /** Ficha de la línea tocada, con acceso a la tabla completa. */
 @Composable
 fun MetricsCard(line: AnnotLine, onTable: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier, number: Int? = null) {
@@ -143,6 +156,17 @@ fun MetricsCard(line: AnnotLine, onTable: () -> Unit, onClose: () -> Unit, modif
                 Text((number?.let { "$it · " } ?: "") + m.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 8.dp).weight(1f))
                 IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Cerrar") }
             }
+            // leyenda de los tramos dibujados en la foto: estilo de trazo y lo que mide
+            val styles = com.photomed.app.ui.camera.guideStyleIndices(line)
+            line.guides.forEachIndexed { i, g ->
+                if (styles[i] < 0) return@forEachIndexed
+                Row(Modifier.fillMaxWidth().padding(end = 12.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    GuideSwatch(styles[i], Modifier.size(36.dp, 14.dp).semantics { contentDescription = "Trazo ${styles[i] + 1}" })
+                    Text(g.label.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+            if (line.guides.any { it.label.isNotEmpty() }) HorizontalDivider(Modifier.padding(vertical = 4.dp, horizontal = 0.dp))
             metricRows(m).forEach { (k, v) ->
                 Row(Modifier.fillMaxWidth().padding(end = 12.dp, top = 2.dp)) {
                     Text(k, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
