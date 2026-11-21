@@ -179,6 +179,26 @@ como rasgo adicional de la puntuación de candidatos (pesos 0,8–2,5, muestra d
 queda implementado pero desactivado (`WrinkleTuning.textureW = 0`). Su valor está como etiqueta débil
 para preentrenar un modelo propio (`tools/train/`).
 
+### Mapa de textura del artículo para generar candidatos (versión 2.44)
+
+Lo único del método del artículo que funciona sin entrenar es su mapa de textura. Como rasgo de la
+puntuación no aportó (arriba); como **generador de candidatos** de la detección libre (en lugar de la
+normalización de luz de σ = 6 % de la cara, el mapa del artículo con σ ≈ 0,8 %) sí mejora, en las dos
+muestras:
+
+| Partición de prueba del artículo | Normalización anterior | **Mapa de textura del artículo** |
+|---|---|---|
+| F1 estricto / JSI | 0,280 / 0,163 | **0,294 / 0,172** |
+| F1 con tolerancia, 4 regiones | 0,50 | 0,51 |
+| F1 con tolerancia, 6 regiones | 0,52 | **0,55** |
+| Infraorbitaria | 0,61 | **0,67** |
+| Patas de gallo / ceño / frente | 0,45 / 0,30 / 0,58 | 0,46 / 0,31 / 0,59 |
+| Precisión total | 0,62 | 0,62 |
+
+(Muestra de calibración: F1 estricto 0,294 → 0,297; 6 regiones 0,53 → 0,54.) Un σ intermedio (2 %) no
+mejora: el beneficio viene de la escala fina del artículo. Sin falsos positivos nuevos en el retrato
+joven de control, y el análisis baja de 425 a 393 ms por cara. Queda activado por defecto.
+
 ## 2. Puntos anatómicos y proporciones: AFW (300-W)
 
 - **Datos**: AFW de [300-W (iBUG)](https://ibug.doc.ic.ac.uk/resources/300-W/): 337 caras con **68 puntos

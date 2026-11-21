@@ -47,7 +47,9 @@ object WrinkleField {
     fun candidates(lum: GrayImage, faceWPx: Float, allowed: (Int, Int) -> Boolean, minLenPx: Float): List<List<Pt>> {
         val w = lum.width; val h = lum.height
         val k = faceWPx / 400f
-        val n = flatField(lum, 0.06f * faceWPx)
+        // luz normalizada: σ grande (6 % de la cara) por defecto; σ pequeño ≈ mapa de textura del artículo
+        val n = if (WrinkleTuning.paperTexture) GrayImage(w, h, textureMap(lum, 0.0083f * faceWPx).data.map { -it }.toFloatArray())
+            else flatField(lum, WrinkleTuning.freeSigma * faceWPx)
         val resp = FloatArray(w * h); val nx = FloatArray(w * h); val ny = FloatArray(w * h)
         for (s0 in SIGMAS) {
             val s = s0 * k

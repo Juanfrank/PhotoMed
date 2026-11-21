@@ -1077,6 +1077,9 @@ object WrinkleTuning {
     /** Peso del mapa de textura en la puntuación (0 = sin usarlo) y su valor de referencia (ln de la razón). */
     @Volatile var textureW = 0f
     @Volatile var textureRef = 0f
+    /** Detección libre: suavizado de la normalización de luz (fracción del ancho de la cara) o el mapa de textura del artículo. */
+    @Volatile var freeSigma = 0.06f
+    @Volatile var paperTexture = true
     /** Buscar con la luz normalizada (campo plano). */
     @Volatile var flat = false
     /** Exigencia extra (puntuación) para los candidatos libres por zona. */
@@ -1103,6 +1106,6 @@ object WrinkleTuning {
     }.getOrDefault(Level.BALANCED))
 
     /** Clave para las cachés del análisis (cambia con la sensibilidad). */
-    val key: String get() = "$k|$kc|$capK|$scoreT|$free|$flat|$textureW"
+    val key: String get() = "$k|$kc|$capK|$scoreT|$free|$flat|$textureW|$freeSigma|$paperTexture"
     fun cap(n: Int) = (n * capK).toInt().coerceAtLeast(1)
 }

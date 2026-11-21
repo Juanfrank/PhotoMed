@@ -2,6 +2,13 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.44 — 21 de noviembre de 2026
+
+- **Arrugas**: la detección libre genera sus candidatos con el mapa de textura del artículo de
+  FFHQ-Wrinkle (escala fina), sin entrenamiento. En la partición de prueba del artículo: F1 estricto
+  0,280 → 0,294, F1 de 6 regiones 0,52 → 0,55, líneas infraorbitarias 0,61 → 0,67, con la misma
+  precisión; análisis algo más rápido (425 → 393 ms por cara).
+
 ## 2.43 — 21 de noviembre de 2026
 
 - **Arrugas: detección libre** además de los pasillos fijos: mapa de crestas en toda la piel (sin ojos,

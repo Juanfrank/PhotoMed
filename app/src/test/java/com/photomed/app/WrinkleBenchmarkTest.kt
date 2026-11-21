@@ -91,6 +91,21 @@ class WrinkleBenchmarkTest {
         com.photomed.app.align.WrinkleTuning.textureW = 0f; com.photomed.app.align.WrinkleTuning.textureRef = 0f
     }
 
+    /** Candidatos libres con el mapa de textura del artículo (σ fino) frente a la normalización actual. */
+    @Test
+    fun paperTextureCandidates() {
+        assumeTrue(System.getenv("PM_PAPER") != null)
+        val T = com.photomed.app.align.WrinkleTuning
+        for ((label, cfg) in listOf<Pair<String, () -> Unit>>(
+            "actual (σ 6 %)" to { T.paperTexture = false; T.freeSigma = 0.06f },
+            "mapa de textura del artículo (σ 0,8 %)" to { T.paperTexture = true },
+            "normalización σ 2 %" to { T.paperTexture = false; T.freeSigma = 0.02f })) {
+            cfg(); println("BENCH CANDIDATOS $label")
+            bench(System.getenv("PM_PAPER")!!, label, save = false)
+        }
+        T.paperTexture = true; T.freeSigma = 0.06f
+    }
+
     private fun bench(name: String, what: String, save: Boolean = true) {
         val dir = File("src/test/resources/bench/$name")
         val meshFile = File(dir, "mesh.json")
