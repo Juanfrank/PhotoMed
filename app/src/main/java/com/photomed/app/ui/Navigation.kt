@@ -82,6 +82,11 @@ fun AppNavigation() {
                 onSequence = { zones ->
                     if (zones.isNotEmpty()) entry.go("camera/$exp/${zones.first().id}?seq=" + zones.joinToString(",") { it.id })
                 },
+                // protocolo: la cámara recorre sus pasos en orden
+                onProtocol = { p -> p.steps.firstOrNull()?.let { s -> entry.go("camera/$exp/${s.zone.id}?protocol=${p.id}&step=0") } },
+                onEditProtocol = { id, from ->
+                    entry.go("protocol/$exp/$id" + if (from.isEmpty()) "" else "?from=" + android.net.Uri.encode(from.joinToString("|")))
+                },
             )
         }
         composable("zone/{exp}/{zone}") { entry ->
@@ -100,14 +105,29 @@ fun AppNavigation() {
             )
         }
         composable(
-            "camera/{exp}/{zone}?seq={seq}",
-            arguments = listOf(navArgument("seq") { type = NavType.StringType; nullable = true; defaultValue = null }),
+            "camera/{exp}/{zone}?seq={seq}&protocol={protocol}&step={step}",
+            arguments = listOf(navArgument("seq") { type = NavType.StringType; nullable = true; defaultValue = null },
+                navArgument("protocol") { type = NavType.StringType; nullable = true; defaultValue = null },
+                navArgument("step") { type = NavType.IntType; defaultValue = 0 }),
         ) { entry ->
             val exp = entry.arguments?.getString("exp").orEmpty()
             val zone = Zone.fromId(entry.arguments?.getString("zone")) ?: return@composable
             val seqArg = entry.arguments?.getString("seq")
             val seq = seqArg?.split(',')?.mapNotNull { Zone.fromId(it) }.orEmpty()
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val pid = entry.arguments?.getString("protocol")
+            val protocol = androidx.compose.runtime.remember(pid) { pid?.let { com.photomed.app.data.Protocols.get(ctx, it) } }
+            val stepIdx = entry.arguments?.getInt("step") ?: 0
             CameraScreen(expId = exp, zone = zone, onBack = { entry.back() }, sequence = seq,
+                protocol = protocol, stepIndex = stepIdx,
+                onProtocolNext = { next ->
+                    // paso siguiente: su cámara sustituye a la actual; al terminar, vuelve
+                    if (entry.lifecycle.currentState == Lifecycle.State.RESUMED) {
+                        val s = next?.let { protocol?.steps?.getOrNull(it) }
+                        if (s == null) entry.back()
+                        else nav.navigate("camera/$exp/${s.zone.id}?protocol=$pid&step=$next") { popUpTo(entry.destination.id) { inclusive = true } }
+                    }
+                },
                 onCompare = { names -> entry.go("compare/$exp?zone=${zone.id}&sel=" + android.net.Uri.encode(names.joinToString("|"))) },
                 onNext = { next ->
                     // secuencia: la cámara de la zona siguiente sustituye a la actual; al final, vuelve
@@ -135,6 +155,16 @@ fun AppNavigation() {
             val name = entry.arguments?.getString("name").orEmpty()
             PhotoViewerScreen(expId = exp, zone = zone, initialName = name, onBack = { entry.back() },
                 onCompare = { names -> entry.go("compare/$exp?zone=${zone.id}&sel=" + android.net.Uri.encode(names.joinToString("|"))) })
+        }
+        composable(
+            "protocol/{exp}/{id}?from={from}",
+            arguments = listOf(navArgument("from") { type = NavType.StringType; nullable = true; defaultValue = null }),
+        ) { entry ->
+            val exp = entry.arguments?.getString("exp").orEmpty()
+            val id = entry.arguments?.getString("id").orEmpty()
+            val from = entry.arguments?.getString("from")?.split('|')?.filter { it.isNotEmpty() }.orEmpty()
+            com.photomed.app.ui.protocol.ProtocolEditorScreen(expId = exp, protocolId = id.takeIf { it != "new" }, fromPhotos = from,
+                onBack = { entry.back() })
         }
         composable("settings") { entry -> com.photomed.app.ui.settings.SettingsScreen(onBack = { entry.back() }) }
         composable("about") { entry ->

@@ -2,6 +2,24 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.38 — 21 de noviembre de 2026
+
+- **Protocolos de fotos** (ver `docs/PROTOCOLOS.md`): listas ordenadas de tomas que se crean, se
+  comparten como archivo (`.photomed.json`) y se importan («Abrir con PhotoMed» o *Importar* en el
+  expediente). Cada toma define zona (ángulo), gesto facial, cantidad de fotos, % mínimo de
+  coincidencia, disparo automático, luz mínima y luz pareja entre mejillas, mirada al frente, cámara e
+  indicaciones.
+- **Referencia sin imagen**: una toma puede exigir coincidir con una foto existente guardando solo sus
+  características (puntos anatómicos, pose, mirada, línea del pelo, perfil, contornos y surcos,
+  distancia y zoom), sin enviar la foto. Se puede crear un protocolo entero desde fotos del expediente
+  (una toma por foto).
+- **La cámara ejecuta el protocolo** paso a paso: fija el gesto, exige la coincidencia, la luz y la
+  referencia (sus contornos y surcos se dibujan como guía), pide la cantidad de fotos de cada toma y
+  guarda en cada foto el protocolo, la toma y su número, la coincidencia y la luz medida.
+- **Resultados de vuelta**: un `.zip` con el protocolo, las fotos tomadas con él y `resultados.json`
+  (toma, coincidencia, luz, distancia… de cada foto), con o sin datos del paciente. Quien creó el
+  protocolo lo importa en su expediente; reimportarlo no duplica fotos.
+
 ## 2.37 — 21 de noviembre de 2026
 
 - **Tabla de medidas compacta** (visor y Comparar): sin interlineado ni relleno entre filas; cada

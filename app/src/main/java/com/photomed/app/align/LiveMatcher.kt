@@ -23,6 +23,8 @@ data class LiveFrame(
     val freeContour: FreeContour? = null,
     /** Línea de implantación frontal del cuadro actual (rostro frontal y frente). */
     val hairline: List<Pt>? = null,
+    /** Luz en el rostro (mejillas y centro), si se midió. */
+    val light: Standardization.Lighting? = null,
 )
 
 /**
@@ -77,11 +79,32 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
 
     /** Puntos de la referencia (para adaptar la guía a la foto). */
     val referencePoints: Map<String, Pt> get() = ref.points
+    /** Detección completa de la referencia (puntos, pose y mirada), para guardarla sin la imagen. */
+    val referenceDetection: Detection get() = ref
+    /** Puntos del perfil de la referencia (vistas de perfil), si los hay. */
+    val referenceProfile: Map<String, Pt>? get() = refProfile
+    /** Referencia sin imagen (protocolo): solo coincide por puntos anatómicos o del perfil. */
+    private var featureOnly = false
+
+    /**
+     * Referencia a partir de sus características (protocolo compartido, sin la foto): puntos, pose,
+     * mirada, línea del pelo y perfil. Las zonas sin puntos (contornos de cuerpo) necesitan la imagen:
+     * ahí se estandariza la toma.
+     */
+    fun setReferenceFeatures(d: Detection, hairline: List<Pt>?, profile: Map<String, Pt>?) {
+        ref = d; referenceHairline = hairline; refProfile = profile?.takeIf { isProfile && it.size >= 3 }
+        referenceSilhouette = null; referenceEdges = null; referenceFree = null
+        refBody = null; refGray = null; refGrayAll = null; refEdgePts = emptyList()
+        frameSil = null; frameSilAt = 0L; frameBody = null; frameBodyAt = 0L
+        featureOnly = true; last = null; matched = false
+    }
     private var last: Similarity? = null
     private var matched = false
 
     /** Umbral de puntos coincidentes (0..1). */
     @Volatile var threshold: Float = LiveMatch.DEFAULT_THRESHOLD
+    /** Medir la luz del rostro también con referencia (protocolo con luz mínima). */
+    @Volatile var measureLight: Boolean = false
 
     /** Silueta del sujeto en la referencia (segmentación), para adaptar la guía corporal y de perfil. */
     @Volatile var referenceSilhouette: Silhouette? = null
@@ -121,6 +144,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     }
 
     fun setReference(bmp: Bitmap) {
+        featureOnly = false
         ref = detector.detectFull(spec.detector, bmp)
         // Segmentación pelo / piel de la referencia (vistas faciales): óvalo ajustado al límite real de
         // la cara (la guía se adapta a él) y línea de implantación
@@ -170,7 +194,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             if (now - lastFreeAt > 600) { lastFreeAt = now; lastFree = runCatching { FreeContour.from(frame) { b -> segmenter?.segment(b) } }.getOrNull() }
             lastFree
         }
-        return LiveFrame(eval, method = "estandarización", currentPointsAll = cur.points, standard = true, freeContour = free,
+        return LiveFrame(eval, method = "estandarización", currentPointsAll = cur.points, standard = true, freeContour = free, light = light,
             hairline = if (smooth) hairlineOf(frame, cur) else null,
             headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze)
     }
@@ -191,7 +215,9 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     private val smoother = LandmarkSmoother()
 
     fun analyze(frame: Bitmap, smooth: Boolean = true): LiveFrame {
-        val refG = refGray?.takeIf { useReference } ?: return standardize(frame, smooth)
+        if (!useReference) return standardize(frame, smooth)
+        val byFeatures = featureOnly && (ref.points.size >= LiveDecision.MIN_POINTS || refProfile != null)
+        val refG = refGray ?: if (byFeatures) GrayImage(1, 1) else return standardize(frame, smooth)
         var eval: MatchEval
         val method: String
         var drawKeys: List<String> = emptyList()
@@ -215,6 +241,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             method = "silueta del perfil"; total = keys.size
             last = null
         } else {
+            // referencia sin imagen: sin puntos no hay con qué comparar los bordes; se estandariza la toma
+            if (featureOnly) return standardize(frame, smooth)
             // cuerpo en el cuadro actual (segmentación como mucho cada 0,5 s; el encuadre cambia poco)
             if (refBody != null) {
                 val now = System.currentTimeMillis()
@@ -235,8 +263,10 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         matched = eval.status == MatchStatus.MATCH
         eval = withDiagnostic(eval, cur)
         val shown = if (drawKeys.size > MAX_DRAWN) drawKeys.filterIndexed { i, _ -> i % (drawKeys.size / MAX_DRAWN + 1) == 0 } else drawKeys
+        val light = if (measureLight && spec.detector == Detector.FACE && cur.points.isNotEmpty())
+            runCatching { Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) }.getOrNull() else null
         return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points, headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze,
-            hairline = if (smooth) hairlineOf(frame, cur) else null)
+            hairline = if (smooth) hairlineOf(frame, cur) else null, light = light)
     }
 
     /**

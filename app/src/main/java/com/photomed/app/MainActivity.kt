@@ -15,6 +15,30 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleShared(intent)
+    }
+
+    /** Protocolo recibido («Abrir con» o «Compartir con» PhotoMed): se importa y se avisa. */
+    private fun handleShared(intent: android.content.Intent?) {
+        val i = intent ?: return
+        val uri: android.net.Uri = when (i.action) {
+            android.content.Intent.ACTION_VIEW -> i.data
+            android.content.Intent.ACTION_SEND -> androidx.core.content.IntentCompat.getParcelableExtra(i, android.content.Intent.EXTRA_STREAM, android.net.Uri::class.java)
+            else -> null
+        } ?: return
+        lifecycleScope.launch {
+            val msg = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                runCatching { "Protocolo «${com.photomed.app.data.Protocols.import(applicationContext, uri).name}» importado: ábralo desde un expediente" }
+                    .getOrElse { it.message ?: "No se pudo importar el archivo" }
+            }
+            android.widget.Toast.makeText(this@MainActivity, msg, android.widget.Toast.LENGTH_LONG).show()
+        }
+        // una sola vez (no al recrear la actividad)
+        i.action = null
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // ningún cierre silencioso: los errores se guardan y se avisan al volver a abrir
@@ -28,6 +52,7 @@ class MainActivity : ComponentActivity() {
         PhotoRepository.legacyRoot(applicationContext)?.let { legacy ->
             if (legacy.exists()) lifecycleScope.launch(Dispatchers.IO) { runCatching { repository.migrateLegacy(legacy) } }
         }
+        handleShared(intent)
         setContent {
             PhotoMedTheme {
                 CompositionLocalProvider(LocalRepository provides repository) {

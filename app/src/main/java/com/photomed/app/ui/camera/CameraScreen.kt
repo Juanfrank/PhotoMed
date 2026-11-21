@@ -188,6 +188,11 @@ fun CameraScreen(
     onNext: (Zone?) -> Unit = {},
     /** Abrir Comparar con estas fotos (desde la revisión tras la captura). */
     onCompare: (List<String>) -> Unit = {},
+    /** Protocolo en curso y su paso (zona, gesto, cantidad, coincidencia, luz y referencia sin imagen). */
+    protocol: com.photomed.app.data.Protocol? = null,
+    stepIndex: Int = 0,
+    /** Paso siguiente del protocolo (índice), o null al terminar. */
+    onProtocolNext: (Int?) -> Unit = {},
 ) = ImmersiveTheme {
     val context = LocalContext.current
     // la cámara y las guías se calculan en vertical: esta pantalla se mantiene en vertical (el resto gira)
@@ -210,7 +215,7 @@ fun CameraScreen(
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (hasPermission) {
-            CameraContent(expId, zone, onBack, sequence, onNext, onCompare)
+            CameraContent(expId, zone, onBack, sequence, onNext, onCompare, protocol, stepIndex, onProtocolNext)
         } else {
             EmptyState(
                 icon = Icons.Default.NoPhotography,
@@ -229,7 +234,13 @@ fun CameraScreen(
 
 @Composable
 private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequence: List<Zone>, onNext: (Zone?) -> Unit,
-                          onCompare: (List<String>) -> Unit = {}) {
+                          onCompare: (List<String>) -> Unit = {}, protocol: com.photomed.app.data.Protocol? = null, stepIndex: Int = 0,
+                          onProtocolNext: (Int?) -> Unit = {}) {
+    // paso del protocolo (si se está ejecutando uno): fija gesto, coincidencia, luz, cámara y referencia
+    val step = protocol?.steps?.getOrNull(stepIndex)
+    val protoRef = step?.ref
+    /** Fotos ya guardadas en este paso (se piden [ProtocolStep.count]). */
+    var shotsDone by remember(stepIndex) { mutableIntStateOf(0) }
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val repo = LocalRepository.current
@@ -239,7 +250,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var photos by remember { mutableStateOf<List<Photo>>(emptyList()) }
     var reload by remember { mutableIntStateOf(0) }
 
-    var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
+    var lensFacing by remember { mutableIntStateOf(if (step?.lens == "front") CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK) }
     var flashMode by remember { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
     // cuadrícula apagada por defecto (menos líneas sobre la imagen)
     var showGrid by remember { mutableStateOf(false) }
@@ -259,7 +270,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var lastNear by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var liveMatch by remember { mutableStateOf(true) }
     val prefs = remember { context.getSharedPreferences("photomed", android.content.Context.MODE_PRIVATE) }
-    var autoCapture by remember { mutableStateOf(prefs.getBoolean("auto_capture", false)) }
+    var autoCapture by remember { mutableStateOf(step?.autoCapture ?: prefs.getBoolean("auto_capture", false)) }
     /** Vibración (y sonido al coincidir) según el grado de coincidencia. */
     var feedback by remember { mutableStateOf(prefs.getBoolean("guide_feedback", true)) }
     /** Disparo automático también "casi" alineado (≥ 80 %): la alineación fina se hace en Comparar. */
@@ -286,7 +297,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var limbSide by remember(zone) { mutableStateOf(LimbSide.ofTag(prefs.getString("limb_side_${zone.id}", null))) }
     // Expresión facial de la toma (arrugas dinámicas): reposo por defecto en cada zona
     val expressions = remember(zone) { com.photomed.app.data.FacialExpression.forZone(zone) }
-    var expression by remember(zone) { mutableStateOf(com.photomed.app.data.FacialExpression.NEUTRAL) }
+    var expression by remember(zone, stepIndex) { mutableStateOf(step?.expression ?: com.photomed.app.data.FacialExpression.NEUTRAL) }
     var threshold by remember { mutableFloatStateOf(prefs.getFloat("match_threshold_v2", LiveMatch.DEFAULT_THRESHOLD)) }
     var showSettings by remember { mutableStateOf(false) }
     var mirrorOn by remember { mutableStateOf(prefs.getBoolean("mirror_front", true)) }
@@ -321,13 +332,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     val engine = com.photomed.app.align.FaceEngine.MEDIAPIPE
     val matcher = remember(zone, engine) { LiveMatcher(zone, context.applicationContext, engine) }
     SideEffect { pipeline.swap(matcher) }
-    matcher.threshold = threshold
-    matcher.useGaze = useGaze
+    matcher.threshold = step?.threshold ?: threshold
+    matcher.useGaze = step?.gaze ?: useGaze
+    matcher.measureLight = step != null && (step.minLight != null || step.maxLight != null || step.maxLightAsym != null)
     DisposableEffect(Unit) { onDispose { pipeline.shutdown() } }
     val lastAnalysis = remember { AtomicLong(0L) }
     // Asistencia en vivo: con referencia (foto superpuesta) iguala el encuadre; sin ella, estandariza la toma.
     val matchingEnabled = liveMatch
-    val referenceMode = showGhost && ghost != null
+    val referenceMode = protoRef != null || (showGhost && ghost != null)
     matcher.useReference = referenceMode
     matcher.expression = expression
     val matchingFlag = remember { AtomicBoolean(false) }
@@ -357,6 +369,27 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             refFree = m.referenceFree
             refEdges = m.referenceEdges
             refHairline = m.referenceHairline
+        }
+    }
+    // Referencia del protocolo (sin imagen): puntos, pose, línea del pelo y perfil; distancia y zoom de la toma
+    LaunchedEffect(protoRef, matcher, camera) {
+        val r = protoRef ?: return@LaunchedEffect
+        ghost = null; live = null
+        val m = matcher
+        pipeline.post {
+            m.setReferenceFeatures(com.photomed.app.align.ProtocolReference.detectionOf(r), r.hairline, r.profile)
+            refPoints = m.referencePoints; refHairline = m.referenceHairline
+            refSilhouette = null; refFree = null; refEdges = null
+        }
+        refCond = buildMap {
+            r.distanceCm?.let { put("DistanceCm", "%.0f".format(java.util.Locale.US, it)) }
+            r.zoom?.let { put("Zoom", "%.2f".format(java.util.Locale.US, it)) }
+        }
+        val z = r.zoom ?: return@LaunchedEffect
+        val cam = camera ?: return@LaunchedEffect
+        if (zoomAssist && !manualZoom && z > 1.01f) {
+            val zz = z.coerceIn(zoomRange.start, zoomRange.endInclusive)
+            cam.cameraControl.setZoomRatio(zz); zoomRatio = zz
         }
     }
     val status = live?.eval?.status
@@ -417,7 +450,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         overheadHint()?.let { return it }
         if (zone.category != com.photomed.app.data.ZoneCategory.FACIAL) return null
         val d = live?.let { CameraGuidance.faceDistanceCm(it.currentPointsAll, focalNorm, zoomRatio) } ?: return null
-        val target = refCond["DistanceCm"]?.toFloatOrNull()?.takeIf { showGhost && ghost != null }
+        val target = refCond["DistanceCm"]?.toFloatOrNull()?.takeIf { (showGhost && ghost != null) || protoRef != null }
         return when {
             target != null && kotlin.math.abs(d - target) / target > 0.15f -> "Distancia: %.0f cm → %.0f cm".format(d, target)
             target != null -> null
@@ -428,7 +461,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
 
     // Referencia: condiciones guardadas; su zoom se aplica al elegirla (salvo zoom manual)
     LaunchedEffect(ghost?.key, camera) {
-        val g = ghost ?: run { refCond = emptyMap(); return@LaunchedEffect }
+        val g = ghost ?: run { if (protoRef == null) refCond = emptyMap(); return@LaunchedEffect }
         refCond = withContext(Dispatchers.IO) { runCatching { repo.readInfo(g)?.conditions }.getOrNull() }.orEmpty()
         val z = refCond["Zoom"]?.toFloatOrNull() ?: return@LaunchedEffect
         val cam = camera ?: return@LaunchedEffect
@@ -444,7 +477,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             e to e?.let { repo.photos(it, zone) }.orEmpty()
         }
         exp = e; photos = list
-        if (ghost == null || photos.none { it.key == ghost?.key })
+        // protocolo con referencia: la referencia es la del protocolo, no una foto del expediente
+        if (protoRef == null && (ghost == null || photos.none { it.key == ghost?.key }))
             ghost = photos.lastOrNull { LimbSide.ofFileName(it.displayName, zone) == limbSide && it.expression == expression }
                 ?: photos.lastOrNull { it.expression == expression } ?: photos.lastOrNull()
     }
@@ -552,6 +586,16 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         if (zone.hasLimbSides) put("Side", limbSide.label)
         put("Expression", expression.label)
         put("Zoom", "%.2f".format(java.util.Locale.US, zoomRatio))
+        if (protocol != null && step != null) {
+            putAll(com.photomed.app.data.ProtocolResults.conditions(protocol, stepIndex, shotsDone + 1))
+            put("ProtocolThreshold", "%.0f".format(java.util.Locale.US, (step.threshold ?: threshold) * 100))
+            if (protoRef != null) put("ProtocolReference", "sí")
+        }
+        live?.light?.let { l ->
+            put("LightFace", "%.2f".format(java.util.Locale.US, l.face))
+            val m = maxOf(l.leftCheek, l.rightCheek)
+            if (m > 0f) put("LightAsymmetry", "%.2f".format(java.util.Locale.US, kotlin.math.abs(l.leftCheek - l.rightCheek) / m))
+        }
         live?.let { f ->
             f.eval.pointFraction?.let { put("MatchPercent", "%.0f".format(java.util.Locale.US, it * 100)) }
             put("Assist", if (f.standard) "estandarización" else "coincidencia con referencia")
@@ -743,9 +787,24 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     // Disparo automático: coincidencia sostenida ~0,4 s, sin zoom/enfoque en curso; enfoca en el
     // pivote anatómico, espera el resultado y dispara solo si sigue coincidiendo. Una vez por coincidencia.
     // Listo para disparar: coincide, o "casi" (≥ 80 %) si se permite; la alineación fina se hace después.
+    /** Luz fuera de lo que pide el paso del protocolo (null: bien o no se pide). */
+    fun lightIssue(f: LiveFrame?): String? {
+        val st = step ?: return null
+        if (st.minLight == null && st.maxLight == null && st.maxLightAsym == null) return null
+        if (!zone.isFaceZone()) return null
+        val l = f?.light ?: return "Luz: midiendo…"
+        st.minLight?.let { if (l.face < it) return "Luz insuficiente: %.0f %% (mín. %.0f %%)".format(l.face * 100, it * 100) }
+        st.maxLight?.let { if (l.face > it) return "Demasiada luz: %.0f %% (máx. %.0f %%)".format(l.face * 100, it * 100) }
+        st.maxLightAsym?.let { a ->
+            val m = maxOf(l.leftCheek, l.rightCheek)
+            if (m > 0f && kotlin.math.abs(l.leftCheek - l.rightCheek) / m > a) return "Luz desigual entre mejillas (máx. %.0f %%)".format(a * 100)
+        }
+        return null
+    }
     fun readyNow(e: com.photomed.app.align.MatchEval?) =
-        // la expresión pedida es obligatoria (también con «casi alineada»)
-        e != null && e.expressionOk && (e.status == MatchStatus.MATCH || (nearCapture && (GuideTone.degree(e) ?: 0f) >= 0.8f))
+        // la expresión pedida es obligatoria (también con «casi alineada»); con protocolo, también su luz
+        e != null && e.expressionOk && lightIssue(live) == null &&
+            (e.status == MatchStatus.MATCH || (nearCapture && step == null && (GuideTone.degree(e) ?: 0f) >= 0.8f))
     val ready = matchingEnabled && readyNow(live?.eval)
     LaunchedEffect(ready, autoCapture) {
         if (!ready) { autoArmed = true; return@LaunchedEffect }
@@ -771,18 +830,25 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             Column(Modifier.weight(1f)) {
                 Text(zone.label, color = Color.White, style = MaterialTheme.typography.titleMedium)
                 val idx = sequence.indexOf(zone)
-                Text(if (idx >= 0) "Secuencia ${idx + 1}/${sequence.size} · ${exp?.patientName.orEmpty()}" else exp?.patientName.orEmpty(),
-                    color = if (idx >= 0) GuideTone.MATCH.color else Color.LightGray, style = MaterialTheme.typography.bodySmall)
+                Text(when {
+                    protocol != null && step != null -> "${protocol.name} · paso ${stepIndex + 1}/${protocol.steps.size} · foto ${shotsDone + 1}/${step.count}"
+                    idx >= 0 -> "Secuencia ${idx + 1}/${sequence.size} · ${exp?.patientName.orEmpty()}"
+                    else -> exp?.patientName.orEmpty()
+                }, color = if (idx >= 0 || step != null) GuideTone.MATCH.color else Color.LightGray, style = MaterialTheme.typography.bodySmall)
             }
-            if (zone in sequence) {
+            if (protocol != null && step != null) {
+                androidx.compose.material3.TextButton(onClick = { onProtocolNext((stepIndex + 1).takeIf { it < protocol.steps.size }) }) {
+                    Text(if (stepIndex + 1 < protocol.steps.size) "Saltar" else "Terminar", color = Color.White)
+                }
+            } else if (zone in sequence) {
                 androidx.compose.material3.TextButton(onClick = { onNext(sequence.getOrNull(sequence.indexOf(zone) + 1)) }) {
                     Text(if (sequence.indexOf(zone) + 1 < sequence.size) "Saltar" else "Terminar", color = Color.White)
                 }
             }
             IconToggleButton(
                 checked = autoCapture,
-                onCheckedChange = { autoCapture = it; prefs.edit().putBoolean("auto_capture", it).apply() },
-                enabled = photos.isNotEmpty(),
+                onCheckedChange = { autoCapture = it; if (step?.autoCapture == null) prefs.edit().putBoolean("auto_capture", it).apply() },
+                enabled = photos.isNotEmpty() || protoRef != null,
             ) {
                 Icon(Icons.Default.AutoMode, if (autoCapture) "Disparo automático activado" else "Disparo automático desactivado",
                     tint = if (autoCapture) GuideTone.MATCH.color else Color.White)
@@ -914,6 +980,11 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                             HairlineGuide(rgh, tone.color, Modifier.fillMaxSize())
                         }
                     else if (showContour && showGhost && hl != null) HairlineGuide(hl, tone.color, Modifier.fillMaxSize())
+                    // contornos y surcos de la referencia del protocolo (guía discontinua)
+                    if (showContour && protoRef != null) protoRef.lines.forEach { l ->
+                        HairlineGuide(if (l.closed && l.points.size > 2) l.points + l.points.first() else l.points,
+                            Color.White.copy(alpha = 0.55f), Modifier.fillMaxSize())
+                    }
                     val liveHl = live?.hairline
                     if (showContour && liveHl != null) HairlineGuide(liveHl, Color(0xFFFFD54F), Modifier.fillMaxSize(), dashed = false)
                     if (matchingEnabled && expert) live?.let { LivePoints(it, tone, mirror = false) }
@@ -989,7 +1060,21 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         }
 
         // Expresión facial (arrugas dinámicas): reposo o contracción máxima de cada grupo muscular
-        if (expressions.size > 1) {
+        // con protocolo: el paso, sus indicaciones y lo que falta (el gesto lo fija el paso)
+        if (step != null) Column(Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.s3, vertical = 2.dp)) {
+            Text(step.title, color = Color.White, style = MaterialTheme.typography.labelLarge)
+            if (step.expression != com.photomed.app.data.FacialExpression.NEUTRAL)
+                Text("${step.expression.instruction} · ${step.expression.muscle}", color = Color(0xFFFFD54F), style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.semantics { contentDescription = "Instrucción: ${step.expression.instruction}" })
+            step.instructions?.let { Text(it, color = Color.LightGray, style = MaterialTheme.typography.bodySmall) }
+            val req = listOfNotNull(
+                "coincidencia ≥ ${((step.threshold ?: threshold) * 100).toInt()} %",
+                step.minLight?.let { "luz ≥ ${(it * 100).toInt()} %" },
+                if (protoRef != null) "igual a la referencia" + (protoRef.sourceTakenAt?.let { " del ${formatDate(it)}" } ?: "") else null)
+            Text("Exige: " + req.joinToString(" · "), color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
+            lightIssue(live)?.let { Text(it, color = GuideTone.FAR.color, style = MaterialTheme.typography.labelMedium) }
+        }
+        if (expressions.size > 1 && step == null) {
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Md3Spacing.s2),
                 horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2),
@@ -1151,7 +1236,15 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         fun keep() {
             reviewName = null
             val idx = sequence.indexOf(zone)
-            if (idx >= 0) {
+            if (protocol != null && step != null) {
+                shotsDone++
+                if (shotsDone < step.count) scope.launch { snackbar.showSnackbar("Foto $shotsDone de ${step.count} de este paso guardada") }
+                else {
+                    val next = (stepIndex + 1).takeIf { it < protocol.steps.size }
+                    if (next == null) android.widget.Toast.makeText(context, "Protocolo «${protocol.name}» completado", android.widget.Toast.LENGTH_SHORT).show()
+                    onProtocolNext(next)
+                }
+            } else if (idx >= 0) {
                 // secuencia: pasa a la siguiente zona (o termina); la cabecera muestra "Secuencia i/N"
                 if (idx + 1 >= sequence.size) android.widget.Toast.makeText(context, "Secuencia completada", android.widget.Toast.LENGTH_SHORT).show()
                 onNext(sequence.getOrNull(idx + 1))

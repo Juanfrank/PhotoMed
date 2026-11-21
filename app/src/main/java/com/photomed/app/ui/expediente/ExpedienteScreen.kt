@@ -102,6 +102,10 @@ fun ExpedienteScreen(
     onCompare: () -> Unit,
     /** Secuencia guiada por las zonas elegidas (plantilla), en orden. */
     onSequence: (List<Zone>) -> Unit = {},
+    /** Iniciar un protocolo (la cámara recorre sus pasos). */
+    onProtocol: (com.photomed.app.data.Protocol) -> Unit = {},
+    /** Crear ("new") o editar un protocolo; con fotos de partida (nombres) para crearlo desde ellas. */
+    onEditProtocol: (String, List<String>) -> Unit = { _, _ -> },
 ) {
     val repo = LocalRepository.current
     val scope = rememberCoroutineScope()
@@ -145,6 +149,7 @@ fun ExpedienteScreen(
         onBack = onBack, onZone = onZone, onCompare = onCompare,
         onEdit = { editing = true }, onDelete = { confirmDelete = true },
         onSequence = onSequence,
+        onProtocol = onProtocol, onEditProtocol = onEditProtocol, photoVersion = reload, onPhotosImported = { reload++ },
         onImport = {
             picker.launch(androidx.activity.result.PickVisualMediaRequest(
                 androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -230,6 +235,10 @@ fun ExpedienteContent(
     onSequence: (List<Zone>) -> Unit = {},
     /** Importar fotos de la galería u otra fuente, asignando el ángulo de cada una. */
     onImport: () -> Unit = {},
+    onProtocol: (com.photomed.app.data.Protocol) -> Unit = {},
+    onEditProtocol: (String, List<String>) -> Unit = { _, _ -> },
+    photoVersion: Int = 0,
+    onPhotosImported: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var menu by remember { mutableStateOf(false) }
@@ -319,6 +328,10 @@ fun ExpedienteContent(
                         com.photomed.app.data.SessionTemplates.delete(prefs, t.name)
                         templates = com.photomed.app.data.SessionTemplates.load(prefs)
                     })
+            }
+            item(span = { GridItemSpan(maxLineSpan) }, key = "protocolos") {
+                com.photomed.app.ui.protocol.ProtocolsSection(exp, snackbar, photoVersion, onStart = onProtocol, onEdit = onEditProtocol,
+                    onPhotosImported = onPhotosImported)
             }
             // Primero las zonas con fotos; el resto, por categoría en secciones plegables
             // (abiertas si el expediente aún no tiene fotos o si hay zonas suyas seleccionadas)
