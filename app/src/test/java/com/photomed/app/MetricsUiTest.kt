@@ -55,7 +55,9 @@ class MetricsUiTest {
         compose.waitForIdle()
         compose.onNodeWithText("Medidas de líneas y surcos").assertIsDisplayed()
         // número de la línea (el mismo que en la foto) + nombre + medida
-        compose.onNodeWithText("1  Nasogeniano derecho\nLong. mm").assertExists()
+        // cada renglón de la celda (línea y medida) es un texto aparte (tabla sin interlineado)
+        compose.onNodeWithText("1  Nasogeniano derecho").assertExists()
+        compose.onAllNodesWithText("Long. mm")[0].assertExists()
         compose.onNodeWithText("-2.0").assertExists()      // longitud
         compose.onNodeWithText("-0.50").assertExists()     // profundidad
         assertTrue(compose.onAllNodesWithText("Ojera derecha", substring = true).fetchSemanticsNodes().isNotEmpty())
