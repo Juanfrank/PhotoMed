@@ -10,6 +10,7 @@ import kotlin.math.roundToInt
 enum class AnnotLayer(val label: String) {
     CONTOUR("Contorno"), HAIRLINE("Línea del pelo"), EYES("Ojos y cejas"), NOSE("Nariz"), LIPS("Labios"), FOLDS("Surcos"),
     FOREHEAD("Frente"), GLABELLA("Ceño"), CROWS_FEET("Patas de gallo"), DARK_CIRCLES("Ojeras"), EYE_BAGS("Bolsas palpebrales"),
+    JAWLINE("Línea mandibular"), PAPADA("Papada"),
 }
 
 /** Una línea de anotación (x del ancho, y en unidades del ancho). [estimated]: posición estimada, no medida. */
@@ -211,6 +212,13 @@ object FaceAnnotations {
         // labios: bermellón superior e inferior, cada uno con sus medidas
         out += feat(AnnotLayer.LIPS, FeatureMetrics.upperLipPoly(mesh), true) { mm, s -> FeatureMetrics.upperLipM(mesh, mm, s) }
         out += feat(AnnotLayer.LIPS, FeatureMetrics.lowerLipPoly(mesh), true) { mm, s -> FeatureMetrics.lowerLipM(mesh, mm, s) }
+        // línea mandibular (nitidez, rectitud, ángulo goníaco) y papada bajo el mentón
+        if (lum != null) {
+            val ovalPts = (0 until 36).mapNotNull { p["oval_$it"] }
+            runCatching { Jawline.front(mesh, ovalPts, lum, sc) }.getOrNull()?.let { out += it }
+            val skinJ = labels?.let { l -> { q: Pt -> l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()] == FaceLabels.FACE_SKIN } }
+            runCatching { Jawline.papada(mesh, ovalPts, lum, sc, skinJ) }.getOrNull()?.let { out += it }
+        }
         if (lum != null) {
             out += folds(mesh, lum, labels, lab, extras, info, hairOf = { hairM })
             out += withReference(mesh, lum, labels, lab, extras, out, priors, added, hairOf = { hairM })
@@ -677,7 +685,7 @@ object FaceCrop {
         val faceW = hypot(mesh[234].x - mesh[454].x, mesh[234].y - mesh[454].y) * srcW
         val xs = mesh.map { it.x * srcW }; val ys = mesh.map { it.y * srcW }
         val x0 = (xs.min() - 0.2f * faceW).coerceAtLeast(0f); val x1 = (xs.max() + 0.2f * faceW).coerceAtMost(srcW.toFloat())
-        val y0 = (ys.min() - 0.55f * faceW).coerceAtLeast(0f); val y1 = (ys.max() + 0.08f * faceW).coerceAtMost(srcH.toFloat())
+        val y0 = (ys.min() - 0.55f * faceW).coerceAtLeast(0f); val y1 = (ys.max() + 0.25f * faceW).coerceAtMost(srcH.toFloat())
         var s = (FACE_PX / faceW.coerceAtLeast(1f)).coerceAtMost(2f)
         val big = maxOf(x1 - x0, y1 - y0) * s
         if (big > MAX_SIDE) s *= MAX_SIDE / big
@@ -754,7 +762,9 @@ class PhotoAnnotator(private val context: Context) {
 
     /** Lo que dan los modelos nativos para una cara: malla con su recorte y segmentación, o puntos de ML Kit. */
     private class NativeFace(val mesh: List<Pt>? = null, val crop: FaceCrop.Crop? = null, val cropBmp: Bitmap? = null,
-                             val labels: FaceLabels? = null, val points: Map<String, Pt> = emptyMap(), val err: String = "")
+                             val labels: FaceLabels? = null, val points: Map<String, Pt> = emptyMap(), val err: String = "",
+                             /** Perfil: máscara del paciente (silueta) para el cuello y la papada. */
+                             val profileMask: Mask? = null)
 
     /**
      * Los modelos nativos (malla, ML Kit, segmentación) van de uno en uno en toda la app ([NativeGate]);
@@ -768,6 +778,9 @@ class PhotoAnnotator(private val context: Context) {
             return@withContext NativeGate.run("análisis de una foto (${zone.id}, ${bmp.width}×${bmp.height})") { analyzeGated(bmp, zone) }
         val nat = NativeGate.run("análisis de una foto: malla y segmentación (${zone.id}, ${bmp.width}×${bmp.height})") {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                // perfil: silueta del paciente (ángulo cervicomentoniano y papada)
+                val pm = if (zone.guide == com.photomed.app.data.GuideType.FACE_PROFILE)
+                    runCatching { SubjectSegmenter().use { it.segment(bmp) } }.getOrNull() else null
                 // malla completa de MediaPipe (nariz, labios, ojos y pasillos de los surcos con su topología real)
                 val mesh = meshRobust(bmp)
                 if (mesh != null && mesh.size >= 468) {
@@ -775,15 +788,17 @@ class PhotoAnnotator(private val context: Context) {
                     val c = FaceCrop.crop(mesh, bmp.width, bmp.height)
                     val b = FaceCrop.bitmap(bmp, c)
                     val labels = HairSkinSegmenter.createOrNull(context)?.use { seg -> runCatching { seg.labels(b) }.getOrNull() }
-                    NativeFace(mesh, c, b, labels)
+                    NativeFace(mesh, c, b, labels, profileMask = pm)
                 } else {
                     val pts = mlkitPoints(bmp)
                     val err = MediaPipeFace.lastError?.let { " (detalle: $it)" } ?: ""
                     val labels = if (pts.size >= LiveDecision.MIN_POINTS) HairSkinSegmenter.createOrNull(context)?.use { it.labels(bmp) } else null
-                    NativeFace(labels = labels, points = pts, err = err)
+                    NativeFace(labels = labels, points = pts, err = err, profileMask = pm)
                 }
             }
         }
+        // perfil: cuello y papada por la silueta (fuera de la puerta)
+        val prof = nat.profileMask?.let { m -> runCatching { Jawline.profile(m, bmp.width, bmp.height) }.getOrNull() }.orEmpty()
         val mesh = nat.mesh
         if (mesh != null && nat.crop != null && nat.cropBmp != null) {
             run {
@@ -796,7 +811,9 @@ class PhotoAnnotator(private val context: Context) {
                 if (memoryUri != null) LineMemory.save(context, memoryUri, mesh, lines)
                 val note = if (lines.none { it.metrics != null }) "No se encontraron arrugas ni surcos medibles en esta foto (piel lisa, " +
                     "poca resolución de la cara o luz muy plana)." else beardNote(info)
-                return@withContext lines to note
+                // de perfil: además, el cuello y la papada por la silueta (la papada de frente no aplica)
+                val withProf = if (prof.isEmpty()) lines else lines.filter { it.layer != AnnotLayer.PAPADA } + prof
+                return@withContext withProf to note
             }
         }
         // sin malla: puntos de ML Kit; surcos estimados y ajustados a la sombra, con medidas (escala
@@ -811,7 +828,8 @@ class PhotoAnnotator(private val context: Context) {
                     "(nasogeniano, marioneta, valle lagrimal); frente, ceño, patas de gallo y ojeras necesitan la malla." +
                     (beardNote(info)?.let { " $it" } ?: ""))
             }
-            emptyList<AnnotLine>() to "No se detectó ninguna cara en la foto$err."
+            if (prof.isNotEmpty()) prof to "Perfil: sin malla facial; el cuello y la papada se miden por la silueta."
+            else emptyList<AnnotLine>() to "No se detectó ninguna cara en la foto$err."
         }
     }
 

@@ -154,4 +154,63 @@ class ProtocolTest {
         compose.onNodeWithContentDescription("Iniciar el protocolo Control facial").performClick()
         assertEquals(saved.id, started?.id)
     }
+
+    /** Biblioteca: aplicar un protocolo a un paciente elegido. */
+    @Test
+    fun libraryAppliesToChosenPatient() {
+        Protocols.save(ctx, sample)
+        repo.createExpediente("Otra Paciente", "777", "", consent = true)
+        var applied: Pair<String, String>? = null
+        setContent { com.photomed.app.ui.protocol.ProtocolLibraryScreen(onEdit = {}, onApply = { e, p -> applied = e to p.id }) }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText(sample.name).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Aplicar").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Otra Paciente").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Buscar por nombre o número").performTextInput("777")
+        compose.onNodeWithText("Otra Paciente").performClick()
+        assertEquals(sample.id, applied?.second)
+        assertEquals("Otra Paciente", repo.getExpediente(applied!!.first)?.patientName)
+    }
+
+    /** Tabla de expedientes: miniatura solo de la cara, orden por columnas, filtros y búsqueda. */
+    @Test
+    fun expedientesTableSortsFiltersAndSearches() {
+        val jpeg = File(tmp.root, "c.jpg").apply { writeBytes(this@ProtocolTest.javaClass.getResourceAsStream("/blank.jpg")!!.readBytes()) }
+        Protocols.save(ctx, sample)
+        // Paciente Prueba: frontal (protocolo, 1 de 3) + mano (más reciente; no cuenta para la miniatura)
+        repo.savePhoto(exp, Zone.FACE_FRONTAL, jpeg, takenAt = 1_763_400_000_000L, conditions = ProtocolResults.conditions(sample, 0, 1))
+        repo.savePhoto(exp, Zone.HANDS_DORSAL, jpeg, takenAt = 1_763_500_000_000L)
+        val b = repo.createExpediente("Ana Alba", "100", "", consent = false)
+        repeat(3) { repo.savePhoto(b, Zone.LIPS, jpeg, takenAt = 1_763_000_000_000L + it) }
+        repo.createExpediente("Zoe Zeta", "555", "", consent = true)
+        val list = repo.listExpedientes()
+        val sums = list.associate { it.id to com.photomed.app.data.ExpedienteSummaries.of(ctx, repo, it) }
+        val s0 = sums.getValue(exp.id)
+        assertEquals(Zone.FACE_FRONTAL, s0.lastFace?.zone)
+        assertEquals(2, s0.angles); assertEquals(2, s0.pendingShots)
+        setContent {
+            com.photomed.app.ui.expedientes.ExpedientesContent(list, androidx.compose.material3.SnackbarHostState(), {}, {}, {}, {}, summaries = sums)
+        }
+        fun order() = compose.onAllNodesWithText("Paciente Prueba").fetchSemanticsNodes().let { _ ->
+            listOf("Ana Alba", "Paciente Prueba", "Zoe Zeta").sortedBy { compose.onNodeWithText(it).fetchSemanticsNode().boundsInRoot.top }
+        }
+        compose.onNodeWithText("Nombre").performClick()
+        assertEquals(listOf("Ana Alba", "Paciente Prueba", "Zoe Zeta"), order())
+        compose.onNodeWithText("Fotos").performClick()   // más fotos primero
+        assertEquals("Ana Alba", order().first())
+        // filtros
+        compose.onNodeWithText("Con tomas pendientes").performClick()
+        compose.waitForIdle()
+        assertTrue(compose.onAllNodesWithText("Ana Alba").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithText("2 fotos").assertExists()
+        compose.onNodeWithText("Con tomas pendientes").performClick()
+        compose.onNodeWithText("Sin consentimiento").performScrollTo().performClick()
+        compose.waitForIdle()
+        assertTrue(compose.onAllNodesWithText("Zoe Zeta").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithText("Sin consentimiento").performScrollTo().performClick()
+        // búsqueda por número
+        compose.onNodeWithText("Buscar nombre o n.º de expediente").performTextInput("555")
+        compose.waitForIdle()
+        assertTrue(compose.onAllNodesWithText("Ana Alba").fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithText("Zoe Zeta").assertExists()
+    }
 }

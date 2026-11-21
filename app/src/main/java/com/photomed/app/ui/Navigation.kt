@@ -69,8 +69,11 @@ fun AppNavigation() {
         popExitTransition = { slideOutHorizontally(exit) { it / 5 } + fadeOut(tween(Md3Motion.durationShort4)) },
     ) {
         composable("expedientes") { entry ->
-            ExpedientesScreen(onOpen = { entry.go("expediente/$it") }, onAbout = { entry.go("about") },
-                onSettings = { entry.go("settings") })
+            HomeScreen(onOpen = { entry.go("expediente/$it") }, onAbout = { entry.go("about") },
+                onSettings = { entry.go("settings") },
+                // biblioteca de protocolos: editar sin expediente; aplicar = abrir la cámara del paciente elegido
+                onEditProtocol = { id -> entry.go("protocol/-/$id") },
+                onApplyProtocol = { expId, p -> p.steps.firstOrNull()?.let { s -> entry.go("camera/$expId/${s.zone.id}?protocol=${p.id}&step=0") } })
         }
         composable("expediente/{exp}") { entry ->
             val exp = entry.arguments?.getString("exp").orEmpty()

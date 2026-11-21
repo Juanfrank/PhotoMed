@@ -2,6 +2,27 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.40 — 21 de noviembre de 2026
+
+- **Línea mandibular** (capa nueva, en «Contorno externo»), como la línea del pelo:
+  - de frente u oblicua: el borde inferior del contorno de ángulo a ángulo, con **nitidez del borde**
+    (contraste cara / cuello y ancho de la transición del 10 al 90 %: menor = más definido),
+    **rectitud** de cada lado (desviación hacia abajo respecto a la recta ángulo → mentón) y **ángulo
+    goníaco** en el lado visible cuando la cara está girada;
+  - de perfil (por la silueta del paciente): **ángulo cervicomentoniano** (rectas del submentón y del
+    cuello; referencia ≈ 90–120°).
+- **Papada** (capa aparte de la línea mandibular): de frente, el pliegue bajo el mentón con sus medidas
+  de surco; de perfil, el contorno submentoniano con su convexidad. El análisis llega ahora más abajo
+  del mentón.
+- **Pestañas Expedientes y Protocolos**: la biblioteca de protocolos se reutiliza con cualquier
+  paciente: crear, importar, editar, duplicar, compartir, eliminar y **Aplicar** (se elige el paciente y
+  la cámara empieza). Al editar desde la biblioteca se elige de qué expediente salen las fotos de
+  referencia.
+- **Lista de expedientes en tabla**: miniatura con la última foto de la cara (solo ángulos faciales),
+  nombre y número, fotos, ángulos, última toma y tomas pendientes de protocolos; se ordena tocando la
+  cabecera de cada columna, se busca por nombre o número y se filtra (con / sin fotos, con tomas
+  pendientes, últimos 30 días, sin fotos en 6 meses, sin consentimiento).
+
 ## 2.39 — 21 de noviembre de 2026
 
 - **Ángulos (línea multipunto)** en el menú de símbolos: cada toque añade un punto y la línea sigue al

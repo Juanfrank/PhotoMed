@@ -119,8 +119,14 @@ fun ProtocolEditorScreen(expId: String, protocolId: String?, fromPhotos: List<St
 
     suspend fun refFrom(p: Photo) = runCatching { ProtocolReference.fromPhoto(context, repo, p) }.getOrNull()
 
-    LaunchedEffect(expId) {
-        photos = withContext(Dispatchers.IO) { repo.getExpediente(expId)?.let { repo.photos(it) }.orEmpty() }
+    // expediente de donde salen las fotos de referencia (desde la biblioteca se elige)
+    var refExp by remember { mutableStateOf(expId.takeIf { it != "-" }) }
+    var refExpName by remember { mutableStateOf<String?>(null) }
+    var pickExp by remember { mutableStateOf(false) }
+    LaunchedEffect(refExp) {
+        val e = refExp?.let { withContext(Dispatchers.IO) { repo.getExpediente(it) } }
+        refExpName = e?.patientName
+        photos = withContext(Dispatchers.IO) { e?.let { repo.photos(it) }.orEmpty() }
         // desde fotos: un paso por foto (zona, gesto) con su referencia
         if (original == null && fromPhotos.isNotEmpty() && steps.isEmpty()) {
             val chosen = fromPhotos.mapNotNull { n -> photos.firstOrNull { it.displayName == n } }
@@ -159,6 +165,11 @@ fun ProtocolEditorScreen(expId: String, protocolId: String?, fromPhotos: List<St
                 OutlinedTextField(author, { author = it.take(80) }, label = { Text("Autor (opcional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(notes, { notes = it.take(500) }, label = { Text("Notas e indicaciones generales (opcional)") }, modifier = Modifier.fillMaxWidth())
                 busy?.let { Column(Modifier.padding(top = 8.dp)) { Text(it, style = MaterialTheme.typography.bodySmall); LinearProgressIndicator(Modifier.fillMaxWidth()) } }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                    Text("Fotos de referencia: " + (refExpName ?: "ningún expediente"), style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f))
+                    TextButton(onClick = { pickExp = true }) { Text(if (refExp == null) "Elegir expediente" else "Cambiar") }
+                }
                 Text("Tomas en orden (${steps.sumOf { it.count }} fotos)", style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
             }
@@ -182,6 +193,7 @@ fun ProtocolEditorScreen(expId: String, protocolId: String?, fromPhotos: List<St
         }
     }
 
+    if (pickExp) ExpedientePicker("Fotos de referencia de…", onDismiss = { pickExp = false }) { e -> pickExp = false; refExp = e.id }
     if (pickMany) {
         val chosen = remember { mutableStateListOf<String>() }
         AlertDialog(onDismissRequest = { pickMany = false },
