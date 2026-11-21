@@ -898,7 +898,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         val exportAnnots = seq.mapNotNull { p ->
             com.photomed.app.align.PhotoAnnotator.cached("34|${p.uri}|${com.photomed.app.align.PhotoEdits.of(context, p.uri.toString()).hashCode()}")?.let { base ->
                 val phi = shown[p.key]?.keystoneDeg ?: 0f
-                p.key to (if (phi == 0f) base else base.map { l -> l.copy(points = l.points.map { com.photomed.app.align.Perspective.mapPt(it, phi) }) })
+                p.key to (if (phi == 0f) base else base.map { l -> l.mapped { com.photomed.app.align.Perspective.mapPt(it, phi) } })
             }
         }.toMap()
         ExportSheet(

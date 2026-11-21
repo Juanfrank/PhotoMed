@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -100,7 +101,13 @@ const val METRICS_NOTE = "Medidas orientativas desde una sola foto: escala por e
 fun hitLine(lines: List<AnnotLine>, layers: Set<AnnotLayer>, p: Pt, tol: Float): AnnotLine? {
     var best: AnnotLine? = null; var bd = tol
     for (l in lines) {
-        if (l.metrics == null || l.layer !in layers) continue
+        if (l.layer !in layers) continue
+        // trazo sin medidas propio (p. ej. el dorso o las alas de la nariz): cuenta como la línea medida de su capa
+        if (l.metrics == null) {
+            val owner = lines.filter { it.layer == l.layer && it.metrics != null }.singleOrNull() ?: continue
+            for (i in 1 until l.points.size) { val d = segDist(p, l.points[i - 1], l.points[i]); if (d < bd) { bd = d; best = owner } }
+            continue
+        }
         if (l.filled && insidePoly(p, l.points)) { if (best == null || bd > tol * 0.5f) { best = l; bd = tol * 0.5f }; continue }
         for (i in 1 until l.points.size) {
             val d = segDist(p, l.points[i - 1], l.points[i])
@@ -194,7 +201,9 @@ fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
                  loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null,
                  /** Eliminar una línea (falso positivo): nombre y foto (índice de columna; null = en todas). */
                  onDelete: ((String, Int?) -> Unit)? = null, dismissedCount: Int = 0, onRestore: (() -> Unit)? = null,
-                 traces: TraceActions? = null) {
+                 traces: TraceActions? = null,
+                 /** Tocar una fila selecciona su línea en la foto (y muestra lo que se mide). */
+                 onSelectLine: ((AnnotLine) -> Unit)? = null) {
     androidx.compose.material3.Surface(modifier, color = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 2.dp) {
         Column(Modifier.fillMaxWidth()) {
@@ -204,7 +213,7 @@ fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
             }
             HorizontalDivider()
             Column(Modifier.padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
-                MetricsContent(columns, layers, loading, note, onShowLayers, onDelete, dismissedCount, onRestore, traces)
+                MetricsContent(columns, layers, loading, note, onShowLayers, onDelete, dismissedCount, onRestore, traces, onSelectLine)
             }
         }
     }
@@ -215,7 +224,7 @@ fun MetricsPanel(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
 fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<AnnotLayer>,
                    loading: Boolean = false, note: String? = null, onShowLayers: ((Set<AnnotLayer>) -> Unit)? = null,
                    onDelete: ((String, Int?) -> Unit)? = null, dismissedCount: Int = 0, onRestore: (() -> Unit)? = null,
-                   traces: TraceActions? = null) {
+                   traces: TraceActions? = null, onSelectLine: ((AnnotLine) -> Unit)? = null) {
     // estado de los trazos: confirmados (guardados en la foto, no se vuelven a analizar) o por confirmar
     if (traces != null && !loading) Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(if (traces.confirmed) Icons.Default.Verified else Icons.Default.Info, null, Modifier.size(18.dp),
@@ -252,7 +261,8 @@ fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Ann
     }
     val ordered = byName.entries.sortedBy { numbers[it.key] ?: Int.MAX_VALUE }
     val single = columns.size == 1
-    val scroll = rememberScrollState()
+    // un desplazamiento horizontal por tabla (compartido, la tabla más estrecha limitaba a las demás)
+    val scrolls = List(3) { rememberScrollState() }
     fun label(name: String, v: Pair<AnnotLine, List<LineMetrics?>>) = "${numbers[name] ?: ""}  $name" + if (v.second.any { it?.note != null }) " ✱" else ""
     for (group in 0..2) {
         val rows = ordered.filter { e -> e.value.second.firstNotNullOfOrNull { it }?.let { com.photomed.app.align.MeasureNumbering.group(it) } == group }
@@ -260,7 +270,7 @@ fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Ann
         val area = group == 1
         Text(listOf("Arrugas y surcos", "Ojeras", "Rasgos")[group], style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 12.dp))
-        Column(Modifier.horizontalScroll(scroll).padding(top = 4.dp)) {
+        Column(Modifier.horizontalScroll(scrolls[group]).padding(top = 4.dp)) {
             if (group == 2) {
                 // rasgos: una fila por medida
                 TableRow(listOf("Rasgo · medida") + (if (single) listOf("Valor") else columns.map { it.first.replace(", ", "\n") } + "Δ"), header = true)
@@ -271,7 +281,8 @@ fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Ann
                         val first = vals.firstOrNull { it != null }; val last = vals.lastOrNull { it != null }
                         val delta = if (!single && first != null && last != null && vals.count { it != null } >= 2) last - first else null
                         TableRow(listOf(if (i == 0) "${label(name, v)}\n${lab}" else "   $lab") + vals.map { it?.let { x -> featureValue(lab, x) } ?: "—" } +
-                            (if (single) emptyList() else listOf(signed(delta, if (lab.endsWith("mm²")) 0 else 1))), line = if (i == 0) v.first else null, wide = true)
+                            (if (single) emptyList() else listOf(signed(delta, if (lab.endsWith("mm²")) 0 else 1))), line = if (i == 0) v.first else null, wide = true,
+                            onClick = onSelectLine?.let { f -> { f(v.first) } })
                     }
                     HorizontalDivider()
                 }
@@ -306,8 +317,13 @@ fun MetricsContent(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Ann
                 }
             }
             Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                Column(Modifier.weight(1f).horizontalScroll(scroll)) {
-                    specs.forEach { r -> TableRow(r.cells, header = r.header, line = r.line, fixedHeight = ROW_H); if (r.divider) HorizontalDivider() }
+                Column(Modifier.weight(1f).horizontalScroll(scrolls[group])) {
+                    var owner: AnnotLine? = null
+                    specs.forEach { r -> if (r.line != null) owner = r.line; if (r.header) owner = null
+                        val o = owner
+                        TableRow(r.cells, header = r.header, line = r.line, fixedHeight = ROW_H,
+                            onClick = if (r.header || o == null) null else onSelectLine?.let { f -> { f(o) } })
+                        if (r.divider) HorizontalDivider() }
                 }
                 // acciones fijas a la derecha: volver a trazar, revertir y eliminar
                 val edit = traces?.onEdit?.takeIf { single && !area }
@@ -369,8 +385,10 @@ private class RowSpec(val cells: List<String>, val header: Boolean = false, val 
 @Composable
 private fun TableRow(cells: List<String>, header: Boolean = false, line: AnnotLine? = null, wide: Boolean = false,
                      /** Acción al final de la fila (eliminar la línea). */
-                     action: (@Composable () -> Unit)? = null, fixedHeight: Dp? = null) {
-    Row(if (fixedHeight != null) Modifier.height(fixedHeight) else Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                     action: (@Composable () -> Unit)? = null, fixedHeight: Dp? = null, onClick: (() -> Unit)? = null) {
+    Row((if (fixedHeight != null) Modifier.height(fixedHeight) else Modifier.padding(vertical = 3.dp))
+        .then(if (onClick != null) Modifier.clickable(onClickLabel = "Ver en la foto", onClick = onClick) else Modifier),
+        verticalAlignment = Alignment.CenterVertically) {
         cells.forEachIndexed { i, c ->
             val w: Dp = if (i == 0) (if (wide) 210.dp else 170.dp) else 72.dp
             Row(Modifier.width(w), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = if (i == 0) Arrangement.Start else Arrangement.End) {

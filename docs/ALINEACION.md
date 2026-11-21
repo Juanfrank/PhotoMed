@@ -664,3 +664,15 @@ estado de la cámara (zona, expresión, zoom, ajustes) se conserva; el análisis
   orientativo 0–3 por altura y relieve (no hay una escala fotonumérica validada específica de bolsas;
   la de Barton gradúa el contorno del párpado inferior y las de ojera hundida —Allergan, Merz— el
   hundimiento, no la protrusión).
+
+## Segmentos de medida y frente en rectas (2.25)
+
+- `AnnotLine.guides`: segmentos medidos (`MeasureGuide`: texto con el valor y dos puntos), en las
+  mismas coordenadas que la línea; siguen todas sus transformaciones (`AnnotLine.mapped`: recorte de la
+  cara → foto, perspectiva de Comparar, edición de la foto en los trazos confirmados).
+- Línea del pelo: en el sistema de la cara (eje entre pupilas y su perpendicular), para cada vertical
+  (centro, pupila, canto externo) se interpola el borde superior de las cejas (las dos juntas, para el
+  centro) y la línea del pelo; altura = pelo − ceja en esa recta. Segmentos: pupila → ceja → pelo.
+- Ojeras y bolsas: el borde inferior es un ajuste cuadrático de la profundidad por columna (sin las
+  atípicas, > 2,5 % del ancho de la cara), multiplicado por sen(π·t) a lo largo del ojo: media luna que
+  se cierra en los cantos.

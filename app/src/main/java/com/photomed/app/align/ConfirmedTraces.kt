@@ -94,7 +94,9 @@ object TraceMap {
  */
 data class StoredTrace(val layer: AnnotLayer, val points: List<Pt>, val closed: Boolean, val filled: Boolean,
                        val estimated: Boolean, val metrics: LineMetrics?, val origin: String = "auto",
-                       val previous: StoredTrace? = null) {
+                       val previous: StoredTrace? = null,
+                       /** Segmentos medidos (coordenadas de la original). */
+                       val guides: List<MeasureGuide> = emptyList()) {
     val name: String? get() = metrics?.name
 }
 
@@ -106,7 +108,8 @@ data class StoredTrace(val layer: AnnotLayer, val points: List<Pt>, val closed: 
 data class TraceSet(val baseAspect: Float, val traces: List<StoredTrace>, val removed: List<StoredTrace> = emptyList(),
                     val confirmedAt: Long = System.currentTimeMillis()) {
     fun lines(e: ImageEdit, frame: TraceFrame): List<AnnotLine> = traces.map { t ->
-        AnnotLine(t.layer, TraceMap.toView(e, baseAspect, frame, t.points), t.closed, t.estimated, t.filled, t.metrics)
+        AnnotLine(t.layer, TraceMap.toView(e, baseAspect, frame, t.points), t.closed, t.estimated, t.filled, t.metrics,
+            t.guides.map { g -> TraceMap.toView(e, baseAspect, frame, listOf(g.a, g.b)).let { (a, b) -> MeasureGuide(g.label, a, b) } })
     }
     fun byName(name: String) = traces.firstOrNull { it.name == name }
     val editedNames: Set<String> get() = traces.filter { it.previous != null }.mapNotNull { it.name }.toSet()
@@ -140,11 +143,13 @@ object TraceJson {
         .put("closed", t.closed).put("filled", t.filled).put("est", t.estimated).put("origin", t.origin).apply {
             t.metrics?.let { put("m", metrics(it)) }
             t.previous?.let { put("prev", trace(it.copy(previous = null))) }
+            if (t.guides.isNotEmpty()) put("guides", JSONArray().apply { t.guides.forEach { g -> put(JSONObject().put("l", g.label).put("p", pts(listOf(g.a, g.b)))) } })
         }
 
     private fun traceOf(o: JSONObject): StoredTrace = StoredTrace(AnnotLayer.valueOf(o.getString("layer")), ptsOf(o.getJSONArray("pts")),
         o.optBoolean("closed"), o.optBoolean("filled"), o.optBoolean("est"), o.optJSONObject("m")?.let(::metricsOf),
-        o.optString("origin", "auto"), o.optJSONObject("prev")?.let(::traceOf))
+        o.optString("origin", "auto"), o.optJSONObject("prev")?.let(::traceOf),
+        o.optJSONArray("guides")?.let { a -> (0 until a.length()).map { i -> val g = a.getJSONObject(i); val p = ptsOf(g.getJSONArray("p")); MeasureGuide(g.getString("l"), p[0], p[1]) } }.orEmpty())
 
     fun write(s: TraceSet): String = JSONObject().put("v", 1).put("aspect", r(s.baseAspect)).put("at", s.confirmedAt)
         .put("traces", JSONArray().apply { s.traces.forEach { put(trace(it)) } })
@@ -212,7 +217,8 @@ object ConfirmedTraces {
         val a0 = TraceMap.baseAspect(e, aE)
         return TraceSet(a0, lines.map { l ->
             StoredTrace(l.layer, TraceMap.fromView(e, a0, frame, l.points), l.closed, l.filled, l.estimated, l.metrics,
-                if (l.metrics?.name?.startsWith("Surco añadido") == true) "añadido" else "auto")
+                if (l.metrics?.name?.startsWith("Surco añadido") == true) "añadido" else "auto",
+                guides = l.guides.map { g -> TraceMap.fromView(e, a0, frame, listOf(g.a, g.b)).let { (a, b) -> MeasureGuide(g.label, a, b) } })
         })
     }
 
@@ -255,11 +261,12 @@ object ConfirmedTraces {
     fun add(s: TraceSet, t: StoredTrace) = s.copy(traces = s.traces + t)
 
     /** Vuelve a trazar la línea [name]: conserva la versión anterior para revertir. */
-    fun replace(s: TraceSet, name: String, points: List<Pt>, metrics: LineMetrics?): TraceSet {
+    fun replace(s: TraceSet, name: String, points: List<Pt>, metrics: LineMetrics?, guides: List<MeasureGuide> = emptyList()): TraceSet {
         val old = s.byName(name) ?: return s
         val first = old.previous ?: old
         val m = (metrics ?: old.metrics)?.copy(name = name, note = "Trazado de nuevo a mano")
-        val n = old.copy(points = points, metrics = m, origin = "editado", previous = first.copy(previous = null), closed = false, filled = false)
+        val n = old.copy(points = points, metrics = m, origin = "editado", previous = first.copy(previous = null), closed = false, filled = false,
+            guides = guides)
         return s.copy(traces = s.traces.map { if (it === old) n else it })
     }
 

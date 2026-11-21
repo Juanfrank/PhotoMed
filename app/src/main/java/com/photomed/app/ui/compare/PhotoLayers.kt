@@ -198,7 +198,7 @@ fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boole
         val confirmed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.ConfirmedTraces.of(context, u) }
         if (confirmed != null) {
             val base = confirmed.lines(edit, com.photomed.app.align.TraceFrame.C34)
-            value = base.map { l -> if (phiDeg == 0f) l else l.copy(points = l.points.map { Perspective.mapPt(it, phiDeg) }) }
+            value = base.map { l -> if (phiDeg == 0f) l else l.mapped { Perspective.mapPt(it, phiDeg) } }
             return@produceState
         }
         val user = com.photomed.app.align.AnnotUserEdits.of(context, u).let { e ->
@@ -211,7 +211,7 @@ fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boole
                 user = user, priors = com.photomed.app.align.LineMemory.priors(context, previous), memoryUri = u)
         }.getOrNull()?.let { (lines, note) -> PhotoAnnotator.put(key, lines); PhotoAnnotator.putNote(key, note); lines }
             ?: emptyList<AnnotLine>().also { PhotoAnnotator.putNote(key, "No se pudo analizar la foto.") }
-        value = base?.map { l -> if (phiDeg == 0f) l else l.copy(points = l.points.map { Perspective.mapPt(it, phiDeg) }) }
+        value = base?.map { l -> if (phiDeg == 0f) l else l.mapped { Perspective.mapPt(it, phiDeg) } }
     }
 }
 

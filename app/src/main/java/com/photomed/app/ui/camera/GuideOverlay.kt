@@ -728,6 +728,37 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLineNumbers(
 }
 
 /**
+ * Segmentos medidos de la línea seleccionada ([com.photomed.app.align.AnnotLine.guides]): línea
+ * punteada blanca con sombra, marcas en los extremos y el valor junto al segmento.
+ */
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMeasureGuides(
+    line: com.photomed.app.align.AnnotLine, k: Float, map: (com.photomed.app.align.Pt) -> Offset,
+) {
+    val dash = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx() * k.coerceAtLeast(0.6f), 4.dp.toPx() * k.coerceAtLeast(0.6f)))
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE; textSize = 11.dp.toPx(); typeface = android.graphics.Typeface.DEFAULT_BOLD
+    }
+    val bg = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xD9202020.toInt() }
+    for (g in line.guides) {
+        val a = map(g.a); val b = map(g.b)
+        val dx = b.x - a.x; val dy = b.y - a.y; val len = kotlin.math.hypot(dx, dy)
+        if (len < 1f) continue
+        drawLine(Color.Black.copy(alpha = 0.6f), a, b, strokeWidth = 3.5.dp.toPx(), pathEffect = dash)
+        drawLine(Color.White, a, b, strokeWidth = 1.6.dp.toPx(), pathEffect = dash)
+        // marcas perpendiculares en los extremos
+        val nx = -dy / len * 5.dp.toPx(); val ny = dx / len * 5.dp.toPx()
+        for (p in listOf(a, b)) drawLine(Color.White, Offset(p.x - nx, p.y - ny), Offset(p.x + nx, p.y + ny), strokeWidth = 1.6.dp.toPx())
+        if (g.label.isEmpty()) continue
+        // valor junto al centro del segmento, desplazado a un lado
+        val tw = paint.measureText(g.label); val th = paint.textSize
+        val off = 10.dp.toPx(); val cx = (a.x + b.x) / 2 + (-dy / len) * off; val cy = (a.y + b.y) / 2 + (dx / len) * off
+        val r = android.graphics.RectF(cx - tw / 2 - 4.dp.toPx(), cy - th, cx + tw / 2 + 4.dp.toPx(), cy + th * 0.4f)
+        drawContext.canvas.nativeCanvas.drawRoundRect(r, 4.dp.toPx(), 4.dp.toPx(), bg)
+        drawContext.canvas.nativeCanvas.drawText(g.label, cx - tw / 2, cy, paint)
+    }
+}
+
+/**
  * Dibuja las líneas de anotación visibles ([layers]) con el estilo del contorno: sombra + trazo
  * suave (Catmull-Rom); las estimadas, discontinuas. [map]: de coordenadas de la foto (unidades del
  * ancho) a píxeles del lienzo; [k]: escala del grosor.

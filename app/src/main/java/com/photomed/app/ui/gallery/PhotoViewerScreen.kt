@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.ui.graphics.asImageBitmap
 import com.photomed.app.ui.camera.drawAnnotations
+import com.photomed.app.ui.camera.drawMeasureGuides
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -327,6 +328,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                             scope.launch { snackbar.showSnackbar("Vuelva a dibujar «$name»: una línea por donde se ve, o rodee el área") } },
                         onRevert = { name -> mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.revert(it, name) } },
                         edited = set?.editedNames.orEmpty(), savedInPhoto = savedInPhoto[u] != false),
+                    onSelectLine = { l -> selected = l; if (l.layer !in layersState.value) layersState.value = layersState.value + l.layer },
                     modifier = Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.45f).dp))
             }
             if (editing) androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))) {
@@ -538,6 +540,8 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                         width = 7.dp.toPx() * k, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
                 }
                 drawAnnotations(a, layers, k, numbers = com.photomed.app.align.MeasureNumbering.of(listOf(a)), alpha = alpha) { p -> map(p) }
+                // lo que se mide de la línea seleccionada (ancho, alto, distancias), punteado
+                selected?.takeIf { it.layer in layers }?.let { sl -> drawMeasureGuides(sl, k) { p -> map(p) } }
             }
         }
         // trazar un surco a mano alzada: el trazo se ve mientras se dibuja (con o sin zoom)

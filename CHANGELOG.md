@@ -2,6 +2,23 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.25 — 21 de noviembre de 2026
+
+- **Ojeras y bolsas con forma de media luna**: el borde inferior es una curva ajustada (cuadrática
+  robusta) que se cierra hacia los cantos, sin los picos de columnas sueltas; la profundidad no pasa
+  de 1,35 veces la mediana.
+- **Línea del pelo medida en rectas**: desde el centro de cada pupila, perpendicular a la línea de los
+  ojos, pasando por la ceja hasta el pelo (y en el centro y en la vertical de cada canto externo). Se
+  dibuja punteada al seleccionarla. La altura de la ceja también se mide en la vertical de la pupila.
+- **Nariz**: ancho alar, ancho del puente (raíz), ancho del dorso (mitad), longitud del dorso (raíz →
+  punta) y alto. Tocar cualquier trazo de la nariz (dorso, alas) la selecciona (antes no hacía nada).
+- **Cada medida con su segmento**: al seleccionar una línea (en la foto o tocando su fila en la tabla)
+  se dibujan punteados los segmentos que se miden, con su valor: anchos y altos de ojos, labios,
+  nariz, contorno y tercios, frente, altura de la ceja, ancho de arrugas y surcos, alto y ancho de la
+  ojera, altura y surco de la bolsa. Se guardan con los trazos confirmados.
+- **Tabla de medidas**: cada tabla se desplaza en horizontal por su cuenta (compartían el
+  desplazamiento y la más estrecha impedía ver las columnas de las demás).
+
 ## 2.24 — 21 de noviembre de 2026
 
 - **Ojeras mejoradas**: la zona se segmenta por columnas bajo el párpado (sigue la parte oscura real,

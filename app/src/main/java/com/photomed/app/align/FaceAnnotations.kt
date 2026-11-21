@@ -17,7 +17,18 @@ data class AnnotLine(val layer: AnnotLayer, val points: List<Pt>, val closed: Bo
                      /** Zona (relleno translúcido) en lugar de solo trazo, p. ej. ojeras. */
                      val filled: Boolean = false,
                      /** Medidas orientativas (longitud, ancho, profundidad, grado; color en ojeras). */
-                     val metrics: LineMetrics? = null)
+                     val metrics: LineMetrics? = null,
+                     /** Segmentos de lo que se mide (ancho, alto, distancias): se ven, punteados, al seleccionar la línea. */
+                     val guides: List<MeasureGuide> = emptyList()) {
+    /** La misma línea con sus puntos y guías llevados por [f] (otro encuadre, perspectiva…). */
+    fun mapped(f: (Pt) -> Pt) = copy(points = points.map(f), guides = guides.map { MeasureGuide(it.label, f(it.a), f(it.b)) })
+}
+
+/**
+ * Segmento medido de una línea: de [a] a [b] (mismas coordenadas que la línea). [label]: la etiqueta de
+ * la medida en [LineMetrics] (rasgo, «Longitud», «Ancho»…), para mostrar su valor junto al segmento.
+ */
+data class MeasureGuide(val label: String, val a: Pt, val b: Pt)
 
 /**
  * Líneas estéticas a partir de los puntos del rostro (iguales con ML Kit y MediaPipe), la
@@ -170,30 +181,36 @@ object FaceAnnotations {
         // medidas de los rasgos (mm con la escala del iris o del sensor)
         val sc = scaleOf(mesh, extras)
         fun fm(f: (Float, String) -> LineMetrics?): LineMetrics? = sc?.let { runCatching { f(it.first, it.second) }.getOrNull() }
+        /** Línea de un rasgo con sus medidas y los segmentos medidos. */
+        fun feat(layer: AnnotLayer, pts: List<Pt>, closed: Boolean, f: (Float, String) -> FeatureMetrics.Measured?): AnnotLine {
+            val m = sc?.let { runCatching { f(it.first, it.second) }.getOrNull() }
+            return AnnotLine(layer, pts, closed, metrics = m?.metrics, guides = m?.guides.orEmpty())
+        }
         (0 until 36).mapNotNull { p["oval_$it"] }.takeIf { it.size == 36 }?.let {
-            out += AnnotLine(AnnotLayer.CONTOUR, it, true, metrics = fm { mm, s -> FeatureMetrics.contour(mesh, mm, s) })
+            out += feat(AnnotLayer.CONTOUR, it, true) { mm, s -> FeatureMetrics.contourM(mesh, mm, s) }
         }
         labels?.let { HairSkin.hairline(it, keys)?.points?.let { h ->
-            out += AnnotLine(AnnotLayer.HAIRLINE, h, false, metrics = fm { mm, s -> FeatureMetrics.hairline(mesh, h, mm, s) })
+            out += feat(AnnotLayer.HAIRLINE, h, false) { mm, s -> FeatureMetrics.hairlineM(mesh, h, mm, s) }
         } }
         fun chain(idx: IntArray) = idx.map { mesh[it] }
-        out += AnnotLine(AnnotLayer.EYES, chain(EYE_R), true, metrics = fm { mm, s -> FeatureMetrics.eye(mesh, true, mm, s) })
-        out += AnnotLine(AnnotLayer.EYES, chain(EYE_L), true, metrics = fm { mm, s -> FeatureMetrics.eye(mesh, false, mm, s) })
-        out += AnnotLine(AnnotLayer.EYES, chain(BROW_R), true, metrics = fm { mm, s -> FeatureMetrics.brow(mesh, true, mm, s) })
-        out += AnnotLine(AnnotLayer.EYES, chain(BROW_L), true, metrics = fm { mm, s -> FeatureMetrics.brow(mesh, false, mm, s) })
+        out += feat(AnnotLayer.EYES, chain(EYE_R), true) { mm, s -> FeatureMetrics.eyeM(mesh, true, mm, s) }
+        out += feat(AnnotLayer.EYES, chain(EYE_L), true) { mm, s -> FeatureMetrics.eyeM(mesh, false, mm, s) }
+        out += feat(AnnotLayer.EYES, chain(BROW_R), true) { mm, s -> FeatureMetrics.browM(mesh, true, mm, s) }
+        out += feat(AnnotLayer.EYES, chain(BROW_L), true) { mm, s -> FeatureMetrics.browM(mesh, false, mm, s) }
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_DORSAL_R).toTypedArray(), perSeg = 4), false)
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_DORSAL_L).toTypedArray(), perSeg = 4), false)
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_ALA_R).toTypedArray(), perSeg = 4), false)
         out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_ALA_L).toTypedArray(), perSeg = 4), false)
-        out += AnnotLine(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_TIP).toTypedArray(), perSeg = 6), false,
-            metrics = fm { mm, s -> FeatureMetrics.nose(mesh, mm, s) })
+        out += feat(AnnotLayer.NOSE, FaceAnnotations.curve(*chain(NOSE_TIP).toTypedArray(), perSeg = 6), false) { mm, s -> FeatureMetrics.noseM(mesh, mm, s) }
         // labios: bermellón superior e inferior, cada uno con sus medidas
-        out += AnnotLine(AnnotLayer.LIPS, FeatureMetrics.upperLipPoly(mesh), true, metrics = fm { mm, s -> FeatureMetrics.upperLip(mesh, mm, s) })
-        out += AnnotLine(AnnotLayer.LIPS, FeatureMetrics.lowerLipPoly(mesh), true, metrics = fm { mm, s -> FeatureMetrics.lowerLip(mesh, mm, s) })
+        out += feat(AnnotLayer.LIPS, FeatureMetrics.upperLipPoly(mesh), true) { mm, s -> FeatureMetrics.upperLipM(mesh, mm, s) }
+        out += feat(AnnotLayer.LIPS, FeatureMetrics.lowerLipPoly(mesh), true) { mm, s -> FeatureMetrics.lowerLipM(mesh, mm, s) }
         if (lum != null) {
             out += folds(mesh, lum, labels, lab, extras, info)
             out += withReference(mesh, lum, labels, lab, extras, out, priors, added)
         }
+        // arrugas y surcos: el ancho medido, como segmento perpendicular en el centro de la línea
+        sc?.let { (mm, _) -> for (i in out.indices) out[i] = withWidthGuide(out[i], mm) }
         return out
     }
 
@@ -429,6 +446,19 @@ object FaceAnnotations {
 
     private fun mid(a: Pt, b: Pt) = Pt((a.x + b.x) / 2, (a.y + b.y) / 2)
 
+    /** Segmento del ancho (perpendicular, centrado en la mitad de la línea) de una arruga o surco medidos. */
+    fun withWidthGuide(l: AnnotLine, mmPerUnit: Float): AnnotLine {
+        val m = l.metrics ?: return l
+        val w = m.widthMm ?: return l
+        if (m.isFeature || l.filled || l.points.size < 3 || l.guides.isNotEmpty() || mmPerUnit <= 0f) return l
+        val k = l.points.size / 2
+        val a = l.points[k - 1]; val b = l.points[k + 1]; val c = l.points[k]
+        val tn = hypot(b.x - a.x, b.y - a.y).takeIf { it > 1e-7f } ?: return l
+        val nx = -(b.y - a.y) / tn; val ny = (b.x - a.x) / tn
+        val h = w / mmPerUnit / 2
+        return l.copy(guides = listOf(MeasureGuide(FeatureMetrics.mmText("ancho", w), Pt(c.x - nx * h, c.y - ny * h), Pt(c.x + nx * h, c.y + ny * h))))
+    }
+
     /**
      * Tramo de [pts] fuera del vello (con un margen de ~2 px): el más largo, o con [fromStart] el
      * que empieza en el primer punto (si el primero no está sobre vello).
@@ -645,7 +675,7 @@ object FaceCrop {
         val lines = FaceAnnotations.fromMesh(m, labels, lum(b), LabImage.fromArgb(px, b.width, b.height), ex, info, priors,
             added.map { l -> l.map { c.toCrop(it) } })
         if (b !== src) b.recycle()
-        return lines.map { l -> l.copy(points = l.points.map { c.toPhoto(it) }) }
+        return lines.map { l -> l.mapped { c.toPhoto(it) } }
     }
 }
 

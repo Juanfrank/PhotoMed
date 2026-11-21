@@ -89,6 +89,7 @@ object Periorbital {
             }
             Col(p, fine, broad, skin)
         }
+        val lidPts = cols.map { it.p }; val down = Pt(nx, ny)
         // referencia: mejilla de la misma columna (mediana entre columnas vecinas)
         val r0 = (R0 * fpx).roundToInt() - t0
         val refs = medFilter(FloatArray(NC) { c ->
@@ -134,16 +135,22 @@ object Periorbital {
             val curve = span.map { c -> at(c, fit2(c.toFloat()).coerceIn(BAG0 * fpx, BAG1 * fpx)) }
             // forma: sin saltos bruscos entre columnas
             if (curve.zipWithNext().any { (a, b) -> hypot(b.x - a.x, b.y - a.y) > 0.06f * fpx }) return@run null
-            Triple(span, curve, inl)
+            Triple(span, curve, inl) to fit2
         }
         if (bag != null) {
-            val (span, curve, inl) = bag
-            val poly = span.map { cols[it].p } + curve.reversed()
+            val (span, curve, inl) = bag.first; val fit2 = bag.second
+            // media luna: del párpado al surco, con los extremos que se cierran sobre el párpado
+            val (poly, _) = crescent(lidPts, down, span.first - 0.5f, span.last + 0.5f, t0.toFloat()) { cf -> fit2(cf).coerceIn(BAG0 * fpx, BAG1 * fpx) }
             val name = "Bolsa palpebral $side"
+            var guides = emptyList<MeasureGuide>()
             val metrics = sc?.let { s ->
                 val mm = s.first / wf
                 val height = median(span.map { c -> hypot(curve[c - span.first].x - cols[c].p.x, curve[c - span.first].y - cols[c].p.y) }) * mm
                 val lenMm = LineMeasure.length(curve) * mm
+                val cm = (span.first + span.last) / 2
+                guides = listOf(
+                    MeasureGuide(FeatureMetrics.mmText("altura", height), toImg(cols[cm].p), toImg(at(cm, fit2(cm.toFloat())))),
+                    MeasureGuide(FeatureMetrics.mmText("surco", lenMm), toImg(curve.first()), toImg(curve.last())))
                 val rel = median(inl.map { relief[it] })
                 val area = LineMeasure.area(poly.map(::toImg)) * s.first * s.first
                 val grade = when { height < 4.5f || rel < 4f -> 1; height >= 8f && rel >= 7f -> 3; else -> 2 }
@@ -155,7 +162,7 @@ object Periorbital {
                     "Grado orientativo (0–3)" to grade.toFloat(),
                 ))
             }
-            out += AnnotLine(AnnotLayer.EYE_BAGS, poly.map(::toImg), true, filled = true, metrics = metrics)
+            out += AnnotLine(AnnotLayer.EYE_BAGS, poly.map(::toImg), true, filled = true, metrics = metrics, guides = guides)
         }
 
         // --- ojera ---
@@ -174,11 +181,20 @@ object Periorbital {
         val e = medFilter(ends)
         val med = e.filter { !it.isNaN() }.let { if (it.isEmpty()) Float.NaN else median(it) }
         val deep = e.count { !it.isNaN() && it > t0 + 0.03f * fpx }
-        if (deep >= NC / 2 && dls.isNotEmpty() && dls.average() >= 4.0 && !med.isNaN()) {
-            // contorno sin picos: cada columna a ±3 % del ancho de la cara de la mediana
-            val lim = 0.03f * fpx
-            val bottom = (0 until NC).map { c -> at(c, (if (e[c].isNaN()) t0.toFloat() else e[c]).coerceIn(med - lim, med + lim).coerceAtLeast(t0.toFloat())) }
-            val poly = (0 until NC).map { at(it, t0.toFloat()) } + bottom.reversed()
+        // borde inferior suave: ajuste cuadrático robusto de la profundidad de la zona oscura
+        val dfit = run {
+            val idx = (0 until NC).filter { !e[it].isNaN() }
+            if (idx.size < 4) return@run null
+            val f1 = quadFit(idx.map { it.toFloat() }, idx.map { e[it] }) ?: return@run null
+            val inl = idx.filter { abs(e[it] - f1(it.toFloat())) < 0.025f * fpx }.takeIf { it.size >= 4 } ?: idx
+            quadFit(inl.map { it.toFloat() }, inl.map { e[it] })?.let { it to (inl.first()..inl.last()) }
+        }
+        if (deep >= NC / 2 && dls.isNotEmpty() && dls.average() >= 4.0 && !med.isNaN() && dfit != null) {
+            val (fitD, spanD) = dfit
+            // media luna bajo el párpado (forma característica de la ojera): profundidad ajustada que se
+            // cierra hacia los cantos, sin picos de columnas sueltas
+            val (poly, deepest) = crescent(lidPts, down, spanD.first - 0.5f, spanD.last + 0.5f, t0.toFloat()) { cf ->
+                fitD(cf).coerceIn(t0 + 0.02f * fpx, T1 * fpx) }
             val name = "Ojera $side"
             val polyImg = poly.map(::toImg)
             val metrics = sc?.let { s ->
@@ -194,9 +210,44 @@ object Periorbital {
                 val shadow = bag != null && base.type?.startsWith("estructural") == true
                 base.copy(grade = grade, type = (if (shadow) "estructural (sombra de la bolsa)" else base.type ?: "—") + " · intensidad $grade/4")
             }
-            out += AnnotLine(AnnotLayer.DARK_CIRCLES, polyImg, true, filled = true, metrics = metrics)
+            val guides = sc?.let { s ->
+                val mm = s.first / wf
+                val top = poly.first(); val topEnd = poly[poly.size / 2 - 1]
+                listOf(MeasureGuide(FeatureMetrics.mmText("alto", hypot(deepest.second.x - deepest.first.x, deepest.second.y - deepest.first.y) * mm),
+                        toImg(deepest.first), toImg(deepest.second)),
+                    MeasureGuide(FeatureMetrics.mmText("ancho", hypot(topEnd.x - top.x, topEnd.y - top.y) * mm), toImg(top), toImg(topEnd)))
+            }.orEmpty()
+            out += AnnotLine(AnnotLayer.DARK_CIRCLES, polyImg, true, filled = true, metrics = metrics, guides = guides)
         }
         return out
+    }
+
+    /**
+     * Media luna bajo el párpado entre las columnas fraccionarias [c0] y [c1]: arriba, el borde del
+     * párpado (a [top] px); abajo, la profundidad [depth] (px desde el párpado) atenuada hacia los
+     * extremos (seno), de modo que la zona se cierra en los cantos. Devuelve el polígono (21 + 21
+     * puntos, en px) y el segmento de mayor altura (arriba, abajo).
+     */
+    private fun crescent(cols: List<Pt>, n: Pt, c0: Float, c1: Float, top: Float, depth0: (Float) -> Float): Pair<List<Pt>, Pair<Pt, Pt>> {
+        // sin extremos disparados por el ajuste: como mucho 1,35 × la profundidad mediana
+        val med = median((0..20).map { depth0(c0 + (c1 - c0) * it / 20f) - top })
+        val depth = { cf: Float -> minOf(depth0(cf), top + 1.35f * med) }
+        fun lidAt(cf: Float): Pt {
+            val x = cf.coerceIn(0f, cols.size - 1f); val i = x.toInt().coerceAtMost(cols.size - 2); val f = x - i
+            return Pt(cols[i].x + (cols[i + 1].x - cols[i].x) * f, cols[i].y + (cols[i + 1].y - cols[i].y) * f)
+        }
+        val k = 20
+        val tops = ArrayList<Pt>(); val bots = ArrayList<Pt>(); var best = 0f; var seg = Pt(0f, 0f) to Pt(0f, 0f)
+        for (i in 0..k) {
+            val cf = c0 + (c1 - c0) * i / k
+            val taper = kotlin.math.sin(Math.PI * i / k).toFloat()
+            val p = lidAt(cf)
+            val d = top + (depth(cf) - top).coerceAtLeast(0f) * taper
+            val a = Pt(p.x + n.x * top, p.y + n.y * top); val b = Pt(p.x + n.x * d, p.y + n.y * d)
+            tops += a; bots += b
+            if (d - top > best) { best = d - top; seg = a to b }
+        }
+        return (tops + bots.reversed()) to seg
     }
 
     /** Ajuste por mínimos cuadrados y = a + b x + c x²; null si es degenerado. */
