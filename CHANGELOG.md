@@ -2,6 +2,16 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.41 — 21 de noviembre de 2026
+
+- **Anotaciones con iconos en lugar de textos**: símbolos (punto, círculo, triángulo, cuadrado, X, cruz,
+  estrella, línea, flecha, ángulos), lado del texto (auto, arriba, abajo, izquierda, derecha), texto,
+  tamaño y grosor; sin la línea de ayuda. Cada icono conserva su nombre para TalkBack. El panel ocupa
+  menos alto y deja más foto.
+- **Benchmark del motor** frente a mediciones manuales publicadas (ver `docs/BENCHMARK.md`): arrugas y
+  surcos con FFHQ-Wrinkle (100 fotos) y puntos y proporciones con AFW / 300-W (178 caras).
+- Recorrido de capturas de todas las pantallas (prueba `ScreenTourTest`) para revisar el diseño.
+
 ## 2.40 — 21 de noviembre de 2026
 
 - **Línea mandibular** (capa nueva, en «Contorno externo»), como la línea del pelo:

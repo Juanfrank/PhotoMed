@@ -23,6 +23,24 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Interests
 import androidx.compose.material.icons.filled.OpenWith
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.East
+import androidx.compose.material.icons.filled.HorizontalRule
+import androidx.compose.material.icons.filled.LineWeight
+import androidx.compose.material.icons.filled.North
+import androidx.compose.material.icons.filled.NorthEast
+import androidx.compose.material.icons.filled.PhotoSizeSelectSmall
+import androidx.compose.material.icons.filled.South
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.West
+import androidx.compose.material.icons.outlined.ChangeHistory
+import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.CropSquare
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -99,51 +117,63 @@ fun InkRail(style: InkStyle, onStyle: (InkStyle) -> Unit, canUndo: Boolean, onUn
         dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancelar") } })
 }
 
-/** Ajustes de la herramienta elegida (abajo): colores, grosor o tamaño, símbolo, texto y su lado. */
+/** Icono de cada símbolo (en lugar del nombre; el nombre queda como descripción accesible). */
+val SYMBOL_ICONS: Map<String, ImageVector> = linkedMapOf(
+    "dot" to Icons.Default.Circle, "circle" to Icons.Outlined.Circle, "triangle" to Icons.Outlined.ChangeHistory,
+    "square" to Icons.Outlined.CropSquare, "x" to Icons.Default.Close, "plus" to Icons.Default.Add, "star" to Icons.Outlined.StarOutline,
+    "line" to Icons.Default.HorizontalRule, "arrow" to Icons.Default.NorthEast, "polyline" to Icons.Default.Timeline)
+/** Icono del lado del texto. */
+val SIDE_ICONS: Map<String, ImageVector> = linkedMapOf(
+    "auto" to Icons.Default.AutoMode, "top" to Icons.Default.North, "bottom" to Icons.Default.South,
+    "left" to Icons.Default.West, "right" to Icons.Default.East)
+
+/** Fila de iconos para elegir uno (seleccionado con fondo de color). */
+@Composable
+private fun IconPicker(icons: Map<String, ImageVector>, labels: Map<String, String>, value: String, onPick: (String) -> Unit, what: String) =
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        icons.forEach { (k, ic) ->
+            val sel = value == k
+            IconButton(onClick = { onPick(k) }, modifier = Modifier.size(44.dp).semantics { selected = sel }
+                .then(if (sel) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f), CircleShape) else Modifier)) {
+                Icon(ic, "$what: ${labels[k] ?: k}", tint = Color.White)
+            }
+        }
+    }
+
+/** Ajustes de la herramienta elegida (abajo): iconos en lugar de textos (más sitio para la foto). */
 @Composable
 fun InkOptions(style: InkStyle, onStyle: (InkStyle) -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.background(Color.Black.copy(alpha = 0.7f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-        @Composable fun chips(map: Map<String, String>, value: String, onPick: (String) -> Unit) =
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                map.forEach { (k, label) -> FilterChip(selected = value == k, onClick = { onPick(k) }, label = { Text(label) }) }
-            }
-        Text(when (style.tool) {
-            InkTool.PEN -> "Dibuje sobre la foto"
-            InkTool.SYMBOL -> if (style.symbol == "polyline") "Toque para añadir puntos; arrastre un punto para moverlo; confirme o descarte arriba"
-                else "Toque para un marcador; arrastre para ampliarlo (línea y flecha: de un extremo al otro)"
-            InkTool.SELECT -> "Toque un trazo o símbolo y arrástrelo (en las líneas multipunto, arrastre un punto para moverlo solo)"
-            InkTool.ERASE_STROKE -> "Pase por encima de un trazo o símbolo para quitarlo"
-            InkTool.ERASE_PAINT -> "Pase la goma por donde quiera borrar"
-        }, color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
+    Column(modifier.background(Color.Black.copy(alpha = 0.7f)).padding(horizontal = 8.dp, vertical = 2.dp)) {
         if (style.tool == InkTool.SYMBOL) {
-            chips(SYMBOL_LABELS, style.symbol) { onStyle(style.copy(symbol = it)) }
-            androidx.compose.material3.OutlinedTextField(style.text, { onStyle(style.copy(text = it.take(30))) }, singleLine = true,
-                label = { Text("Texto corto (opcional)") }, modifier = Modifier.fillMaxWidth(),
-                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                    focusedLabelColor = Color.White, unfocusedLabelColor = Color.LightGray))
-            if (style.text.isNotBlank()) chips(SIDE_LABELS, style.side) { onStyle(style.copy(side = it)) }
+            IconPicker(SYMBOL_ICONS, SYMBOL_LABELS, style.symbol, { onStyle(style.copy(symbol = it)) }, "Símbolo")
+            if (style.symbol != "polyline") Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.TextFields, null, tint = Color.LightGray, modifier = Modifier.padding(end = 6.dp))
+                androidx.compose.material3.OutlinedTextField(style.text, { onStyle(style.copy(text = it.take(30))) }, singleLine = true,
+                    placeholder = { Text("Texto", color = Color.Gray) }, modifier = Modifier.weight(1f).semantics { contentDescription = "Texto corto (opcional)" },
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+            }
+            if (style.text.isNotBlank() && style.symbol != "polyline") IconPicker(SIDE_ICONS, SIDE_LABELS, style.side, { onStyle(style.copy(side = it)) }, "Lado del texto")
         }
-        if (style.tool in setOf(InkTool.PEN, InkTool.SYMBOL)) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (style.tool in setOf(InkTool.PEN, InkTool.SYMBOL)) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             INK_COLORS.forEachIndexed { i, c ->
                 val sel = style.color == c
                 // área táctil de 44 dp (accesibilidad) con el círculo de color dentro
                 Box(Modifier.size(44.dp).clickable(onClickLabel = "Elegir el color ${COLOR_NAMES[i]}") { onStyle(style.copy(color = c)) }
                     .semantics { contentDescription = "Color ${COLOR_NAMES[i]}"; selected = sel }, contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(30.dp).background(Color(c), CircleShape)
+                    Box(Modifier.size(28.dp).background(Color(c), CircleShape)
                         .border(if (sel) 3.dp else 1.dp, if (sel) MaterialTheme.colorScheme.primary else Color.Gray, CircleShape))
                 }
             }
         }
         if (style.tool != InkTool.SELECT) Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(if (style.tool == InkTool.SYMBOL) "Tamaño" else "Grosor", color = Color.White, style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(end = 8.dp))
-            Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+            Icon(if (style.tool == InkTool.SYMBOL) Icons.Default.PhotoSizeSelectSmall else Icons.Default.LineWeight, null, tint = Color.LightGray)
+            Box(Modifier.padding(start = 8.dp).size(24.dp), contentAlignment = Alignment.Center) {
                 val d = (style.width * 900f).coerceIn(2f, 22f).dp
                 Box(Modifier.size(d).background(if (style.tool in setOf(InkTool.PEN, InkTool.SYMBOL)) Color(style.color) else Color.LightGray, CircleShape))
             }
             Slider(value = style.width, onValueChange = { onStyle(style.copy(width = it)) }, valueRange = 0.002f..0.025f,
-                modifier = Modifier.weight(1f).semantics { contentDescription = "Grosor del trazo" })
+                modifier = Modifier.weight(1f).semantics { contentDescription = if (style.tool == InkTool.SYMBOL) "Tamaño del símbolo" else "Grosor del trazo" })
         }
     }
 }

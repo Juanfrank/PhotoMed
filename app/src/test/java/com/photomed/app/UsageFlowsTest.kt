@@ -413,8 +413,8 @@ class UsageFlowsTest {
         compose.onNodeWithContentDescription("Anotar sobre la foto").performClick()
         compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Símbolo").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Símbolo").performClick()
-        waitText("Ángulos (multipunto)")
-        compose.onNodeWithText("Ángulos (multipunto)").performScrollTo().performClick()
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Símbolo: Ángulos (multipunto)").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Símbolo: Ángulos (multipunto)").performScrollTo().performClick()
         fun o(x: Float, y: Float) = androidx.compose.ui.geometry.Offset(x, y)
         for (q in listOf(o(-120f, 60f), o(0f, -60f), o(120f, 60f)))
             compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { click(center + q) }
@@ -497,16 +497,16 @@ class UsageFlowsTest {
         compose.waitUntil(15_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 1 }
         // símbolo con texto: un toque lo coloca como marcador
         compose.onNodeWithContentDescription("Símbolo").performClick()
-        waitText("Estrella")
-        compose.onNodeWithText("Estrella").performClick()
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Símbolo: Estrella").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Símbolo: Estrella").performClick()
         compose.onNode(androidx.compose.ui.test.hasSetTextAction()).performTextInput("1 ml")
-        compose.onNodeWithText("Abajo").performClick()
+        compose.onNodeWithContentDescription("Lado del texto: Abajo").performClick()
         compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { click(center + androidx.compose.ui.geometry.Offset(-100f, -100f)) }
         compose.waitUntil(15_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 2 }
         val st = com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.last()
         assertEquals(listOf("symbol", "star", "1 ml", "bottom", 1), listOf(st.kind, st.shape, st.text, st.side, st.points.size))
         // arrastrando, el cuadrado ocupa de un extremo al otro
-        compose.onNodeWithText("Cuadrado").performClick()
+        compose.onNodeWithContentDescription("Símbolo: Cuadrado").performClick()
         compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center + androidx.compose.ui.geometry.Offset(0f, 120f), center + androidx.compose.ui.geometry.Offset(150f, 220f), 300) }
         compose.waitUntil(15_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 3 }
         assertEquals(2, com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.last().points.size)
