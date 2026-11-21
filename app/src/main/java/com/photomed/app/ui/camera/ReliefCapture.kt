@@ -28,6 +28,7 @@ import com.photomed.app.align.MediaPipeFace
 import com.photomed.app.align.PhotometricStereo
 import com.photomed.app.align.PhotometricStereo.Pattern
 import com.photomed.app.align.PsFrame
+import com.photomed.app.i18n.tr
 import com.photomed.app.align.Relief
 import com.photomed.app.align.ReliefStore
 import kotlinx.coroutines.CompletableDeferred
@@ -129,22 +130,23 @@ object ReliefCapture {
      */
     suspend fun process(context: Context, frames: List<PsFrame>, photoUri: Uri, focalNorm: Float?, zoom: Float, depthMm: Float?): String =
         com.photomed.app.align.NativeGate.run("relieve") { withContext(Dispatchers.Default) {
-            val full = frames.lastOrNull { it.pattern == Pattern.FULL } ?: return@withContext "Relieve: faltan tomas"
+            val full = frames.lastOrNull { it.pattern == Pattern.FULL } ?: return@withContext tr("Relieve: faltan tomas")
             MediaPipeFace(context).use { mp ->
-                val frameMesh = mp.mesh(full.bmp) ?: return@withContext "Relieve: no se encontró la cara"
+                val frameMesh = mp.mesh(full.bmp) ?: return@withContext tr("Relieve: no se encontró la cara")
                 val focalPx = focalNorm?.let { it * maxOf(full.bmp.width, full.bmp.height) * zoom }
-                val r = Relief.compute(frames, frameMesh, screen(context), focalPx, depthMm) ?: return@withContext "Relieve: no se pudo calcular"
-                if (r.signalRatio < 0.25f) return@withContext "Relieve no guardado: demasiada luz ambiente (use penumbra)"
-                if (r.validFraction < 0.5f) return@withContext "Relieve no guardado: hubo movimiento o sombras"
+                val r = Relief.compute(frames, frameMesh, screen(context), focalPx, depthMm) ?: return@withContext tr("Relieve: no se pudo calcular")
+                if (r.signalRatio < 0.25f) return@withContext tr("Relieve no guardado: demasiada luz ambiente (use penumbra)")
+                if (r.validFraction < 0.5f) return@withContext tr("Relieve no guardado: hubo movimiento o sombras")
                 val photo = ImageOps.loadFull(context, photoUri, 1440, ImageEdit.NONE)
-                val photoMesh = mp.mesh(photo) ?: return@withContext "Relieve: no se encontró la cara en la foto"
+                val photoMesh = mp.mesh(photo) ?: return@withContext tr("Relieve: no se encontró la cara en la foto")
                 val (bmp, factor) = Relief.toPhoto(r, frameMesh, photoMesh, photo.width, photo.height)
-                    ?: return@withContext "Relieve: la foto no coincide con la secuencia"
+                    ?: return@withContext tr("Relieve: la foto no coincide con la secuencia")
                 ReliefStore.save(context, photoUri.toString(), bmp, MeasureMeta(true,
                     irisFactor = factor?.takeIf { r.distanceSource == "sensor de profundidad" },
                     distanceMm = r.distanceMm, distanceSource = r.distanceSource,
                     signalRatio = r.signalRatio, validFraction = r.validFraction))
-                "Relieve guardado (${"%.0f".format(r.distanceMm / 10)} cm, ${r.distanceSource})"
+                tr("Relieve guardado (%1\$s cm, %2\$s)", "%.0f".format(r.distanceMm / 10),
+                    if (r.distanceSource == "sensor de profundidad") tr("sensor de profundidad") else r.distanceSource)
             }
         } }
 

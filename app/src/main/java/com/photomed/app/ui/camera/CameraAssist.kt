@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.clickable
+import com.photomed.app.i18n.tr
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -141,13 +142,13 @@ fun BoxScope.EdgeArrows(g: Guidance?, color: Color) {
             contentAlignment = Alignment.Center,
         ) { Icon(icon, null, tint = color, modifier = Modifier.size(28.dp)) }
     }
-    if (g.moveX < 0) arrow(Icons.AutoMirrored.Filled.ArrowBack, Alignment.CenterStart, "Mover a la izquierda")
-    if (g.moveX > 0) arrow(Icons.AutoMirrored.Filled.ArrowForward, Alignment.CenterEnd, "Mover a la derecha")
-    if (g.moveY < 0) arrow(Icons.Default.ArrowUpward, Alignment.TopCenter, "Mover hacia arriba")
-    if (g.moveY > 0) arrow(Icons.Default.ArrowDownward, Alignment.BottomCenter, "Mover hacia abajo")
+    if (g.moveX < 0) arrow(Icons.AutoMirrored.Filled.ArrowBack, Alignment.CenterStart, tr("Mover a la izquierda"))
+    if (g.moveX > 0) arrow(Icons.AutoMirrored.Filled.ArrowForward, Alignment.CenterEnd, tr("Mover a la derecha"))
+    if (g.moveY < 0) arrow(Icons.Default.ArrowUpward, Alignment.TopCenter, tr("Mover hacia arriba"))
+    if (g.moveY > 0) arrow(Icons.Default.ArrowDownward, Alignment.BottomCenter, tr("Mover hacia abajo"))
     if (g.zoom != 0 && g.moveX == 0 && g.moveY == 0) {
         arrow(if (g.zoom > 0) Icons.Default.ZoomIn else Icons.Default.ZoomOut, Alignment.TopEnd,
-            if (g.zoom > 0) "Acercarse" else "Alejarse")
+            if (g.zoom > 0) tr("Acercarse") else tr("Alejarse"))
     }
 }
 
@@ -186,11 +187,11 @@ fun CueOverlay(items: List<String>, accent: Color, modifier: Modifier = Modifier
     ) {
         if (expanded) {
             cues.forEach { CueChip(it, accent, compact = true) }
-            if (cues.size > 1) MoreChip(Icons.Default.ExpandMore, null, "Mostrar solo la indicación principal") { expanded = false }
+            if (cues.size > 1) MoreChip(Icons.Default.ExpandMore, null, tr("Mostrar solo la indicación principal")) { expanded = false }
         } else {
             CueChip(cues.first(), accent, compact = true)
             if (cues.size > 1) MoreChip(Icons.Default.MoreHoriz, "+${cues.size - 1}",
-                "${cues.size - 1} indicaciones más: " + cues.drop(1).joinToString("; ") { it.description }) { expanded = true }
+                tr("%1\$d indicaciones más: %2\$s", cues.size - 1, cues.drop(1).joinToString("; ") { it.description })) { expanded = true }
         }
     }
 }
@@ -218,11 +219,16 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
     val color = GuideTone.of(eval).let { if (it == GuideTone.NORMAL) Color.White else it.color }
     val moving = g != null && (g.moveX != 0 || g.moveY != 0 || g.zoom != 0 || g.rotateDeg != 0f)
     val title = when (eval?.status) {
-        MatchStatus.MATCH -> if (frame.standard) (if (autoCapture) "Encuadre estándar · capturando" else "Encuadre estándar correcto")
-            else if (autoCapture) "Coincide · capturando" else "Coincide con la referencia"
-        MatchStatus.SEARCHING -> "Buscando al paciente…"
-        null -> "Preparando la referencia…"
-        else -> (if (frame.standard) "Ajuste la pose" else "Alinee con la referencia") + if (moving) " · siga las flechas" else ""
+        MatchStatus.MATCH -> if (frame.standard) (if (autoCapture) tr("Encuadre estándar · capturando") else tr("Encuadre estándar correcto"))
+            else if (autoCapture) tr("Coincide · capturando") else tr("Coincide con la referencia")
+        MatchStatus.SEARCHING -> tr("Buscando al paciente…")
+        null -> tr("Preparando la referencia…")
+        else -> when {
+            frame.standard && moving -> tr("Ajuste la pose · siga las flechas")
+            frame.standard -> tr("Ajuste la pose")
+            moving -> tr("Alinee con la referencia · siga las flechas")
+            else -> tr("Alinee con la referencia")
+        }
     }
     val items = correctionItems(frame, zoomInfo, distanceHint)
     Column(
@@ -241,7 +247,7 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LinearProgressIndicator(progress = { it }, color = color, trackColor = Color(0x33FFFFFF),
                     modifier = Modifier.weight(1f).height(3.dp))
-                Text("  puntos ${(it * 100).toInt()} % / ${(eval.threshold * 100).toInt()} %", color = color,
+                Text(tr("  puntos %1\$d %% / %2\$d %%", (it * 100).toInt(), (eval.threshold * 100).toInt()), color = color,
                     style = MaterialTheme.typography.labelSmall)
             }
         }
@@ -259,7 +265,7 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
         texts.forEach { item ->
             Row(Modifier.padding(top = 2.dp)) {
                 Text("•  ", color = Color(0xFFCAC4D0), style = MaterialTheme.typography.labelMedium)
-                Text(item, color = Color(0xFFE6E0E9), style = MaterialTheme.typography.labelMedium)
+                Text(HintText.display(item), color = Color(0xFFE6E0E9), style = MaterialTheme.typography.labelMedium)
             }
         }
     }
@@ -318,7 +324,7 @@ fun LevelIndicator(tilt: Tilt, rotateDeg: Float, modifier: Modifier = Modifier) 
             drawCircle(color, 3.dp.toPx(), c)
         }
         Text(
-            if (rotateDeg != 0f) "Gire %.1f° %s".format(abs(rotateDeg), if (rotateDeg > 0) "↻" else "↺")
+            if (rotateDeg != 0f) tr("Gire %1\$.1f° %2\$s", abs(rotateDeg), if (rotateDeg > 0) "↻" else "↺")
             else "%.1f° · %.0f°".format(tilt.roll, tilt.pitch),
             color = if (rotateDeg != 0f) target else color,
             style = MaterialTheme.typography.labelSmall,
@@ -353,7 +359,7 @@ fun LayerToggle(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .toggleable(on, enabled = enabled, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = onChange)
-            .semantics { stateDescription = if (on) "Activado" else "Desactivado"; contentDescription = label }
+            .semantics { stateDescription = if (on) tr("Activado") else tr("Desactivado"); contentDescription = label }
             .graphicsLayer { alpha = disabledAlpha }
             .padding(horizontal = 2.dp, vertical = 2.dp),
     ) {
@@ -413,14 +419,14 @@ fun ZoomBar(
             value = pos,
             onValueChange = { onZoom(kotlin.math.exp(lo + it * (hi - lo))) },
             modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
-                .semantics { contentDescription = "Zoom" },
+                .semantics { contentDescription = tr("Zoom") },
         )
         Icon(Icons.Default.ZoomIn, null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
         Text("%.1f×".format(ratio), color = Color.White, style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.width(44.dp).padding(start = 6.dp))
         if (assist && manual) {
             androidx.compose.material3.TextButton(onClick = onResumeAssist, modifier = Modifier.height(36.dp)) {
-                Text("Auto", style = MaterialTheme.typography.labelLarge)
+                Text(tr("Auto"), style = MaterialTheme.typography.labelLarge)
             }
         }
     }

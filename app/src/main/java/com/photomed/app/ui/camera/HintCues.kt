@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trn
 
 /**
  * Indicación como icono: [icon] (qué: cabeza, barbilla, mirada, luz, cámara, distancia…), [badge]
@@ -62,7 +64,9 @@ object HintCues {
     }
 
     /** Icono para una indicación de texto; null si no tiene equivalente (se muestra el texto). */
-    fun of(h: String): HintCue? {
+    fun of(h: String): HintCue? = cue(h)?.let { it.copy(description = HintText.display(h)) }
+
+    private fun cue(h: String): HintCue? {
         val t = h.lowercase()
         return when {
             // cabeza: giro (guiñada), perfil, lado, enderezar (alabeo)
@@ -122,5 +126,111 @@ object HintCues {
             t.startsWith("detector") -> HintCue(Icons.Default.ErrorOutline, null, null, h)
             else -> null
         }
+    }
+}
+
+/**
+ * Traducción de las indicaciones al mostrarlas. Las indicaciones se generan en español (en `align/`)
+ * y [HintCues] las analiza por su texto; aquí solo se traducen para pintarlas o anunciarlas, sin
+ * cambiar el texto interno. En español devuelve el mismo texto.
+ */
+object HintText {
+    /** Indicaciones fijas (sin datos). */
+    private val FIXED = setOf(
+        trn("Perfil: alinee la oreja y el plano de Frankfort con la guía"),
+        trn("No se detecta el rostro del paciente"),
+        trn("No se detecta el cuerpo del paciente"),
+        trn("Mirada: al frente"),
+        trn("Luz desigual: lado izquierdo más oscuro"),
+        trn("Luz desigual: lado derecho más oscuro"),
+        trn("Poca luz en el rostro"),
+        trn("Demasiada luz: sin flash"),
+        trn("Buscando referencias anatómicas…"),
+        trn("← Mueva la cámara a la izquierda"),
+        trn("Mueva la cámara a la derecha →"),
+        trn("↑ Suba la cámara"),
+        trn("↓ Baje la cámara"),
+        trn("Acérquese"),
+        trn("Aléjese"),
+        trn("Gire la cámara ↺"),
+        trn("Gire la cámara ↻"),
+        trn("Cámara: inclinar hacia abajo"),
+        trn("Cámara: inclinar hacia arriba"),
+        trn("Cara: mirar a la derecha de la imagen"),
+        trn("Cara: mirar a la izquierda de la imagen"),
+        trn("Expresión: abrir los ojos"),
+        trn("Expresión: entrecerrar los ojos como en la referencia"),
+        trn("Expresión: relajar la sonrisa"),
+        trn("Expresión: sonreír como en la referencia"),
+        trn("Expresión: juntar los labios"),
+        trn("Expresión: separar los labios como en la referencia"),
+        trn("Expresión: relajar las cejas"),
+        trn("Expresión: subir las cejas como en la referencia"),
+        trn("Expresión: subir más las cejas"),
+        trn("Expresión: sonreír al máximo"),
+        trn("Expresión: apretar los ojos"),
+        trn("Expresión: fruncir más los labios"),
+        trn("Expresión: fruncir más el ceño (bajar las cejas)"),
+        trn("Expresión: bajar las comisuras de la boca"),
+    )
+
+    /** Partes de "Mirada: … y …". */
+    private val GAZE_PARTS = setOf(trn("más a la izquierda"), trn("más a la derecha"), trn("más arriba"), trn("más abajo"))
+
+    private const val N = "(-?[\\d.,]+)"
+    private val R_AIM_DOWN = Regex("^Cámara: apuntar más abajo $N°$")
+    private val R_AIM_UP = Regex("^Cámara: apuntar más arriba $N°$")
+    private val R_PROFILE = Regex("^Cabeza: girar hasta el perfil \\(faltan $N°\\)$")
+    private val R_TURN_LEFT = Regex("^Cabeza: girar a la izquierda $N°$")
+    private val R_TURN_RIGHT = Regex("^Cabeza: girar a la derecha $N°$")
+    private val R_TURN_MORE = Regex("^Cabeza: girar más \\($N° de 45°\\)$")
+    private val R_TURN_LESS = Regex("^Cabeza: girar menos \\($N° de 45°\\)$")
+    private val R_YAW = Regex("^Cabeza: corregir giro $N°$")
+    private val R_CHIN_DOWN_F = Regex("^Barbilla: bajar $N° \\(Frankfort\\)$")
+    private val R_CHIN_UP_F = Regex("^Barbilla: subir $N° \\(Frankfort\\)$")
+    private val R_CHIN_DOWN = Regex("^Barbilla: bajar $N°$")
+    private val R_CHIN_UP = Regex("^Barbilla: subir $N°$")
+    private val R_ROLL_RIGHT = Regex("^Cabeza: enderezar $N° \\(inclinada a la derecha\\)$")
+    private val R_ROLL_LEFT = Regex("^Cabeza: enderezar $N° \\(inclinada a la izquierda\\)$")
+    private val R_DISTANCE = Regex("^Distancia: $N cm → $N cm$")
+    private val R_TOO_CLOSE = Regex("^≈ $N cm: aléjese ≥ 1 m y use zoom$")
+    private val R_ABOUT = Regex("^≈ $N cm$")
+    private val R_ZOOM = Regex("^zoom asistido $N×$")
+
+    fun display(h: String): String {
+        if (h in FIXED) return tr(h)
+        fun m(r: Regex) = r.find(h)?.groupValues
+        m(R_AIM_DOWN)?.let { return tr("Cámara: apuntar más abajo %1\$s°", it[1]) }
+        m(R_AIM_UP)?.let { return tr("Cámara: apuntar más arriba %1\$s°", it[1]) }
+        m(R_PROFILE)?.let { return tr("Cabeza: girar hasta el perfil (faltan %1\$s°)", it[1]) }
+        m(R_TURN_LEFT)?.let { return tr("Cabeza: girar a la izquierda %1\$s°", it[1]) }
+        m(R_TURN_RIGHT)?.let { return tr("Cabeza: girar a la derecha %1\$s°", it[1]) }
+        m(R_TURN_MORE)?.let { return tr("Cabeza: girar más (%1\$s° de 45°)", it[1]) }
+        m(R_TURN_LESS)?.let { return tr("Cabeza: girar menos (%1\$s° de 45°)", it[1]) }
+        m(R_YAW)?.let { return tr("Cabeza: corregir giro %1\$s°", it[1]) }
+        m(R_CHIN_DOWN_F)?.let { return tr("Barbilla: bajar %1\$s° (Frankfort)", it[1]) }
+        m(R_CHIN_UP_F)?.let { return tr("Barbilla: subir %1\$s° (Frankfort)", it[1]) }
+        m(R_CHIN_DOWN)?.let { return tr("Barbilla: bajar %1\$s°", it[1]) }
+        m(R_CHIN_UP)?.let { return tr("Barbilla: subir %1\$s°", it[1]) }
+        m(R_ROLL_RIGHT)?.let { return tr("Cabeza: enderezar %1\$s° (inclinada a la derecha)", it[1]) }
+        m(R_ROLL_LEFT)?.let { return tr("Cabeza: enderezar %1\$s° (inclinada a la izquierda)", it[1]) }
+        m(R_DISTANCE)?.let { return tr("Distancia: %1\$s cm → %2\$s cm", it[1], it[2]) }
+        m(R_TOO_CLOSE)?.let { return tr("≈ %1\$s cm: aléjese ≥ 1 m y use zoom", it[1]) }
+        m(R_ABOUT)?.let { return h }
+        m(R_ZOOM)?.let { return tr("zoom asistido %1\$s×", it[1]) }
+        if (h.startsWith("Mirada: ")) {
+            val parts = h.removePrefix("Mirada: ").split(" y ")
+            if (parts.all { it in GAZE_PARTS }) return when (parts.size) {
+                1 -> tr("Mirada: %1\$s", tr(parts[0]))
+                else -> tr("Mirada: %1\$s y %2\$s", tr(parts[0]), tr(parts[1]))
+            }
+        }
+        // "Expresión: <indicación de la expresión pedida>" (ya traducida en FacialExpression o en español)
+        if (h.startsWith("Expresión: ")) return tr("Expresión: %1\$s", tr(h.removePrefix("Expresión: ")))
+        if (h.startsWith("Detector (pelo y piel): ")) {
+            val rest = h.removePrefix("Detector (pelo y piel): ")
+            return tr("Detector (pelo y piel): %1\$s", if (rest == "no disponible") tr("no disponible") else rest)
+        }
+        return h
     }
 }

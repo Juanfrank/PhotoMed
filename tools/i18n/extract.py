@@ -23,7 +23,7 @@ RES = ROOT / "app/src/main/res"
 CATALOGS = ROOT / "tools/i18n"
 
 CALL = re.compile(r'\btrn?\(\s*"')
-FMT = re.compile(r'%(?:\d+\$)?[-#+ 0,(]*\d*(?:\.\d+)?[sdfxXcbeEgGoh%]')
+FMT = re.compile(r'%(?:\d+\$)?[-#+0,(]*\d*(?:\.\d+)?[sdfxXcbeEgGoh%]')
 
 
 def fnv_key(s: str) -> str:

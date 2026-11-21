@@ -4,14 +4,22 @@ import androidx.compose.ui.geometry.Rect
 import com.photomed.app.align.Pt
 import com.photomed.app.align.Silhouette
 import com.photomed.app.data.Zone
+import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trn
 
 /**
  * Modo individual de las extremidades (manos, pies, piernas): fotografiar una sola en la misma
  * zona. La guía se acerca a la mitad del dibujo que corresponde a ese lado del paciente y se
  * ajusta a su silueta; la foto guarda el lado (nombre de archivo y metadatos).
  */
-enum class LimbSide(val label: String, val tag: String?) {
-    BOTH("Ambas", null), RIGHT("Derecha", "der"), LEFT("Izquierda", "izq");
+enum class LimbSide(
+    /** Etiqueta en español: se guarda en las condiciones de la toma ("Side"). */
+    val label: String, val tag: String?,
+) {
+    BOTH(trn("Ambas"), null), RIGHT(trn("Derecha"), "der"), LEFT(trn("Izquierda"), "izq");
+
+    /** Etiqueta en el idioma de la interfaz. */
+    val displayLabel: String get() = tr(label)
 
     companion object {
         fun ofTag(tag: String?) = entries.firstOrNull { it.tag == tag } ?: BOTH

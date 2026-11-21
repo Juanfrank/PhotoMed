@@ -170,6 +170,7 @@ import com.photomed.app.data.Expediente
 import com.photomed.app.data.Photo
 import com.photomed.app.data.expression
 import com.photomed.app.data.Zone
+import com.photomed.app.i18n.tr
 import com.photomed.app.ui.LocalRepository
 import com.photomed.app.ui.formatDate
 import kotlinx.coroutines.Dispatchers
@@ -220,14 +221,15 @@ fun CameraScreen(
         } else {
             EmptyState(
                 icon = Icons.Default.NoPhotography,
-                title = "Se necesita acceso a la cámara",
-                body = "PhotoMed usa la cámara solo para tomar las fotografías clínicas del expediente." +
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) " En esta versión de Android también necesita permiso para guardar en la galería." else "",
-                actionLabel = "Conceder permiso",
+                title = tr("Se necesita acceso a la cámara"),
+                body = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+                    tr("PhotoMed usa la cámara solo para tomar las fotografías clínicas del expediente. En esta versión de Android también necesita permiso para guardar en la galería.")
+                else tr("PhotoMed usa la cámara solo para tomar las fotografías clínicas del expediente."),
+                actionLabel = tr("Conceder permiso"),
                 onAction = { launcher.launch(needed.toTypedArray()) },
             )
             IconButton(onClick = onBack, modifier = Modifier.statusBarsPadding().padding(4.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Atrás"))
             }
         }
     }
@@ -433,7 +435,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var hairSkinWarned by remember { mutableStateOf(false) }
     LaunchedEffect(live) {
         val h = live?.eval?.hints?.firstOrNull { it.startsWith("Detector (pelo y piel)") } ?: return@LaunchedEffect
-        if (!hairSkinWarned) { hairSkinWarned = true; snackbar.showSnackbar("Línea del pelo no disponible. $h") }
+        if (!hairSkinWarned) { hairSkinWarned = true; snackbar.showSnackbar(tr("Línea del pelo no disponible. %1\$s", HintText.display(h))) }
     }
     val tone = GuideTone.of(live?.eval, matchingEnabled)
     /**
@@ -579,7 +581,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 kotlinx.coroutines.delay(50)
             }
         } catch (e: Exception) {
-            Toast.makeText(context, "No se pudo iniciar la cámara: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, tr("No se pudo iniciar la cámara: %1\$s", e.message), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -587,7 +589,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         // motor que dio los puntos: MediaPipe, o ML Kit si MediaPipe no estuvo disponible
         put("Engine", if (matcher.detectorUnavailable) "ML Kit (respaldo)" else engine.label)
         if (zone.hasLimbSides) put("Side", limbSide.label)
-        put("Expression", expression.label)
+        put("Expression", expression.labelEs)
         put("Zoom", "%.2f".format(java.util.Locale.US, zoomRatio))
         if (protocol != null && step != null) {
             putAll(com.photomed.app.data.ProtocolResults.conditions(protocol, stepIndex, shotsDone + 1))
@@ -659,7 +661,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 psPattern = null
                 screenFlash.release()
             }
-            if (frames == null) { capturing = false; snackbar.showSnackbar("Error al capturar"); return@launch }
+            if (frames == null) { capturing = false; snackbar.showSnackbar(tr("Error al capturar")); return@launch }
             val conds = if (depthMm != null) conditions + ("DepthSensorCm" to "%.1f".format(java.util.Locale.US, depthMm / 10)) else conditions
             AppScope.launch {
                 val saved = runCatching { repo.savePhoto(e, zone, file, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conds,
@@ -667,11 +669,11 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     .also { file.delete() }
                 scope.launch {
                     capturing = false
-                    saved.onSuccess { lastSaved = it; reload++; lastNear = false; reviewName = it.displayName }.onFailure { snackbar.showSnackbar("No se pudo guardar: ${it.message}") }
+                    saved.onSuccess { lastSaved = it; reload++; lastNear = false; reviewName = it.displayName }.onFailure { snackbar.showSnackbar(tr("No se pudo guardar: %1\$s", it.message)) }
                 }
                 val photo = saved.getOrNull() ?: return@launch
                 val msg = runCatching { ReliefCapture.process(context, frames, photo.uri, focal, zoom, depthMm) }
-                    .getOrElse { "Relieve: ${it.message}" }
+                    .getOrElse { tr("Relieve: %1\$s", it.message) }
                 frames.forEach { it.bmp.recycle() }
                 scope.launch { snackbar.showSnackbar(msg) }
             }
@@ -734,7 +736,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             if (files.isEmpty()) {
                 watch?.cancel()
                 capturing = false
-                snackbar.showSnackbar("Error al capturar")
+                snackbar.showSnackbar(tr("Error al capturar"))
                 return@launch
             }
             val best = if (files.size == 1) files[0] else files.maxBy { scoreOf(it) }
@@ -743,7 +745,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 files.forEach { it.delete() }
                 capturing = false
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                snackbar.showSnackbar("Foto cancelada: la cara se salió del encuadre o de la posición. Manténgase quieto hasta que se guarde.")
+                snackbar.showSnackbar(tr("Foto cancelada: la cara se salió del encuadre o de la posición. Manténgase quieto hasta que se guarde."))
                 return@launch
             }
             files.filter { it !== best }.forEach { it.delete() }
@@ -769,7 +771,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         // se muestra la foto para guardarla o repetirla
                         reviewName = it.displayName
                     }.onFailure {
-                        snackbar.showSnackbar("No se pudo guardar: ${it.message}")
+                        snackbar.showSnackbar(tr("No se pudo guardar: %1\$s", it.message))
                     }
                 }
             }
@@ -820,12 +822,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         val st = step ?: return null
         if (st.minLight == null && st.maxLight == null && st.maxLightAsym == null) return null
         if (!zone.isFaceZone()) return null
-        val l = f?.light ?: return "Luz: midiendo…"
-        st.minLight?.let { if (l.face < it) return "Luz insuficiente: %.0f %% (mín. %.0f %%)".format(l.face * 100, it * 100) }
-        st.maxLight?.let { if (l.face > it) return "Demasiada luz: %.0f %% (máx. %.0f %%)".format(l.face * 100, it * 100) }
+        val l = f?.light ?: return tr("Luz: midiendo…")
+        st.minLight?.let { if (l.face < it) return tr("Luz insuficiente: %1\$.0f %% (mín. %2\$.0f %%)", l.face * 100, it * 100) }
+        st.maxLight?.let { if (l.face > it) return tr("Demasiada luz: %1\$.0f %% (máx. %2\$.0f %%)", l.face * 100, it * 100) }
         st.maxLightAsym?.let { a ->
             val m = maxOf(l.leftCheek, l.rightCheek)
-            if (m > 0f && kotlin.math.abs(l.leftCheek - l.rightCheek) / m > a) return "Luz desigual entre mejillas (máx. %.0f %%)".format(a * 100)
+            if (m > 0f && kotlin.math.abs(l.leftCheek - l.rightCheek) / m > a) return tr("Luz desigual entre mejillas (máx. %1\$.0f %%)", a * 100)
         }
         return null
     }
@@ -844,7 +846,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             }
             if (readyNow(live?.eval) && !capturing) {
                 autoArmed = false
-                if (focused == false) scope.launch { snackbar.showSnackbar("Enfoque no confirmado: se tomó la foto igualmente") }
+                if (focused == false) scope.launch { snackbar.showSnackbar(tr("Enfoque no confirmado: se tomó la foto igualmente")) }
                 capture(stillOk = { readyNow(live?.eval) })
             }
         }
@@ -854,23 +856,23 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         // Barra superior
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás", tint = Color.White) }
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Atrás"), tint = Color.White) }
             Column(Modifier.weight(1f)) {
                 Text(zone.label, color = Color.White, style = MaterialTheme.typography.titleMedium)
                 val idx = sequence.indexOf(zone)
                 Text(when {
-                    protocol != null && step != null -> "${protocol.name} · paso ${stepIndex + 1}/${protocol.steps.size} · foto ${shotsDone + 1}/${step.count}"
-                    idx >= 0 -> "Secuencia ${idx + 1}/${sequence.size} · ${exp?.patientName.orEmpty()}"
+                    protocol != null && step != null -> tr("%1\$s · paso %2\$d/%3\$d · foto %4\$d/%5\$d", protocol.name, stepIndex + 1, protocol.steps.size, shotsDone + 1, step.count)
+                    idx >= 0 -> tr("Secuencia %1\$d/%2\$d · %3\$s", idx + 1, sequence.size, exp?.patientName.orEmpty())
                     else -> exp?.patientName.orEmpty()
                 }, color = if (idx >= 0 || step != null) GuideTone.MATCH.color else Color.LightGray, style = MaterialTheme.typography.bodySmall)
             }
             if (protocol != null && step != null) {
                 androidx.compose.material3.TextButton(onClick = { onProtocolNext((stepIndex + 1).takeIf { it < protocol.steps.size }) }) {
-                    Text(if (stepIndex + 1 < protocol.steps.size) "Saltar" else "Terminar", color = Color.White)
+                    Text(if (stepIndex + 1 < protocol.steps.size) tr("Saltar") else tr("Terminar"), color = Color.White)
                 }
             } else if (zone in sequence) {
                 androidx.compose.material3.TextButton(onClick = { onNext(sequence.getOrNull(sequence.indexOf(zone) + 1)) }) {
-                    Text(if (sequence.indexOf(zone) + 1 < sequence.size) "Saltar" else "Terminar", color = Color.White)
+                    Text(if (sequence.indexOf(zone) + 1 < sequence.size) tr("Saltar") else tr("Terminar"), color = Color.White)
                 }
             }
             IconToggleButton(
@@ -878,7 +880,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 onCheckedChange = { autoCapture = it; if (step?.autoCapture == null) prefs.edit().putBoolean("auto_capture", it).apply() },
                 enabled = photos.isNotEmpty() || protoRef != null,
             ) {
-                Icon(Icons.Default.AutoMode, if (autoCapture) "Disparo automático activado" else "Disparo automático desactivado",
+                Icon(Icons.Default.AutoMode, if (autoCapture) tr("Disparo automático activado") else tr("Disparo automático desactivado"),
                     tint = if (autoCapture) GuideTone.MATCH.color else Color.White)
             }
             IconButton(onClick = {
@@ -894,52 +896,52 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         ImageCapture.FLASH_MODE_AUTO -> Icons.Default.FlashAuto
                         else -> Icons.Default.FlashOff
                     }, when (flashMode) {
-                        ImageCapture.FLASH_MODE_ON -> if (lensFacing == CameraSelector.LENS_FACING_FRONT) "Flash de pantalla activado" else "Flash activado"
-                        ImageCapture.FLASH_MODE_AUTO -> "Flash automático"
-                        else -> "Flash desactivado"
+                        ImageCapture.FLASH_MODE_ON -> if (lensFacing == CameraSelector.LENS_FACING_FRONT) tr("Flash de pantalla activado") else tr("Flash activado")
+                        ImageCapture.FLASH_MODE_AUTO -> tr("Flash automático")
+                        else -> tr("Flash desactivado")
                     }, tint = Color.White
                 )
             }
             // Menú "⋯": ajustes, modo experto y ayudas (fuera de la barra para no saturarla)
             Box {
                 var more by remember { mutableStateOf(false) }
-                IconButton(onClick = { more = true }) { Icon(Icons.Default.MoreVert, "Más opciones de la cámara", tint = Color.White) }
+                IconButton(onClick = { more = true }) { Icon(Icons.Default.MoreVert, tr("Más opciones de la cámara"), tint = Color.White) }
                 androidx.compose.material3.DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
                     androidx.compose.material3.DropdownMenuItem(
-                        text = { Text("Ajustes de coincidencia") },
+                        text = { Text(tr("Ajustes de coincidencia")) },
                         leadingIcon = { Icon(Icons.Default.Tune, null) },
                         onClick = { more = false; showSettings = true },
                     )
                     if (lensFacing == CameraSelector.LENS_FACING_FRONT && zone.isFaceZone()) androidx.compose.material3.DropdownMenuItem(
-                        text = { Text("Medición de relieve (pantalla)") },
+                        text = { Text(tr("Medición de relieve (pantalla)")) },
                         leadingIcon = { Icon(if (reliefMode) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, null) },
                         onClick = {
                             reliefMode = !reliefMode; prefs.edit().putBoolean("relief_mode", reliefMode).apply(); more = false
-                            if (reliefMode) scope.launch { snackbar.showSnackbar("Relieve: penumbra, teléfono a 25–35 cm y sin moverse unos 2 s al disparar") }
+                            if (reliefMode) scope.launch { snackbar.showSnackbar(tr("Relieve: penumbra, teléfono a 25–35 cm y sin moverse unos 2 s al disparar")) }
                         },
                     )
                     androidx.compose.material3.DropdownMenuItem(
-                        text = { Text("Modo experto") },
+                        text = { Text(tr("Modo experto")) },
                         leadingIcon = { Icon(if (expert) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank, null) },
                         onClick = { expert = !expert; prefs.edit().putBoolean("camera_expert", expert).apply(); more = false },
                     )
                     androidx.compose.material3.DropdownMenuItem(
-                        text = { Text(if (photos.isNotEmpty()) "Girar la referencia 90°" else "Girar la guía 90°") },
+                        text = { Text(if (photos.isNotEmpty()) tr("Girar la referencia 90°") else tr("Girar la guía 90°")) },
                         leadingIcon = { Icon(Icons.Default.RotateRight, null) },
                         onClick = { refOrient = refOrient.rotated() },
                     )
                     androidx.compose.material3.DropdownMenuItem(
-                        text = { Text(if (photos.isNotEmpty()) "Espejo de la referencia" else "Espejo de la guía") },
+                        text = { Text(if (photos.isNotEmpty()) tr("Espejo de la referencia") else tr("Espejo de la guía")) },
                         leadingIcon = { Icon(Icons.Default.Flip, null) },
                         onClick = { refOrient = refOrient.mirrored() },
                     )
                     if (!refOrient.isIdentity) androidx.compose.material3.DropdownMenuItem(
-                        text = { Text("Orientación original") },
+                        text = { Text(tr("Orientación original")) },
                         leadingIcon = { Icon(Icons.Default.Restore, null) },
                         onClick = { refOrient = com.photomed.app.align.ImageEdit.NONE; more = false },
                     )
                     androidx.compose.material3.DropdownMenuItem(
-                        text = { Text("Mostrar las ayudas otra vez") },
+                        text = { Text(tr("Mostrar las ayudas otra vez")) },
                         leadingIcon = { Icon(Icons.Default.TouchApp, null) },
                         onClick = { more = false; com.photomed.app.ui.components.CoachMarks.resetAll(context) },
                     )
@@ -965,11 +967,11 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         EdgeGhost(edges, (ghostAlpha + 0.25f).coerceAtMost(1f), Modifier.fillMaxSize())
                     } else if (showGhost && g != null) {
                         val gb = ghostBitmap
-                        if (gb != null) androidx.compose.foundation.Image(gb, "Foto anterior superpuesta", contentScale = ContentScale.Crop,
+                        if (gb != null) androidx.compose.foundation.Image(gb, tr("Foto anterior superpuesta"), contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize().graphicsLayer { alpha = ghostAlpha })
                         else AsyncImage(
                             model = com.photomed.app.ui.photoModel(context, g.uri),
-                            contentDescription = "Foto anterior superpuesta",
+                            contentDescription = tr("Foto anterior superpuesta"),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize().graphicsLayer { alpha = ghostAlpha },
                         )
@@ -1054,7 +1056,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 val g = ghost
                 if (showGhost && g != null) {
                     Text(
-                        "Referencia: ${formatDate(g.takenAt)}" + if (zoomRatio > 1.01f) " · zoom %.1f×".format(zoomRatio) else "",
+                        if (zoomRatio > 1.01f) tr("Referencia: %1\$s · zoom %2\$.1f×", formatDate(g.takenAt), zoomRatio)
+                        else tr("Referencia: %1\$s", formatDate(g.takenAt)),
                         color = Color.White,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.align(Alignment.BottomStart).padding(6.dp)
@@ -1093,13 +1096,13 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             Text(step.title, color = Color.White, style = MaterialTheme.typography.labelLarge)
             if (step.expression != com.photomed.app.data.FacialExpression.NEUTRAL)
                 Text("${step.expression.instruction} · ${step.expression.muscle}", color = Color(0xFFFFD54F), style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.semantics { contentDescription = "Instrucción: ${step.expression.instruction}" })
+                    modifier = Modifier.semantics { contentDescription = tr("Instrucción: %1\$s", step.expression.instruction) })
             step.instructions?.let { Text(it, color = Color.LightGray, style = MaterialTheme.typography.bodySmall) }
             val req = listOfNotNull(
-                "coincidencia ≥ ${((step.threshold ?: threshold) * 100).toInt()} %",
-                step.minLight?.let { "luz ≥ ${(it * 100).toInt()} %" },
-                if (protoRef != null) "igual a la referencia" + (protoRef.sourceTakenAt?.let { " del ${formatDate(it)}" } ?: "") else null)
-            Text("Exige: " + req.joinToString(" · "), color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
+                tr("coincidencia ≥ %1\$d %%", ((step.threshold ?: threshold) * 100).toInt()),
+                step.minLight?.let { tr("luz ≥ %1\$d %%", (it * 100).toInt()) },
+                if (protoRef != null) (protoRef.sourceTakenAt?.let { tr("igual a la referencia del %1\$s", formatDate(it)) } ?: tr("igual a la referencia")) else null)
+            Text(tr("Exige: %1\$s", req.joinToString(" · ")), color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
             lightIssue(live)?.let { Text(it, color = GuideTone.FAR.color, style = MaterialTheme.typography.labelMedium) }
         }
         if (expressions.size > 1 && step == null) {
@@ -1108,7 +1111,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Expresión", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                Text(tr("Expresión"), color = Color.White, style = MaterialTheme.typography.labelLarge)
                 expressions.forEach { ex ->
                     androidx.compose.material3.FilterChip(
                         selected = expression == ex,
@@ -1125,7 +1128,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 "${expression.instruction} · ${expression.muscle}",
                 color = Color(0xFFFFD54F), style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.s3, vertical = 2.dp)
-                    .semantics { contentDescription = "Instrucción: ${expression.instruction}" })
+                    .semantics { contentDescription = tr("Instrucción: %1\$s", expression.instruction) })
         }
 
         // Modo individual de extremidades: ambas o una sola (misma zona)
@@ -1135,7 +1138,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(when (zone.guide) { com.photomed.app.data.GuideType.HANDS -> "Mano"; com.photomed.app.data.GuideType.FEET -> "Pie"; else -> "Pierna" },
+                Text(when (zone.guide) { com.photomed.app.data.GuideType.HANDS -> tr("Mano"); com.photomed.app.data.GuideType.FEET -> tr("Pie"); else -> tr("Pierna") },
                     color = Color.White, style = MaterialTheme.typography.labelLarge)
                 LimbSide.entries.forEach { sd ->
                     androidx.compose.material3.FilterChip(
@@ -1144,7 +1147,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                             limbSide = sd; prefs.edit().putString("limb_side_${zone.id}", sd.tag).apply()
                             photos.lastOrNull { LimbSide.ofFileName(it.displayName, zone) == sd }?.let { ghost = it }
                         },
-                        label = { Text(if (sd == LimbSide.BOTH) "Ambas" else sd.label) },
+                        label = { Text(sd.displayLabel) },
                     )
                 }
             }
@@ -1156,31 +1159,31 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s3),
         ) {
             // modo simple: solo las capas de uso diario; el resto, en el modo experto
-            if (expert) LayerToggle("Cuadrícula", Icons.Default.GridOn, showGrid) { showGrid = it }
-            LayerToggle("Contorno", Icons.Default.Face, showContour) { showContour = it }
-            LayerToggle("Superponer", Icons.Default.Layers, showGhost, enabled = photos.isNotEmpty()) { showGhost = it }
-            if (expert) LayerToggle("Nivel", Icons.Default.Straighten, showLevel) { showLevel = it }
-            LayerToggle("Asistir", Icons.Default.CenterFocusStrong, liveMatch) { liveMatch = it }
+            if (expert) LayerToggle(tr("Cuadrícula"), Icons.Default.GridOn, showGrid) { showGrid = it }
+            LayerToggle(tr("Contorno"), Icons.Default.Face, showContour) { showContour = it }
+            LayerToggle(tr("Superponer"), Icons.Default.Layers, showGhost, enabled = photos.isNotEmpty()) { showGhost = it }
+            if (expert) LayerToggle(tr("Nivel"), Icons.Default.Straighten, showLevel) { showLevel = it }
+            LayerToggle(tr("Asistir"), Icons.Default.CenterFocusStrong, liveMatch) { liveMatch = it }
             if (expert || lensFacing == CameraSelector.LENS_FACING_FRONT)
-                LayerToggle("Espejo", Icons.Default.Flip, mirrorOn, enabled = lensFacing == CameraSelector.LENS_FACING_FRONT) {
+                LayerToggle(tr("Espejo"), Icons.Default.Flip, mirrorOn, enabled = lensFacing == CameraSelector.LENS_FACING_FRONT) {
                     mirrorOn = it; prefs.edit().putBoolean("mirror_front", it).apply()
                 }
-            if (expert) LayerToggle("Adaptar", Icons.Default.AutoFixHigh, adaptGuide, enabled = refPoints.isNotEmpty() || refSilhouette != null) { adaptGuide = it }
+            if (expert) LayerToggle(tr("Adaptar"), Icons.Default.AutoFixHigh, adaptGuide, enabled = refPoints.isNotEmpty() || refSilhouette != null) { adaptGuide = it }
         }
 
         if (showGhost && photos.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 // girar (pasos de 90°) y espejar la referencia superpuesta
                 IconButton(onClick = { refOrient = refOrient.rotated() }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.RotateRight, "Girar la referencia 90°", tint = if (refOrient.rot != 0) GuideTone.MATCH.color else Color.White)
+                    Icon(Icons.Default.RotateRight, tr("Girar la referencia 90°"), tint = if (refOrient.rot != 0) GuideTone.MATCH.color else Color.White)
                 }
                 IconButton(onClick = { refOrient = refOrient.mirrored() }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Flip, "Espejo de la referencia", tint = if (refOrient.mirror) GuideTone.MATCH.color else Color.White)
+                    Icon(Icons.Default.Flip, tr("Espejo de la referencia"), tint = if (refOrient.mirror) GuideTone.MATCH.color else Color.White)
                 }
                 androidx.compose.material3.FilterChip(
                     selected = ghostEdges,
                     onClick = { ghostEdges = !ghostEdges; prefs.edit().putBoolean("ghost_edges", ghostEdges).apply() },
-                    label = { Text("Bordes", style = MaterialTheme.typography.labelMedium) },
+                    label = { Text(tr("Bordes"), style = MaterialTheme.typography.labelMedium) },
                     modifier = Modifier.padding(end = 8.dp).height(32.dp),
                 )
                 // opacidad: un chip; al tocarlo aparece el control y se oculta solo a los pocos segundos
@@ -1188,7 +1191,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     if (opacityOpen && !expert) { kotlinx.coroutines.delay(CONTROLS_HIDE_MS); opacityOpen = false }
                 }
                 if (expert || opacityOpen) {
-                    Text("Opacidad", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                    Text(tr("Opacidad"), color = Color.White, style = MaterialTheme.typography.labelMedium)
                     Slider(
                         value = ghostAlpha,
                         onValueChange = { ghostAlpha = it; opacityTouchedAt = System.currentTimeMillis() },
@@ -1200,7 +1203,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 } else {
                     androidx.compose.material3.AssistChip(
                         onClick = { opacityOpen = true; opacityTouchedAt = System.currentTimeMillis() },
-                        label = { Text("Opacidad ${(ghostAlpha * 100).toInt()} %", style = MaterialTheme.typography.labelMedium) },
+                        label = { Text(tr("Opacidad %1\$d %%", (ghostAlpha * 100).toInt()), style = MaterialTheme.typography.labelMedium) },
                         leadingIcon = { Icon(Icons.Default.Contrast, null, Modifier.size(16.dp)) },
                         modifier = Modifier.height(32.dp),
                     )
@@ -1233,7 +1236,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         ) {
             Box(Modifier.size(52.dp)) {
                 photos.lastOrNull()?.let {
-                    AsyncImage(it.uri, "Última fotografía", contentScale = ContentScale.Crop,
+                    AsyncImage(it.uri, tr("Última fotografía"), contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.small))
                 }
             }
@@ -1250,13 +1253,13 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     else CameraSelector.LENS_FACING_BACK
                 },
                 modifier = Modifier.size(52.dp),
-            ) { Icon(Icons.Default.FlipCameraAndroid, "Cambiar cámara", tint = Color.White, modifier = Modifier.size(30.dp)) }
+            ) { Icon(Icons.Default.FlipCameraAndroid, tr("Cambiar cámara"), tint = Color.White, modifier = Modifier.size(30.dp)) }
         }
     }
     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 120.dp))
     com.photomed.app.ui.components.CoachMark("camara_gestos", Icons.Default.TouchApp,
-        "Pellizque para el zoom. El anillo del disparador se llena al coincidir con la guía. " +
-            "Más capas y datos: modo experto en los ajustes (⋯).",
+        tr("Pellizque para el zoom. El anillo del disparador se llena al coincidir con la guía. " +
+            "Más capas y datos: modo experto en los ajustes (⋯)."),
         Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 120.dp))
     ScreenFlashOverlay(screenFlash)
     ReliefPatternOverlay(psPattern)
@@ -1266,18 +1269,19 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             val idx = sequence.indexOf(zone)
             if (protocol != null && step != null) {
                 shotsDone++
-                if (shotsDone < step.count) scope.launch { snackbar.showSnackbar("Foto $shotsDone de ${step.count} de este paso guardada") }
+                if (shotsDone < step.count) scope.launch { snackbar.showSnackbar(tr("Foto %1\$d de %2\$d de este paso guardada", shotsDone, step.count)) }
                 else {
                     val next = (stepIndex + 1).takeIf { it < protocol.steps.size }
-                    if (next == null) android.widget.Toast.makeText(context, "Protocolo «${protocol.name}» completado", android.widget.Toast.LENGTH_SHORT).show()
+                    if (next == null) android.widget.Toast.makeText(context, tr("Protocolo «%1\$s» completado", protocol.name), android.widget.Toast.LENGTH_SHORT).show()
                     onProtocolNext(next)
                 }
             } else if (idx >= 0) {
                 // secuencia: pasa a la siguiente zona (o termina); la cabecera muestra "Secuencia i/N"
-                if (idx + 1 >= sequence.size) android.widget.Toast.makeText(context, "Secuencia completada", android.widget.Toast.LENGTH_SHORT).show()
+                if (idx + 1 >= sequence.size) android.widget.Toast.makeText(context, tr("Secuencia completada"), android.widget.Toast.LENGTH_SHORT).show()
                 onNext(sequence.getOrNull(idx + 1))
             } else scope.launch {
-                snackbar.showSnackbar("Guardada en el álbum ${exp?.id.orEmpty()}" + if (lastNear) " · casi alineada: se alinea en Comparar" else "")
+                snackbar.showSnackbar(if (lastNear) tr("Guardada en el álbum %1\$s · casi alineada: se alinea en Comparar", exp?.id.orEmpty())
+                    else tr("Guardada en el álbum %1\$s", exp?.id.orEmpty()))
             }
         }
         // la revisión tapa la cámara (el análisis en vivo y el disparo automático quedan en pausa)
@@ -1367,17 +1371,17 @@ fun MatchSettingsContent(
     onExpert: (Boolean) -> Unit = {},
 ) {
     Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Coincidencia con la referencia", style = MaterialTheme.typography.titleLarge)
-        SettingSwitch("Modo experto", "Muestra siempre las líneas de referencia, los puntos detectados, los porcentajes, " +
+        Text(tr("Coincidencia con la referencia"), style = MaterialTheme.typography.titleLarge)
+        SettingSwitch(tr("Modo experto"), tr("Muestra siempre las líneas de referencia, los puntos detectados, los porcentajes, " +
             "la franja de indicaciones, la barra de zoom y todas las capas. En el modo simple solo se ven el contorno, " +
-            "un icono con la corrección principal y el anillo del disparador.", expert, onExpert)
+            "un icono con la corrección principal y el anillo del disparador."), expert, onExpert)
         Row(
             Modifier.fillMaxWidth().toggleable(autoCapture, role = Role.Switch, onValueChange = onAutoCapture),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Disparo automático", style = MaterialTheme.typography.bodyLarge)
-                Text("Toma la foto sola cuando los puntos de referencia coinciden (se mantiene ~0,4 s).",
+                Text(tr("Disparo automático"), style = MaterialTheme.typography.bodyLarge)
+                Text(tr("Toma la foto sola cuando los puntos de referencia coinciden (se mantiene ~0,4 s)."),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Switch(checked = autoCapture, onCheckedChange = null)
@@ -1387,39 +1391,39 @@ fun MatchSettingsContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Zoom asistido", style = MaterialTheme.typography.bodyLarge)
-                Text("Ajusta el zoom para igualar el tamaño de la referencia; permite alejarse (≥ 1 m en el rostro) " +
-                    "sin perder exactitud.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr("Zoom asistido"), style = MaterialTheme.typography.bodyLarge)
+                Text(tr("Ajusta el zoom para igualar el tamaño de la referencia; permite alejarse (≥ 1 m en el rostro) " +
+                    "sin perder exactitud."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Switch(checked = zoomAssist, onCheckedChange = null)
         }
-        SettingSwitch("Disparar también casi alineado", "Dispara al llegar al 80 % de coincidencia (verde amarillento); " +
-            "la alineación fina se hace en Comparar.", nearCapture, onNearCapture)
-        SettingSwitch("Ráfaga de 3 fotos", "Al disparar toma tres y guarda la de mayor coincidencia (evita repetir por un parpadeo).",
+        SettingSwitch(tr("Disparar también casi alineado"), tr("Dispara al llegar al %1\$d %% de coincidencia (verde amarillento); " +
+            "la alineación fina se hace en Comparar.", 80), nearCapture, onNearCapture)
+        SettingSwitch(tr("Ráfaga de 3 fotos"), tr("Al disparar toma tres y guarda la de mayor coincidencia (evita repetir por un parpadeo)."),
             burst, onBurst)
-        SettingSwitch("Vibración y sonido de guía", "Pulsos que se aceleran al acercarse a la coincidencia y un tono al coincidir, " +
-            "para no tener que mirar la pantalla.", feedback, onFeedback)
+        SettingSwitch(tr("Vibración y sonido de guía"), tr("Pulsos que se aceleran al acercarse a la coincidencia y un tono al coincidir, " +
+            "para no tener que mirar la pantalla."), feedback, onFeedback)
         Row(
             Modifier.fillMaxWidth().toggleable(useGaze, role = Role.Switch, onValueChange = onUseGaze),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Exigir la misma mirada", style = MaterialTheme.typography.bodyLarge)
-                Text("La coincidencia también requiere que el paciente mire en la misma dirección que en la referencia " +
-                    "(posición del iris dentro del ojo).", style = MaterialTheme.typography.bodySmall,
+                Text(tr("Exigir la misma mirada"), style = MaterialTheme.typography.bodyLarge)
+                Text(tr("La coincidencia también requiere que el paciente mire en la misma dirección que en la referencia " +
+                    "(posición del iris dentro del ojo)."), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Switch(checked = useGaze, onCheckedChange = null)
         }
-        Text("Umbral mínimo de puntos coincidentes: ${(threshold * 100).toInt()} %", style = MaterialTheme.typography.bodyLarge)
+        Text(tr("Umbral mínimo de puntos coincidentes: %1\$d %%", (threshold * 100).toInt()), style = MaterialTheme.typography.bodyLarge)
         Slider(
             value = threshold * 100, onValueChange = { onThreshold((it.toInt()) / 100f) },
             valueRange = 50f..100f, steps = 49,
-            modifier = Modifier.semantics { contentDescription = "Umbral de puntos coincidentes" },
+            modifier = Modifier.semantics { contentDescription = tr("Umbral de puntos coincidentes") },
         )
-        Text("Un punto coincide si está a menos del 3 % del ancho de su posición en la foto de referencia. " +
-            "Por defecto 80 %.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        TextButton(onClick = { onThreshold(LiveMatch.DEFAULT_THRESHOLD) }) { Text("Restablecer 80 %") }
+        Text(tr("Un punto coincide si está a menos del %1\$d %% del ancho de su posición en la foto de referencia. " +
+            "Por defecto %2\$d %%.", 3, 80), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(onClick = { onThreshold(LiveMatch.DEFAULT_THRESHOLD) }) { Text(tr("Restablecer 80 %")) }
     }
 }
 
@@ -1506,8 +1510,8 @@ fun ShutterButton(degree: Float?, capturing: Boolean, enabled: Boolean, onClick:
     }
     Box(Modifier.size(76.dp)
         .semantics {
-            contentDescription = "Disparador"
-            if (degree != null) stateDescription = "Coincidencia ${(degree * 100).toInt()} %"
+            contentDescription = tr("Disparador")
+            if (degree != null) stateDescription = tr("Coincidencia %1\$d %%", (degree * 100).toInt())
         }, contentAlignment = Alignment.Center) {
         androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
             val sw = 4.dp.toPx()
@@ -1522,7 +1526,7 @@ fun ShutterButton(degree: Float?, capturing: Boolean, enabled: Boolean, onClick:
         Box(
             Modifier.size(60.dp).clip(CircleShape)
                 .background(if (capturing) MaterialTheme.colorScheme.outline else Color.White)
-                .clickable(enabled = enabled, onClickLabel = "Tomar fotografía", onClick = onClick),
+                .clickable(enabled = enabled, onClickLabel = tr("Tomar fotografía"), onClick = onClick),
             contentAlignment = Alignment.Center,
         ) { if (capturing) CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp) }
     }
