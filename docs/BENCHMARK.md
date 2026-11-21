@@ -199,6 +199,35 @@ muestras:
 mejora: el beneficio viene de la escala fina del artículo. Sin falsos positivos nuevos en el retrato
 joven de control, y el análisis baja de 425 a 393 ms por cara. Queda activado por defecto.
 
+### Intento de subir la exhaustividad sin perder precisión (versión 2.45)
+
+Ideas probadas (calibradas con la muestra aleatoria y confirmadas una sola vez con la partición de
+prueba del artículo, con 3 decimales):
+
+| Idea | Muestra de calibración | Partición de prueba |
+|---|---|---|
+| A. Surcos accesorios junto al nasogeniano y la marioneta (detección libre) | R +7 pts, P −1 | — |
+| A con filtros geométricos (cerca del eje, misma dirección, largos) | R +1–2, P igual | **R +1,0, P −0,7** (sus líneas aciertan un 42 % frente al 60 % de calibración) |
+| B. Alargar las líneas por los extremos siguiendo la cresta | R +1, P −1 | — |
+| C. Más líneas por zona solo con puntuación alta | sin cambio | — |
+| Frente más permisiva (más candidatos libres, más horizontales) | R +0,4, P −0,2 | R +0,3, P −0,2 |
+| Más líneas infraorbitarias (5 por lado) | R +1, P −1 | R +1, P −3 en esa zona |
+
+Ninguna idea sube la exhaustividad sin bajar algo la precisión en fotos no usadas para calibrar: es la
+misma frontera que mostró el barrido de sensibilidad (el F1 apenas cambia; se cambia precisión por
+exhaustividad). Por eso la sensibilidad **equilibrada (de serie) queda igual que en 2.44**, y las
+búsquedas que sí encuentran más líneas (A con filtros, frente más permisiva, 5 infraorbitarias por lado)
+pasan al nivel **exhaustiva**:
+
+| Nivel (partición de prueba) | Precisión | Exhaustividad | F1 (6 regiones) | F1 estricto |
+|---|---|---|---|---|
+| Conservadora | 0,667 | 0,426 | 0,520 | 0,279 |
+| **Equilibrada** (de serie) | 0,625 | 0,484 | 0,546 | 0,294 |
+| Exhaustiva | 0,580 | **0,515** | 0,546 | 0,295 |
+
+Subir la exhaustividad manteniendo la precisión requiere un criterio aprendido de datos anotados (el
+modelo de la recomendación 5); sin entrenamiento, el límite está en este equilibrio.
+
 ## 2. Puntos anatómicos y proporciones: AFW (300-W)
 
 - **Datos**: AFW de [300-W (iBUG)](https://ibug.doc.ic.ac.uk/resources/300-W/): 337 caras con **68 puntos

@@ -106,6 +106,54 @@ class WrinkleBenchmarkTest {
         T.paperTexture = true; T.freeSigma = 0.06f
     }
 
+    /** Experimentos de exhaustividad: PM_EXP=conjunto[:config,config…] (configs en [EXPERIMENTS]). */
+    @Test
+    fun experiments() {
+        val spec = System.getenv("PM_EXP"); assumeTrue(spec != null)
+        val set = spec!!.substringBefore(":")
+        val names = spec.substringAfter(":", "").split(',').filter { it.isNotBlank() }.ifEmpty { EXPERIMENTS.keys.toList() }
+        for (n in names) {
+            resetTuning(); EXPERIMENTS.getValue(n)()
+            println("BENCH EXPERIMENTO $n")
+            bench(set, n, save = false)
+        }
+        resetTuning()
+    }
+
+    private fun resetTuning() {
+        val T = com.photomed.app.align.WrinkleTuning
+        T.paperTexture = true; T.freeSigma = 0.06f; T.textureW = 0f; T.extend = false; T.strongCapK = 1f
+        T.cheekDist = 0.07f; T.cheekAgree = 0.85f; T.cheekLen = 0.06f; T.freeBias = T.freeBias + ("surcos" to 0.6f)
+        T.apply(com.photomed.app.align.WrinkleTuning.Level.BALANCED)
+    }
+
+    private val EXPERIMENTS: Map<String, () -> Unit> = linkedMapOf(
+        "base" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = false; T.extend = false; T.foreheadAgree = 0.8f; T.infraCap = 3
+            T.freeBias = T.freeBias + ("frente" to 1.0f) },
+        "actual" to { },
+        "nivel_conservadora" to { com.photomed.app.align.WrinkleTuning.apply(com.photomed.app.align.WrinkleTuning.Level.CONSERVATIVE) },
+        "nivel_exhaustiva" to { com.photomed.app.align.WrinkleTuning.apply(com.photomed.app.align.WrinkleTuning.Level.EXHAUSTIVE) },
+        "solo_frente" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = false; T.infraCap = 3 },
+        "conservadora" to { val T = com.photomed.app.align.WrinkleTuning; T.infraCap = 3; T.cheekDist = 0.05f; T.cheekAgree = 0.9f; T.cheekLen = 0.07f
+            T.freeBias = T.freeBias + ("surcos" to 0.3f) },
+        "A_surcos" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = true; T.extend = false },
+        "B_alargar" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = false; T.extend = true },
+        "AB" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = true; T.extend = true },
+        "ABC" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = true; T.extend = true; T.strongCapK = 2f },
+        "A_exig06" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = true; T.extend = false; T.freeBias = T.freeBias + ("surcos" to 0.6f) },
+        "A_exig10" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = true; T.extend = false; T.freeBias = T.freeBias + ("surcos" to 1.0f) },
+        "A_geo1" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = true; T.extend = false; T.cheekDist = 0.06f; T.cheekAgree = 0.8f; T.cheekLen = 0.05f },
+        "A_geo2" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = true; T.extend = false; T.cheekDist = 0.05f; T.cheekAgree = 0.9f; T.cheekLen = 0.07f },
+        "A_geo3" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = true; T.extend = false; T.cheekDist = 0.07f; T.cheekAgree = 0.85f; T.cheekLen = 0.06f; T.freeBias = T.freeBias + ("surcos" to 0.6f) },
+        "G1_frente" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = true; T.extend = false; T.cheekDist = 0.07f; T.cheekAgree = 0.85f; T.cheekLen = 0.06f
+            T.freeBias = T.freeBias + ("surcos" to 0.6f) + ("frente" to 0.6f); T.foreheadAgree = 0.9f },
+        "G2_infra" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = true; T.extend = false; T.cheekDist = 0.07f; T.cheekAgree = 0.85f; T.cheekLen = 0.06f
+            T.freeBias = T.freeBias + ("surcos" to 0.6f); T.infraCap = 5 },
+        "G12" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = true; T.extend = false; T.cheekDist = 0.07f; T.cheekAgree = 0.85f; T.cheekLen = 0.06f
+            T.freeBias = T.freeBias + ("surcos" to 0.6f) + ("frente" to 0.6f); T.foreheadAgree = 0.9f; T.infraCap = 5 },
+        "A_exig15" to { val T = com.photomed.app.align.WrinkleTuning; T.cheeks = true; T.extend = false; T.freeBias = T.freeBias + ("surcos" to 1.5f) },
+    )
+
     private fun bench(name: String, what: String, save: Boolean = true) {
         val dir = File("src/test/resources/bench/$name")
         val meshFile = File(dir, "mesh.json")
@@ -216,7 +264,7 @@ class WrinkleBenchmarkTest {
         val summary = JSONObject().put("images", n).put("toleranceFraction", TOL / 1024.0).put("strictF1", strictF1).put("strictJSI", jsi)
         println("BENCH ARRUGAS (FFHQ-Wrinkle, $what, $n fotos, tolerancia ${TOL.toInt()} px de 1024):")
         acc.forEach { (r, a) ->
-            println("BENCH  %-18s precisión %.2f  exhaustividad %.2f  F1 %.2f  (trazado %d px, manual %d px)".format(r, a.p(), a.r(), a.f(), a.pred, a.gt))
+            println("BENCH  %-18s precisión %.3f  exhaustividad %.3f  F1 %.3f  (trazado %d px, manual %d px)".format(r, a.p(), a.r(), a.f(), a.pred, a.gt))
             summary.put(r, JSONObject().put("precision", a.p().toDouble()).put("recall", a.r().toDouble()).put("f1", a.f().toDouble()).put("predPx", a.pred).put("gtPx", a.gt))
         }
         if (save) File(out, "$name.json").writeText(JSONObject().put("summary", summary).put("images", perImage).toString(2))

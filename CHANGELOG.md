@@ -2,6 +2,14 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.45 — 21 de noviembre de 2026
+
+- **Sensibilidad exhaustiva** de la detección de arrugas (Ajustes): además busca surcos accesorios junto
+  al nasogeniano y la marioneta, más líneas en la frente y hasta 5 infraorbitarias por lado. En la
+  partición de prueba de FFHQ-Wrinkle: exhaustividad 0,484 → 0,515 (precisión 0,625 → 0,580). La
+  sensibilidad equilibrada (de serie) no cambia: ninguna de estas búsquedas sube la exhaustividad sin
+  bajar algo la precisión (ver `docs/BENCHMARK.md`).
+
 ## 2.44 — 21 de noviembre de 2026
 
 - **Arrugas**: la detección libre genera sus candidatos con el mapa de textura del artículo de

@@ -271,7 +271,7 @@ object FaceAnnotations {
                     metrics = sc?.let { LineMeasure.line(label, pts, lum, it, halfMm = if (name == "nasogeniano") 5f else 4f, relief = extras?.relief).copy(note = note) })
             }
         } }.filterNotNull()
-        return folds + wrinkles(mesh, lum, labels, faceW, lab, extras)
+        return folds + wrinkles(mesh, lum, labels, faceW, lab, extras, existing = folds)
     }
 
     /**
@@ -339,14 +339,20 @@ object FaceAnnotations {
      * raíz nasal), patas de gallo (abanico de rayos desde el canto externo) y ojeras y bolsas
      * palpebrales ([Periorbital]). Candidatos múltiples con supresión de no máximos.
      */
-    fun wrinkles(mesh: List<Pt>, lumIn: GrayImage, labels: FaceLabels?, faceW: Float, lab: LabImage? = null, extras: MeasureExtras? = null): List<AnnotLine> {
+    fun wrinkles(mesh: List<Pt>, lumIn: GrayImage, labels: FaceLabels?, faceW: Float, lab: LabImage? = null, extras: MeasureExtras? = null,
+                 /** Surcos ya encontrados en sus pasillos (para no repetirlos como accesorios). */
+                 existing: List<AnnotLine> = emptyList()): List<AnnotLine> {
         val out = ArrayList<AnnotLine>()
         // luz normalizada para buscar (campo plano con la misma escala de brillo); las medidas usan la original
         val lumRaw = lumIn
         val lum = if (WrinkleTuning.flat) WrinkleField.flatScaled(lumIn, 0.06f * faceW * lumIn.width) else lumIn
         val sc = scaleOf(mesh, extras)
-        fun withMetrics(layer: AnnotLayer, name: String, r: RidgeTracker.Result) =
-            AnnotLine(layer, r.points, false, metrics = sc?.let { LineMeasure.line(name, r.points, lumRaw, it, halfMm = 2f, relief = extras?.relief) })
+        /** Alargar por los extremos mientras siga la cresta (se define más abajo, con la piel). */
+        var extendFn: (RidgeTracker.Result) -> RidgeTracker.Result = { it }
+        fun withMetrics(layer: AnnotLayer, name: String, r0: RidgeTracker.Result): AnnotLine {
+            val r = if (WrinkleTuning.extend && layer != AnnotLayer.FOLDS) extendFn(r0) else r0
+            return AnnotLine(layer, r.points, false, metrics = sc?.let { LineMeasure.line(name, r.points, lumRaw, it, halfMm = 2f, relief = extras?.relief) })
+        }
         val skin = labels?.let { l -> { q: Pt -> l[(q.x * l.width).roundToInt(), (q.y * l.width).roundToInt()] == FaceLabels.FACE_SKIN } }
         val eR = mesh[468].takeIf { mesh.size > 473 } ?: mesh[159]; val eL = mesh[473].takeIf { mesh.size > 473 } ?: mesh[386]
         val ipd = dist(eR, eL).coerceAtLeast(1e-4f)
@@ -406,6 +412,29 @@ object FaceAnnotations {
             }.filterNotNull()
         }.getOrDefault(emptyList())
         fun midOf(r: RidgeTracker.Result) = r.points[r.points.size / 2]
+        // alargar: eje prolongado en recta un 35 % por cada extremo; el rastreador conserva solo el tramo
+        // continuo con cresta (si no la hay, la línea queda igual)
+        extendFn = { r ->
+            val p = r.points
+            if (p.size < 3) r else {
+                val len = LineMeasure.length(p)
+                val a = p.first(); val a2 = p[minOf(2, p.size - 1)]; val b = p.last(); val b2 = p[maxOf(0, p.size - 3)]
+                fun ext(from: Pt, toward: Pt): Pt { val vx = from.x - toward.x; val vy = from.y - toward.y; val n = hypot(vx, vy).coerceAtLeast(1e-6f)
+                    return Pt(from.x + vx / n * len * 0.35f, from.y + vy / n * len * 0.35f) }
+                val axis = listOf(ext(a, a2)) + p + ext(b, b2)
+                val t = runCatching { RidgeTracker.track(lum, axis, 0.006f * faceW, stations = (len * 1.7f / (0.006f * faceW)).toInt().coerceIn(12, 50),
+                    offsets = 3, minStrength = 0.6f * r.strength, minContrast = 1.3f, skin = skinNoBrow) }.getOrNull()
+                if (t != null && LineMeasure.length(t.points) > len * 1.05f && t.points.map { q -> p.minOf { dist(q, it) } }.sorted()
+                        .let { it[it.size / 2] } < 0.01f * faceW) t else r
+            }
+        }
+        /** Tope de líneas de una zona; por encima, solo las de puntuación alta (C). */
+        fun pick(cands: List<Cand>, sep: Float, baseCap: Int, region: String, dir: (Cand) -> Pt?): List<Cand> {
+            val cap = WrinkleTuning.cap(baseCap)
+            if (WrinkleTuning.strongCapK <= 1f) return nms(cands, sep, cap)
+            return nms(cands, sep, (cap * WrinkleTuning.strongCapK).toInt()).filterIndexed { i, c ->
+                i < cap || scoreOf(c.res, region, dir(c)) > WrinkleTuning.scoreT + 1f }
+        }
         // frente: franjas que siguen el arco de las cejas (que se aplana hacia arriba), enteras o por mitades
         run {
             val browIdx = intArrayOf(70, 63, 105, 66, 107, 336, 296, 334, 293, 300)
@@ -452,8 +481,8 @@ object FaceAnnotations {
                     .forEach { r -> r?.let { if (accepted(it, "frente", ex)) cands += uv(it, vertical = false) } }
                 // libres en la frente (encima de las cejas, entre sus colas)
                 free.filter { r -> val (u, v) = proj(midOf(r), mid); v > browTop + 0.02f * faceW && v < top && u in xl..xr }
-                    .filter { WrinkleField.agreement(it.points, ex) >= 0.8f && acceptedFree(it, "frente", ex) }.forEach { cands += uv(it, vertical = false) }
-                nms(cands, step * 0.7f, WrinkleTuning.cap(8)).sortedByDescending { it.v }.forEachIndexed { i, c ->
+                    .filter { WrinkleField.agreement(it.points, ex) >= WrinkleTuning.foreheadAgree && acceptedFree(it, "frente", ex) }.forEach { cands += uv(it, vertical = false) }
+                pick(cands, step * 0.7f, 8, "frente") { ex }.sortedByDescending { it.v }.forEachIndexed { i, c ->
                     out += withMetrics(AnnotLayer.FOREHEAD, "Frente, línea ${i + 1}", c.res)
                 }
             }
@@ -478,7 +507,7 @@ object FaceAnnotations {
                 .forEach { r -> r?.let { if (vertOk(it) && accepted(it, "ceño", up)) cands += uv(it, vertical = true) } }
             free.filter { r -> val (u, v) = proj(midOf(r), mid); u in minOf(hR.first, hL.first) - 0.01f * faceW..maxOf(hR.first, hL.first) + 0.01f * faceW && v in base..topY }
                 .filter { vertOk(it) && acceptedFree(it, "ceño", up) }.forEach { cands += uv(it, vertical = true) }
-            nms(cands, 0.045f * faceW, WrinkleTuning.cap(4)).sortedBy { it.v }.forEachIndexed { i, c ->
+            pick(cands, 0.045f * faceW, 4, "ceño") { up }.sortedBy { it.v }.forEachIndexed { i, c ->
                 out += withMetrics(AnnotLayer.GLABELLA, "Ceño, vertical ${i + 1}", c.res)
             }
             // raíz nasal: horizontales del prócer
@@ -524,9 +553,38 @@ object FaceAnnotations {
                     r.points.none { hypot(it.x - canthus.x, it.y - canthus.y) < 0.045f * faceW }
             }.filter { acceptedFree(it, "patas", radial(it)) }.forEach { cands += rayCand(it) }
             // rayos separados al menos ~13° entre sí
-            nms(cands, 0.022f * faceW, WrinkleTuning.cap(4)).sortedBy { it.v }.forEachIndexed { i, c ->
+            pick(cands, 0.022f * faceW, 4, "patas") { c -> radial(c.res) }.sortedBy { it.v }.forEachIndexed { i, c ->
                 out += withMetrics(AnnotLayer.CROWS_FEET, "Pata de gallo $side ${i + 1}", c.res)
             }
+        }
+        // surcos accesorios junto al nasogeniano y la marioneta (líneas paralelas o ramas que los pasillos no
+        // recorren): libres cerca de sus ejes, con la dirección del eje más cercano y sin repetir los ya hallados
+        if (WrinkleTuning.cheeks) for ((side, corrs) in listOf("derecho" to listOf(0, 2), "izquierdo" to listOf(1, 3))) {
+            val axes = corrs.map { i -> FOLD_CORRIDORS[i].second.map { mesh[it] } }
+            fun nearestDir(q: Pt): Pair<Float, Pt> {
+                var best = Float.MAX_VALUE; var dir = Pt(0f, 1f)
+                for (ax in axes) for (i in 1 until ax.size) {
+                    val dd = segPointDist(q, ax[i - 1], ax[i]); if (dd < best) { best = dd; dir = Pt(ax[i].x - ax[i - 1].x, ax[i].y - ax[i - 1].y) }
+                }
+                return best to dir
+            }
+            fun meanDist(a: List<Pt>, b: List<Pt>) = a.map { p -> b.minOf { dist(p, it) } }.average().toFloat()
+            val taken = existing.filter { it.layer == AnnotLayer.FOLDS }
+            val cands = free.mapNotNull { r ->
+                val (d, dir) = nearestDir(midOf(r))
+                if (d > WrinkleTuning.cheekDist * faceW) return@mapNotNull null
+                if (WrinkleField.agreement(r.points, dir) < WrinkleTuning.cheekAgree) return@mapNotNull null
+                if (LineMeasure.length(r.points) < WrinkleTuning.cheekLen * faceW) return@mapNotNull null
+                if (taken.any { it.points.size >= 2 && meanDist(r.points, it.points) < 0.015f * faceW }) return@mapNotNull null
+                if (!acceptedFree(r, "surcos", dir)) return@mapNotNull null
+                r to scoreOf(r, "surcos", dir)
+            }.sortedByDescending { it.second }
+            val kept = ArrayList<RidgeTracker.Result>()
+            for ((r, _) in cands) {
+                if (kept.size >= WrinkleTuning.cap(3)) break
+                if (kept.none { meanDist(r.points, it.points) < 0.015f * faceW }) kept += r
+            }
+            kept.forEachIndexed { i, r -> out += withMetrics(AnnotLayer.FOLDS, "Surco accesorio $side ${i + 1}", r) }
         }
         // líneas infraorbitarias (bajo el párpado inferior, entre los cantos): casi horizontales
         for ((side, idx) in listOf("derecha" to intArrayOf(133, 33, 145), "izquierda" to intArrayOf(362, 263, 374))) {
@@ -534,7 +592,7 @@ object FaceAnnotations {
             val ul = minOf(inner.first, outer.first); val ur = maxOf(inner.first, outer.first)
             val cands = free.filter { r -> val (u, v) = proj(midOf(r), mid); u in ul..ur && v in lid.second - 0.13f * faceW..lid.second - 0.015f * faceW }
                 .filter { acceptedFree(it, "infraorbital", ex) }.map { uv(it, vertical = false) }
-            nms(cands, 0.02f * faceW, WrinkleTuning.cap(3)).sortedByDescending { it.v }.forEachIndexed { i, c ->
+            pick(cands, 0.02f * faceW, WrinkleTuning.infraCap, "infraorbital") { ex }.sortedByDescending { it.v }.forEachIndexed { i, c ->
                 out += withMetrics(AnnotLayer.INFRAORBITAL, "Infraorbitaria $side ${i + 1}", c.res)
             }
         }
@@ -558,6 +616,12 @@ object FaceAnnotations {
     }
 
     private fun mid(a: Pt, b: Pt) = Pt((a.x + b.x) / 2, (a.y + b.y) / 2)
+
+    private fun segPointDist(p: Pt, a: Pt, b: Pt): Float {
+        val vx = b.x - a.x; val vy = b.y - a.y; val l2 = vx * vx + vy * vy
+        val t = if (l2 < 1e-12f) 0f else (((p.x - a.x) * vx + (p.y - a.y) * vy) / l2).coerceIn(0f, 1f)
+        return hypot(p.x - (a.x + vx * t), p.y - (a.y + vy * t))
+    }
 
     /**
      * Trazado regular de un surco: media móvil de 5 puntos y corte del final donde la dirección se
@@ -1082,21 +1146,38 @@ object WrinkleTuning {
     @Volatile var paperTexture = true
     /** Buscar con la luz normalizada (campo plano). */
     @Volatile var flat = false
+    /** Alargar las líneas aceptadas por sus extremos mientras siga la cresta. */
+    @Volatile var extend = false
+    /** Líneas extra por encima del tope de cada zona, solo con puntuación alta (1 = sin extra). */
+    @Volatile var strongCapK = 1f
+    /** Surcos accesorios junto al nasogeniano y la marioneta: distancia máxima al eje, acuerdo mínimo con su
+     *  dirección (cos²) y longitud mínima (fracción del ancho de la cara). */
+    @Volatile var cheeks = false
+    @Volatile var cheekDist = 0.07f
+    @Volatile var cheekAgree = 0.85f
+    @Volatile var cheekLen = 0.06f
+    /** Frente: acuerdo mínimo con la horizontal de los candidatos libres. Infraorbitarias: tope por lado. */
+    @Volatile var foreheadAgree = 0.8f
+    @Volatile var infraCap = 3
     /** Exigencia extra (puntuación) para los candidatos libres por zona. */
-    @Volatile var freeBias: Map<String, Float> = mapOf("frente" to 1.0f, "perioral" to 1.8f, "ceño" to 0.2f, "patas" to 0.2f, "infraorbital" to 0f)
+    @Volatile var freeBias: Map<String, Float> = mapOf("frente" to 1.0f, "perioral" to 1.8f, "ceño" to 0.2f, "patas" to 0.2f, "infraorbital" to 0f, "surcos" to 0.6f)
     /** Sensibilidad elegida en los ajustes. */
     enum class Level(val label: String, val desc: String) {
         CONSERVATIVE("Conservadora", "Menos líneas, casi todas seguras (más precisión)."),
         BALANCED("Equilibrada", "Recomendada: equilibrio entre precisión y líneas encontradas."),
-        EXHAUSTIVE("Exhaustiva", "Más líneas finas (más hallazgos, algunos falsos)."),
+        EXHAUSTIVE("Exhaustiva", "Más líneas: surcos accesorios, más frente y bajo los ojos (más hallazgos, algunos falsos)."),
     }
     const val PREF = "wrinkle_sensitivity"
 
     fun apply(level: Level) {
+        // equilibrada y conservadora: sin las búsquedas extra (no perder precisión); exhaustiva: con ellas
+        val extra = level == Level.EXHAUSTIVE
+        cheeks = extra; foreheadAgree = if (extra) 0.9f else 0.8f; infraCap = if (extra) 5 else 3
+        freeBias = freeBias + ("frente" to (if (extra) 0.6f else 1.0f))
         when (level) {
             Level.CONSERVATIVE -> { k = 1.15f; kc = 1.1f; capK = 0.8f; scoreT = 0.6f }
             Level.BALANCED -> { k = 1f; kc = 1f; capK = 1f; scoreT = 0f }
-            Level.EXHAUSTIVE -> { k = 0.7f; kc = 0.85f; capK = 1.8f; scoreT = -0.6f }
+            Level.EXHAUSTIVE -> { k = 0.85f; kc = 0.92f; capK = 1.3f; scoreT = -0.3f }
         }
     }
 
@@ -1106,6 +1187,6 @@ object WrinkleTuning {
     }.getOrDefault(Level.BALANCED))
 
     /** Clave para las cachés del análisis (cambia con la sensibilidad). */
-    val key: String get() = "$k|$kc|$capK|$scoreT|$free|$flat|$textureW|$freeSigma|$paperTexture"
+    val key: String get() = "$k|$kc|$capK|$scoreT|$free|$flat|$textureW|$freeSigma|$paperTexture|$cheeks|$cheekDist|$cheekAgree|$cheekLen|$foreheadAgree|$infraCap|${freeBias["frente"]}|${freeBias["surcos"]}|$extend|$strongCapK"
     fun cap(n: Int) = (n * capK).toInt().coerceAtLeast(1)
 }
