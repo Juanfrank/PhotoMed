@@ -171,6 +171,14 @@ tras la frente). La métrica del artículo mejora un 20 %, pero sigue lejos de u
 periorales son escasas en el conjunto y su detección es la menos fiable (por eso solo se muestran con
 alta puntuación).
 
+### Mapa de textura del artículo como rasgo de la puntuación
+
+Se reimplementó el mapa de textura de FFHQ-Wrinkle (T = 1 − I / (1 + I_G), σ ≈ 5 px a 1024) y se probó
+como rasgo adicional de la puntuación de candidatos (pesos 0,8–2,5, muestra de calibración): F1 0,51 →
+0,50–0,51 y F1 estricto 0,294 → 0,289. **No mejora** (aporta lo mismo que el contraste del rastreador);
+queda implementado pero desactivado (`WrinkleTuning.textureW = 0`). Su valor está como etiqueta débil
+para preentrenar un modelo propio (`tools/train/`).
+
 ## 2. Puntos anatómicos y proporciones: AFW (300-W)
 
 - **Datos**: AFW de [300-W (iBUG)](https://ibug.doc.ic.ac.uk/resources/300-W/): 337 caras con **68 puntos

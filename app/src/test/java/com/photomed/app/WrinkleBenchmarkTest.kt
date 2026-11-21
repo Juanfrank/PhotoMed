@@ -79,6 +79,18 @@ class WrinkleBenchmarkTest {
         com.photomed.app.align.WrinkleTuning.apply(com.photomed.app.align.WrinkleTuning.Level.BALANCED)
     }
 
+    /** Peso del mapa de textura en la puntuación (muestra de calibración). */
+    @Test
+    fun textureSweep() {
+        assumeTrue(System.getenv("PM_TEXTURE") != null)
+        for ((w, ref) in listOf(0f to 0f, 0.8f to 0.4f, 1.5f to 0.4f, 1.5f to 0.7f, 2.5f to 0.7f)) {
+            com.photomed.app.align.WrinkleTuning.textureW = w; com.photomed.app.align.WrinkleTuning.textureRef = ref
+            println("BENCH TEXTURA peso=$w ref=$ref")
+            bench("wrinkles", "textura $w/$ref", save = false)
+        }
+        com.photomed.app.align.WrinkleTuning.textureW = 0f; com.photomed.app.align.WrinkleTuning.textureRef = 0f
+    }
+
     private fun bench(name: String, what: String, save: Boolean = true) {
         val dir = File("src/test/resources/bench/$name")
         val meshFile = File(dir, "mesh.json")

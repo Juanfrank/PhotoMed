@@ -373,10 +373,19 @@ object FaceAnnotations {
                 .map { Pt(c.x + (it.x - c.x) * 1.08f, c.y + (it.y - c.y) * 1.15f) } }
         fun regionMin(r: String) = when (r) { "frente" -> 0.016f to 1.8f; "ceño" -> 0.022f to 2.0f; "perioral" -> 0.02f to 2.0f; else -> 0.018f to 1.9f }
         /** Puntuación de un candidato en su zona, con la orientación esperada [dir] (null = cualquiera). */
+        // mapa de textura (método de FFHQ-Wrinkle) y su media en la piel, para puntuar
+        val tex = if (WrinkleTuning.textureW != 0f) WrinkleField.textureMap(lum, 0.0083f * faceW * lum.width) else null
+        val texBg = tex?.let { t -> var sum = 0.0; var n = 0
+            for (y in 0 until t.height step 3) for (x in 0 until t.width step 3) {
+                val q = Pt((x + 0.5f) / t.width, (y + 0.5f) / t.width)
+                if (skin?.invoke(q) != false) { sum += t[x, y]; n++ }
+            }
+            if (n > 0) (sum / n).toFloat() else 0f } ?: 0f
         fun scoreOf(r: RidgeTracker.Result, region: String, dir: Pt?): Float {
             val (ms, mc) = regionMin(region)
             val f = WrinkleField.Features(r.contrast, r.strength, LineMeasure.length(r.points) / faceW,
-                dir?.let { WrinkleField.agreement(r.points, it) } ?: 1f, WrinkleField.straightness(r.points))
+                dir?.let { WrinkleField.agreement(r.points, it) } ?: 1f, WrinkleField.straightness(r.points),
+                tex?.let { WrinkleField.textureRatio(it, r.points, texBg) } ?: 1f)
             return WrinkleField.score(f, ms * WrinkleTuning.k, mc * WrinkleTuning.kc)
         }
         fun accepted(r: RidgeTracker.Result, region: String, dir: Pt?) = scoreOf(r, region, dir) > WrinkleTuning.scoreT
@@ -1065,6 +1074,9 @@ object WrinkleTuning {
     @Volatile var scoreT = 0f
     /** Detección libre además de los pasillos. */
     @Volatile var free = true
+    /** Peso del mapa de textura en la puntuación (0 = sin usarlo) y su valor de referencia (ln de la razón). */
+    @Volatile var textureW = 0f
+    @Volatile var textureRef = 0f
     /** Buscar con la luz normalizada (campo plano). */
     @Volatile var flat = false
     /** Exigencia extra (puntuación) para los candidatos libres por zona. */
@@ -1091,6 +1103,6 @@ object WrinkleTuning {
     }.getOrDefault(Level.BALANCED))
 
     /** Clave para las cachés del análisis (cambia con la sensibilidad). */
-    val key: String get() = "$k|$kc|$capK|$scoreT|$free|$flat"
+    val key: String get() = "$k|$kc|$capK|$scoreT|$free|$flat|$textureW"
     fun cap(n: Int) = (n * capK).toInt().coerceAtLeast(1)
 }

@@ -144,8 +144,27 @@ object WrinkleField {
         return path
     }
 
+    /**
+     * Mapa de textura del artículo de FFHQ-Wrinkle (Moon et al., ICPR 2024), reimplementado:
+     * T = max(0, 1 − I / (1 + I_G)) con I en 0–255 e I_G la luminancia suavizada (σ ≈ 5 px en una
+     * foto de 1024; aquí escalado al ancho de la cara). Alto donde un píxel es más oscuro que su entorno.
+     */
+    fun textureMap(lum: GrayImage, sigmaPx: Float): GrayImage {
+        val g = PhotometricStereo.blur(lum.data, lum.width, lum.height, sigmaPx)
+        return GrayImage(lum.width, lum.height, FloatArray(lum.data.size) { i -> max(0f, 1f - lum.data[i] * 255f / (1f + g[i] * 255f)) })
+    }
+
+    /** Textura media a lo largo de [pts] frente a la media de la piel ([bg]): > 1 = más oscuro que la piel. */
+    fun textureRatio(t: GrayImage, pts: List<Pt>, bg: Float): Float {
+        if (pts.isEmpty() || bg <= 1e-6f) return 1f
+        val w = t.width.toFloat()
+        return pts.map { t.sample(it.x * w, it.y * w) }.average().toFloat() / bg
+    }
+
     /** Rasgos de un candidato (ya seguido con [RidgeTracker]) para [score]. */
-    class Features(val contrast: Float, val strength: Float, val lengthFace: Float, val orientation: Float, val straightness: Float)
+    class Features(val contrast: Float, val strength: Float, val lengthFace: Float, val orientation: Float, val straightness: Float,
+                   /** Textura a lo largo de la línea frente a la piel ([textureRatio]); 1 = neutro. */
+                   val texture: Float = 1f)
 
     /**
      * Puntuación por diseño (pesos fijados a mano, sin entrenar con datos de terceros): contraste y
@@ -156,7 +175,9 @@ object WrinkleField {
         val c = kotlin.math.ln((f.contrast / minContrast).coerceAtLeast(1e-3f))
         val s = kotlin.math.ln((f.strength / minStrength).coerceAtLeast(1e-3f))
         val len = (f.lengthFace / 0.08f).coerceAtMost(2f)
-        return 1.2f * c + 0.8f * s + 0.5f * (len - 1f) + 1.6f * (f.orientation - 0.6f) + 1.2f * (f.straightness - 0.85f)
+        val tx = kotlin.math.ln(f.texture.coerceAtLeast(1e-3f))
+        return 1.2f * c + 0.8f * s + 0.5f * (len - 1f) + 1.6f * (f.orientation - 0.6f) + 1.2f * (f.straightness - 0.85f) +
+            WrinkleTuning.textureW * (tx - WrinkleTuning.textureRef)
     }
 
     /** cos² del ángulo entre la dirección del candidato (de extremo a extremo) y [dir]. */
