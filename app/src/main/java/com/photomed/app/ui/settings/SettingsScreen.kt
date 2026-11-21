@@ -190,7 +190,9 @@ private fun WatermarkSetting() {
     var version by remember { mutableStateOf(0) }
     val logo = remember(version) { com.photomed.app.export.Watermark.logo(context) }
     var error by remember { mutableStateOf<String?>(null) }
-    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+    // sin registro de resultados (vista previa o pruebas) no hay selector de archivos
+    val canPick = androidx.activity.compose.LocalActivityResultRegistryOwner.current != null
+    val picker = if (!canPick) null else androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) scope.launch {
             error = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -216,7 +218,7 @@ private fun WatermarkSetting() {
             error?.let { Text(it, color = androidx.compose.material3.MaterialTheme.colorScheme.error,
                 style = androidx.compose.material3.MaterialTheme.typography.bodySmall) }
             androidx.compose.foundation.layout.Row {
-                androidx.compose.material3.TextButton(onClick = { picker.launch("image/*") }) {
+                androidx.compose.material3.TextButton(onClick = { picker?.launch("image/*") }, enabled = picker != null) {
                     Text(if (logo == null) tr("Adjuntar logo") else tr("Cambiar"))
                 }
                 if (logo != null) androidx.compose.material3.TextButton(onClick = {

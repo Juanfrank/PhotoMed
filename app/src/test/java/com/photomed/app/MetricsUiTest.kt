@@ -39,7 +39,7 @@ class MetricsUiTest {
             MetricsCard(line("Nasogeniano derecho", 31.2f, 1.25f, 4), onTable = { table = true }, onClose = {})
         } }
         compose.onNodeWithText("Nasogeniano derecho").assertIsDisplayed()
-        compose.onNodeWithText("31.2 mm", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("31.2 mm".loc(), substring = true).assertIsDisplayed()
         compose.onNodeWithText("4 · profunda").assertIsDisplayed()
         compose.onNodeWithText("Tabla de medidas").performClick()
         assertTrue(table)
@@ -58,8 +58,8 @@ class MetricsUiTest {
         // cada renglón de la celda (línea y medida) es un texto aparte (tabla sin interlineado)
         compose.onNodeWithText("1  Nasogeniano derecho").assertExists()
         compose.onAllNodesWithText("Long. mm")[0].assertExists()
-        compose.onNodeWithText("-2.0").assertExists()      // longitud
-        compose.onNodeWithText("-0.50").assertExists()     // profundidad
+        compose.onNodeWithText("-2.0".loc()).assertExists()      // longitud
+        compose.onNodeWithText("-0.50".loc()).assertExists()     // profundidad
         assertTrue(compose.onAllNodesWithText("Ojera derecha", substring = true).fetchSemanticsNodes().isNotEmpty())
         compose.onNodeWithText("vascular", substring = true).assertExists()
     }

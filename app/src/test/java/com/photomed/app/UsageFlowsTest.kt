@@ -321,7 +321,7 @@ class UsageFlowsTest {
         compose.onNode(isSelected() and hasText("Frente, línea 1", substring = true)).assertExists()
         // selección hecha en la foto: la tabla se filtra a esa línea, con «Ver todas» para volver
         compose.onNodeWithText("Ver todas (1)").assertExists()
-        compose.onNodeWithText("0.31").assertExists()
+        compose.onNodeWithText("0.31".loc()).assertExists()
         // diseño: selector de capas encima de la foto y tabla debajo, sin taparla
         val photoBox = compose.onNodeWithContentDescription("Fotografía", substring = true).fetchSemanticsNode().boundsInRoot
         val chips = compose.onNodeWithContentDescription("Contorno interno", substring = true).fetchSemanticsNode().boundsInRoot

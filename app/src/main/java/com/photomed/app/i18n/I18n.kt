@@ -43,7 +43,8 @@ object I18n {
  */
 fun tr(source: String, vararg args: Any?): String {
     val s = I18n.lookup(source)
-    return if (args.isEmpty()) s else runCatching { String.format(I18n.locale, s, *args) }.getOrElse { String.format(Locale.ROOT, source, *args) }
+    // números con el idioma por defecto, como String.format sin idioma (Android lo pone al idioma elegido)
+    return if (args.isEmpty()) s else runCatching { String.format(Locale.getDefault(), s, *args) }.getOrElse { String.format(Locale.getDefault(), source, *args) }
 }
 
 /**
