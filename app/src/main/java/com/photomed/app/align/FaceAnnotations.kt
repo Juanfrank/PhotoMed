@@ -398,9 +398,9 @@ object FaceAnnotations {
                     }
                 }
                 // un rastreo por franja, en varios núcleos (mismo orden que en serie)
-                Par.map(axes) { axis -> RidgeTracker.track(lum, axis, step * 0.55f, stations = 28, offsets = 8, minStrength = 0.016f, minContrast = 1.8f, skin = skin) }
+                Par.map(axes) { axis -> RidgeTracker.track(lum, axis, step * 0.55f, stations = 28, offsets = 8, minStrength = 0.016f * WrinkleTuning.k, minContrast = 1.8f * WrinkleTuning.kc, skin = skin) }
                     .forEach { r -> r?.let { cands += uv(it, vertical = false) } }
-                nms(cands, step * 0.7f, 8).sortedByDescending { it.v }.forEachIndexed { i, c ->
+                nms(cands, step * 0.7f, WrinkleTuning.cap(8)).sortedByDescending { it.v }.forEachIndexed { i, c ->
                     out += withMetrics(AnnotLayer.FOREHEAD, "Frente, línea ${i + 1}", c.res)
                 }
             }
@@ -419,9 +419,9 @@ object FaceAnnotations {
                 val tilt = kotlin.math.tan(Math.toRadians(deg.toDouble())).toFloat() * len / 2
                 axes += listOf(along(mid, x - tilt, base), along(mid, x, (base + topY) / 2), along(mid, x + tilt, topY))
             }
-            Par.map(axes) { axis -> RidgeTracker.track(lum, axis, 0.02f * faceW, stations = 22, offsets = 6, minStrength = 0.022f, minContrast = 2.0f, skin = skin) }
+            Par.map(axes) { axis -> RidgeTracker.track(lum, axis, 0.02f * faceW, stations = 22, offsets = 6, minStrength = 0.022f * WrinkleTuning.k, minContrast = 2.0f * WrinkleTuning.kc, skin = skin) }
                 .forEach { r -> r?.let { cands += uv(it, vertical = true) } }
-            nms(cands, 0.045f * faceW, 4).sortedBy { it.v }.forEachIndexed { i, c ->
+            nms(cands, 0.045f * faceW, WrinkleTuning.cap(4)).sortedBy { it.v }.forEachIndexed { i, c ->
                 out += withMetrics(AnnotLayer.GLABELLA, "Ceño, vertical ${i + 1}", c.res)
             }
             // raíz nasal: horizontales del prócer
@@ -450,7 +450,7 @@ object FaceAnnotations {
                 val p0 = Pt(canthus.x + rx * 0.035f * faceW, canthus.y + ry * 0.035f * faceW)
                 val p1 = Pt(canthus.x + rx * 0.16f * faceW, canthus.y + ry * 0.16f * faceW)
                 RidgeTracker.track(lum, listOf(p0, Pt((p0.x + p1.x) / 2, (p0.y + p1.y) / 2), p1), 0.016f * faceW, stations = 18, offsets = 5,
-                    minStrength = 0.018f, minContrast = 1.9f, skin = skinNoBrow)
+                    minStrength = 0.018f * WrinkleTuning.k, minContrast = 1.9f * WrinkleTuning.kc, skin = skinNoBrow)
             }
             for ((deg, ray) in degs.zip(rays)) {
                 ray?.let { r ->
@@ -460,7 +460,7 @@ object FaceAnnotations {
                 }
             }
             // rayos separados al menos ~13° entre sí
-            nms(cands, 0.022f * faceW, 4).sortedBy { it.v }.forEachIndexed { i, c ->
+            nms(cands, 0.022f * faceW, WrinkleTuning.cap(4)).sortedBy { it.v }.forEachIndexed { i, c ->
                 out += withMetrics(AnnotLayer.CROWS_FEET, "Pata de gallo $side ${i + 1}", c.res)
             }
         }
@@ -971,4 +971,16 @@ class PhotoAnnotator(private val context: Context) {
         fun clearCache() = synchronized(cache) { cache.clear(); notes.clear() }
         fun put(key: String, v: List<AnnotLine>) = synchronized(cache) { cache[key] = v }
     }
+}
+
+/**
+ * Sensibilidad de la detección de arrugas (frente, ceño, patas de gallo): factores sobre los umbrales
+ * de fuerza ([k]) y contraste ([kc]) del surco y sobre el número máximo de líneas por zona ([capK]).
+ * 1 = valores calibrados; menor = más sensible (más líneas, menos precisión). Ver docs/BENCHMARK.md.
+ */
+object WrinkleTuning {
+    @Volatile var k = 1f
+    @Volatile var kc = 1f
+    @Volatile var capK = 1f
+    fun cap(n: Int) = (n * capK).toInt().coerceAtLeast(1)
 }

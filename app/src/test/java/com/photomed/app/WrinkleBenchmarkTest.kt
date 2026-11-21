@@ -67,7 +67,20 @@ class WrinkleBenchmarkTest {
     @Test
     fun wrinklesOnPaperTestSplit() = bench("wrinkles_test", "partición de prueba del artículo")
 
-    private fun bench(name: String, what: String) {
+    /** Equilibrio precisión / exhaustividad según la sensibilidad (partición del artículo). */
+    @Test
+    fun sensitivitySweep() {
+        assumeTrue(System.getenv("PM_SWEEP") != null)
+        for ((k, kc, cap) in listOf(Triple(1f, 1f, 1f), Triple(0.8f, 0.9f, 1.5f), Triple(0.65f, 0.8f, 2f), Triple(0.5f, 0.7f, 2.5f))) {
+            com.photomed.app.align.WrinkleTuning.k = k; com.photomed.app.align.WrinkleTuning.kc = kc; com.photomed.app.align.WrinkleTuning.capK = cap
+            com.photomed.app.align.PhotoAnnotator.clearCache()
+            println("BENCH SENSIBILIDAD k=$k kc=$kc cap=$cap")
+            bench("wrinkles_test", "sensibilidad $k/$kc/$cap", save = false)
+        }
+        com.photomed.app.align.WrinkleTuning.k = 1f; com.photomed.app.align.WrinkleTuning.kc = 1f; com.photomed.app.align.WrinkleTuning.capK = 1f
+    }
+
+    private fun bench(name: String, what: String, save: Boolean = true) {
         val dir = File("src/test/resources/bench/$name")
         val meshFile = File(dir, "mesh.json")
         assumeTrue("sin datos del benchmark (tools/eval/bench_wrinkles.py)", meshFile.exists())
@@ -154,7 +167,7 @@ class WrinkleBenchmarkTest {
             n++
             perImage.put(JSONObject().put("id", k).apply { per.forEach { (r, a) -> put(r, JSONObject().put("precision", a.p().toDouble().takeIf { !it.isNaN() }).put("recall", a.r().toDouble().takeIf { !it.isNaN() })) } })
             // superposiciones de las primeras (verde: manual; rojo: motor)
-            if (n <= 12) {
+            if (save && n <= 12) {
                 val ov = img.copy(Bitmap.Config.ARGB_8888, true); val c = Canvas(ov)
                 for (i in gt.indices) if (gt[i]) ov.setPixel(i % w, i / w, Color.rgb(0, 230, 118))
                 val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.RED; strokeWidth = 3f; style = Paint.Style.STROKE }
@@ -170,6 +183,6 @@ class WrinkleBenchmarkTest {
             println("BENCH  %-18s precisión %.2f  exhaustividad %.2f  F1 %.2f  (trazado %d px, manual %d px)".format(r, a.p(), a.r(), a.f(), a.pred, a.gt))
             summary.put(r, JSONObject().put("precision", a.p().toDouble()).put("recall", a.r().toDouble()).put("f1", a.f().toDouble()).put("predPx", a.pred).put("gtPx", a.gt))
         }
-        File(out, "$name.json").writeText(JSONObject().put("summary", summary).put("images", perImage).toString(2))
+        if (save) File(out, "$name.json").writeText(JSONObject().put("summary", summary).put("images", perImage).toString(2))
     }
 }

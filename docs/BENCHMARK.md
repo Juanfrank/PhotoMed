@@ -45,6 +45,78 @@ fracción de lo marcado que el motor encuentra.
   no.
 - Puntos débiles medidos: **ceño** (F1 0,28) y **patas de gallo** (0,41).
 
+### Partición de prueba del artículo (comparación directa)
+
+El repositorio publica la lista de fotos de prueba del artículo (`test_file_lists.txt`, 100 fotos); la
+muestra aleatoria anterior solo compartía 6. Con esa partición:
+
+| | Precisión | Exhaustividad | F1 (8 px) | F1 estricto | JSI |
+|---|---|---|---|---|---|
+| Frente | 0,77 | 0,47 | 0,59 | | |
+| Ceño | 0,26 | 0,22 | 0,24 | | |
+| Patas de gallo | 0,49 | 0,34 | 0,40 | | |
+| Nasogenianos | 0,69 | 0,38 | 0,49 | | |
+| **PhotoMed, total** | **0,62** | **0,39** | **0,48** | **0,23** | **0,13** |
+| Mejor modelo del artículo (U-Net con preentrenamiento de textura) | | | | 0,64 | 0,48 |
+
+### Experimentos
+
+- **Resolución del análisis** (cara a 640 px en lugar de 400): mismo resultado (F1 0,50 → 0,50). El
+  rastreador ya ajusta sus escalas al tamaño de la cara; la resolución no es el cuello de botella.
+- **Sensibilidad** (umbrales de fuerza y contraste × 0,5–1 y hasta 2,5 veces más líneas por zona):
+
+| Sensibilidad | Precisión | Exhaustividad | F1 |
+|---|---|---|---|
+| Calibrada (actual) | 0,62 | 0,39 | 0,48 |
+| Media (umbrales × 0,8 / 0,9; líneas × 1,5) | 0,59 | 0,41 | 0,48 |
+| Alta (× 0,65 / 0,8; × 2) | 0,55 | 0,43 | 0,48 |
+| Muy alta (× 0,5 / 0,7; × 2,5) | 0,51 | 0,46 | 0,48 |
+
+  El F1 no cambia: bajar umbrales solo cambia precisión por exhaustividad. Para mejorar hay que
+  cambiar el **método** (cómo se proponen y puntúan las líneas), no los umbrales.
+
+### Brechas del conjunto y de su documentación
+
+- **Licencia CC BY-NC-SA 4.0 (no comercial)** para las máscaras, las imágenes de FFHQ y los modelos
+  publicados: sirven para evaluar, pero **no** para entrenar ni incluir un modelo en una versión
+  comercial de PhotoMed.
+- **Una sola máscara por foto, sin capas**: no distingue frente, ceño, patas de gallo o surcos (aquí se
+  separan por regiones aproximadas de la malla), ni publica las máscaras de cada anotador (no se puede
+  calcular el acuerdo humano con estas métricas).
+- **Sin escala ni gravedad**: no hay mm, profundidad ni grado; no valida las medidas de los surcos, solo
+  su localización.
+- **Fotos no clínicas**: FFHQ son fotos de Flickr (pose, luz, maquillaje y expresión variables, sin
+  metadatos de expresión); en fotos clínicas estandarizadas el resultado debería ser mejor, pero no está
+  medido.
+- **Alcance de la anotación** («sobre todo frente, patas de gallo y nasogenianos») con muchas líneas
+  finas bajo los ojos y periorales, que la app no busca como arrugas.
+- La evaluación del artículo enmascara todo salvo cara y nariz (face-parsing.PyTorch); aquí se usa la
+  malla de MediaPipe.
+
+### Recomendaciones para aumentar precisión y exhaustividad
+
+1. **Detección libre además de los pasillos**: un mapa de crestas (Hessiano / Frangi multiescala) en
+   toda la piel de la cara y seguimiento de crestas conectadas en cualquier orientación; hoy solo se
+   buscan líneas en posiciones y ángulos fijos (por eso el ceño y las patas de gallo pierden líneas).
+2. **Puntuar los candidatos con un clasificador pequeño** (pocas decenas de miles de parámetros, sobre
+   el perfil de luz a lo largo y a través de la línea): permite subir la sensibilidad (exhaustividad
+   0,46) sin perder precisión; es la forma de mover el F1, que con umbrales no se mueve.
+3. **Ceño** (el peor, precisión 0,26): excluir el borde de las cejas con la segmentación, exigir
+   orientación vertical estable y evaluar sobre todo con el gesto de fruncir (en reposo hay pocas
+   líneas y la sombra de las cejas confunde).
+4. **Capas nuevas para lo que los anotadores marcan y la app no busca**: líneas infraorbitarias (bajo
+   el ojo) y periorales (código de barras); suben la exhaustividad de patas de gallo y nasogenianos.
+5. **Modelo de segmentación en el teléfono** (U-Net ligera en TFLite, 2–5 M parámetros) entrenado con
+   fotos clínicas **propias** (500–1 000 fotos con 2–3 anotadores), preentrenado con mapas de textura
+   generados automáticamente de fotos propias sin anotar (el método del artículo, sin sus datos).
+   FFHQ-Wrinkle sirve solo para evaluarlo, por su licencia.
+6. **Normalizar la luz** antes de buscar (ecualización local de contraste / campo plano), sobre todo con
+   flash o luz lateral, y aprovechar las tomas con relieve (estéreo fotométrico) cuando existan.
+7. **Validar en fotos clínicas**: anotar 50–100 fotos propias estandarizadas con 2 profesionales y
+   repetir este benchmark con las mismas métricas.
+8. **Sensibilidad elegible** en la app (conservadora / equilibrada / exhaustiva): el ajuste ya existe
+   (`WrinkleTuning`); el usuario elegiría entre menos falsos positivos o encontrar más líneas.
+
 ## 2. Puntos anatómicos y proporciones: AFW (300-W)
 
 - **Datos**: AFW de [300-W (iBUG)](https://ibug.doc.ic.ac.uk/resources/300-W/): 337 caras con **68 puntos

@@ -2,6 +2,20 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.42 — 21 de noviembre de 2026
+
+- **Visor**: en la barra, Anotar, Pantalla completa, Compartir y ⋯ (Comparar, Girar / espejo /
+  recorte, Información, Eliminar); el título ya no se aplasta. Al anotar se cierra la tabla de medidas
+  y la barra de herramientas se desplaza si no cabe (nunca queda cortada).
+- **Inicio**: buscador en la barra superior (sin el título grande); en horizontal, menú lateral en lugar
+  de la barra inferior (antes no se veía ningún expediente).
+- **Expediente**: ficha del paciente en una línea (al tocarla, notas y álbum); plantillas y protocolos
+  en «Iniciar sesión de fotos», plegado si ya hay fotos: las fotos aparecen arriba.
+- **Opacidad** de trazos y números como chip («50 %») en la fila de capas, en el visor y en Comparar
+  (una fila menos sobre la foto).
+- **Benchmark** también con la partición de prueba del artículo de FFHQ-Wrinkle, experimentos de
+  resolución y sensibilidad, brechas del conjunto y recomendaciones (ver `docs/BENCHMARK.md`).
+
 ## 2.41 — 21 de noviembre de 2026
 
 - **Anotaciones con iconos en lugar de textos**: símbolos (punto, círculo, triángulo, cuadrado, X, cruz,
