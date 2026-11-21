@@ -2,6 +2,14 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.28 — 21 de noviembre de 2026
+
+- **Trazos confirmados de versiones anteriores, con tramo y fila**: al leerlos, cada tramo se enlaza
+  con su medida en la ficha (por su nombre corto o por su valor). Los confirmados en 2.23–2.24, que no
+  guardaban tramos, los recuperan: arrugas y surcos (ancho), ojeras (alto y ancho) y bolsas (altura y
+  surco) de su propio trazo; los rasgos (ojos, cejas, nariz, labios, contorno, frente), una sola vez al
+  abrirlos en el visor, de la cara detectada en la foto. Los trazos y las cifras confirmadas no cambian.
+
 ## 2.27 — 21 de noviembre de 2026
 
 - **Actualizar sin cierres**: al abrir una versión nueva se borran las cachés de la anterior (imágenes,

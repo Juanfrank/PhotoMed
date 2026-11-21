@@ -158,7 +158,8 @@ object TraceJson {
     fun read(json: String): TraceSet? = runCatching {
         val o = JSONObject(json)
         fun list(k: String) = o.optJSONArray(k)?.let { a -> (0 until a.length()).map { traceOf(a.getJSONObject(it)) } }.orEmpty()
-        TraceSet(o.getDouble("aspect").toFloat(), list("traces"), list("removed"), o.optLong("at"))
+        // versiones anteriores: tramos enlazados a su fila y los que salen del propio trazo
+        GuideMigration.migrate(TraceSet(o.getDouble("aspect").toFloat(), list("traces"), list("removed"), o.optLong("at")))
     }.getOrNull()
 }
 

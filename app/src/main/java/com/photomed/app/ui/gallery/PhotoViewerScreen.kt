@@ -466,7 +466,24 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
         val confirmed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.ConfirmedTraces.of(context, u) }
         if (confirmed != null) {
             value = confirmed.lines(edit, com.photomed.app.align.TraceFrame.FULL)
-            onAnalyzed(value.orEmpty(), null); return@produceState
+            onAnalyzed(value.orEmpty(), null)
+            // trazos confirmados en 2.23–2.24 (sin tramos de los rasgos): se recuperan una vez de la cara,
+            // sin cambiar los trazos ni las cifras confirmadas
+            if (com.photomed.app.align.GuideMigration.needsFeatureGuides(confirmed) && com.photomed.app.align.PhotoAnnotator.enabled) {
+                val updated = runCatching {
+                    val fresh = com.photomed.app.align.PhotoAnnotator(context.applicationContext)
+                        .analyze(com.photomed.app.align.ImageOps.loadFull(context, photo.uri, 1600, edit), zone).first
+                    val toOrig = { q: com.photomed.app.align.Pt ->
+                        com.photomed.app.align.TraceMap.fromView(edit, confirmed.baseAspect, com.photomed.app.align.TraceFrame.FULL, listOf(q)).single() }
+                    com.photomed.app.align.GuideMigration.adoptFeatureGuides(confirmed, fresh.map { l -> l.mapped(toOrig) })
+                }.getOrNull()
+                if (updated != null && updated != confirmed) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.ConfirmedTraces.save(context, u, updated) }
+                    value = updated.lines(edit, com.photomed.app.align.TraceFrame.FULL)
+                    onAnalyzed(value.orEmpty(), null)
+                }
+            }
+            return@produceState
         }
         val user = com.photomed.app.align.AnnotUserEdits.of(context, u).let { e -> if (e.editHash != edit.hashCode()) e.copy(added = emptyList()) else e }
         val key = "full|$u|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, u)}|" +
