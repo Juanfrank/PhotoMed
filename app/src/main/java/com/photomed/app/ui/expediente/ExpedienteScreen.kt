@@ -269,6 +269,9 @@ fun ExpedienteContent(
     /** Categorías desplegadas por el usuario (las zonas sin fotos van plegadas). */
     var openCats by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(setOf<String>()) }
     var naming by remember { mutableStateOf(false) }
+    /** Bloque «Iniciar sesión de fotos»: abierto si aún no hay fotos (o lo abre el usuario). */
+    var sessionOpenUser by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Boolean?>(null) }
+    val sessionOpen = sessionOpenUser ?: photos.isEmpty()
     androidx.activity.compose.BackHandler(enabled = selecting) { selection = emptyList() }
     fun toggleZone(z: Zone) { selection = if (z.id in selection) selection - z.id else selection + z.id }
     Scaffold(
@@ -339,7 +342,17 @@ fun ExpedienteContent(
             if (exp != null) {
                 item(span = { GridItemSpan(maxLineSpan) }) { SummaryCard(exp, photos.size) }
             }
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            // iniciar una sesión: plantillas y protocolos, plegados si el expediente ya tiene fotos
+            item(span = { GridItemSpan(maxLineSpan) }, key = "sesion") {
+                Row(Modifier.fillMaxWidth().clickable(onClickLabel = if (sessionOpen) "Plegar" else "Desplegar") { sessionOpenUser = !sessionOpen }
+                    .padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
+                    Text("Iniciar sesión de fotos (plantillas y protocolos)", style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f).padding(start = 6.dp))
+                    Icon(if (sessionOpen) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null)
+                }
+            }
+            if (sessionOpen || selecting) item(span = { GridItemSpan(maxLineSpan) }) {
                 TemplatesRow(templates, selection,
                     onPick = { t -> selection = t.zones.map { it.id } },
                     onDelete = { t ->
@@ -347,7 +360,7 @@ fun ExpedienteContent(
                         templates = com.photomed.app.data.SessionTemplates.load(prefs)
                     })
             }
-            item(span = { GridItemSpan(maxLineSpan) }, key = "protocolos") {
+            if (sessionOpen) item(span = { GridItemSpan(maxLineSpan) }, key = "protocolos") {
                 com.photomed.app.ui.protocol.ProtocolsSection(exp, snackbar, photoVersion, repo, onStart = onProtocol, onEdit = onEditProtocol,
                     onPhotosImported = onPhotosImported, onImportFile = onImportProtocol, listVersion = protocolsVersion)
             }
@@ -449,39 +462,26 @@ private fun TemplatesRow(templates: List<com.photomed.app.data.SessionTemplate>,
 
 @Composable
 private fun SummaryCard(exp: Expediente, count: Int) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(Md3Spacing.s4), verticalArrangement = Arrangement.spacedBy(Md3Spacing.s2)) {
+    // una línea (número, fotos, consentimiento); al tocarla, las notas y el álbum
+    var open by remember { mutableStateOf(false) }
+    androidx.compose.material3.OutlinedCard(Modifier.fillMaxWidth().clickable(onClickLabel = if (open) "Ocultar detalles" else "Ver detalles") { open = !open }) {
+        Column(Modifier.padding(horizontal = Md3Spacing.s3, vertical = Md3Spacing.s2), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    if (exp.recordNumber.isNotBlank()) {
-                        Text("Expediente ${exp.recordNumber}", style = MaterialTheme.typography.titleMedium)
-                    }
-                    Text(
-                        "Creado el ${formatDate(exp.createdAt)} · $count fotografías",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Icon(if (exp.consent) Icons.Default.Verified else Icons.Default.Warning,
+                    if (exp.consent) "Consentimiento registrado" else "Consentimiento no registrado", Modifier.size(18.dp),
+                    tint = if (exp.consent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                Text(listOfNotNull(exp.recordNumber.takeIf { it.isNotBlank() }?.let { "Exp. $it" }, "$count fotos", "creado el ${formatDate(exp.createdAt)}")
+                    .joinToString(" · "), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(start = 6.dp))
+                Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            AssistChip(
-                onClick = {},
-                label = { Text(if (exp.consent) "Consentimiento registrado" else "Consentimiento no registrado") },
-                leadingIcon = {
-                    Icon(
-                        if (exp.consent) Icons.Default.Verified else Icons.Default.Warning, null,
-                        Modifier.size(AssistChipDefaults.IconSize),
-                        tint = if (exp.consent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                    )
-                },
-            )
-            if (exp.notes.isNotBlank()) {
-                Text(exp.notes, style = MaterialTheme.typography.bodyMedium)
+            if (exp.notes.isNotBlank()) Text(exp.notes, style = MaterialTheme.typography.bodySmall, maxLines = if (open) 20 else 1,
+                overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (open) {
+                Text(if (exp.consent) "Consentimiento registrado" else "Consentimiento no registrado", style = MaterialTheme.typography.bodySmall,
+                    color = if (exp.consent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                Text("Álbum en la galería: Pictures/PhotoMed/${exp.id}", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(
-                "Álbum en la galería: Pictures/PhotoMed/${exp.id}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

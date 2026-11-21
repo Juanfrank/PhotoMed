@@ -1,5 +1,7 @@
 package com.photomed.app.ui.compare
 
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.material.icons.filled.Contrast
 import com.photomed.app.ui.components.detectTapPassThrough
 import com.photomed.app.ui.components.detectZoomPanPassThrough
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -123,7 +125,9 @@ fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, mod
                /** Si se da, chip «Trazar surco» (dibujar a mano alzada el surco que falta). */
                onTrace: (() -> Unit)? = null, tracing: Boolean = false,
                /** Si se da, chip «Vista» con las cuatro capas (imagen, diagrama, anotaciones, overlay). */
-               viewLayers: MutableState<ViewLayers>? = null) {
+               viewLayers: MutableState<ViewLayers>? = null,
+               /** Opacidad de trazos y números: un chip con el % que abre el control (antes era una fila fija). */
+               opacity: Float? = null, onOpacity: ((Float) -> Unit)? = null, light: Boolean = false) {
     Row(modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically) {
         if (onMetrics != null) androidx.compose.material3.AssistChip(onClick = onMetrics, label = { Text("Medidas") },
@@ -132,6 +136,16 @@ fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, mod
             leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.Gesture, null, Modifier.size(18.dp)) })
         LayerMenu("Contorno externo", OUTER_LAYERS, layers, onChange)
         LayerMenu("Contorno interno", INNER_LAYERS, layers, onChange)
+        if (opacity != null && onOpacity != null) androidx.compose.foundation.layout.Box {
+            var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+            val pct = (opacity * 100).toInt()
+            androidx.compose.material3.AssistChip(onClick = { open = true }, label = { Text("$pct %") },
+                leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.Contrast, null, Modifier.size(18.dp)) },
+                modifier = Modifier.semantics { contentDescription = "Opacidad $pct %" })
+            androidx.compose.material3.DropdownMenu(open, { open = false }) {
+                OpacitySlider(opacity, onOpacity, Modifier.requiredWidth(260.dp).padding(horizontal = 12.dp))
+            }
+        }
         if (viewLayers != null) ViewLayersButton(viewLayers)
     }
 }

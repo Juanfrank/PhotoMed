@@ -5,7 +5,8 @@ genera la malla de MediaPipe y la segmentación pelo / piel con los mismos model
 deja en app/src/test/resources/bench/wrinkles/ (carpeta ignorada: FFHQ es CC BY-NC-SA, no se sube).
 La prueba WrinkleBenchmarkTest pasa el motor de la app y compara con las máscaras.
 
-Uso: python3 tools/eval/bench_wrinkles.py carpeta_mascaras/ [n=100]
+Uso: python3 tools/eval/bench_wrinkles.py carpeta_mascaras/ [n=100 | lista_ids.txt] [carpeta_salida]
+  (lista_ids.txt: p. ej. test_file_lists.txt del repositorio, la partición de prueba del artículo)
   (máscaras: https://github.com/labhai/ffhq-wrinkle-dataset, manual_wrinkle_masks)
 """
 import sys, json, pathlib, random, io
@@ -14,11 +15,15 @@ from mediapipe.tasks.python import vision, BaseOptions
 from remotezip import RemoteZip
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-OUT = ROOT / "app/src/test/resources/bench/wrinkles"; OUT.mkdir(parents=True, exist_ok=True)
+OUT = ROOT / (sys.argv[3] if len(sys.argv) > 3 else "app/src/test/resources/bench/wrinkles"); OUT.mkdir(parents=True, exist_ok=True)
 A = ROOT / "app/src/main/assets"
-masks = pathlib.Path(sys.argv[1]); n = int(sys.argv[2]) if len(sys.argv) > 2 else 100
+masks = pathlib.Path(sys.argv[1]); arg = sys.argv[2] if len(sys.argv) > 2 else "100"
 ids = sorted(p.stem for p in masks.glob("*.png"))
-random.seed(7); pick = set(random.sample(ids, min(n, len(ids))))
+if arg.isdigit():
+    random.seed(7); pick = set(random.sample(ids, min(int(arg), len(ids))))
+else:
+    import re
+    pick = set(re.findall(r"\d{5}", open(arg).read())) & set(ids)
 det = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=str(A / "face_landmarker.task")), num_faces=1))
 seg = vision.ImageSegmenter.create_from_options(vision.ImageSegmenterOptions(

@@ -208,7 +208,7 @@ class ProtocolTest {
         assertTrue(compose.onAllNodesWithText("Zoe Zeta").fetchSemanticsNodes().isEmpty())
         compose.onNodeWithText("Sin consentimiento").performScrollTo().performClick()
         // búsqueda por número
-        compose.onNodeWithText("Buscar nombre o n.º de expediente").performTextInput("555")
+        compose.onNodeWithContentDescription("Buscar paciente o número de expediente").performTextInput("555")
         compose.waitForIdle()
         assertTrue(compose.onAllNodesWithText("Ana Alba").fetchSemanticsNodes().isEmpty())
         compose.onNodeWithText("Zoe Zeta").assertExists()

@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Share
@@ -357,18 +358,15 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 },
                 navigationIcon = { IconButton(onClick = review?.onKeep ?: onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
                 actions = {
-                    if (onCompare != null) IconButton(onClick = { onCompare(compareNames(current)) }) {
+                    // tres acciones a la vista (el título no se aplasta); el resto en ⋯
+                    // en la revisión tras la captura, Comparar a la vista (no hay Eliminar)
+                    if (review != null && onCompare != null) IconButton(onClick = { onCompare(compareNames(current)) }) {
                         Icon(Icons.Default.CompareArrows, "Comparar")
                     }
-                    IconButton(onClick = { inking = !inking; if (inking) { tracing = false; viewLayers.value = viewLayers.value.copy(notes = true) } }) {
+                    IconButton(onClick = { inking = !inking; if (inking) { tracing = false; metricsSheet = false; viewLayers.value = viewLayers.value.copy(notes = true) } }) {
                         Icon(Icons.Default.Draw, if (inking) "Terminar de anotar" else "Anotar sobre la foto")
                     }
-                    // pantalla completa (las capas se eligen con los chips de encima de la foto)
                     IconButton(onClick = { fullscreen = true }) { Icon(Icons.Default.Fullscreen, "Pantalla completa") }
-                    IconButton(onClick = { editing = !editing }) { Icon(Icons.Default.Crop, if (editing) "Terminar edición" else "Girar, espejo y recorte") }
-                    IconButton(onClick = {
-                        scope.launch { info = current to withContext(Dispatchers.IO) { repo.readInfo(current) } }
-                    }) { Icon(Icons.Default.Info, "Información") }
                     Box {
                         IconButton(onClick = { shareMenu = true }) { Icon(Icons.Default.Share, "Compartir") }
                         DropdownMenu(expanded = shareMenu, onDismissRequest = { shareMenu = false }) {
@@ -384,7 +382,20 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                             )
                         }
                     }
-                    if (review == null) IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Eliminar") }
+                    Box {
+                        var more by remember { mutableStateOf(false) }
+                        IconButton(onClick = { more = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
+                        DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                            if (onCompare != null && review == null) DropdownMenuItem(text = { Text("Comparar") }, leadingIcon = { Icon(Icons.Default.CompareArrows, null) },
+                                onClick = { more = false; onCompare(compareNames(current)) })
+                            DropdownMenuItem(text = { Text(if (editing) "Terminar edición" else "Girar, espejo y recorte") }, leadingIcon = { Icon(Icons.Default.Crop, null) },
+                                onClick = { more = false; editing = !editing })
+                            DropdownMenuItem(text = { Text("Información") }, leadingIcon = { Icon(Icons.Default.Info, null) },
+                                onClick = { more = false; scope.launch { info = current to withContext(Dispatchers.IO) { repo.readInfo(current) } } })
+                            if (review == null) DropdownMenuItem(text = { Text("Eliminar") }, leadingIcon = { Icon(Icons.Default.Delete, null) },
+                                onClick = { more = false; confirmDelete = true })
+                        }
+                    }
                 }
             )
         },
@@ -444,9 +455,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 Modifier.fillMaxWidth().padding(vertical = 4.dp), onMetrics = { metricsSheet = !metricsSheet },
                 onTrace = { traceTarget = null; tracing = !tracing
                     if (tracing) scope.launch { snackbar.showSnackbar("Dibuje sobre el surco: una línea por donde se ve, o rodee el área") } },
-                tracing = tracing, viewLayers = viewLayers)
-            if (showLayers && !fullscreen) com.photomed.app.ui.compare.OpacitySlider(annotAlpha.value, { annotAlpha.value = it },
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp), light = true)
+                tracing = tracing, viewLayers = viewLayers, opacity = annotAlpha.value, onOpacity = { annotAlpha.value = it })
             // análisis en curso: barra de proceso visible
             val analyzing = showLayers && annotsByUri[current.uri.toString()] == null || traceBusy
             if (analyzing) androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),

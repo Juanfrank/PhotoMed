@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,7 +97,9 @@ val SIDE_LABELS = linkedMapOf("auto" to "Auto", "top" to "Arriba", "bottom" to "
 fun InkRail(style: InkStyle, onStyle: (InkStyle) -> Unit, canUndo: Boolean, onUndo: () -> Unit, onClear: () -> Unit, onDone: () -> Unit,
             modifier: Modifier = Modifier) {
     var confirmClear by remember { mutableStateOf(false) }
-    Column(modifier.background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp)).padding(vertical = 4.dp),
+    // si no cabe en el alto de la foto (tabla abierta, horizontal), se desplaza: nunca queda cortada
+    Column(modifier.background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+        .verticalScroll(rememberScrollState()).padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally) {
         InkTool.entries.forEach { t ->
             val sel = style.tool == t

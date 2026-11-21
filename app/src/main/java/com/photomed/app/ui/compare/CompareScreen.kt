@@ -525,8 +525,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             }
 
             if (showLayers) LayerChips(layersState.value, { layersState.value = it }, Modifier.fillMaxWidth().padding(top = 4.dp),
-                onMetrics = { metricsSheet = !metricsSheet })
-            if (showLayers) OpacitySlider(annotAlpha.value, { annotAlpha.value = it }, Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact))
+                onMetrics = { metricsSheet = !metricsSheet }, opacity = annotAlpha.value, onOpacity = { annotAlpha.value = it })
             // expresiones distintas en la comparación: las arrugas dinámicas no son comparables
             seq?.map { it.expression }?.distinct()?.takeIf { it.size > 1 }?.let { ex ->
                 Text("Atención: compara expresiones distintas (${ex.joinToString(" / ") { it.label }}); las arrugas dinámicas solo se comparan con la misma expresión.",

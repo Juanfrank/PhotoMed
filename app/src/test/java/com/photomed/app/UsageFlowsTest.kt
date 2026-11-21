@@ -270,8 +270,9 @@ class UsageFlowsTest {
     fun viewerEditBarSavesRotationAndMirror() {
         com.photomed.app.align.PhotoEdits.clearCache()
         setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, photos[0].displayName, onBack = {}) }
-        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Girar, espejo y recorte").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription("Girar, espejo y recorte").performClick()
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Más opciones").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Más opciones").performClick()
+        compose.onNodeWithText("Girar, espejo y recorte").performClick()
         compose.onNodeWithContentDescription("Girar 90°").performClick()
         compose.onNodeWithContentDescription("Espejo").performClick()
         val ctx = ApplicationProvider.getApplicationContext<Context>()
@@ -328,7 +329,7 @@ class UsageFlowsTest {
         assertTrue("chips encima de la foto", chips.bottom <= photoBox.top + 1f)
         assertTrue("tabla debajo de la foto", table.top >= photoBox.bottom - 1f)
         // opacidad de trazos y números: empieza en 50 %
-        compose.onNodeWithText("Opacidad 50 %").assertExists()
+        compose.onNodeWithContentDescription("Opacidad 50 %").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Opacidad de los trazos y números")
             .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(0.8f) }
         compose.waitForIdle()
@@ -608,7 +609,7 @@ class UsageFlowsTest {
         waitText("Guardar")
         compose.onNodeWithText("Repetir", substring = true).assertExists()
         compose.onNodeWithText("1/1", substring = true).assertExists()
-        assertTrue(compose.onAllNodesWithContentDescription("Eliminar").fetchSemanticsNodes().isEmpty())
+        assertTrue(compose.onAllNodesWithText("Eliminar").fetchSemanticsNodes().isEmpty())
         compose.onNodeWithContentDescription("Comparar").performClick()
         assertEquals(listOf(photos[2].displayName, last.displayName), compared)
         compose.onNodeWithText("Guardar").performClick()
@@ -624,9 +625,10 @@ class UsageFlowsTest {
     fun viewerOpensCompare() {
         var compared: List<String>? = null
         setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, photos[1].displayName, onBack = {}, onCompare = { compared = it }) }
-        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Comparar").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription("Eliminar").assertExists()
-        compose.onNodeWithContentDescription("Comparar").performClick()
+        compose.waitUntil(15_000) { compose.onAllNodesWithContentDescription("Más opciones").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Más opciones").performClick()
+        compose.onNodeWithText("Eliminar").assertExists()
+        compose.onNodeWithText("Comparar").performClick()
         assertEquals(listOf(photos[0].displayName, photos[1].displayName), compared)
     }
 

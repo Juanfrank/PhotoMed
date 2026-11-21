@@ -59,9 +59,16 @@ class WrinkleBenchmarkTest {
         fun r() = if (gt == 0) Float.NaN else gtIn.toFloat() / gt
         fun f() = p().let { p -> r().let { r -> if (p + r > 0) 2 * p * r / (p + r) else 0f } } }
 
+    /** Muestra aleatoria de 100 fotos (semilla 7). */
     @Test
-    fun wrinklesAgainstManualMasks() {
-        val dir = File("src/test/resources/bench/wrinkles")
+    fun wrinklesAgainstManualMasks() = bench("wrinkles", "muestra aleatoria")
+
+    /** Partición de prueba del artículo (test_file_lists.txt del repositorio): comparable con su tabla 3. */
+    @Test
+    fun wrinklesOnPaperTestSplit() = bench("wrinkles_test", "partición de prueba del artículo")
+
+    private fun bench(name: String, what: String) {
+        val dir = File("src/test/resources/bench/$name")
         val meshFile = File(dir, "mesh.json")
         assumeTrue("sin datos del benchmark (tools/eval/bench_wrinkles.py)", meshFile.exists())
         val o = JSONObject(meshFile.readText())
@@ -152,17 +159,17 @@ class WrinkleBenchmarkTest {
                 for (i in gt.indices) if (gt[i]) ov.setPixel(i % w, i / w, Color.rgb(0, 230, 118))
                 val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.RED; strokeWidth = 3f; style = Paint.Style.STROKE }
                 for (l in wr) for (s in 1 until l.points.size) c.drawLine(l.points[s - 1].x * w, l.points[s - 1].y * w, l.points[s].x * w, l.points[s].y * w, p)
-                File(out, "wrinkles_$k.jpg").outputStream().use { ov.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+                File(out, "${name}_$k.jpg").outputStream().use { ov.compress(Bitmap.CompressFormat.JPEG, 85, it) }
             }
         }
         val strictF1 = 2.0 * tp / (2 * tp + fp + fn).coerceAtLeast(1); val jsi = tp.toDouble() / (tp + fp + fn).coerceAtLeast(1)
         println("BENCH  estricto (píxel a píxel, toda la foto): F1 %.3f  JSI %.3f".format(strictF1, jsi))
         val summary = JSONObject().put("images", n).put("toleranceFraction", TOL / 1024.0).put("strictF1", strictF1).put("strictJSI", jsi)
-        println("BENCH ARRUGAS (FFHQ-Wrinkle, $n fotos, tolerancia ${TOL.toInt()} px de 1024):")
+        println("BENCH ARRUGAS (FFHQ-Wrinkle, $what, $n fotos, tolerancia ${TOL.toInt()} px de 1024):")
         acc.forEach { (r, a) ->
             println("BENCH  %-18s precisión %.2f  exhaustividad %.2f  F1 %.2f  (trazado %d px, manual %d px)".format(r, a.p(), a.r(), a.f(), a.pred, a.gt))
             summary.put(r, JSONObject().put("precision", a.p().toDouble()).put("recall", a.r().toDouble()).put("f1", a.f().toDouble()).put("predPx", a.pred).put("gtPx", a.gt))
         }
-        File(out, "wrinkles.json").writeText(JSONObject().put("summary", summary).put("images", perImage).toString(2))
+        File(out, "$name.json").writeText(JSONObject().put("summary", summary).put("images", perImage).toString(2))
     }
 }

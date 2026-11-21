@@ -166,8 +166,26 @@ fun ExpedientesContent(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            LargeTopAppBar(
-                title = { Text("Expedientes") },
+            // barra pequeña con el buscador dentro (el título grande ocupaba ~150 px; la pestaña ya dice dónde se está)
+            androidx.compose.material3.TopAppBar(
+                title = {
+                    if (expedientes.isNullOrEmpty()) Text("Expedientes")
+                    else TextField(
+                        value = query, onValueChange = { query = it },
+                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                        trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Borrar búsqueda") } },
+                        placeholder = { Text("Buscar paciente o n.º", maxLines = 1) },
+                        singleLine = true, shape = CircleShape,
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                        ),
+                        modifier = Modifier.fillMaxWidth().padding(end = 4.dp).semantics { contentDescription = "Buscar paciente o número de expediente" },
+                    )
+                },
                 actions = {
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más opciones") }
@@ -222,7 +240,7 @@ fun ExpedientesContent(
                 )
                 return@Column
             }
-            ExpedientesTable(list, summaries, query, { query = it }, listState, onOpen)
+            ExpedientesTable(list, summaries, query, { query = it }, listState, onOpen, showSearch = false)
         }
     }
 }
@@ -244,7 +262,9 @@ enum class ExpFilter(val label: String) {
 @Composable
 fun ExpedientesTable(list: List<Expediente>, summaries: Map<String, com.photomed.app.data.ExpedienteSummary>,
                      query: String, onQuery: (String) -> Unit, listState: androidx.compose.foundation.lazy.LazyListState,
-                     onOpen: (String) -> Unit) {
+                     onOpen: (String) -> Unit,
+                     /** Buscador propio (si no, está en la barra superior). */
+                     showSearch: Boolean = true) {
     var sort by rememberSaveable { mutableStateOf(ExpSort.LAST) }
     var asc by rememberSaveable { mutableStateOf(false) }
     var filters by rememberSaveable { mutableStateOf(setOf<String>()) }
@@ -252,7 +272,7 @@ fun ExpedientesTable(list: List<Expediente>, summaries: Map<String, com.photomed
     val day = 86_400_000L
     Column {
         // Campo de búsqueda con forma completa y contenedor surface-container-high (M3 search bar).
-        TextField(
+        if (showSearch) TextField(
             value = query,
             onValueChange = onQuery,
             leadingIcon = { Icon(Icons.Default.Search, null) },
