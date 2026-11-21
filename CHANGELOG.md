@@ -25,6 +25,16 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
   ida y vuelta: al repetirse en bucle no se nota el salto. La vista previa sigue el mismo guion.
 - **Exportar en MP4** (H.264), con el mismo guion de ida y vuelta y los mismos tiempos.
 - **Menú de exportación**: cambiar de opción ya no lo devuelve arriba.
+- **Logo en las exportaciones**: se adjunta en Ajustes (PNG con transparencia recomendado) y la
+  esquina se elige al exportar (se recuerda); va en fotos, cuadrículas, GIF y MP4.
+- **Colores de la marca**: paletas tonales calculadas a partir de los colores del logo (verde
+  azulado, azul y azul marino), con contraste WCAG AA comprobado en claro y oscuro.
+- **Modo oscuro** elegible en Ajustes: según el sistema, claro u oscuro.
+- **Idiomas: español e inglés** (Ajustes > Idioma, o el idioma de la app de Android 13+). Toda la
+  interfaz, las indicaciones de la cámara y los documentos legales; los nombres de líneas y medidas
+  se guardan en español y se muestran traducidos.
+- **Tema**: solo la referencia oficial de Material Design 3 (tokens de Material Web).
+- **Cámara**: ya no vibra sin parar en la revisión de la foto recién tomada.
 
 ## 2.45 — 21 de noviembre de 2026
 
