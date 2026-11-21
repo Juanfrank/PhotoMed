@@ -2,6 +2,25 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.34 — 21 de noviembre de 2026
+
+- **La expresión pedida es condición para capturar.** Con sonrisa, cejas arriba, ojos apretados,
+  labios fruncidos, ceño o tristeza, la captura automática (también la de «casi alineada») y el botón
+  en verde esperan a que se haga el gesto; antes, con una foto de referencia bastaba con parecerse a
+  ella. Si la cara está de perfil y no se puede medir, no se da por cumplida. Nuevas comprobaciones
+  para el **ceño** (cejas bajas) y la **tristeza** (comisuras hacia abajo), calibradas con caras en
+  reposo para que no se cumplan sin el gesto.
+- **Línea del pelo: nunca se omite.** Se mide sobre la foto ya guardada, en segundo plano (antes se
+  medía antes de guardar y, si el modelo estaba ocupado, se saltaba).
+- **Comparar: tocar una línea en cualquiera de las fotos** la selecciona en todas, abre la tabla de
+  medidas en su fila y muestra sus tramos punteados (como en el visor).
+- **Horizontal y tabletas**: la app ya gira (la cámara sigue en vertical). En pantallas anchas la
+  tabla de medidas va a la derecha de la foto, en el visor y en Comparar, sin reducirla.
+- **Rendimiento**: lecturas de trazos y correcciones fuera del hilo principal en Comparar y el visor
+  (nota de la tabla, restaurar líneas, correcciones del usuario).
+- **Revisión con lint**: anotación de API experimental de la cámara, carácter BOM del XMP escrito
+  como escape.
+
 ## 2.33 — 21 de noviembre de 2026
 
 - **Comparar se alinea solo al abrir** (interruptor en los ajustes, activo por defecto); antes solo

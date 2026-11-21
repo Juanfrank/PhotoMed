@@ -137,7 +137,7 @@ object PhotoMetadata {
     private fun iso(millis: Long) = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         .apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date(millis))
 
-    fun xmp(i: PhotoInfo, description: String = describe(i)): String = """<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+    fun xmp(i: PhotoInfo, description: String = describe(i)): String = """<?xpacket begin="${'\uFEFF'}" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <rdf:Description rdf:about=""

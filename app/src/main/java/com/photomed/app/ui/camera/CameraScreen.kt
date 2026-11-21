@@ -190,6 +190,13 @@ fun CameraScreen(
     onCompare: (List<String>) -> Unit = {},
 ) = ImmersiveTheme {
     val context = LocalContext.current
+    // la cámara y las guías se calculan en vertical: esta pantalla se mantiene en vertical (el resto gira)
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val act = context as? android.app.Activity
+        val before = act?.requestedOrientation
+        act?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        onDispose { act?.requestedOrientation = before ?: android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
     val needed = remember {
         buildList {
             add(Manifest.permission.CAMERA)
@@ -1312,7 +1319,7 @@ private fun ImageProxy.toUprightCrop(width: Int): Bitmap {
 }
 
 /** Focal de la cámara en unidades de alto de imagen (lado largo del sensor), para la corrección de perspectiva. */
-@OptIn(ExperimentalCamera2Interop::class)
+@androidx.annotation.OptIn(markerClass = [ExperimentalCamera2Interop::class])
 private fun focalNormOf(camera: Camera): Float? = runCatching {
     val info = Camera2CameraInfo.from(camera.cameraInfo)
     val focal = info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.firstOrNull()
