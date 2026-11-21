@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.graphics.graphicsLayer
@@ -815,4 +816,30 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAnnotations(
         drawPath(path, col.copy(alpha = alpha), style = Stroke(1.5.dp.toPx() * k, cap = StrokeCap.Round, pathEffect = dash))
     }
     if (numbers != null) drawLineNumbers(lines, layers, numbers, k, map, alpha)
+}
+
+/**
+ * Capa de anotaciones: trazos de lápiz y, con el borrador tipo pintura, lo borrado (en una capa
+ * aparte, para no borrar la foto ni el diagrama). [strokes] en coordenadas de [map] (unidades del
+ * ancho) con su grosor en las mismas unidades; [unit]: px por unidad.
+ */
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawInk(
+    strokes: List<com.photomed.app.align.InkStroke>, unit: Float, map: (com.photomed.app.align.Pt) -> Offset,
+) {
+    if (strokes.isEmpty()) return
+    drawIntoCanvas { c ->
+        c.saveLayer(androidx.compose.ui.geometry.Rect(Offset.Zero, size), androidx.compose.ui.graphics.Paint())
+        for (s in strokes) {
+            if (s.points.isEmpty()) continue
+            val w = (s.width * unit).coerceAtLeast(1f)
+            val col = if (s.erase) Color.Black else Color(s.color)
+            val blend = if (s.erase) androidx.compose.ui.graphics.BlendMode.Clear else androidx.compose.ui.graphics.BlendMode.SrcOver
+            if (s.points.size == 1) { drawCircle(col, w / 2, map(s.points[0]), blendMode = blend); continue }
+            val path = androidx.compose.ui.graphics.Path().apply {
+                val p0 = map(s.points[0]); moveTo(p0.x, p0.y); s.points.drop(1).forEach { val p = map(it); lineTo(p.x, p.y) }
+            }
+            drawPath(path, col, style = Stroke(w, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round), blendMode = blend)
+        }
+        c.restore()
+    }
 }

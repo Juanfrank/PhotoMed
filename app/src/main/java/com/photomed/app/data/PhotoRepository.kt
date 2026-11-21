@@ -155,6 +155,21 @@ class PhotoRepository(
 
     fun deletePhotos(photos: List<Photo>): DeleteResult = store.delete(photos.map { it.uri })
 
+    /**
+     * Cambia la fecha de captura de una foto: nombre del archivo (lleva la fecha) y fecha de toma de la
+     * galería. Devuelve la foto con su nuevo nombre (la URI es la misma en la galería; en archivo cambia).
+     * Los metadatos EXIF/XMP los actualiza quien llama (ver CaptureDate).
+     */
+    fun setCaptureDate(exp: Expediente, photo: Photo, takenAt: Long): Photo {
+        val prefix = photo.displayName.substringBeforeLast('.').dropLast(19)
+        val used = store.list(exp.id).map { it.displayName }.toSet() - photo.displayName
+        var t = takenAt
+        var name = "$prefix${stampFormat.format(Date(t))}.jpg"
+        while (name in used) { t++; name = "$prefix${stampFormat.format(Date(t))}.jpg" }
+        val uri = store.rename(photo.uri, name, t)
+        return Photo(uri, name, photo.zone, t)
+    }
+
     fun readInfo(photo: Photo): PhotoInfo? = openStream(photo.uri)?.use { PhotoMetadata.read(it) }
 
     /**

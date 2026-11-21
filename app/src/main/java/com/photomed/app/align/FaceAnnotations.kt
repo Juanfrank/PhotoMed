@@ -244,7 +244,9 @@ object FaceAnnotations {
                 minContrast = if (naso) NASO_MIN_CONTRAST else RidgeTracker.MIN_CONTRAST,
                 anchorStart = naso)?.let { r ->
                 // sin colas sobre el vello (el trazado se mueve a los lados del eje)
-                val pts = hair?.let { offHair(r.points, it, fromStart = name == "nasogeniano") } ?: r.points
+                val pts0 = hair?.let { offHair(r.points, it, fromStart = name == "nasogeniano") } ?: r.points
+                // sin curvas irregulares: suavizado y corte donde el trazado se aparta de la dirección del surco
+                val pts = regularize(pts0, axis)
                 if (pts.size < 5) return@mapIndexedNotNull null
                 val note = if (covered > 0.2f) "Parcialmente cubierto por barba o bigote (${(covered * 100).roundToInt()} % del recorrido): " +
                     "se traza y mide solo la parte visible" else null
@@ -447,6 +449,36 @@ object FaceAnnotations {
     }
 
     private fun mid(a: Pt, b: Pt) = Pt((a.x + b.x) / 2, (a.y + b.y) / 2)
+
+    /**
+     * Trazado regular de un surco: media móvil de 5 puntos y corte del final donde la dirección se
+     * aparta más de 40° de la del pasillo ([axis]) en dos puntos seguidos (a partir de la mitad del
+     * recorrido, para no perder el arranque), y sin ganchos en los extremos.
+     */
+    fun regularize(pts: List<Pt>, axis: List<Pt>): List<Pt> {
+        if (pts.size < 5 || axis.size < 2) return pts
+        val sm = pts.indices.map { i ->
+            if (i == 0 || i == pts.lastIndex) pts[i] else {
+                val r = (maxOf(0, i - 2)..minOf(pts.lastIndex, i + 2)).map { pts[it] }
+                Pt(r.map { it.x }.average().toFloat(), r.map { it.y }.average().toFloat())
+            }
+        }
+        fun axisDir(q: Pt): Pt {
+            var bi = 0; var bd = Float.MAX_VALUE
+            for (i in 0 until axis.size - 1) { val d = hypot(axis[i].x - q.x, axis[i].y - q.y); if (d < bd) { bd = d; bi = i } }
+            val a = axis[bi]; val b = axis[bi + 1]; val n = hypot(b.x - a.x, b.y - a.y).coerceAtLeast(1e-6f)
+            return Pt((b.x - a.x) / n, (b.y - a.y) / n)
+        }
+        val total = LineMeasure.length(sm)
+        var acc = 0f; var bad = 0; var cut = sm.size
+        for (i in 1 until sm.size - 1) {
+            acc += hypot(sm[i].x - sm[i - 1].x, sm[i].y - sm[i - 1].y)
+            val a = sm[i - 1]; val b = sm[i + 1]; val n = hypot(b.x - a.x, b.y - a.y).coerceAtLeast(1e-6f)
+            val d = axisDir(sm[i]); val cos = ((b.x - a.x) / n * d.x + (b.y - a.y) / n * d.y).coerceIn(-1f, 1f)
+            if (acc > 0.5f * total && cos < 0.766f) { bad++; if (bad >= 2) { cut = i - 1; break } } else bad = 0
+        }
+        return RegionTrace.trimHooks(sm.subList(0, cut.coerceAtLeast(2)))
+    }
 
     /** Segmento del ancho (perpendicular, centrado en la mitad de la línea) de una arruga o surco medidos. */
     fun withWidthGuide(l: AnnotLine, mmPerUnit: Float): AnnotLine {

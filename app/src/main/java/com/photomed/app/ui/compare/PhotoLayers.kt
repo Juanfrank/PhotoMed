@@ -49,6 +49,9 @@ import com.photomed.app.align.Similarity
 import com.photomed.app.data.Zone
 import com.photomed.app.ui.camera.annotColor
 import com.photomed.app.ui.camera.drawAnnotations
+import com.photomed.app.ui.camera.drawMeasureGuides
+import com.photomed.app.ui.camera.drawInk
+import androidx.compose.ui.layout.onSizeChanged
 
 private const val PREF_LAYERS = "annot_layers"
 private const val PREF_ALPHA = "annot_alpha"
@@ -220,18 +223,49 @@ fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boole
     }
 }
 
+/** Anotaciones de una foto en su encuadre 3:4, llevadas a la foto corregida en perspectiva [phiDeg]. */
+@Composable
+fun rememberPhotoInk(uri: Uri, phiDeg: Float, enabled: Boolean): State<List<com.photomed.app.align.InkStroke>?> {
+    val context = LocalContext.current
+    val edit = PhotoEdits.of(context, uri.toString())
+    val tag = com.photomed.app.align.Annotations.tag(context, uri.toString())
+    return produceState<List<com.photomed.app.align.InkStroke>?>(null, uri, edit, phiDeg, enabled, tag) {
+        if (!enabled) { value = null; return@produceState }
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { com.photomed.app.align.Annotations.of(context, uri.toString())?.inView(edit, com.photomed.app.align.TraceFrame.C34) }.getOrNull()
+        }?.map { s -> if (phiDeg == 0f) s else s.copy(points = s.points.map { Perspective.mapPt(it, phiDeg) }) }.orEmpty()
+    }
+}
+
 /** Foto 3:4 (modelo de Coil) con la semejanza de alineación y sus anotaciones en la misma capa. */
 @Composable
 fun PhotoContent(model: Any, transform: Similarity?, annots: List<AnnotLine>?, layers: Set<AnnotLayer>,
                  description: String?, modifier: Modifier = Modifier,
                  /** Números de las líneas medidas (los mismos en todas las fotos y en la tabla). */
                  numbers: Map<String, Int>? = annots?.let { com.photomed.app.align.MeasureNumbering.of(listOf(it)) },
-                 alpha: Float = 0.5f) {
+                 alpha: Float = 0.5f,
+                 showImage: Boolean = true, ink: List<com.photomed.app.align.InkStroke> = emptyList(), selected: String? = null) {
     Box(modifier.alignedBy(transform)) {
-        AsyncImage(model, description, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        if (annots != null && layers.isNotEmpty()) Canvas(Modifier.fillMaxSize()) {
+        // capa 1: imagen
+        AsyncImage(model, description, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = if (showImage) 1f else 0f })
+        Canvas(Modifier.fillMaxSize()) {
             val k = (size.width / 360.dp.toPx()).coerceIn(0.35f, 1.4f)
-            drawAnnotations(annots, layers, k, numbers = numbers, alpha = alpha) { p: Pt -> Offset(p.x * size.width, p.y * size.width) }
+            fun map(p: Pt) = Offset(p.x * size.width, p.y * size.width)
+            // capa 2: diagrama facial (con la línea seleccionada resaltada y sus tramos)
+            if (annots != null && layers.isNotEmpty()) {
+                val sl = selected?.let { n -> annots.firstOrNull { it.metrics?.name == n && it.layer in layers } }
+                sl?.let { l ->
+                    val path = androidx.compose.ui.graphics.Path()
+                    l.points.forEachIndexed { i, q -> val o = map(q); if (i == 0) path.moveTo(o.x, o.y) else path.lineTo(o.x, o.y) }
+                    if (l.closed) path.close()
+                    drawPath(path, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f), style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = 6.dp.toPx() * k, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                }
+                drawAnnotations(annots, layers, k, numbers = numbers, alpha = alpha) { p: Pt -> map(p) }
+                sl?.let { drawMeasureGuides(it, k) { p -> map(p) } }
+            }
+            // capa 3: anotaciones
+            drawInk(ink, size.width) { p -> map(p) }
         }
     }
 }
@@ -273,6 +307,12 @@ data class CompareView(
     val annots: Map<Any, List<AnnotLine>> = emptyMap(),
     /** Opacidad de los trazos y números. */
     val alpha: Float = 0.5f,
+    /** Capas de la vista: imagen, anotaciones y overlay (el diagrama son [layers]). */
+    val view: ViewLayers = ViewLayers(),
+    /** Anotaciones de cada foto (por modelo), en su encuadre 3:4. */
+    val ink: Map<Any, List<com.photomed.app.align.InkStroke>> = emptyMap(),
+    /** Línea seleccionada en la tabla (por nombre): resaltada y con sus tramos en todas las fotos. */
+    val selected: String? = null,
 ) {
     /** Proporción (ancho/alto) de cada celda: 3:4, o 4:3 con giro de 90° o 270°. */
     val aspect: Float get() = if (rot % 2 == 1) 4f / 3f else 3f / 4f
@@ -280,12 +320,17 @@ data class CompareView(
 
 val LocalCompareView = androidx.compose.runtime.staticCompositionLocalOf { CompareView() }
 
+/** Tamaño de la celda de foto en Comparar (para centrar la línea seleccionada con el zoom). */
+val LocalCellSize = androidx.compose.runtime.staticCompositionLocalOf<MutableState<androidx.compose.ui.unit.IntSize>?> { null }
+
 /** Una foto de la comparación con la vista actual (giro, espejo, capas) y su alineación. */
 @Composable
 fun ComparePhoto(model: Any, transform: Similarity?, description: String?, layer: Modifier, modifier: Modifier = Modifier.fillMaxSize()) {
     val v = LocalCompareView.current
-    OrientBox(v.rot, v.mirror, modifier) {
+    val cell = LocalCellSize.current
+    OrientBox(v.rot, v.mirror, modifier.then(if (cell != null) Modifier.onSizeChanged { cell.value = it } else Modifier)) {
         PhotoContent(model, transform, v.annots[model], v.layers, description, layer,
-            numbers = com.photomed.app.align.MeasureNumbering.of(v.annots.values.toList()), alpha = v.alpha)
+            numbers = com.photomed.app.align.MeasureNumbering.of(v.annots.values.toList()), alpha = v.alpha,
+            showImage = v.view.image, ink = if (v.view.notes) v.ink[model].orEmpty() else emptyList(), selected = v.selected)
     }
 }

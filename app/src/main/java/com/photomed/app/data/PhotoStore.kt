@@ -32,6 +32,8 @@ interface PhotoStore {
     fun folders(): List<String>
     fun save(folder: String, displayName: String, source: File, dateTaken: Long): Uri
     fun delete(uris: List<Uri>): DeleteResult
+    /** Cambia el nombre y la fecha de toma de una foto; devuelve su URI (la misma en la galería). */
+    fun rename(uri: Uri, displayName: String, dateTaken: Long): Uri
 
     companion object {
         const val ALBUM = "PhotoMed"
@@ -98,6 +100,14 @@ class MediaStorePhotoStore(private val resolver: ContentResolver) : PhotoStore {
         return uri
     }
 
+    override fun rename(uri: Uri, displayName: String, dateTaken: Long): Uri {
+        resolver.update(uri, ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+            put(MediaStore.MediaColumns.DATE_TAKEN, dateTaken)
+        }, null, null)
+        return uri
+    }
+
     override fun delete(uris: List<Uri>): DeleteResult {
         val notOwned = mutableListOf<Uri>()
         for (uri in uris) {
@@ -136,6 +146,15 @@ class FilePhotoStore(
         target.setLastModified(dateTaken)
         onChanged(listOf(target.absolutePath))
         return Uri.fromFile(target)
+    }
+
+    override fun rename(uri: Uri, displayName: String, dateTaken: Long): Uri {
+        val src = File(uri.path!!)
+        val dst = File(src.parentFile, displayName)
+        if (dst != src && !src.renameTo(dst)) error("No se pudo renombrar la foto")
+        dst.setLastModified(dateTaken)
+        onChanged(listOf(src.absolutePath, dst.absolutePath))
+        return Uri.fromFile(dst)
     }
 
     override fun delete(uris: List<Uri>): DeleteResult {

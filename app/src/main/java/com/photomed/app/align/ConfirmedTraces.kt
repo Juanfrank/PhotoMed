@@ -350,7 +350,7 @@ object FreehandTrace {
         val line = smooth(resample(path, 40))
         // recorte alrededor del trazo, a ~400 px de lado
         val l = length(line)
-        val m = maxOf(0.15f * l, 12f / w)
+        val m = maxOf(0.3f * l, 24f / w)
         val x0 = ((line.minOf { it.x } - m) * w).coerceAtLeast(0f); val y0 = ((line.minOf { it.y } - m) * w).coerceAtLeast(0f)
         val x1 = ((line.maxOf { it.x } + m) * w).coerceAtMost(w); val y1 = ((line.maxOf { it.y } + m) * w).coerceAtMost(bmp.height.toFloat())
         val cw = (x1 - x0).toInt().coerceAtLeast(2); val ch = (y1 - y0).toInt().coerceAtLeast(2)
@@ -363,9 +363,10 @@ object FreehandTrace {
         fun fromC(p: Pt) = Pt((p.x * cwF / sc + x0.toInt()) / w, (p.y * cwF / sc + y0.toInt()) / w)
         val axis = resample(line, 9).map(::toC)
         val lenC = length(axis)
-        // pasillo estrecho alrededor del trazo: el surco está donde el usuario lo dibujó
-        val half = (0.06f * lenC).coerceIn(4f / cwF, 18f / cwF)
-        val r = RidgeTracker.track(lum, axis, half, stations = 30, offsets = 10,
+        // pasillo alrededor del trazo (±15 % de su longitud): el surco está donde el usuario lo dibujó
+        // o cerca; se busca también en los alrededores
+        val half = (0.15f * lenC).coerceIn(8f / cwF, 40f / cwF)
+        val r = RidgeTracker.track(lum, axis, half, stations = 30, offsets = 16,
             minStrength = RegionTrace.MIN_STRENGTH, minContrast = RegionTrace.MIN_CONTRAST)
         crop.recycle()
         val snapped = r?.points?.map(::fromC)?.let { RegionTrace.trimHooks(it) }?.takeIf { it.size >= 3 && length(it) >= 0.5f * l }

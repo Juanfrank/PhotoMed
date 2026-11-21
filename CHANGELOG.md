@@ -2,6 +2,33 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.30 — 21 de noviembre de 2026
+
+- **Cuatro capas en cada foto** (botón de la vista 👁 en el visor y en Comparar): la **imagen**, el
+  **diagrama facial** (contorno interno y externo con su numeración), las **anotaciones** y el
+  **overlay** (fechas y rótulos). Cada una se muestra u oculta por separado; se recuerda.
+- **Anotaciones** para planificar el tratamiento, en una capa transparente que no modifica la foto:
+  lápiz con 8 colores y grosor ajustable, borrador por trazo (quita trazos enteros) y borrador tipo
+  pintura, deshacer y borrar todo. Se guardan en la app y en el XMP de la foto (`pm:Ink`), en
+  coordenadas de la original (siguen en su sitio al girar, espejar, recortar o ampliar) y se ven también
+  en Comparar.
+- **Sin datos flotantes**: al tocar una línea se abre la tabla de medidas en su fila, resaltada y
+  desplazada hasta verse (con la muestra del trazo de cada tramo). Tocar una fila de la tabla, en el
+  visor y en Comparar, selecciona la línea y desplaza (y amplía si es pequeña) la foto hasta ella.
+- **Comparar**: con la tabla de medidas abierta se oculta el selector de fotos.
+- **Fecha de captura editable** en la información de la foto (calendario y hora): cambia el nombre del
+  archivo (lleva la fecha), la fecha de la galería y los metadatos EXIF/XMP; los trazos, anotaciones,
+  ediciones y relieve de la foto se conservan.
+- **Registro de errores**: ningún cierre es silencioso. Cada error se guarda (versión, dispositivo y
+  traza, sin fotos ni datos del paciente); al volver a abrir la app se avisa y se puede compartir.
+  También en Ajustes → Registro de errores. Los errores de tareas en segundo plano se registran sin
+  cerrar la app.
+- **Ojeras**: altura máxima del 12 % del ancho de la cara (~15 mm) y umbral de 4 L*: ya no bajan por la
+  mejilla.
+- **Surco nasogeniano** sin curvas irregulares: suavizado y corte del final donde se aparta más de 40°
+  de la dirección del surco.
+- **Trazar surco**: busca en un pasillo más ancho alrededor del trazo (±15 % de su longitud).
+
 ## 2.29 — 21 de noviembre de 2026
 
 - Los tramos de los rasgos de los trazos confirmados en 2.23–2.24 se recuperan también al abrir la

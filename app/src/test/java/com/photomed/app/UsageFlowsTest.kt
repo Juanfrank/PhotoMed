@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.isSelected
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onRoot
@@ -23,6 +24,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.isDialog
@@ -311,12 +313,11 @@ class UsageFlowsTest {
         compose.onNodeWithContentDescription("Fotografía", substring = true).performTouchInput {
             click(androidx.compose.ui.geometry.Offset(x - page.left, y - page.top))
         }
-        // ficha con el número de la línea (el mismo que en la foto y en la tabla)
-        waitText("1 · Frente, línea 1")
-        compose.onNodeWithText("0.31 mm").assertExists()
-        compose.onNodeWithText("Tabla de medidas").performClick()
-        // la tabla va en un panel debajo de la foto (no superpuesta)
+        // sin ficha flotante: se abre la tabla con la fila de la línea seleccionada (resaltada)
         waitText("Arrugas y surcos")
+        assertTrue(compose.onAllNodesWithText("Tabla de medidas").fetchSemanticsNodes().isEmpty())
+        compose.onNode(isSelected() and hasText("Frente, línea 1", substring = true)).assertExists()
+        compose.onNodeWithText("0.31").assertExists()
         // diseño: selector de capas encima de la foto y tabla debajo, sin taparla
         val photoBox = compose.onNodeWithContentDescription("Fotografía", substring = true).fetchSemanticsNode().boundsInRoot
         val chips = compose.onNodeWithContentDescription("Contorno interno", substring = true).fetchSemanticsNode().boundsInRoot
@@ -345,7 +346,7 @@ class UsageFlowsTest {
         compose.waitForIdle()
         assertEquals("FOREHEAD", layersNow())
 
-        assertTrue(compose.onAllNodesWithText("Frente, línea 1", substring = true).fetchSemanticsNodes().size >= 2) // ficha y tabla
+        assertTrue(compose.onAllNodesWithText("Frente, línea 1", substring = true).fetchSemanticsNodes().isNotEmpty()) // en la tabla
         // eliminar la línea (falso positivo) desde la tabla y restaurarla
         compose.onNodeWithText("Trazar surco").assertExists()
         compose.onNodeWithContentDescription("Eliminar Frente, línea 1 (falso positivo)").performClick()
@@ -382,6 +383,34 @@ class UsageFlowsTest {
         compose.onNodeWithText("Mostrar en la foto: Surcos").performClick()
         compose.waitForIdle()
         assertTrue(ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("annot_layers", "")!!.contains("FOLDS"))
+    }
+
+    /** Anotar: lápiz sobre la foto (capa aparte), deshacer y la capa se puede ocultar. */
+    @Test
+    fun drawAnnotationsOnThePhoto() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val p = photos[0]; val u = p.uri.toString()
+        setContent { com.photomed.app.ui.gallery.PhotoViewerScreen(exp.id, Zone.LIPS, p.displayName, onBack = {}) }
+        compose.waitUntil(5_000) { compose.onAllNodesWithContentDescription("Anotar sobre la foto").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Anotar sobre la foto").performClick()
+        waitText("Lápiz")
+        compose.onNodeWithContentDescription("Color verde").performClick()
+        compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center, center + androidx.compose.ui.geometry.Offset(120f, 40f), 300) }
+        compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 1 }
+        assertEquals(0xFF00E676.toInt(), com.photomed.app.align.Annotations.of(ctx, u)!!.strokes.single().color)
+        // borrador por trazo sobre el mismo sitio: lo quita; deshacer lo devuelve
+        compose.onNodeWithText("Borrar trazo").performClick()
+        compose.onNodeWithContentDescription("Dibuje sobre la foto").performTouchInput { swipe(center, center + androidx.compose.ui.geometry.Offset(120f, 40f), 300) }
+        compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u) == null }
+        compose.onNodeWithContentDescription("Deshacer").performClick()
+        compose.waitUntil(5_000) { com.photomed.app.align.Annotations.of(ctx, u)?.strokes?.size == 1 }
+        compose.onAllNodesWithContentDescription("Terminar de anotar")[0].performClick()
+        // capas de la vista: las anotaciones se pueden ocultar
+        compose.onNodeWithContentDescription("Vista", substring = true).performClick()
+        waitText("Anotaciones")
+        compose.onNodeWithText("Anotaciones").performClick()
+        compose.waitForIdle()
+        assertTrue(ctx.getSharedPreferences("photomed", Context.MODE_PRIVATE).getString("view_layers", "")!! == "1101")
     }
 
     /**

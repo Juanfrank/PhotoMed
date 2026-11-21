@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.ui.graphics.asImageBitmap
 import com.photomed.app.ui.camera.drawAnnotations
 import com.photomed.app.ui.camera.drawMeasureGuides
+import com.photomed.app.ui.camera.drawInk
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +36,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Check
@@ -107,6 +111,14 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     var editVersion by remember { mutableIntStateOf(0) }
     // línea tocada (ficha de medidas) y tabla de medidas
     var selected by remember { mutableStateOf<com.photomed.app.align.AnnotLine?>(null) }
+    // fila de la tabla tocada: la foto se desplaza para que la línea se vea
+    var focusTick by remember { mutableIntStateOf(0) }
+    // capas de la vista y anotaciones (dibujo de planificación)
+    val viewLayers = com.photomed.app.ui.compare.rememberViewLayers()
+    var inking by remember { mutableStateOf(false) }
+    var inkStyle by remember { mutableStateOf(InkStyle()) }
+    var inkVersion by remember { mutableIntStateOf(0) }
+    val inkUndo = remember { androidx.compose.runtime.mutableStateMapOf<String, List<com.photomed.app.align.InkSet>>() }
     var metricsSheet by remember { mutableStateOf(false) }
     // correcciones del usuario: versión (vuelve a analizar) y modo «trazar surco»
     var userVersion by remember { mutableIntStateOf(0) }
@@ -123,15 +135,20 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     val annotsByUri = remember { androidx.compose.runtime.mutableStateMapOf<String, List<com.photomed.app.align.AnnotLine>>() }
     val notesByUri = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
 
+    // nombre de la foto mostrada (cambia si se edita su fecha: el nombre lleva la fecha)
+    var trackName by remember { mutableStateOf(initialName) }
+    var editDate by remember { mutableStateOf<Photo?>(null) }
     LaunchedEffect(reload) {
         photos = withContext(Dispatchers.IO) { repo.getExpediente(expId)?.let { repo.photos(it, zone) }.orEmpty() }
-        if (photos.isNullOrEmpty() || (review != null && photos.orEmpty().none { it.displayName == initialName })) onBack()
+        if (photos.isNullOrEmpty() || (review != null && photos.orEmpty().none { it.displayName == trackName })) onBack()
     }
     // en revisión: solo la foto recién tomada (las anteriores siguen sirviendo de referencia)
     val all = photos ?: return@ImmersiveTheme
-    val list = if (review != null) all.filter { it.displayName == initialName } else all
+    val list = if (review != null) all.filter { it.displayName == trackName } else all
     if (list.isEmpty()) return@ImmersiveTheme
     val pager = rememberPagerState(initialPage = list.indexOfFirst { it.displayName == initialName }.coerceAtLeast(0)) { list.size }
+    // tras cambiar la fecha, la lista se reordena: se vuelve a la misma foto
+    LaunchedEffect(list) { list.indexOfFirst { it.displayName == trackName }.takeIf { it >= 0 && it != pager.currentPage }?.let { pager.scrollToPage(it) } }
     val current = list[pager.currentPage.coerceIn(0, list.lastIndex)]
     var retrying by remember { mutableStateOf(false) }
     val galleryDelete = rememberGalleryDelete { ok ->
@@ -192,6 +209,31 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
         }
     }
 
+    /** Trazo de anotación ([path] en la foto editada, unidades del ancho; [aE]: alto / ancho de la editada). */
+    fun inkPath(ph: Photo, path: List<com.photomed.app.align.Pt>, aE: Float) {
+        val u = ph.uri.toString(); val st = inkStyle
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) { runCatching {
+                val e = com.photomed.app.align.PhotoEdits.of(context, u)
+                val old = com.photomed.app.align.Annotations.of(context, u) ?: com.photomed.app.align.InkSet(com.photomed.app.align.TraceMap.baseAspect(e, aE))
+                val fr = com.photomed.app.align.TraceFrame.FULL
+                val orig = com.photomed.app.align.TraceMap.fromView(e, old.baseAspect, fr, path)
+                // grosor: del ancho de la foto editada al de la original
+                val (a, b) = com.photomed.app.align.TraceMap.fromView(e, old.baseAspect, fr, listOf(path[0], com.photomed.app.align.Pt(path[0].x + st.width, path[0].y)))
+                val wOrig = kotlin.math.hypot(b.x - a.x, (b.y - a.y) * old.baseAspect)
+                val next = when (st.tool) {
+                    InkTool.PEN -> old.copy(strokes = old.strokes + com.photomed.app.align.InkStroke(st.color, wOrig, orig))
+                    InkTool.ERASE_PAINT -> if (old.strokes.isEmpty()) old else old.copy(strokes = old.strokes + com.photomed.app.align.InkStroke(0, wOrig, orig, erase = true))
+                    InkTool.ERASE_STROKE -> com.photomed.app.align.Annotations.eraseStrokes(old, orig, wOrig / 2)
+                }
+                if (next != old) { inkUndo[u] = (inkUndo[u].orEmpty() + old).takeLast(30); com.photomed.app.align.Annotations.save(context, u, next) }
+                true
+            }.onFailure { com.photomed.app.CrashLog.write("Guardar una anotación", it) }.getOrDefault(false) }
+            if (!ok) snackbar.showSnackbar("No se pudo guardar la anotación")
+            inkVersion++
+        }
+    }
+
     fun compareNames(p: Photo): List<String> =
         listOfNotNull(all.filter { it.takenAt < p.takenAt && it.expression == p.expression }.maxByOrNull { it.takenAt }?.displayName, p.displayName)
 
@@ -211,6 +253,10 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 actions = {
                     if (onCompare != null) IconButton(onClick = { onCompare(compareNames(current)) }) {
                         Icon(Icons.Default.CompareArrows, "Comparar")
+                    }
+                    com.photomed.app.ui.compare.ViewLayersButton(viewLayers)
+                    IconButton(onClick = { inking = !inking; if (inking) { tracing = false; viewLayers.value = viewLayers.value.copy(notes = true) } }) {
+                        Icon(Icons.Default.Draw, if (inking) "Terminar de anotar" else "Anotar sobre la foto")
                     }
                     IconButton(onClick = { showLayers = !showLayers }) {
                         Icon(Icons.Default.Layers, if (showLayers) "Ocultar capas" else "Capas: contorno, línea del pelo, rasgos y surcos")
@@ -275,10 +321,14 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize().background(Color.Black), key = { list[it].key },
-                userScrollEnabled = !cropping && !tracing) { page ->
+                userScrollEnabled = !cropping && !tracing && !inking) { page ->
                 val ph = list[page]
-                PhotoPage(ph, zone, if (showLayers) layersState.value else emptySet(), editVersion, Modifier.fillMaxSize(),
+                PhotoPage(ph, zone, if (showLayers && viewLayers.value.diagram) layersState.value else emptySet(), editVersion, Modifier.fillMaxSize(),
+                    showImage = viewLayers.value.image, showInk = viewLayers.value.notes, inkVersion = inkVersion,
+                    ink = if (inking && page == pager.currentPage) inkStyle else null,
+                    onInk = { path, aE -> inkPath(ph, path, aE) },
                     selected = selected, analyze = showLayers, alpha = annotAlpha.value,
+                    focusTick = if (page == pager.currentPage) focusTick else 0,
                     // referencia: fotos anteriores de la misma zona (la más reciente primero)
                     // (solo con la misma expresión: las arrugas dinámicas aparecen con el gesto)
                     previous = all.filter { it.takenAt < ph.takenAt && it.expression == ph.expression }.sortedByDescending { it.takenAt }.map { it.uri.toString() },
@@ -286,6 +336,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     onTracePath = { path -> tracing = false; tracePath(ph, path, traceTarget); traceTarget = null },
                     onSelect = { hit ->
                         selected = hit
+                        // sin ficha flotante: la tabla de medidas se abre en la fila de la línea
+                        if (hit != null) metricsSheet = true
                         // toque sin línea medida y ninguna capa de arrugas visible: cómo verlas
                         val visibleMeasured = annotsByUri[list[page].uri.toString()].orEmpty().any { it.metrics != null && it.layer in layersState.value }
                         if (hit == null && !visibleMeasured) scope.launch {
@@ -296,13 +348,6 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                         annotsByUri[list[page].uri.toString()] = lines
                         if (note != null) notesByUri[list[page].uri.toString()] = note else notesByUri.remove(list[page].uri.toString())
                     })
-            }
-            androidx.compose.foundation.layout.Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-                selected?.takeIf { showLayers && it.layer in layersState.value }?.let { l ->
-                    val nums = com.photomed.app.align.MeasureNumbering.of(listOf(annotsByUri[current.uri.toString()].orEmpty()))
-                    com.photomed.app.ui.compare.MetricsCard(l, onTable = { metricsSheet = true }, onClose = { selected = null },
-                        modifier = Modifier.fillMaxWidth().padding(8.dp), number = l.metrics?.name?.let { nums[it] })
-                }
             }
             }
             // tabla de medidas: debajo de la foto, sin taparla
@@ -328,9 +373,25 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                             scope.launch { snackbar.showSnackbar("Vuelva a dibujar «$name»: una línea por donde se ve, o rodee el área") } },
                         onRevert = { name -> mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.revert(it, name) } },
                         edited = set?.editedNames.orEmpty(), savedInPhoto = savedInPhoto[u] != false),
-                    onSelectLine = { l -> selected = l; if (l.layer !in layersState.value) layersState.value = layersState.value + l.layer },
+                    onSelectLine = { l -> selected = l; focusTick++; if (l.layer !in layersState.value) layersState.value = layersState.value + l.layer },
+                    selected = selected,
                     modifier = Modifier.fillMaxWidth().heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.45f).dp))
             }
+            if (inking) InkToolbar(inkStyle, { inkStyle = it }, canUndo = inkUndo[current.uri.toString()].orEmpty().isNotEmpty(),
+                onUndo = {
+                    val u = current.uri.toString(); val st = inkUndo[u].orEmpty()
+                    st.lastOrNull()?.let { prev -> inkUndo[u] = st.dropLast(1)
+                        scope.launch { withContext(Dispatchers.IO) { com.photomed.app.align.Annotations.save(context, u, prev) }; inkVersion++ } }
+                },
+                onClear = {
+                    val u = current.uri.toString()
+                    scope.launch {
+                        withContext(Dispatchers.IO) { com.photomed.app.align.Annotations.of(context, u)?.let { old ->
+                            inkUndo[u] = inkUndo[u].orEmpty() + old; com.photomed.app.align.Annotations.save(context, u, old.copy(strokes = emptyList())) } }
+                        inkVersion++
+                    }
+                },
+                onDone = { inking = false }, modifier = Modifier.fillMaxWidth().navigationBarsPadding())
             if (editing) androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))) {
                 // la edición se lee al pulsar (no la de la última composición) para encadenar giro, espejo…
                 fun now() = com.photomed.app.align.PhotoEdits.of(context, current.uri.toString())
@@ -396,6 +457,21 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
         )
     }
 
+    editDate?.let { ph ->
+        com.photomed.app.ui.components.DateTimePickerDialog(ph.takenAt, onDismiss = { editDate = null }, onPick = { t ->
+            editDate = null
+            scope.launch {
+                val np = withContext(Dispatchers.IO) { runCatching {
+                    com.photomed.app.data.CaptureDate.write(context, ph.uri, t)
+                    val e = repo.getExpediente(expId) ?: error("Sin expediente")
+                    repo.setCaptureDate(e, ph, t).also { com.photomed.app.align.PhotoKeys.move(context, ph.uri.toString(), it.uri.toString()) }
+                }.onFailure { com.photomed.app.CrashLog.write("Cambiar la fecha de captura", it) }.getOrNull() }
+                if (np == null) snackbar.showSnackbar("No se pudo cambiar la fecha")
+                else { trackName = np.displayName; reload++; snackbar.showSnackbar("Fecha de captura: ${formatDateTime(np.takenAt)}") }
+            }
+        })
+    }
+
     info?.let { (photo, meta) ->
         SafeBottomSheet(onDismiss = { info = null }) {
             Column(Modifier.padding(bottom = androidx.compose.ui.unit.Dp(16f))) {
@@ -404,7 +480,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 InfoRow("Paciente", meta?.patientName ?: "—")
                 InfoRow("Expediente", meta?.recordNumber?.ifBlank { null } ?: "—")
                 InfoRow("Zona", meta?.zoneLabel ?: photo.zone.label)
-                InfoRow("Fecha de captura", formatDateTime(photo.takenAt))
+                ListItem(overlineContent = { Text("Fecha de captura") }, headlineContent = { Text(formatDateTime(photo.takenAt)) },
+                    trailingContent = { IconButton(onClick = { editDate = photo; info = null }) { Icon(Icons.Default.EditCalendar, "Editar la fecha de captura") } })
                 InfoRow("Consentimiento", if (meta?.consent == true) "Registrado" else "No registrado")
                 meta?.conditions?.takeIf { it.isNotEmpty() }?.let { c ->
                     val labels = mapOf("Engine" to "Motor de puntos", "Assist" to "Asistencia", "MatchPercent" to "Puntos coincidentes (%)",
@@ -442,6 +519,15 @@ private fun EditButton(icon: androidx.compose.ui.graphics.vector.ImageVector, la
 @Composable
 private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.align.AnnotLayer>, version: Int, modifier: Modifier,
                       selected: com.photomed.app.align.AnnotLine? = null, onSelect: (com.photomed.app.align.AnnotLine?) -> Unit = {},
+                      /** Cambia al tocar una fila de la tabla: se desplaza la foto hasta la línea seleccionada. */
+                      focusTick: Int = 0,
+                      /** Capas de la vista: imagen y anotaciones. */
+                      showImage: Boolean = true, showInk: Boolean = true,
+                      /** Cambia al guardar anotaciones (vuelve a leerlas). */
+                      inkVersion: Int = 0,
+                      /** Anotando con este estilo (null = no): un dedo dibuja. */
+                      ink: InkStyle? = null,
+                      onInk: (List<com.photomed.app.align.Pt>, Float) -> Unit = { _, _ -> },
                       /** Analizar la foto (panel de capas abierto), aunque no haya capas encendidas: la tabla lo necesita. */
                       analyze: Boolean = layers.isNotEmpty(),
                       /** Opacidad de los trazos y números. */
@@ -498,14 +584,38 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
         }
         onAnalyzed(value.orEmpty(), com.photomed.app.align.PhotoAnnotator.note(key))
     }
+    // anotaciones de la foto, en su encuadre completo con la edición
+    val inkLines by androidx.compose.runtime.produceState<List<com.photomed.app.align.InkStroke>>(emptyList(), photo.uri, edit, inkVersion) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { com.photomed.app.align.Annotations.of(context, photo.uri.toString())?.inView(edit, com.photomed.app.align.TraceFrame.FULL) }.getOrNull().orEmpty()
+        }
+    }
     val imgState = androidx.compose.runtime.rememberUpdatedState(img)
     val annotsState = androidx.compose.runtime.rememberUpdatedState(annots)
     val layersState = androidx.compose.runtime.rememberUpdatedState(layers)
     val onSelectState = androidx.compose.runtime.rememberUpdatedState(onSelect)
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    var boxSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
     val b = img
+    // fila de la tabla tocada: la línea seleccionada al centro, ampliada si es pequeña
+    LaunchedEffect(focusTick) {
+        val l = selected ?: return@LaunchedEffect
+        val bb = img ?: return@LaunchedEffect
+        if (focusTick == 0 || boxSize.width == 0 || l.points.isEmpty()) return@LaunchedEffect
+        val sw = boxSize.width.toFloat(); val sh = boxSize.height.toFloat()
+        val ia = bb.width / bb.height.toFloat()
+        val w = minOf(sw, sh * ia); val h = w / ia
+        val pts = l.points + l.guides.flatMap { listOf(it.a, it.b) }
+        val x0 = pts.minOf { it.x }; val x1 = pts.maxOf { it.x }; val y0 = pts.minOf { it.y }; val y1 = pts.maxOf { it.y }
+        val size = maxOf(x1 - x0, y1 - y0).coerceAtLeast(0.02f) * w
+        val s = (minOf(sw, sh) * 0.5f / size).coerceIn(1f, 4f).coerceAtLeast(scale)
+        val px = (sw - w) / 2 + (x0 + x1) / 2 * w; val py = (sh - h) / 2 + (y0 + y1) / 2 * w
+        scale = s
+        offset = if (s == 1f) androidx.compose.ui.geometry.Offset.Zero else androidx.compose.ui.geometry.Offset(-(px - sw / 2) * s, -(py - sh / 2) * s)
+    }
     Box(modifier
+        .onSizeChanged { boxSize = it }
         .pointerInput(Unit) {
             detectTransformGestures { _, pan, zoom, _ ->
                 scale = (scale * zoom).coerceIn(1f, 6f)
@@ -535,7 +645,8 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
             val ia = b.width / b.height.toFloat()
             val w = minOf(size.width, size.height * ia); val h = w / ia
             val left = (size.width - w) / 2; val top = (size.height - h) / 2
-            drawImage(b, dstOffset = androidx.compose.ui.unit.IntOffset(left.toInt(), top.toInt()),
+            // capa 1: la imagen
+            if (showImage) drawImage(b, dstOffset = androidx.compose.ui.unit.IntOffset(left.toInt(), top.toInt()),
                 dstSize = androidx.compose.ui.unit.IntSize(w.toInt(), h.toInt()), filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium)
             annots?.let { a ->
                 val k = (w / 360.dp.toPx()).coerceIn(0.35f, 1.4f) / scale.coerceAtLeast(1f).let { kotlin.math.sqrt(it) }
@@ -551,6 +662,37 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
                 drawAnnotations(a, layers, k, numbers = com.photomed.app.align.MeasureNumbering.of(listOf(a)), alpha = alpha) { p -> map(p) }
                 // lo que se mide de la línea seleccionada (ancho, alto, distancias), punteado
                 selected?.takeIf { it.layer in layers }?.let { sl -> drawMeasureGuides(sl, k) { p -> map(p) } }
+            }
+            // capa 3: anotaciones (encima del diagrama)
+            if (showInk) drawInk(inkLines, w) { p -> androidx.compose.ui.geometry.Offset(left + p.x * w, top + p.y * w) }
+        }
+        // anotar: un dedo dibuja (el trazo se ve mientras se dibuja); la foto no se mueve
+        if (ink != null && b != null) {
+            val path = remember { androidx.compose.runtime.mutableStateListOf<androidx.compose.ui.geometry.Offset>() }
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()
+                .semantics { contentDescription = "Dibuje sobre la foto" }
+                .pointerInput(b, ink) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        down.consume()   // un toque al anotar no selecciona líneas
+                        path.clear(); path += down.position
+                        drag(down.id) { ch -> path += ch.position; ch.consume() }
+                        if (path.isNotEmpty()) {
+                            val sw = size.width.toFloat(); val sh = size.height.toFloat()
+                            onInk(path.map { o -> screenToPhoto(o.x, o.y, sw, sh, b.width, b.height, scale, offset.x, offset.y) }, b.height / b.width.toFloat())
+                        }
+                        path.clear()
+                    }
+                }) {
+                if (path.isNotEmpty()) {
+                    val ia = b.width / b.height.toFloat()
+                    val wImg = minOf(size.width, size.height * ia) * scale
+                    val sw = (ink.width * wImg).coerceAtLeast(2f)
+                    val p = androidx.compose.ui.graphics.Path().apply { moveTo(path[0].x, path[0].y); path.drop(1).forEach { lineTo(it.x, it.y) } }
+                    val col = if (ink.tool == InkTool.PEN) Color(ink.color) else Color.White.copy(alpha = 0.45f)
+                    drawPath(p, col, style = androidx.compose.ui.graphics.drawscope.Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                        join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                }
             }
         }
         // trazar un surco a mano alzada: el trazo se ve mientras se dibuja (con o sin zoom)

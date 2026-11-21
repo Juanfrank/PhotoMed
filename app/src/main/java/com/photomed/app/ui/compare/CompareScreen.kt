@@ -191,6 +191,10 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     // eliminar líneas (falsos positivos): vuelve a analizar
     var userVersion by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var regenerate by remember { mutableStateOf(false) }
+    // capas de la vista, línea seleccionada en la tabla y tamaño de la celda (para centrarla)
+    val viewLayers = rememberViewLayers()
+    var selLine by remember { mutableStateOf<String?>(null) }
+    val cellSize = remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
     // panel bajo las fotos (alineación, filtros, miniaturas, medidas) desplegado o plegado (se recuerda)
     var panelOpen by remember { mutableStateOf(prefs.getBoolean("compare_panel_open", true)) }
     /** Cambia los trazos confirmados de [ps] (los que no los tienen, primero se confirman como se ven) y los guarda. */
@@ -374,6 +378,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } },
                 actions = {
+                    ViewLayersButton(viewLayers)
                     IconButton(onClick = { showLayers = !showLayers }, enabled = seq != null) {
                         Icon(Icons.Default.Layers, if (showLayers) "Ocultar capas" else "Capas: contorno, línea del pelo, rasgos y surcos")
                     }
@@ -431,7 +436,13 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             key("a" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, showLayers,
                 previous = previousOf(p), userVersion = userVersion).value }?.let { p.key to it }
         }?.toMap().orEmpty()
-        val view = CompareView(viewRot, viewMirror, layers, models.mapNotNull { (k, m) -> annots[k]?.let { m to it } }.toMap(), annotAlpha.value)
+        // anotaciones de cada foto (dibujo de planificación), en su foto corregida
+        val inks: Map<String, List<com.photomed.app.align.InkStroke>> = seq?.associate { p ->
+            p.key to key("i" + p.key) { rememberPhotoInk(p.uri, resultOf(p)?.keystoneDeg ?: 0f, viewLayers.value.notes).value.orEmpty() }
+        }.orEmpty()
+        val view = CompareView(viewRot, viewMirror, if (viewLayers.value.diagram) layers else emptySet(),
+            models.mapNotNull { (k, m) -> annots[k]?.let { m to it } }.toMap(), annotAlpha.value,
+            view = viewLayers.value, ink = models.mapNotNull { (k, m) -> inks[k]?.let { m to it } }.toMap(), selected = selLine)
         if (all != null && photos.size < 2) {
             EmptyState(Icons.Default.Compare, "Se necesitan dos fotografías",
                 "Tome al menos dos fotografías de una zona para compararlas.", Modifier.padding(padding))
@@ -471,7 +482,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     modifier = Modifier.padding(start = 10.dp))
             }
             // Área de comparación
-            androidx.compose.runtime.CompositionLocalProvider(LocalCompareView provides view) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalCompareView provides view, LocalCellSize provides cellSize) {
             Box(
                 Modifier.weight(1f).fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact, vertical = Md3Spacing.s2),
                 contentAlignment = Alignment.Center,
@@ -620,6 +631,13 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                     onClose = { metricsSheet = false }, loading = seq.any { annots[it.key] == null },
                     note = seq.firstNotNullOfOrNull { photoAnnotationNote(context, it.uri, previousOf(it)) },
                     onShowLayers = { layersState.value = it },
+                    selected = selLine?.let { n -> seq.firstNotNullOfOrNull { p -> annots[p.key]?.firstOrNull { it.metrics?.name == n } } },
+                    // fila tocada: la línea se selecciona en todas las fotos y el zoom la centra
+                    onSelectLine = { l ->
+                        selLine = l.metrics?.name
+                        if (l.layer !in layersState.value) layersState.value = layersState.value + l.layer
+                        zoom = focusZoom(l, cellSize.value, zoom)
+                    },
                     // eliminar (falso positivo): los trazos de esa foto quedan confirmados sin la línea
                     onDelete = { name, col ->
                         val ps = if (col == null) seq else listOfNotNull(seq.getOrNull(col))
@@ -690,6 +708,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 }
             }
 
+            // con la tabla de medidas abierta, el selector de fotos se oculta (más sitio para la tabla)
+            if (!(metricsSheet && showLayers && seq != null)) Column {
             // Filtro por zona
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Md3Spacing.marginCompact),
@@ -761,6 +781,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                             maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
                 }
+            }
             }
             }
             }
@@ -1004,6 +1025,21 @@ private fun PhotoCell(model: Any, label: String, t: Similarity?, zoom: ZoomState
         })
         Label(label, Modifier.align(Alignment.TopStart))
     }
+}
+
+/**
+ * Zoom que centra la línea [l] (unidades del ancho de la foto 3:4) en una celda de [cell] px; amplía
+ * si es pequeña (sin reducir el zoom actual).
+ */
+fun focusZoom(l: com.photomed.app.align.AnnotLine, cell: androidx.compose.ui.unit.IntSize, current: ZoomState): ZoomState {
+    if (cell.width == 0 || l.points.isEmpty()) return current
+    val w = cell.width.toFloat(); val h = cell.height.toFloat()
+    val pts = l.points + l.guides.flatMap { listOf(it.a, it.b) }
+    val x0 = pts.minOf { it.x }; val x1 = pts.maxOf { it.x }; val y0 = pts.minOf { it.y }; val y1 = pts.maxOf { it.y }
+    val size = maxOf(x1 - x0, y1 - y0).coerceAtLeast(0.02f) * w
+    val s = (minOf(w, h) * 0.5f / size).coerceIn(1f, 4f).coerceAtLeast(current.scale)
+    val px = (x0 + x1) / 2 * w; val py = (y0 + y1) / 2 * w
+    return ZoomState(s, androidx.compose.ui.geometry.Offset(-(px - w / 2) * s, -(py - h / 2) * s))
 }
 
 /**

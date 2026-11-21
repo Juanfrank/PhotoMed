@@ -8,4 +8,6 @@ import kotlinx.coroutines.SupervisorJob
  * Ámbito de la aplicación para trabajo que no debe cancelarse al salir de una pantalla
  * (p. ej. guardar en la galería una foto recién tomada aunque el usuario cierre la cámara).
  */
-object AppScope : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.IO)
+object AppScope : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.IO +
+    // un error en una tarea en segundo plano no cierra la app, pero queda registrado
+    kotlinx.coroutines.CoroutineExceptionHandler { _, e -> CrashLog.write("Error en una tarea en segundo plano", e) })

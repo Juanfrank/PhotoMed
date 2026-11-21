@@ -165,7 +165,13 @@ object PhotoMetadata {
      * XMP con los trazos confirmados ([json], ver ConfirmedTraces) en `pm:Traces`; null los quita. Si
      * no hay XMP, se crea uno mínimo con el espacio `pm:`.
      */
-    fun withTraces(xmp: String?, json: String?): String {
+    fun withTraces(xmp: String?, json: String?): String = withAttr(xmp, "Traces", json)
+
+    /** Valor JSON de un atributo `pm:<name>` del XMP, o null. */
+    fun attrOf(xmp: String?, name: String): String? = xmp?.let { Regex("""pm:$name="([^"]*)"""").find(it)?.groupValues?.get(1)?.let(::unesc) }
+
+    /** XMP con el atributo `pm:<name>` = [json] (null lo quita). */
+    fun withAttr(xmp: String?, name: String, json: String?): String {
         val base = xmp?.takeIf { it.contains("rdf:Description") } ?: """<?xpacket begin="${'\uFEFF'}" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
@@ -174,9 +180,9 @@ object PhotoMetadata {
  </rdf:RDF>
 </x:xmpmeta>
 <?xpacket end="w"?>"""
-        var out = base.replace(Regex("""\s*pm:Traces="[^"]*""""), "")
+        var out = base.replace(Regex("""\s*pm:$name="[^"]*""""), "")
         if (json != null) {
-            val attr = "\n    pm:Traces=\"${esc(json)}\""
+            val attr = "\n    pm:$name=\"${esc(json)}\""
             out = if (out.contains("xmlns:pm=")) Regex("""xmlns:pm="[^"]*"""").replace(out) { it.value + attr }
             else out.replaceFirst("rdf:about=\"\"", "rdf:about=\"\"\n    xmlns:pm=\"$NS\"$attr")
         }

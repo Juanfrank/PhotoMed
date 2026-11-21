@@ -125,6 +125,8 @@ fun JuxtaposeSlider(
 
 @Composable
 fun Label(text: String, modifier: Modifier = Modifier) {
+    // capa 4 (overlay): fechas y rótulos, se pueden ocultar
+    if (!LocalCompareView.current.view.overlay || text.isEmpty()) return
     Text(
         text,
         color = Color.White,

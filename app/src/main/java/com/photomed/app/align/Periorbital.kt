@@ -9,8 +9,8 @@ import kotlin.math.roundToInt
  *
  * Se recorre la zona en 15 columnas perpendiculares a la línea de los ojos, desde el borde del párpado
  * hacia la mejilla, con el perfil de L* (CIE) suavizado:
- * - **Ojera**: tramo, desde el párpado, más oscuro que la piel de la **misma columna** más abajo
- *   (mejilla, a 23–30 % del ancho de la cara), en más de 3 L*. La referencia local compensa la
+ * - **Ojera**: tramo, desde el párpado (como mucho un 12 % del ancho de la cara, ~15 mm), más oscuro que la piel de la **misma columna** más abajo
+ *   (mejilla, a 23–30 % del ancho de la cara), en más de 4 L*. La referencia local compensa la
  *   iluminación lateral (antes se comparaba con un punto fijo de la mejilla, a veces en otra luz). La
  *   colorimetría clínica mide lo mismo: ΔL* y ΔE*ab de la zona periocular frente a la mejilla. El
  *   contorno es el de la zona oscura (mediana entre columnas), no un polígono fijo; las gafas, el pelo
@@ -29,12 +29,12 @@ object Periorbital {
     private const val NC = 15
 
     // distancias en fracción del ancho de la cara
-    private const val T0 = 0.012f; private const val T1 = 0.20f
+    private const val T0 = 0.012f; private const val T1 = 0.12f
     private const val R0 = 0.23f; private const val R1 = 0.30f
     private const val BAG0 = 0.035f; private const val BAG1 = 0.15f
 
     /** Umbral de oscurecimiento de la ojera (L*). */
-    const val DARK_DL = 3f
+    const val DARK_DL = 4f
 
     class Maps(val fine: GrayImage, val broad: GrayImage, val lab: LabImage?)
 
@@ -174,7 +174,7 @@ object Periorbital {
             for (j in 0 until tEnd) {
                 if (!cols[c].skin[j]) break
                 val d = ref - cols[c].fine[j]
-                if (d > DARK_DL) { end = j; gap = 0; sum += d; cnt++ } else { gap++; if (gap > 3) break }
+                if (d > DARK_DL) { end = j; gap = 0; sum += d; cnt++ } else { gap++; if (gap > 2) break }
             }
             if (end >= 0) { ends[c] = (t0 + end).toFloat(); dls += sum / cnt }
         }

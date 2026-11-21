@@ -8,6 +8,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.lifecycle.lifecycleScope
 import com.photomed.app.data.PhotoRepository
 import com.photomed.app.ui.AppNavigation
+import com.photomed.app.ui.CrashNotice
 import com.photomed.app.ui.LocalRepository
 import com.photomed.app.ui.theme.PhotoMedTheme
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +17,8 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // ningún cierre silencioso: los errores se guardan y se avisan al volver a abrir
+        CrashLog.install(applicationContext)
         // versión nueva: fuera las cachés de la anterior (formatos que pueden haber cambiado)
         AppUpgrade.onStart(applicationContext)
         enableEdgeToEdge()
@@ -28,6 +31,7 @@ class MainActivity : ComponentActivity() {
             PhotoMedTheme {
                 CompositionLocalProvider(LocalRepository provides repository) {
                     AppNavigation()
+                    CrashNotice()
                 }
             }
         }

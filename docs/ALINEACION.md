@@ -643,7 +643,7 @@ estado de la cámara (zona, expresión, zoom, ajustes) se conserva; el análisis
 ## Trazado a mano alzada (2.23; `FreehandTrace`)
 
 - **Línea**: se remuestrea y suaviza; se busca el valle de sombra en un pasillo estrecho a lo largo de
-  ella (±6 % de su longitud, umbral concesivo) y se acepta si cubre al menos la mitad del trazo. Si no,
+  ella (±15 % de su longitud, umbral concesivo) y se acepta si cubre al menos la mitad del trazo. Si no,
   se guarda el trazo del usuario (marcado como tal). Error mediano en la prueba: < 2 px.
 - **Área**: si el trazo vuelve cerca de su inicio y encierra superficie, se busca el surco dentro del
   rectángulo que la contiene (`RegionTrace`) y se conserva lo que cae dentro.
@@ -676,3 +676,19 @@ estado de la cámara (zona, expresión, zoom, ajustes) se conserva; el análisis
 - Ojeras y bolsas: el borde inferior es un ajuste cuadrático de la profundidad por columna (sin las
   atípicas, > 2,5 % del ancho de la cara), multiplicado por sen(π·t) a lo largo del ojo: media luna que
   se cierra en los cantos.
+
+## Capas de la vista y anotaciones (2.30)
+
+- Orden de dibujo: imagen → diagrama facial (líneas, números, tramos de la seleccionada) → anotaciones
+  → overlay (rótulos de fecha). `ViewLayers` guarda qué capas se ven.
+- Anotaciones (`Annotations.kt`): trazos en la foto original (x, y normalizadas) con su grosor en
+  fracción del ancho; se llevan a cada encuadre con `TraceMap` (el grosor, midiendo un segmento
+  horizontal de ese ancho). El borrador tipo pintura es un trazo con `BlendMode.Clear` dentro de una
+  capa propia (no borra la foto ni el diagrama); el borrador por trazo quita los trazos que toca
+  (distancia a sus segmentos). JSON en la app y en el XMP (`pm:Ink`, hasta 40 kB).
+
+## Registro de errores (2.30; `CrashLog.kt`)
+
+`Thread.setDefaultUncaughtExceptionHandler` escribe `files/errores/cierre_<fecha>.txt` (versión,
+Android, dispositivo, traza) y deja seguir al manejador del sistema; las tareas de `AppScope` tienen un
+`CoroutineExceptionHandler` que escribe `error_<fecha>.txt` sin cerrar la app. Se guardan 20.

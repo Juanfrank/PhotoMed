@@ -105,6 +105,19 @@ fun SettingsScreen(onBack: () -> Unit) {
                     mirror = it; prefs.edit().putBoolean("mirror_front", it).apply()
                 },
             )
+            HorizontalDivider()
+            SectionHeader("Registro de errores", Modifier.padding(horizontal = Md3Spacing.s6))
+            var logs by remember { mutableStateOf(com.photomed.app.CrashLog.all(context)) }
+            ListItem(
+                headlineContent = { Text(if (logs.isEmpty()) "Sin errores registrados" else "Compartir el registro (${logs.size})") },
+                supportingContent = { Text(logs.firstOrNull()?.let { "Último: " + it.readLines().getOrNull(1)?.removePrefix("Fecha: ").orEmpty() }
+                    ?: "Si la app se cierra por un error, queda registrado aquí (sin fotos ni datos del paciente).") },
+                modifier = Modifier.fillMaxWidth().clickable(enabled = logs.isNotEmpty()) { com.photomed.app.CrashLog.share(context, logs) },
+            )
+            if (logs.isNotEmpty()) ListItem(
+                headlineContent = { Text("Borrar el registro") },
+                modifier = Modifier.fillMaxWidth().clickable { com.photomed.app.CrashLog.clear(context); logs = emptyList() },
+            )
         }
     }
 }
