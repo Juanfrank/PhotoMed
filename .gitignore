@@ -14,3 +14,4 @@ keystore.properties
 apk/
 __pycache__/
 app/src/test/resources/stock/
+app/src/test/resources/bench/
