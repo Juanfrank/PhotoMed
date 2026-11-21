@@ -24,7 +24,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /** Zona de «Trazar surco» con zoom y botón de eliminar visible en un teléfono estrecho. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w360dp-h740dp")
+@Config(sdk = [34], qualifiers = "es-w360dp-h740dp")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class TraceAndDeleteTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()

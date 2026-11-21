@@ -22,7 +22,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w600dp-h1600dp")
+@Config(sdk = [34], qualifiers = "es-w600dp-h1600dp")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class MetricsUiTest {
     @get:Rule

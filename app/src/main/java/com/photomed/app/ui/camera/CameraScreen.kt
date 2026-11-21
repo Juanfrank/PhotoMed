@@ -404,13 +404,15 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     val toneGen = remember { runCatching { android.media.ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, 70) }.getOrNull() }
     DisposableEffect(Unit) { onDispose { toneGen?.release() } }
     LaunchedEffect(status) {
-        if (status == MatchStatus.MATCH) {
+        if (status == MatchStatus.MATCH && reviewName == null && !capturing) {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             if (feedback) runCatching { toneGen?.startTone(android.media.ToneGenerator.TONE_PROP_ACK, 160) }
         }
     }
     // Pulsos que se aceleran al acercarse a la coincidencia (sin mirar la pantalla)
-    val degree = if (matchingEnabled) GuideTone.degree(live?.eval) else null
+    // sin pulsos durante la captura ni en la revisión de la foto: el análisis está en pausa y el último
+    // cuadro quedaría congelado (vibraba sin parar en el visor)
+    val degree = if (matchingEnabled && !capturing && reviewName == null) GuideTone.degree(live?.eval) else null
     val degreeStep = degree?.let { (it * 10).toInt() }
     LaunchedEffect(degreeStep, feedback) {
         val d = degreeStep ?: return@LaunchedEffect

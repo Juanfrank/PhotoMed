@@ -43,7 +43,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w600dp-h1400dp")
+@Config(sdk = [34], qualifiers = "es-w600dp-h1400dp")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PhotoImportTest {
     @get:Rule(order = 0) val tmp = TemporaryFolder()

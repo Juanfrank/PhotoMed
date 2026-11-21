@@ -62,7 +62,7 @@ import java.io.File
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w600dp-h1400dp")
+@Config(sdk = [34], qualifiers = "es-w600dp-h1400dp")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class UsageFlowsTest {
     @get:Rule(order = 0)
@@ -370,7 +370,7 @@ class UsageFlowsTest {
      */
     /** Horizontal / tableta apaisada: la tabla de medidas va a la derecha de la foto, no debajo. */
     @Test
-    @Config(sdk = [34], qualifiers = "w1200dp-h700dp-land")
+    @Config(sdk = [34], qualifiers = "es-w1200dp-h700dp-land")
     fun landscapeMetricsPanelBesideThePhoto() {
         com.photomed.app.align.PhotoEdits.clearCache()
         val ctx = ApplicationProvider.getApplicationContext<Context>()
@@ -442,7 +442,7 @@ class UsageFlowsTest {
 
     /** Comparar en horizontal: controles a la izquierda y las fotos en la mitad derecha. */
     @Test
-    @Config(sdk = [34], qualifiers = "w1200dp-h700dp-land")
+    @Config(sdk = [34], qualifiers = "es-w1200dp-h700dp-land")
     fun compareLandscapeControlsLeftPhotosRight() {
         val jpeg = File(tmp.root, "l.jpg").apply { writeBytes(this@UsageFlowsTest.javaClass.getResourceAsStream("/blank.jpg")!!.readBytes()) }
         val ps = listOf(1L, 2L).map { repo.savePhoto(exp, Zone.FOREHEAD, jpeg, takenAt = it * 86_400_000L * 30) }
@@ -738,7 +738,7 @@ class UsageFlowsTest {
 
 /** Capturas de la comparación de N fotos con rostros sintéticos (build/reports/compare_*.png). */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w400dp-h860dp-xxhdpi")
+@Config(sdk = [34], qualifiers = "es-w400dp-h860dp-xxhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class CompareNCaptureTest {
     @get:Rule(order = 0)

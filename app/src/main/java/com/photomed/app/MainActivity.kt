@@ -39,8 +39,14 @@ class MainActivity : ComponentActivity() {
         i.action = null
     }
 
+    override fun attachBaseContext(newBase: android.content.Context) {
+        // idioma elegido en Ajustes (antes de Android 13; después lo aplica el sistema)
+        super.attachBaseContext(com.photomed.app.i18n.AppLanguage.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.photomed.app.i18n.I18n.init(applicationContext.createConfigurationContext(resources.configuration))
         // ningún cierre silencioso: los errores se guardan y se avisan al volver a abrir
         CrashLog.install(applicationContext)
         CrashLog.checkExitReasons(applicationContext)
@@ -49,6 +55,7 @@ class MainActivity : ComponentActivity() {
         // sensibilidad de la detección de arrugas elegida en los ajustes
         com.photomed.app.align.WrinkleTuning.load(applicationContext)
         runCatching { com.photomed.app.data.BuiltInProtocols.seed(applicationContext) }
+        com.photomed.app.ui.theme.AppTheme.load(applicationContext)
         enableEdgeToEdge()
         val repository = PhotoRepository.create(applicationContext)
         // Versión 1 guardaba las fotos en almacenamiento privado: se mueven a la galería.

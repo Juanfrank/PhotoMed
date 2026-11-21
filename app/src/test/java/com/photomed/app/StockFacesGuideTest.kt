@@ -46,7 +46,7 @@ import kotlin.random.Random
  * Comprueba que la malla deformada no se pliega y genera láminas en build/reports/stock_guide_*.png.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w1200dp-h1700dp-mdpi")
+@Config(sdk = [34], qualifiers = "es-w1200dp-h1700dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class StockFacesGuideTest {
     @get:Rule

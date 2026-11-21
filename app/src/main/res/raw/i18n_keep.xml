@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Los textos traducibles se buscan por nombre (I18n.lookup): que la reducción de recursos no los quite. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@string/t_*" />

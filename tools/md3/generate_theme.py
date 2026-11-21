@@ -40,6 +40,9 @@ def num(x: float) -> str:
 
 
 palette = {k: v for k, v in t["palette"].items() if k not in ("black", "white")}
+# colores de la marca (logo): primario, secundario, terciario y neutros; el error queda el de M3
+from brand_palette import palettes as brand_palettes  # noqa: E402
+palette.update(brand_palettes())
 weights = {
     "var(--md-ref-typeface-weight-regular)": "FontWeight.W" + t["typeface"]["weight-regular"],
     "var(--md-ref-typeface-weight-medium)": "FontWeight.W" + t["typeface"]["weight-medium"],
@@ -50,6 +53,7 @@ L = []
 w = L.append
 w("// ARCHIVO GENERADO por tools/md3/generate_theme.py — no editar a mano.")
 w(f"// Fuente: Juanfrank/MD docs/material3/tokens.json ({t.get('source', '')}).")
+w("// Paletas de color: las del logo (tools/md3/brand_palette.py).")
 w("@file:Suppress(\"unused\", \"MagicNumber\")")
 w("")
 w("package com.photomed.app.ui.theme")

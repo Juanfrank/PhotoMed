@@ -33,7 +33,7 @@ import java.io.File
 
 /** Plantillas de sesión, selección múltiple de zonas y secuencia de fotos. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w600dp-h1600dp")
+@Config(sdk = [34], qualifiers = "es-w600dp-h1600dp")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SequenceFlowTest {
     @get:Rule

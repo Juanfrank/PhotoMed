@@ -49,7 +49,7 @@ import java.io.File
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w393dp-h851dp-xhdpi")
+@Config(sdk = [34], qualifiers = "es-w393dp-h851dp-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ScreenTourTest {
     @get:Rule(order = 0) val tmp = TemporaryFolder()
@@ -141,7 +141,7 @@ class ScreenTourTest {
     }
 
     @Test
-    @Config(sdk = [34], qualifiers = "w851dp-h393dp-land-xhdpi")
+    @Config(sdk = [34], qualifiers = "es-w851dp-h393dp-land-xhdpi")
     fun tourLandscape() {
         compose.setContent {
             CompositionLocalProvider(LocalRepository provides repo) { PhotoMedTheme(darkTheme = false) { screen?.invoke() } }

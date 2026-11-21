@@ -63,6 +63,18 @@ fun SettingsScreen(onBack: () -> Unit) {
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás") } })
     }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
+            // apariencia: tema claro, oscuro o el del sistema
+            SectionHeader("Apariencia", Modifier.padding(horizontal = Md3Spacing.s6))
+            com.photomed.app.ui.theme.ThemeMode.entries.forEach { m ->
+                androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth()
+                    .selectable(com.photomed.app.ui.theme.AppTheme.mode == m, role = androidx.compose.ui.semantics.Role.RadioButton) {
+                        com.photomed.app.ui.theme.AppTheme.set(context, m)
+                    }.padding(horizontal = Md3Spacing.s6, vertical = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    androidx.compose.material3.RadioButton(selected = com.photomed.app.ui.theme.AppTheme.mode == m, onClick = null)
+                    Text(m.label, style = androidx.compose.material3.MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+            HorizontalDivider()
             MatchSettingsContent(
                 autoCapture = auto, threshold = threshold,
                 onAutoCapture = { auto = it; prefs.edit().putBoolean("auto_capture", it).apply() },
@@ -73,6 +85,20 @@ fun SettingsScreen(onBack: () -> Unit) {
                 nearCapture = nearCapture, onNearCapture = { nearCapture = it; prefs.edit().putBoolean("auto_capture_near", it).apply() },
                 burst = burst, onBurst = { burst = it; prefs.edit().putBoolean("burst", it).apply() },
             )
+            HorizontalDivider()
+            // idioma de la interfaz (Android 13+: el mismo ajuste que «Idioma de la app» del sistema)
+            SectionHeader(com.photomed.app.i18n.tr("Idioma"), Modifier.padding(horizontal = Md3Spacing.s6))
+            val lang = remember { com.photomed.app.i18n.AppLanguage.current(context) }
+            com.photomed.app.i18n.AppLanguage.entries.forEach { l ->
+                androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth()
+                    .selectable(lang == l, role = androidx.compose.ui.semantics.Role.RadioButton) {
+                        (context.findActivity())?.let { com.photomed.app.i18n.AppLanguage.set(it, l) }
+                    }.padding(horizontal = Md3Spacing.s6, vertical = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    androidx.compose.material3.RadioButton(selected = lang == l, onClick = null)
+                    Text(com.photomed.app.i18n.tr(l.label), style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(start = 8.dp))
+                }
+            }
             HorizontalDivider()
             // sensibilidad de la detección de arrugas y surcos (ver docs/BENCHMARK.md)
             SectionHeader("Detección de arrugas", Modifier.padding(horizontal = Md3Spacing.s6))
@@ -140,4 +166,10 @@ fun SettingsScreen(onBack: () -> Unit) {
             )
         }
     }
+}
+
+private fun Context.findActivity(): android.app.Activity? {
+    var c: Context? = this
+    while (c is android.content.ContextWrapper) { if (c is android.app.Activity) return c; c = c.baseContext }
+    return null
 }

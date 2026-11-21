@@ -46,7 +46,7 @@ import java.util.zip.ZipFile
 
 /** Protocolos de fotos: formato, resultados de ida y vuelta, editor y sección del expediente. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "w600dp-h1400dp")
+@Config(sdk = [34], qualifiers = "es-w600dp-h1400dp")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ProtocolTest {
     @get:Rule(order = 0) val tmp = TemporaryFolder()
