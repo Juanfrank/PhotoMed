@@ -109,7 +109,7 @@ data class TraceSet(val baseAspect: Float, val traces: List<StoredTrace>, val re
                     val confirmedAt: Long = System.currentTimeMillis()) {
     fun lines(e: ImageEdit, frame: TraceFrame): List<AnnotLine> = traces.map { t ->
         AnnotLine(t.layer, TraceMap.toView(e, baseAspect, frame, t.points), t.closed, t.estimated, t.filled, t.metrics,
-            t.guides.map { g -> TraceMap.toView(e, baseAspect, frame, listOf(g.a, g.b)).let { (a, b) -> MeasureGuide(g.label, a, b) } })
+            t.guides.map { g -> TraceMap.toView(e, baseAspect, frame, listOf(g.a, g.b)).let { (a, b) -> g.copy(a = a, b = b) } })
     }
     fun byName(name: String) = traces.firstOrNull { it.name == name }
     val editedNames: Set<String> get() = traces.filter { it.previous != null }.mapNotNull { it.name }.toSet()
@@ -143,13 +143,13 @@ object TraceJson {
         .put("closed", t.closed).put("filled", t.filled).put("est", t.estimated).put("origin", t.origin).apply {
             t.metrics?.let { put("m", metrics(it)) }
             t.previous?.let { put("prev", trace(it.copy(previous = null))) }
-            if (t.guides.isNotEmpty()) put("guides", JSONArray().apply { t.guides.forEach { g -> put(JSONObject().put("l", g.label).put("p", pts(listOf(g.a, g.b)))) } })
+            if (t.guides.isNotEmpty()) put("guides", JSONArray().apply { t.guides.forEach { g -> put(JSONObject().put("l", g.label).put("p", pts(listOf(g.a, g.b))).put("k", g.key)) } })
         }
 
     private fun traceOf(o: JSONObject): StoredTrace = StoredTrace(AnnotLayer.valueOf(o.getString("layer")), ptsOf(o.getJSONArray("pts")),
         o.optBoolean("closed"), o.optBoolean("filled"), o.optBoolean("est"), o.optJSONObject("m")?.let(::metricsOf),
         o.optString("origin", "auto"), o.optJSONObject("prev")?.let(::traceOf),
-        o.optJSONArray("guides")?.let { a -> (0 until a.length()).map { i -> val g = a.getJSONObject(i); val p = ptsOf(g.getJSONArray("p")); MeasureGuide(g.getString("l"), p[0], p[1]) } }.orEmpty())
+        o.optJSONArray("guides")?.let { a -> (0 until a.length()).map { i -> val g = a.getJSONObject(i); val p = ptsOf(g.getJSONArray("p")); MeasureGuide(g.getString("l"), p[0], p[1], g.optString("k")) } }.orEmpty())
 
     fun write(s: TraceSet): String = JSONObject().put("v", 1).put("aspect", r(s.baseAspect)).put("at", s.confirmedAt)
         .put("traces", JSONArray().apply { s.traces.forEach { put(trace(it)) } })
@@ -218,7 +218,7 @@ object ConfirmedTraces {
         return TraceSet(a0, lines.map { l ->
             StoredTrace(l.layer, TraceMap.fromView(e, a0, frame, l.points), l.closed, l.filled, l.estimated, l.metrics,
                 if (l.metrics?.name?.startsWith("Surco añadido") == true) "añadido" else "auto",
-                guides = l.guides.map { g -> TraceMap.fromView(e, a0, frame, listOf(g.a, g.b)).let { (a, b) -> MeasureGuide(g.label, a, b) } })
+                guides = l.guides.map { g -> TraceMap.fromView(e, a0, frame, listOf(g.a, g.b)).let { (a, b) -> g.copy(a = a, b = b) } })
         })
     }
 

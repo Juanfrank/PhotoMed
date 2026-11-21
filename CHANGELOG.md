@@ -2,6 +2,15 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.27 — 21 de noviembre de 2026
+
+- **Actualizar sin cierres**: al abrir una versión nueva se borran las cachés de la anterior (imágenes,
+  temporales, memoria de líneas y análisis guardados), cuyo formato puede haber cambiado. Se conservan
+  los expedientes, las fotos, las ediciones, las correcciones, los trazos confirmados, los relieves y
+  las preferencias.
+- **Ficha de medidas más compacta**: la muestra del trazo de cada tramo va delante de su medida, en
+  la misma fila (sin leyenda aparte).
+
 ## 2.26 — 21 de noviembre de 2026
 
 - **Segmentos de medida sin texto sobre la foto**: cada tramo se dibuja con un estilo de trazo propio

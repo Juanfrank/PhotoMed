@@ -21,14 +21,16 @@ data class AnnotLine(val layer: AnnotLayer, val points: List<Pt>, val closed: Bo
                      /** Segmentos de lo que se mide (ancho, alto, distancias): se ven, punteados, al seleccionar la línea. */
                      val guides: List<MeasureGuide> = emptyList()) {
     /** La misma línea con sus puntos y guías llevados por [f] (otro encuadre, perspectiva…). */
-    fun mapped(f: (Pt) -> Pt) = copy(points = points.map(f), guides = guides.map { MeasureGuide(it.label, f(it.a), f(it.b)) })
+    fun mapped(f: (Pt) -> Pt) = copy(points = points.map(f), guides = guides.map { it.copy(a = f(it.a), b = f(it.b)) })
 }
 
 /**
  * Segmento medido de una línea: de [a] a [b] (mismas coordenadas que la línea). [label]: la etiqueta de
  * la medida en [LineMetrics] (rasgo, «Longitud», «Ancho»…), para mostrar su valor junto al segmento.
  */
-data class MeasureGuide(val label: String, val a: Pt, val b: Pt)
+data class MeasureGuide(val label: String, val a: Pt, val b: Pt,
+                        /** Fila de la ficha que representa (etiqueta de [metricRows]); vacía si no tiene. */
+                        val key: String = "")
 
 /**
  * Líneas estéticas a partir de los puntos del rostro (iguales con ML Kit y MediaPipe), la
@@ -456,7 +458,7 @@ object FaceAnnotations {
         val tn = hypot(b.x - a.x, b.y - a.y).takeIf { it > 1e-7f } ?: return l
         val nx = -(b.y - a.y) / tn; val ny = (b.x - a.x) / tn
         val h = w / mmPerUnit / 2
-        return l.copy(guides = listOf(MeasureGuide(FeatureMetrics.mmText("ancho", w), Pt(c.x - nx * h, c.y - ny * h), Pt(c.x + nx * h, c.y + ny * h))))
+        return l.copy(guides = listOf(MeasureGuide(FeatureMetrics.mmText("ancho", w), Pt(c.x - nx * h, c.y - ny * h), Pt(c.x + nx * h, c.y + ny * h), "Ancho (a media profundidad)")))
     }
 
     /**
@@ -860,6 +862,8 @@ class PhotoAnnotator(private val context: Context) {
         fun note(key: String): String? = synchronized(cache) { notes[key] }
         fun putNote(key: String, n: String?) = synchronized(cache) { notes[key] = n }
         fun cached(key: String): List<AnnotLine>? = synchronized(cache) { cache[key] }
+        /** Vacía los análisis en memoria (al actualizar la app). */
+        fun clearCache() = synchronized(cache) { cache.clear(); notes.clear() }
         fun put(key: String, v: List<AnnotLine>) = synchronized(cache) { cache[key] = v }
     }
 }

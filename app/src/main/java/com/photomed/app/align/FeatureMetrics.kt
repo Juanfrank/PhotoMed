@@ -50,15 +50,18 @@ object FeatureMetrics {
     /** Medidas de un rasgo con sus segmentos. */
     class Measured(val metrics: LineMetrics, val guides: List<MeasureGuide>)
 
+    /** Etiqueta de la fila de la ficha para una medida de rasgo (sin la unidad, como en metricRows). */
+    fun rowKey(label: String) = if (label.isEmpty()) "" else label.substringBeforeLast(",")
+
     /** Texto de una distancia para la guía (p. ej. «ancho 34,2 mm»). */
     fun mmText(label: String, v: Float) = "$label " + String.format(java.util.Locale.getDefault(), "%.1f mm", v)
 
     private class B(val mm: Float) {
         val f = ArrayList<Pair<String, Float>>(); val g = ArrayList<MeasureGuide>()
         /** Distancia [a]–[b] como medida [label] y su segmento con el texto [short]. */
-        fun dist(label: String, short: String, a: Pt, b: Pt) { val v = d(a, b) * mm; f += label to v; g += MeasureGuide(mmText(short, v), a, b) }
+        fun dist(label: String, short: String, a: Pt, b: Pt) { val v = d(a, b) * mm; f += label to v; g += MeasureGuide(mmText(short, v), a, b, rowKey(label)) }
         fun value(label: String, v: Float) { f += label to v }
-        fun guide(short: String, v: Float, a: Pt, b: Pt) { g += MeasureGuide(mmText(short, v), a, b) }
+        fun guide(short: String, v: Float, a: Pt, b: Pt, label: String = "") { g += MeasureGuide(mmText(short, v), a, b, rowKey(label)) }
         fun build(name: String, scale: String) = Measured(LineMetrics(name, scale = scale, features = f.toList()), g.toList())
     }
 
@@ -118,7 +121,7 @@ object FeatureMetrics {
         vAt(side, a.u(pupil))?.let { vb ->
             val h = (vb - a.v(pupil)) * mm
             value("Altura sobre la pupila, mm", h)
-            guide("altura", h, pupil, a.at(a.u(pupil), vb))
+            guide("altura", h, pupil, a.at(a.u(pupil), vb), "Altura sobre la pupila, mm")
         }
         build("Ceja ${if (right) "derecha" else "izquierda"}", scale)
     }
@@ -139,8 +142,8 @@ object FeatureMetrics {
         val uc = a.u(mesh[2])
         val vb = vAt(browTop(mesh, a), a.u(a.o)) ?: intArrayOf(107, 336).maxOf { a.v(mesh[it]) }
         val mid = (vb - a.v(mesh[2])) * mm; val low = (a.v(mesh[2]) - a.v(mesh[152])) * mm
-        value("Tercio medio (cejas → subnasal), mm", mid); guide("tercio medio", mid, a.at(uc, vb), mesh[2])
-        value("Tercio inferior (subnasal → mentón), mm", low); guide("tercio inferior", low, mesh[2], a.at(uc, a.v(mesh[152])))
+        value("Tercio medio (cejas → subnasal), mm", mid); guide("tercio medio", mid, a.at(uc, vb), mesh[2], "Tercio medio (cejas → subnasal), mm")
+        value("Tercio inferior (subnasal → mentón), mm", low); guide("tercio inferior", low, mesh[2], a.at(uc, a.v(mesh[152])), "Tercio inferior (subnasal → mentón), mm")
         build("Contorno facial", scale)
     }
 
@@ -157,18 +160,20 @@ object FeatureMetrics {
         val brow = browTop(mesh, a)
         val b = B(mm)
         /** Altura en la vertical de [from] (pupila, centro o canto): ceja → pelo, con sus segmentos. */
-        fun column(from: Pt, short: String): Float? {
+        fun column(from: Pt, short: String, label: String): Float? {
             val u = a.u(from)
             val vb = vAt(brow, u) ?: return null; val vh = vAt(h, u) ?: return null
             val v = (vh - vb) * mm
             if (v <= 0f) return null
             b.g += MeasureGuide("", from, a.at(u, vb))           // pupila → ceja (sin texto)
-            b.guide(short, v, a.at(u, vb), a.at(u, vh))           // ceja → pelo
+            b.guide(short, v, a.at(u, vb), a.at(u, vh), label)    // ceja → pelo
             return v
         }
-        val center = column(a.o, "frente")
-        val pr = column(a.r, "frente der."); val pl = column(a.l, "frente izq.")
-        val tr = column(mesh[33], "cola der."); val tl = column(mesh[263], "cola izq.")
+        val center = column(a.o, "frente", "Frente central (cejas → pelo), mm")
+        val pr = column(a.r, "frente der.", "Sobre la ceja derecha (vertical de la pupila), mm")
+        val pl = column(a.l, "frente izq.", "Sobre la ceja izquierda (vertical de la pupila), mm")
+        val tr = column(mesh[33], "cola der.", "Sobre la cola de la ceja derecha (canto externo), mm")
+        val tl = column(mesh[263], "cola izq.", "Sobre la cola de la ceja izquierda (canto externo), mm")
         center?.let { b.value("Frente central (cejas → pelo), mm", it) }
         pr?.let { b.value("Sobre la ceja derecha (vertical de la pupila), mm", it) }
         pl?.let { b.value("Sobre la ceja izquierda (vertical de la pupila), mm", it) }

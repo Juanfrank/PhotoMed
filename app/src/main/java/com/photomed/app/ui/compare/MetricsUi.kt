@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
@@ -156,22 +157,27 @@ fun MetricsCard(line: AnnotLine, onTable: () -> Unit, onClose: () -> Unit, modif
                 Text((number?.let { "$it · " } ?: "") + m.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 8.dp).weight(1f))
                 IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Cerrar") }
             }
-            // leyenda de los tramos dibujados en la foto: estilo de trazo y lo que mide
+            // la muestra del trazo de cada tramo va delante de su medida (sin leyenda aparte)
             val styles = com.photomed.app.ui.camera.guideStyleIndices(line)
-            line.guides.forEachIndexed { i, g ->
-                if (styles[i] < 0) return@forEachIndexed
+            val styleOf = line.guides.indices.filter { styles[it] >= 0 && line.guides[it].key.isNotEmpty() }.associate { line.guides[it].key to styles[it] }
+            val hasSw = styles.any { it >= 0 }
+            @Composable fun row(label: String, value: String, style: Int?) {
                 Row(Modifier.fillMaxWidth().padding(end = 12.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    GuideSwatch(styles[i], Modifier.size(36.dp, 14.dp).semantics { contentDescription = "Trazo ${styles[i] + 1}" })
-                    Text(g.label.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 8.dp))
+                    if (hasSw) {
+                        if (style != null) GuideSwatch(style, Modifier.size(30.dp, 12.dp).semantics { contentDescription = "Trazo ${style + 1}" })
+                        else Spacer(Modifier.width(30.dp))
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
-            if (line.guides.any { it.label.isNotEmpty() }) HorizontalDivider(Modifier.padding(vertical = 4.dp, horizontal = 0.dp))
-            metricRows(m).forEach { (k, v) ->
-                Row(Modifier.fillMaxWidth().padding(end = 12.dp, top = 2.dp)) {
-                    Text(k, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Text(v, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-                }
+            metricRows(m).forEach { (k, v) -> row(k, v, styleOf[k]) }
+            // tramos sin fila propia (p. ej. alto y ancho de la ojera): su texto, con su trazo
+            line.guides.forEachIndexed { gi, g ->
+                if (styles[gi] < 0 || g.key.isNotEmpty() && metricRows(m).any { it.first == g.key }) return@forEachIndexed
+                val label = g.label.substringBeforeLast(" ").substringBeforeLast(" ").replaceFirstChar { it.uppercase() }
+                row(label, g.label.removePrefix(g.label.substringBeforeLast(" ").substringBeforeLast(" ")).trim(), styles[gi])
             }
             TextButton(onClick = onTable) {
                 Icon(Icons.Default.TableChart, null, Modifier.size(18.dp)); Text("Tabla de medidas", Modifier.padding(start = 6.dp))

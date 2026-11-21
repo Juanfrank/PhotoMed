@@ -16,6 +16,8 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // versión nueva: fuera las cachés de la anterior (formatos que pueden haber cambiado)
+        AppUpgrade.onStart(applicationContext)
         enableEdgeToEdge()
         val repository = PhotoRepository.create(applicationContext)
         // Versión 1 guardaba las fotos en almacenamiento privado: se mueven a la galería.

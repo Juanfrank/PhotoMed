@@ -33,9 +33,13 @@ import java.io.File
 class GuideShotTest {
     @get:Rule val paparazzi = app.cash.paparazzi.Paparazzi(deviceConfig = app.cash.paparazzi.DeviceConfig.PIXEL_5)
     @Test fun shot() {
-        val gs = listOf("ancho alar" to 34.2f, "puente" to 10.7f, "dorso" to 9.9f, "longitud" to 36.1f, "alto" to 50.8f, "extra" to 5f, "extra2" to 4f)
-        val line = AnnotLine(AnnotLayer.NOSE, listOf(Pt(0.4f, 0.5f), Pt(0.6f, 0.5f)), false, metrics = FeatureMetrics.noseM(List(478) { Pt(0.5f, 0.5f) }, 1f, "iris").metrics,
-            guides = listOf(MeasureGuide("", Pt(0.1f, 0.05f), Pt(0.1f, 0.2f))) + gs.mapIndexed { i, (l, v) -> MeasureGuide(FeatureMetrics.mmText(l, v), Pt(0.1f, 0.25f + i * 0.1f), Pt(0.9f, 0.25f + i * 0.1f)) })
+        // nariz de una malla mínima (como en MeasureGuidesTest), con sus 5 tramos
+        val m = MutableList(478) { Pt(0.5f, 0.5f) }
+        fun p(x: Float, y: Float) = Pt(0.5f + x, 0.35f + y)
+        m[98] = p(-0.12f, 0.45f); m[327] = p(0.12f, 0.45f); m[122] = p(-0.04f, 0.06f); m[351] = p(0.04f, 0.06f)
+        m[196] = p(-0.035f, 0.2f); m[419] = p(0.035f, 0.2f); m[6] = p(0f, 0.03f); m[1] = p(0f, 0.4f); m[168] = p(0f, -0.06f); m[2] = p(0f, 0.5f)
+        val nm = FeatureMetrics.noseM(m, 90f, "iris")
+        val line = AnnotLine(AnnotLayer.NOSE, listOf(p(-0.05f, 0.42f), p(0f, 0.44f), p(0.05f, 0.42f)), false, metrics = nm.metrics, guides = nm.guides)
         paparazzi.snapshot {
             com.photomed.app.ui.theme.PhotoMedTheme(darkTheme = false) {
                 Column(Modifier.background(Color.White)) {

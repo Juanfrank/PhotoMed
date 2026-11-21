@@ -149,8 +149,8 @@ object Periorbital {
                 val lenMm = LineMeasure.length(curve) * mm
                 val cm = (span.first + span.last) / 2
                 guides = listOf(
-                    MeasureGuide(FeatureMetrics.mmText("altura", height), toImg(cols[cm].p), toImg(at(cm, fit2(cm.toFloat())))),
-                    MeasureGuide(FeatureMetrics.mmText("surco", lenMm), toImg(curve.first()), toImg(curve.last())))
+                    MeasureGuide(FeatureMetrics.mmText("altura", height), toImg(cols[cm].p), toImg(at(cm, fit2(cm.toFloat()))), "Altura (párpado → surco inferior)"),
+                    MeasureGuide(FeatureMetrics.mmText("surco", lenMm), toImg(curve.first()), toImg(curve.last()), "Longitud del surco inferior"))
                 val rel = median(inl.map { relief[it] })
                 val area = LineMeasure.area(poly.map(::toImg)) * s.first * s.first
                 val grade = when { height < 4.5f || rel < 4f -> 1; height >= 8f && rel >= 7f -> 3; else -> 2 }
