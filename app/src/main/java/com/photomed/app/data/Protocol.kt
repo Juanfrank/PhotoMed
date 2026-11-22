@@ -38,7 +38,13 @@ object ProtocolDefaults {
     /** Toma nueva con la coincidencia, la luz y el disparo automático por defecto. */
     fun step(zone: Zone, expression: FacialExpression = FacialExpression.NEUTRAL, ref: ProtocolRef? = null, threshold: Float? = null) =
         withRefLight(ProtocolStep(zone = zone, expression = expression, threshold = threshold, autoCapture = true,
-            minLight = MIN_LIGHT.takeIf { zone.isFaceZone() }, maxLightAsym = MAX_LIGHT_ASYM.takeIf { zone.isFaceZone() }, ref = ref))
+            minLight = MIN_LIGHT.takeIf { zone.isFaceZone() }, maxLightAsym = MAX_LIGHT_ASYM.takeIf { evenLightApplies(zone) }, ref = ref))
+
+    /**
+     * La luz pareja entre mejillas se pide por defecto solo en vistas frontales del rostro: en las
+     * oblicuas y los perfiles una mejilla queda de lado y su luz es distinta por la forma de la cara.
+     */
+    fun evenLightApplies(zone: Zone) = zone == Zone.FACE_FRONTAL
 
     /**
      * Ajusta la luz pedida a la de la referencia, si se midió: mínima y máxima ±15 puntos alrededor de
@@ -48,7 +54,8 @@ object ProtocolDefaults {
         val l = s.ref?.light ?: return s
         val a = s.ref.lightAsym
         return s.copy(minLight = (l - 0.15f).coerceIn(0.1f, 0.8f), maxLight = (l + 0.15f).coerceIn(0.3f, 0.98f),
-            maxLightAsym = a?.let { (it + 0.08f).coerceIn(0.08f, 0.4f) } ?: s.maxLightAsym ?: MAX_LIGHT_ASYM)
+            maxLightAsym = if (!evenLightApplies(s.zone)) s.maxLightAsym
+                else a?.let { (it + 0.08f).coerceIn(0.08f, 0.4f) } ?: s.maxLightAsym ?: MAX_LIGHT_ASYM)
     }
 }
 

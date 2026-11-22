@@ -337,11 +337,14 @@ private fun StepCard(i: Int, s: ProtocolStep, total: Int, expanded: Boolean, onE
             Text(if (minL <= 0f) tr("Luz mínima en el rostro: sin exigir") else tr("Luz mínima en el rostro: %1\$d %%", (minL * 100).toInt()), style = MaterialTheme.typography.bodyMedium)
             Slider(minL * 100, { onChange(s.copy(minLight = (it.toInt() / 100f).takeIf { v -> v > 0f })) }, valueRange = 0f..80f,
                 modifier = Modifier.semantics { contentDescription = tr("Luz mínima de la toma %1\$d", i + 1) })
-            val asym = s.maxLightAsym ?: 0f
-            Text(if (asym <= 0f) tr("Luz pareja entre mejillas: sin exigir") else tr("Diferencia de luz entre mejillas: máx. %1\$d %%", (asym * 100).toInt()),
-                style = MaterialTheme.typography.bodyMedium)
-            Slider(asym * 100, { onChange(s.copy(maxLightAsym = (it.toInt() / 100f).takeIf { v -> v > 0f })) }, valueRange = 0f..40f,
-                modifier = Modifier.semantics { contentDescription = tr("Diferencia máxima de luz de la toma %1\$d", i + 1) })
+            if (com.photomed.app.data.ProtocolDefaults.evenLightApplies(s.zone)) {
+                val asym = s.maxLightAsym ?: 0f
+                Text(if (asym <= 0f) tr("Luz pareja entre mejillas: sin exigir") else tr("Diferencia de luz entre mejillas: máx. %1\$d %%", (asym * 100).toInt()),
+                    style = MaterialTheme.typography.bodyMedium)
+                Slider(asym * 100, { onChange(s.copy(maxLightAsym = (it.toInt() / 100f).takeIf { v -> v > 0f })) }, valueRange = 0f..40f,
+                    modifier = Modifier.semantics { contentDescription = tr("Diferencia máxima de luz de la toma %1\$d", i + 1) })
+            } else Text(tr("Luz pareja entre mejillas: solo en la vista frontal (en oblicuas y perfiles cada mejilla recibe luz distinta)"),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(tr("Disparo automático al coincidir"), Modifier.weight(1f))
                 Switch(s.autoCapture != false, { onChange(s.copy(autoCapture = it)) })
@@ -383,7 +386,7 @@ private fun stepSummary(s: ProtocolStep): String = listOfNotNull(
     if (s.count != 1) tr("%1\$d fotos", s.count) else tr("%1\$d foto", s.count),
     tr("coincidencia %1\$d %%", ((s.threshold ?: LiveMatch.DEFAULT_THRESHOLD) * 100).toInt()),
     s.minLight?.let { tr("luz ≥ %1\$d %%", (it * 100).toInt()) },
-    s.maxLightAsym?.let { tr("mejillas ≤ %1\$d %%", (it * 100).toInt()) },
+    s.maxLightAsym?.takeIf { com.photomed.app.data.ProtocolDefaults.evenLightApplies(s.zone) }?.let { tr("mejillas ≤ %1\$d %%", (it * 100).toInt()) },
     if (s.autoCapture != false) tr("disparo automático") else null,
     if (s.ref != null) tr("con referencia") else null,
 ).joinToString(" · ")

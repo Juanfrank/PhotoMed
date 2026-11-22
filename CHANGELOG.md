@@ -28,6 +28,9 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 - **Transiciones más fluidas**: el GIF pasa de ~14 a 25 cuadros/s y el movimiento acelera y frena
   suavemente (antes arrancaba y paraba de golpe y el MP4 repetía los pasos del GIF de forma desigual).
 - **Menú de exportación**: cambiar de opción ya no lo devuelve arriba.
+- **Luz del rostro**: ya no se queda «midiendo». En primeros planos (labios, ojo, frente) o con la
+  cara parcial se mide por regiones; sin pupilas se usan los contornos de los ojos. La luz pareja entre
+  mejillas solo se pide en la vista frontal (en oblicuas y perfiles cada mejilla recibe luz distinta).
 - **Logo en las exportaciones**: se adjunta en Ajustes (PNG con transparencia recomendado) y la
   esquina se elige al exportar (se recuerda); va en fotos, cuadrículas, GIF y MP4.
 - **Colores de la marca**: paletas tonales calculadas a partir de los colores del logo (verde

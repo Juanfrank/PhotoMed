@@ -820,12 +820,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     /** Luz fuera de lo que pide el paso del protocolo (null: bien o no se pide). */
     fun lightIssue(f: LiveFrame?): String? {
         val st = step ?: return null
-        if (st.minLight == null && st.maxLight == null && st.maxLightAsym == null) return null
+        val asym = st.maxLightAsym?.takeIf { com.photomed.app.data.ProtocolDefaults.evenLightApplies(zone) }
+        if (st.minLight == null && st.maxLight == null && asym == null) return null
         if (!zone.isFaceZone()) return null
         val l = f?.light ?: return tr("Luz: midiendo…")
         st.minLight?.let { if (l.face < it) return tr("Luz insuficiente: %1\$.0f %% (mín. %2\$.0f %%)", l.face * 100, it * 100) }
         st.maxLight?.let { if (l.face > it) return tr("Demasiada luz: %1\$.0f %% (máx. %2\$.0f %%)", l.face * 100, it * 100) }
-        st.maxLightAsym?.let { a ->
+        // luz pareja entre mejillas: solo en la vista frontal (en oblicuas y perfiles es distinta por la forma de la cara)
+        st.maxLightAsym?.takeIf { com.photomed.app.data.ProtocolDefaults.evenLightApplies(zone) }?.let { a ->
             val m = maxOf(l.leftCheek, l.rightCheek)
             if (m > 0f && kotlin.math.abs(l.leftCheek - l.rightCheek) / m > a) return tr("Luz desigual entre mejillas (máx. %1\$.0f %%)", a * 100)
         }

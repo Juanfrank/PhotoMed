@@ -178,8 +178,9 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     /** Sin referencia: estandarización de la toma (vista, Frankfort, iluminación). */
     fun standardize(frame: Bitmap, smooth: Boolean = true): LiveFrame {
         val cur = detected(frame, smooth)
-        val light = if (spec.detector == Detector.FACE && cur.points.isNotEmpty())
-            Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) else null
+        // luz: también sin la cara entera (primeros planos), por regiones
+        val light = if (spec.detector == Detector.FACE)
+            runCatching { Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) }.getOrNull() else null
         var eval = withDiagnostic(Standardization.evaluate(zone, cur, light, expression), cur)
         // Perfil sin rostro detectado: si la silueta muestra un perfil hacia el lado de la vista
         // (nariz y mentón en el borde anterior), se acepta como perfil
@@ -263,7 +264,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         matched = eval.status == MatchStatus.MATCH
         eval = withDiagnostic(eval, cur)
         val shown = if (drawKeys.size > MAX_DRAWN) drawKeys.filterIndexed { i, _ -> i % (drawKeys.size / MAX_DRAWN + 1) == 0 } else drawKeys
-        val light = if (measureLight && spec.detector == Detector.FACE && cur.points.isNotEmpty())
+        val light = if (measureLight && spec.detector == Detector.FACE)
             runCatching { Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) }.getOrNull() else null
         return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points, headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze,
             hairline = if (smooth) hairlineOf(frame, cur) else null, light = light)

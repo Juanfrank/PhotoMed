@@ -66,7 +66,8 @@ object Standardization {
     }
 
     /** Luminancia media (0..1) de las mejillas izquierda y derecha de la imagen. */
-    data class Lighting(val leftCheek: Float, val rightCheek: Float, val face: Float)
+    /** Luz del rostro; [regional]: medida por regiones (sin pupilas ni nariz, ver [regionLighting]). */
+    data class Lighting(val leftCheek: Float, val rightCheek: Float, val face: Float, val regional: Boolean = false)
 
     /**
      * Las indicaciones quedan en español (HintCues las analiza por su texto); se traducen al
@@ -128,7 +129,8 @@ object Standardization {
         }
         lighting?.let { l ->
             val m = maxOf(l.leftCheek, l.rightCheek)
-            if (m > 0f && abs(l.leftCheek - l.rightCheek) / m > LIGHT_ASYM) {
+            // la diferencia entre mejillas solo con las mejillas localizadas (no por regiones)
+            if (!l.regional && m > 0f && abs(l.leftCheek - l.rightCheek) / m > LIGHT_ASYM) {
                 hints += if (l.leftCheek < l.rightCheek) trn("Luz desigual: lado izquierdo más oscuro") else trn("Luz desigual: lado derecho más oscuro")
                 off += 0.5f
             }
@@ -146,20 +148,54 @@ object Standardization {
             headYawDelta = det.yaw ?: 0f, headPitchDelta = det.pitch ?: 0f, gazeDelta = det.gaze)
     }
 
-    /** Muestreo de luminancia en las mejillas (entre ojo y borde del óvalo) y en el centro del rostro. */
-    fun lighting(rgb: IntArray, w: Int, h: Int, points: Map<String, Pt>): Lighting? {
-        val l = points[Landmarks.EYE_L] ?: return null; val r = points[Landmarks.EYE_R] ?: return null
-        val nose = points["nose_bottom_1"] ?: points[Landmarks.NOSE_BASE] ?: return null
-        val ovalL = points["oval_8"]; val ovalR = points["oval_28"]
-        fun lum(p: Pt, rad: Float): Float {
-            val cx = (p.x * w).toInt(); val cy = (p.y * w).toInt(); val rr = (rad * w).toInt().coerceAtLeast(1)
-            var s = 0f; var n = 0
-            for (y in cy - rr..cy + rr) for (x in cx - rr..cx + rr) if (x in 0 until w && y in 0 until h) {
-                val c = rgb[y * w + x]
-                s += (0.299f * ((c shr 16) and 0xFF) + 0.587f * ((c shr 8) and 0xFF) + 0.114f * (c and 0xFF)) / 255f; n++
-            }
-            return if (n > 0) s / n else 0f
+    /** Luminancia media (0..1) en un cuadrado de radio [rad] (unidades del ancho) alrededor de [p]. */
+    private fun lum(rgb: IntArray, w: Int, h: Int, p: Pt, rad: Float): Float {
+        val cx = (p.x * w).toInt(); val cy = (p.y * w).toInt(); val rr = (rad * w).toInt().coerceAtLeast(1)
+        var s = 0f; var n = 0
+        val step = maxOf(1, rr / 12)
+        for (y in cy - rr..cy + rr step step) for (x in cx - rr..cx + rr step step) if (x in 0 until w && y in 0 until h) {
+            val c = rgb[y * w + x]
+            s += (0.299f * ((c shr 16) and 0xFF) + 0.587f * ((c shr 8) and 0xFF) + 0.114f * (c and 0xFF)) / 255f; n++
         }
+        return if (n > 0) s / n else 0f
+    }
+
+    /**
+     * Luz por regiones cuando no se ven pupilas y nariz (primeros planos: labios, ojo, frente, o la
+     * cara parcial): en el rectángulo de los puntos detectados o, sin ellos, en el centro del encuadre.
+     * Centro = rostro; tercios izquierdo y derecho = «mejillas» (lados de la imagen).
+     */
+    fun regionLighting(rgb: IntArray, w: Int, h: Int, points: Map<String, Pt>): Lighting {
+        val hw = h / w.toFloat()
+        val (x0, x1, y0, y1) = if (points.size >= 8) {
+            listOf(points.values.minOf { it.x }, points.values.maxOf { it.x }, points.values.minOf { it.y }, points.values.maxOf { it.y })
+        } else listOf(0.25f, 0.75f, hw * 0.25f, hw * 0.75f)
+        val bw = (x1 - x0).coerceAtLeast(0.1f); val bh = (y1 - y0).coerceAtLeast(0.1f)
+        val cy = y0 + bh * 0.55f
+        val rad = (minOf(bw, bh) * 0.14f).coerceIn(0.02f, 0.08f)
+        return Lighting(lum(rgb, w, h, Pt(x0 + bw * 0.22f, cy), rad), lum(rgb, w, h, Pt(x0 + bw * 0.78f, cy), rad),
+            lum(rgb, w, h, Pt(x0 + bw * 0.5f, y0 + bh * 0.5f), rad * 1.6f), regional = true)
+    }
+
+    /** Centro de los puntos cuyo nombre empieza por [prefix] (contorno del ojo, base nasal…). */
+    private fun centroid(points: Map<String, Pt>, prefix: String): Pt? {
+        val g = points.filterKeys { it.startsWith(prefix) }.values
+        return if (g.size < 2) null else Pt(g.map { it.x }.average().toFloat(), g.map { it.y }.average().toFloat())
+    }
+
+    /**
+     * Luminancia en las mejillas (entre ojo y borde del óvalo) y en el centro del rostro. Si faltan las
+     * pupilas o la nariz se usan los contornos de los ojos y de la nariz y, si tampoco están, la luz
+     * por regiones ([regionLighting]): siempre hay medida cuando hay imagen.
+     */
+    fun lighting(rgb: IntArray, w: Int, h: Int, points: Map<String, Pt>): Lighting? {
+        if (w <= 0 || h <= 0 || rgb.size < w * h) return null
+        val l = points[Landmarks.EYE_L] ?: centroid(points, "eye_l_")
+        val r = points[Landmarks.EYE_R] ?: centroid(points, "eye_r_")
+        val nose = points["nose_bottom_1"] ?: points[Landmarks.NOSE_BASE] ?: centroid(points, "nose_bottom_")
+        if (l == null || r == null || nose == null) return regionLighting(rgb, w, h, points)
+        val ovalL = points["oval_8"]; val ovalR = points["oval_28"]
+        fun lum(p: Pt, rad: Float) = lum(rgb, w, h, p, rad)
         // mejilla: a medio camino entre la pupila (bajada a la altura de la nariz) y el borde del óvalo
         fun cheek(eye: Pt, edge: Pt?): Pt = Pt(if (edge != null) (eye.x + edge.x) / 2 else eye.x, (eye.y + nose.y) / 2)
         val leftImg = if (r.x < l.x) cheek(r, ovalR) else cheek(l, ovalL)
