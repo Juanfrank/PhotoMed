@@ -59,6 +59,12 @@ data class AlignOptions(
      */
     val beforeLines: List<AnnotLine>? = null,
     val afterLines: List<AnnotLine>? = null,
+    /**
+     * Giro (pasos de 90° horarios) del contenido de la foto de después respecto a la de antes: se tomó con la
+     * referencia girada ([RefOrientation]). Se deshace antes de alinear (la alineación solo busca giros
+     * pequeños) y se incluye en la semejanza final.
+     */
+    val afterRot: Int = 0,
 ) {
     companion object {
         const val PREF_POINTS = "align_points"
@@ -85,7 +91,11 @@ class Aligner(private val context: Context) {
         withContext(Dispatchers.Default) {
             val spec = ZoneAlignment.of(zone)
             val b = ImageOps.load34(context, before, DETECT_W)
-            val a0 = ImageOps.load34(context, after, DETECT_W)
+            val a00 = ImageOps.load34(context, after, DETECT_W)
+            // foto tomada con la referencia girada: se lleva a la orientación de la de antes
+            val undo = ((4 - options.afterRot % 4) % 4)
+            // (encajada entera: la referencia girada se mostró recortada ×4/3 y así se recupera la escala)
+            val a0 = if (undo == 0) a00 else ImageOps.fit34(ImageEdit(rot = undo).apply(a00), a00.width)
             val needDetect = options.points || (options.gaze && spec.detector == Detector.FACE)
             // rostro: MediaPipe (malla completa: ojos, cejas, nariz y labios finos); ML Kit si no está disponible
             val engine = if (spec.detector == Detector.FACE) FaceEngine.MEDIAPIPE else FaceEngine.get(context)
@@ -99,10 +109,12 @@ class Aligner(private val context: Context) {
             val (bD, aD) = foldPairs(options.beforeLines, options.afterLines).let { (fb, fa) ->
                 if (fb.isEmpty()) bD0 to aD0 else bD0.copy(points = bD0.points + fb) to aD0.copy(points = aD0.points + fa)
             }
-            SubjectSegmenter().use { seg ->
-                alignCore(spec, b, a0, bD, aD, manualKeystone, options, { bmp -> autoMask(spec, bmp) },
+            val r = SubjectSegmenter().use { seg ->
+                alignCore(spec, b, a0, bD, aD, if (undo == 0) manualKeystone else 0f, options, { bmp -> autoMask(spec, bmp) },
                     bodyOf = { bmp -> BodyRegion.of(zone, bmp) { seg.segment(it) } })
             }
+            // semejanza de la foto de después tal cual (sin girar) → antes
+            if (undo == 0) r else r.copy(transform = r.transform.compose(RefOrientation.fitPrior(undo)), keystoneDeg = 0f)
         }
     }
 

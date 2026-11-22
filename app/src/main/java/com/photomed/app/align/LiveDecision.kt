@@ -38,7 +38,7 @@ object LiveDecision {
             ref.pitch != null && cur.pitch != null -> cur.pitch - ref.pitch
             else -> 0f
         }
-        val e0 = LiveMatch.evaluate(t, spec.pivot, wasMatched, LiveMatch.pointFraction(rp, cp), threshold, ks,
+        val e0 = LiveMatch.evaluate(t, spec.pivot, wasMatched, LiveMatch.pointFraction(keys, rp, cp), threshold, ks,
             dYaw, dPitch, gate = true)
         // Expresión: la misma que en la referencia (sonrisa, labios, ojos, cejas)
         val exprHints = if (useExpression && spec.detector == Detector.FACE && Expression.usable(cur.yaw) && Expression.usable(ref.yaw)) {

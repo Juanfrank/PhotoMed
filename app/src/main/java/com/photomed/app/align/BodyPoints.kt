@@ -9,7 +9,8 @@ import kotlin.math.hypot
  * referencia y comprobarla con muchos más puntos que los del detector de cuerpo (que en primeros planos
  * de manos o pies apenas ve 3–4 por extremidad):
  * - **Manos**: los 21 puntos de cada mano (muñeca, articulaciones y yema de cada dedo).
- * - **Pies**: punta (extremo distal), centro y bordes interno / externo a media longitud y en el antepié.
+ * - **Pies**: punta (extremo distal) y, medidos desde ella en anchos de pie (½ y 1), los bordes a cada
+ *   lado y el centro: no dependen de cuánta pierna se vea (estables entre cuadros).
  * - **Brazos, piernas y tronco**: los bordes del contorno a ¼, ½ y ¾ de cada segmento (brazo,
  *   antebrazo, muslo, pierna, tronco), a cada lado.
  *
@@ -17,12 +18,17 @@ import kotlin.math.hypot
  * a), así la referencia y la toma se emparejan igual. Coordenadas en unidades del ancho.
  */
 object BodyPoints {
+    /** Punto del contorno (pie, borde de miembro o tronco), no anatómico: algo menos preciso entre cuadros. */
+    fun isContour(key: String) = key.startsWith("pie_") || key.startsWith("borde_")
+
     fun hand(side: Char, i: Int) = "mano_${side}_$i"
     fun foot(side: Char, part: String) = "pie_${side}_$part"
     fun edge(seg: String, t: Int, side: Int) = "borde_${seg}_${t}_$side"
 
     private val SIDES = listOf('a', 'b')
-    private val FOOT_PARTS = listOf("punta", "centro", "izq_50", "der_50", "izq_75", "der_75")
+    /** Alturas (en anchos de pie desde la punta) de los bordes del pie. */
+    private val FOOT_ROWS = listOf(0.25f, 0.5f, 0.75f, 1.0f, 1.25f)
+    private val FOOT_PARTS = listOf("punta", "centro") + FOOT_ROWS.indices.flatMap { listOf("izq_${it + 1}", "der_${it + 1}") }
     private val TS = listOf(25, 50, 75)
 
     private val L = Landmarks
@@ -61,8 +67,16 @@ object BodyPoints {
                 chosen.forEachIndexed { i, h -> if (h.points.size >= 21) h.points.forEachIndexed { k, p -> out[hand(SIDES[i], k)] = p } }
             }
             GuideType.FEET -> s.classes?.let { c ->
-                val fs = ZoneCriteria.feetOf(c).sortedByDescending { it.box.area }.take(if (s.single) 1 else 2).sortedBy { it.box.x0 }
-                fs.forEachIndexed { i, f -> out.putAll(footPoints(f, c, SIDES[i])) }
+                // los dos mayores, ordenados por la posición de su punta (no por su caja, que cambia con la pierna)
+                val fs = ZoneCriteria.feetOf(c).sortedByDescending { it.box.area }.take(if (s.single) 1 else 2)
+                    .sortedBy { f -> f.outline.maxByOrNull { it.y }?.x ?: 0f }
+                // cada pie por su mitad de la imagen (si en un cuadro se pierde o se une uno, el otro no cambia
+                // de nombre); con uno solo, «a»
+                fs.forEach { f ->
+                    val tx = f.outline.maxByOrNull { it.y }?.x ?: 0.5f
+                    val side = if (tx < 0.5f) 'a' else 'b'
+                    out.putAll(footPoints(f, c, if (s.single) 'a' else side))
+                }
             }
             else -> {}
         }
@@ -85,21 +99,29 @@ object BodyPoints {
         return out
     }
 
-    /** Punta, centro y bordes del pie (a media longitud y en el antepié, ¾) a partir de su silueta. */
+    /**
+     * Punta del pie y, a ½ y a 1 ancho de pie de ella hacia el tobillo, los bordes a cada lado; el centro,
+     * entre los bordes a ¾. Todo referido a la punta y al ancho del antepié, no a la caja del pie (que cambia
+     * según cuánta pierna entra en el cuadro).
+     */
     private fun footPoints(f: ZoneCriteria.Foot, c: ZoneCriteria.Classes, side: Char): Map<String, Pt> {
         val o = f.outline; if (o.size < 6) return emptyMap()
         val k = c.width.toFloat()
-        val y0 = f.box.y0 / k; val y1 = (f.box.y1 + 1) / k; val cx = (f.box.x0 + f.box.x1 + 1) / 2f / k
-        val out = HashMap<String, Pt>()
+        // filas del contorno: y → (x mínima, x máxima)
+        val rows = o.groupBy { Math.round(it.y * k / 2f) }.mapValues { (_, v) -> v.minOf { it.x } to v.maxOf { it.x } }
         val tipY = o.maxOf { it.y }
-        val tip = o.filter { it.y >= tipY - 0.01f }
-        out[foot(side, "punta")] = Pt(tip.map { it.x }.average().toFloat(), tipY)
-        out[foot(side, "centro")] = Pt(cx, (y0 + y1) / 2)
-        for ((t, name) in listOf(0.5f to "50", 0.75f to "75")) {
-            val y = y0 + (y1 - y0) * t
-            val row = o.filter { kotlin.math.abs(it.y - y) < 1.5f / k + 0.004f }
-            if (row.size >= 2) { out[foot(side, "izq_$name")] = row.minBy { it.x }; out[foot(side, "der_$name")] = row.maxBy { it.x } }
+        val tipRow = o.filter { it.y >= tipY - 1.5f / k }
+        val out = HashMap<String, Pt>()
+        out[foot(side, "punta")] = Pt((tipRow.minOf { it.x } + tipRow.maxOf { it.x }) / 2, tipY)
+        // ancho del antepié: percentil 90 del ancho de las filas cercanas a la punta
+        val near = rows.filterKeys { it * 2f / k > tipY - 0.6f * (f.box.x1 - f.box.x0 + 1) / k }.values.map { it.second - it.first }.sorted()
+        if (near.isEmpty()) return out
+        val fw = near[(near.size * 0.9f).toInt().coerceAtMost(near.size - 1)]
+        fun rowAt(y: Float) = rows[Math.round(y * k / 2f)]
+        FOOT_ROWS.forEachIndexed { i, d ->
+            rowAt(tipY - d * fw)?.let { (l, r) -> out[foot(side, "izq_${i + 1}")] = Pt(l, tipY - d * fw); out[foot(side, "der_${i + 1}")] = Pt(r, tipY - d * fw) }
         }
+        rowAt(tipY - 0.75f * fw)?.let { (l, r) -> out[foot(side, "centro")] = Pt((l + r) / 2, tipY - 0.75f * fw) }
         return out
     }
 

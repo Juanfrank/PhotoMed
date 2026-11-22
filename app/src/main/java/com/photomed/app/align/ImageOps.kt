@@ -42,6 +42,24 @@ object ImageOps {
         return (edit ?: PhotoEdits.of(context, uri.toString())).apply(bmp)
     }
 
+    /**
+     * Encaja la imagen entera en un cuadro 3:4 de ancho [width] (sin recortar: bandas del color medio de la
+     * imagen arriba y abajo, o a los lados).
+     */
+    fun fit34(src: Bitmap, width: Int): Bitmap {
+        val targetH = width * 4 / 3
+        val scale = minOf(width.toFloat() / src.width, targetH.toFloat() / src.height)
+        val sw = (src.width * scale).toInt().coerceAtLeast(1); val sh = (src.height * scale).toInt().coerceAtLeast(1)
+        val small = Bitmap.createScaledBitmap(src, 8, 8, true)
+        var r = 0; var g = 0; var bb = 0
+        for (y in 0 until 8) for (x in 0 until 8) { val c = small.getPixel(x, y); r += (c shr 16) and 0xFF; g += (c shr 8) and 0xFF; bb += c and 0xFF }
+        val out = Bitmap.createBitmap(width, targetH, Bitmap.Config.ARGB_8888)
+        val cv = android.graphics.Canvas(out)
+        cv.drawColor(android.graphics.Color.rgb(r / 64, g / 64, bb / 64))
+        cv.drawBitmap(Bitmap.createScaledBitmap(src, sw, sh, true), (width - sw) / 2f, (targetH - sh) / 2f, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+        return out
+    }
+
     fun centerCrop34(src: Bitmap, width: Int): Bitmap {
         val targetH = width * 4 / 3
         val scale = maxOf(width.toFloat() / src.width, targetH.toFloat() / src.height)

@@ -109,6 +109,16 @@ object LiveMatch {
     }
 
     /** Fracción de pares (referencia, actual) a ≤ [tol] de distancia (posiciones sin transformar). */
+    /** Tolerancia de los puntos de contorno (bordes de pies, miembros y tronco): se mueven más que los anatómicos. */
+    const val CONTOUR_TOLERANCE = 0.05f
+
+    /** Como [pointFraction], con la tolerancia de cada punto según su clave ([BodyPoints.isContour]). */
+    fun pointFraction(keys: List<String>, ref: List<Pt>, cur: List<Pt>): Float {
+        if (ref.isEmpty()) return 0f
+        return ref.indices.count { val tol = if (BodyPoints.isContour(keys[it])) CONTOUR_TOLERANCE else POINT_TOLERANCE
+            hypot(ref[it].x - cur[it].x, ref[it].y - cur[it].y) <= tol } / ref.size.toFloat()
+    }
+
     fun pointFraction(ref: List<Pt>, cur: List<Pt>, tol: Float = POINT_TOLERANCE): Float {
         if (ref.isEmpty()) return 0f
         return ref.indices.count { hypot(ref[it].x - cur[it].x, ref[it].y - cur[it].y) <= tol } / ref.size.toFloat()

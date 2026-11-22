@@ -148,6 +148,15 @@ Resultado con las 17 fotos evaluables: 5 dedos exactos en 12 y 4–5 en 14 (`Toe
 informe `pies_fotos_reales.png`). Fallan sobre todo cuando la segmentación no separa bien el pie (pies en
 el agua, entre tiras de sandalia). En la cámara, la guía dibuja la separación entre dedos y su punta.
 
+**Estabilidad entre cuadros (pies)**: `FootStabilityTest` genera, con fotos reales de pies, cuadros
+casi iguales (ruido, ±8 % de luz, desplazamientos de medio por ciento, recompresión) segmentados con el
+mismo modelo, y mide cuánto cambian el veredicto, los dedos y los puntos, y si cada cuadro coincide con el
+primero. Medidas que lo estabilizan: máscara de clases por mayoría de las tres últimas segmentaciones
+(`ClassesFusion`; la referencia, con tres luces), puntos del pie referidos a la punta y al ancho del
+antepié, cada pie nombrado por su mitad de la imagen, y tolerancia de 5 % para los bordes de contorno
+(3 % para los puntos anatómicos). Resultado: 0 cambios de veredicto en 50 cuadros y 38/50 coincidencias;
+fallan las fotos con el pie cortado por el borde, pies diminutos en arena o plantas cruzadas.
+
 **Zona centrada**: el centro de la parte del cuerpo (manos, pies en horizontal, brazo, piernas,
 tronco, glúteos, cuello en horizontal) a menos del 13 % del centro del cuadro; si no, «Centre la zona
 en el cuadro».

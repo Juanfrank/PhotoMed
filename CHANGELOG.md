@@ -4,6 +4,17 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Comparar fotos tomadas con la referencia girada**: cada toma guarda la foto de referencia usada y su
+  giro (y espejo). Al alinear, el giro entre dos fotos se calcula por esa cadena y se deshace antes (la
+  alineación solo busca giros pequeños); la foto se muestra alineada con el giro incluido.
+- **Alineación en zonas del cuerpo verificada** con fotos reales de manos, pies, brazo, piernas, espalda,
+  abdomen, glúteos y tórax: 44 de 44 alineadas (error < 1 % del ancho), también con la referencia girada.
+- **Detección del pie estable entre cuadros** (la captura automática del pie casi nunca disparaba): la piel
+  se decide por mayoría de las últimas tres segmentaciones (también la de la referencia, con tres luces);
+  los puntos del pie se miden desde la punta y por la mitad de la imagen de cada pie; los bordes de contorno
+  tienen una tolerancia algo mayor que los puntos anatómicos. Con cuadros casi iguales de fotos reales: el
+  veredicto ya no cambia entre cuadros (antes 5 de 70) y coinciden 38 de 50 (antes 42 de 70 cuadro a
+  cuadro, con saltos de puntos de hasta 1,6 anchos de pie).
 - **Análisis facial solo en el rostro**: en Comparar y en el visor ya no se buscan surcos, arrugas ni
   rasgos faciales en fotos de manos, pies o cuerpo (ni se espera ese análisis para alinear).
 - **Guía con la foto anterior girada**: la guía se gira con la referencia también cuando la foto anterior

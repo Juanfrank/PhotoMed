@@ -593,6 +593,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         // motor que dio los puntos: MediaPipe, o ML Kit si MediaPipe no estuvo disponible
         put("Engine", if (matcher.detectorUnavailable) "ML Kit (respaldo)" else engine.label)
         if (zone.hasLimbSides) put("Side", limbSide.label)
+        // foto anterior usada de referencia y su giro / espejo: Comparar alinea fotos con orientaciones distintas
+        ghost?.let { g ->
+            put(com.photomed.app.align.RefOrientation.KEY_REF, g.displayName)
+            if (refOrient.rot % 4 != 0) put(com.photomed.app.align.RefOrientation.KEY_ROT, "${(refOrient.rot % 4) * 90}")
+            if (refOrient.mirror) put(com.photomed.app.align.RefOrientation.KEY_MIRROR, "1")
+        }
         put("Expression", expression.labelEs)
         put("Zoom", "%.2f".format(java.util.Locale.US, zoomRatio))
         if (protocol != null && step != null) {

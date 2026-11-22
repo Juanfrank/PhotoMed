@@ -161,7 +161,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         // zonas del cuerpo: los mismos puntos adicionales que en la toma (manos, pies, bordes)
         if (ZoneCriteria.applies(zone)) runCatching {
             val hs = if (ZoneCriteria.needsHands(zone)) handsLazy.value?.detect(bmp) else null
-            val cl = if (ZoneCriteria.needsClasses(zone)) hairSkin?.labels(bmp)?.let { ZoneCriteria.Classes.of(it) } else null
+            val cl = if (ZoneCriteria.needsClasses(zone)) referenceClasses(bmp) else null
             val extra = BodyPoints.of(zone, ZoneCriteria.Scene(ref.points, hs, cl, bmp.height / bmp.width.toFloat(), single = singleLimb))
             if (extra.isNotEmpty()) ref = ref.copy(points = ref.points + extra)
         }
@@ -257,11 +257,38 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         if (ZoneCriteria.needsClasses(zone) && (now - lastClassesAt > 500 || handsNow)) {
             lastClassesAt = now
             lastClasses = runCatching { hairSkin?.labels(frame) }.getOrNull()?.let { lb ->
-                // pies: con la luminosidad del cuadro en la misma rejilla (surcos entre los dedos)
+                // pies: con el color del cuadro en la misma rejilla (piel del pie y surcos entre los dedos)
                 if (zone.guide == com.photomed.app.data.GuideType.FEET) ZoneCriteria.Classes(lb.width, lb.height, lb.data, rgbOf(frame, lb.width, lb.height))
                 else ZoneCriteria.Classes.of(lb)
-            }
+            }?.let { fusion.add(it) }   // estable: mayoría de las últimas segmentaciones
         }
+    }
+
+    private val fusion = ClassesFusion()
+
+    /**
+     * Piel por píxel de la referencia: se segmenta una sola vez, así que una segmentación rara (un dedo
+     * perdido) la estropearía para toda la toma; se segmenta con tres luces (−8 %, igual, +8 %) y se toma
+     * la mayoría, como en vivo.
+     */
+    private fun referenceClasses(bmp: Bitmap): ZoneCriteria.Classes? {
+        val seg = hairSkin ?: return null
+        val f = ClassesFusion(); var last: ZoneCriteria.Classes? = null
+        for (k in floatArrayOf(0.92f, 1.08f, 1f)) {
+            val b = if (k == 1f) bmp else runCatching { brightness(bmp, k) }.getOrNull() ?: continue
+            val lb = runCatching { seg.labels(b) }.getOrNull() ?: continue
+            val c = if (zone.guide == com.photomed.app.data.GuideType.FEET) ZoneCriteria.Classes(lb.width, lb.height, lb.data, rgbOf(bmp, lb.width, lb.height))
+                else ZoneCriteria.Classes.of(lb)
+            last = f.add(c)
+        }
+        return last
+    }
+
+    private fun brightness(b: Bitmap, k: Float): Bitmap {
+        val out = Bitmap.createBitmap(b.width, b.height, Bitmap.Config.ARGB_8888)
+        val cm = android.graphics.ColorMatrix(floatArrayOf(k, 0f, 0f, 0f, 0f, 0f, k, 0f, 0f, 0f, 0f, 0f, k, 0f, 0f, 0f, 0f, 0f, 1f, 0f))
+        android.graphics.Canvas(out).drawBitmap(b, 0f, 0f, android.graphics.Paint().apply { colorFilter = android.graphics.ColorMatrixColorFilter(cm) })
+        return out
     }
 
     private fun rgbOf(frame: Bitmap, w: Int, h: Int): IntArray? = runCatching {

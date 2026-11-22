@@ -381,12 +381,15 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             }
             val out = mutableMapOf<String, AlignmentResult>()
             var failed: Throwable? = null
+            // orientación de cada foto por la cadena de referencias con que se tomó (giro de la referencia)
+            val orientInfos = withContext(Dispatchers.IO) { allPhotos.filter { it.zone == s[0].zone }.associate { it.displayName to (repo.readInfo(it)?.conditions.orEmpty()) } }
             for (i in 1 until s.size) {
                 alignProgress = if (s.size > 2) tr("Alineando %1\$d/%2\$d…", i, s.size - 1) else tr("Alineando…")
                 val r = runCatching {
                     aligner.auto(s[0].zone, s[0].uri, s[i].uri, manualK,
                         opts.copy(beforeOutline = outlines[s[0].key], afterOutline = outlines[s[i].key],
-                            beforeLines = lines[s[0].key], afterLines = lines[s[i].key]))
+                            beforeLines = lines[s[0].key], afterLines = lines[s[i].key],
+                            afterRot = com.photomed.app.align.RefOrientation.relative(s[0].displayName, s[i].displayName, orientInfos)))
                 }
                 r.exceptionOrNull()?.let { if (it is kotlinx.coroutines.CancellationException) throw it }
                 r.onSuccess { out[s[i].key] = it }.onFailure { failed = it }
