@@ -48,6 +48,39 @@ object ZoneCriteria {
     class Scene(val pose: Map<String, Pt>, val hands: List<Hand>?, val classes: Classes?, val aspect: Float = 4f / 3f,
                 val single: Boolean = false)
 
+    /**
+     * Escena girada 90° × [q] en sentido antihorario: la del cuadro pasada a la orientación de la guía
+     * cuando la guía se gira (botón «Girar 90°»: se gira en pantalla en sentido horario). Así los
+     * criterios («dedos hacia abajo», dedos del pie en el borde distal, hombros nivelados…) se miden
+     * respecto a la guía girada. Puntos en unidades del ancho; clases por píxel giradas igual.
+     */
+    fun Scene.rotatedCcw(q: Int): Scene {
+        var sc = this
+        repeat(((q % 4) + 4) % 4) {
+            val a = sc.aspect
+            fun r(p: Pt) = Pt(p.y / a, (1f - p.x) / a)
+            val cl = sc.classes?.let { c ->
+                val w2 = c.height; val h2 = c.width; val d = ByteArray(w2 * h2)
+                for (y2 in 0 until h2) for (x2 in 0 until w2) d[y2 * w2 + x2] = c.data[x2 * c.width + (c.width - 1 - y2)]
+                Classes(w2, h2, d)
+            }
+            sc = Scene(sc.pose.mapValues { r(it.value) }, sc.hands?.map { h -> Hand(h.points.map(::r), h.label) }, cl, 1f / a, sc.single)
+        }
+        return sc
+    }
+
+    /** Punto de la escena girada ([rotatedCcw] con [q]) devuelto al cuadro original de alto/ancho [aspect]. */
+    fun unrotate(p: Pt, q: Int, aspect: Float): Pt {
+        val n = ((q % 4) + 4) % 4
+        // aspecto de cada paso intermedio: alterna entre el del cuadro y su inverso
+        var pt = p
+        for (i in n - 1 downTo 0) {
+            val a = if (i % 2 == 0) aspect else 1f / aspect   // aspecto ANTES del paso i
+            pt = Pt(1f - pt.y * a, pt.x * a)
+        }
+        return pt
+    }
+
     /** Datos que necesita cada zona (para calcular solo lo necesario en cada cuadro). */
     fun needsHands(zone: Zone) = zone.guide == GuideType.HANDS
     /** En las manos, la piel sirve para que el contorno del esquema siga el borde real de cada mano. */

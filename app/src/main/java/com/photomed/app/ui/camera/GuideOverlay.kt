@@ -850,6 +850,10 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawInk(
 
 /** Esquema ajustado a la anatomía detectada (unidades del ancho del cuadro 3:4). */
 @Composable
+fun SchemaOverlay(schema: com.photomed.app.align.BodySchema.Schema, showContour: Boolean, showGrid: Boolean, modifier: Modifier, tone: GuideTone) =
+    SchemaGuide(schema, showContour, showGrid, modifier, tone)
+
+@Composable
 private fun SchemaGuide(schema: com.photomed.app.align.BodySchema.Schema, showContour: Boolean, showGrid: Boolean, modifier: Modifier, tone: GuideTone) {
     Canvas(modifier) {
         if (showGrid) drawGrid()

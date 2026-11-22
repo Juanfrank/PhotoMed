@@ -4,6 +4,8 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Giros de 90° de la guía**: el contorno ajustado ya no se gira con la guía (quedaba atravesado sobre
+  la mano) y los criterios de manos, pies y cuerpo se miden en la orientación de la guía girada.
 - **Una sola mano, pie o pierna**: con el selector Derecha / Izquierda ya no se piden las dos. El
   brazo se reconoce también de espaldas (el detector invierte los lados) y en primer plano (sin cadera).
 - **Botón de disparo automático** (barra superior): ya funciona también en la primera toma, sin foto

@@ -55,6 +55,8 @@ class ZoneCriteriaDrawingsTest {
 
     /** Clases por píxel a partir del color del dibujo (piel, piel del rostro, ropa, fondo), a 96×128. */
     private fun classes(b: Bitmap): ZoneCriteria.Classes {
+        // misma proporción que el dibujo (vertical u horizontal si está girado)
+        val (CW, CH) = if (b.width <= b.height) CW to CH else CH to CW
         val s = Bitmap.createScaledBitmap(b, CW, CH, false)
         val px = IntArray(CW * CH).also { s.getPixels(it, 0, CW, 0, 0, CW, CH) }
         val pal = listOf(BG to FaceLabels.BG, SKIN to FaceLabels.BODY_SKIN, NAIL to FaceLabels.BODY_SKIN, FACE to FaceLabels.FACE_SKIN, CLOTH to FaceLabels.CLOTHES)
@@ -381,6 +383,45 @@ class ZoneCriteriaDrawingsTest {
                 assertTrue("contorno más ancho que la mano ($variant): ${o!!.minOf { it.x } - p.minOf { it.x }} ${o.maxOf { it.x } - p.maxOf { it.x }} m=$m", o!!.minOf { it.x } > p.minOf { it.x } - m && o.maxOf { it.x } < p.maxOf { it.x } + m)
                 assertTrue("contorno más largo que la mano ($variant)", o.maxOf { it.y } < p.maxOf { it.y } + m)
             }
+        }
+    }
+
+    /** Dibujo girado 90° en sentido horario (paciente de lado en la cámara) con sus puntos. */
+    private fun rotCw(b: Bitmap): Bitmap = Bitmap.createBitmap(b, 0, 0, b.width, b.height, android.graphics.Matrix().apply { postRotate(90f) }, true)
+    private fun rotCw(p: Pt, a: Float) = Pt((a - p.y) / a, p.x / a)
+
+    /**
+     * Guía girada 90° (botón «Girar 90°»): manos y pies girados igual en la cámara cumplen; sin girar la
+     * guía, no (los dedos ya no van hacia abajo). El esquema vuelve a caer sobre la mano del cuadro.
+     */
+    @Test
+    fun criteriaFollowTheGuideRotatedBy90() {
+        val a = H / W.toFloat()
+        for ((z, palm) in listOf(Zone.HANDS_PALMAR to true, Zone.HANDS_DORSAL to false)) {
+            val (b, hs) = handsScene(palm)
+            val rb = rotCw(b)
+            val rhs = hs.map { ZoneCriteria.Hand(it.points.map { p -> rotCw(p, a) }, it.label) }
+            val scene = ZoneCriteria.Scene(emptyMap(), rhs, classes(rb), rb.height / rb.width.toFloat())
+            val inGuide = with(ZoneCriteria) { scene.rotatedCcw(1) }
+            assertTrue("${z.id} girada con la guía: ${ZoneCriteria.hints(z, inGuide)}", ZoneCriteria.hints(z, inGuide).isEmpty())
+            assertTrue("${z.id} girada sin girar la guía debería pedir los dedos hacia abajo", ZoneCriteria.hints(z, scene).any { "abajo" in it })
+            // el esquema calculado en la orientación de la guía vuelve a las coordenadas del cuadro
+            val sch = com.photomed.app.align.BodySchema.of(z, inGuide)!!
+            val back = with(com.photomed.app.align.BodySchema) { sch.map { ZoneCriteria.unrotate(it, 1, scene.aspect) } }
+            for (tip in rhs.flatMap { h -> listOf(4, 8, 12, 16, 20).map { h.points[it] } })
+                assertTrue("yema fuera del esquema devuelto", back.dots.any { kotlin.math.hypot(it.x - tip.x, it.y - tip.y) < 0.01f })
+        }
+        for (z in listOf(Zone.FEET_DORSAL, Zone.FEET_PLANTAR)) {
+            val rb = rotCw(feetScene(sole = z == Zone.FEET_PLANTAR))
+            val scene = ZoneCriteria.Scene(emptyMap(), null, classes(rb), rb.height / rb.width.toFloat())
+            val h = ZoneCriteria.hints(z, with(ZoneCriteria) { scene.rotatedCcw(1) })
+            assertTrue("${z.id} girada con la guía: $h", h.isEmpty())
+        }
+        // ida y vuelta de un punto con cualquier número de giros
+        for (q in 0..3) for (pt in listOf(Pt(0.1f, 0.2f), Pt(0.8f, 1.2f))) {
+            val sc = with(ZoneCriteria) { ZoneCriteria.Scene(mapOf("x" to pt), null, null, a).rotatedCcw(q) }
+            val r = ZoneCriteria.unrotate(sc.pose["x"]!!, q, a)
+            assertTrue("giro $q: $pt → $r", kotlin.math.abs(r.x - pt.x) < 1e-4f && kotlin.math.abs(r.y - pt.y) < 1e-4f)
         }
     }
 

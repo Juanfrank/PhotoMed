@@ -54,6 +54,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     @Volatile private var lastSchema: BodySchema.Schema? = null
     /** Modo de una sola extremidad (mano, pie o pierna): los criterios piden una, no las dos. */
     @Volatile var singleLimb: Boolean = false
+    /** Giro de la guía en pasos de 90° en sentido horario (botón «Girar 90°» de la referencia). */
+    @Volatile var guideRot: Int = 0
     /** Línea de implantación frontal de la referencia (rostro frontal y frente). */
     @Volatile var referenceHairline: List<Pt>? = null
         private set
@@ -350,8 +352,11 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         // con referencia por bordes no se buscaron puntos: los criterios del cuerpo los necesitan
         val pose = if (spec.detector != Detector.POSE) emptyMap()
             else cur.points.ifEmpty { if (ZoneCriteria.needsHands(zone)) emptyMap() else runCatching { detected(frame, true).points }.getOrDefault(emptyMap()) }
-        val scene = ZoneCriteria.Scene(pose, lastHands, lastClasses, frame.height / frame.width.toFloat(), single = singleLimb)
-        lastSchema = runCatching { BodySchema.of(zone, scene) }.getOrNull()
+        val aspect = frame.height / frame.width.toFloat()
+        val q = guideRot
+        // con la guía girada, los criterios se miden en su orientación y el esquema vuelve al cuadro
+        val scene = with(ZoneCriteria) { ZoneCriteria.Scene(pose, lastHands, lastClasses, aspect, single = singleLimb).rotatedCcw(q) }
+        lastSchema = runCatching { BodySchema.of(zone, scene)?.let { sch -> if (q % 4 == 0) sch else with(BodySchema) { sch.map { ZoneCriteria.unrotate(it, q, aspect) } } } }.getOrNull()
         val hints = ZoneCriteria.hints(zone, scene)
         if (hints.isEmpty()) return e
         return e.copy(status = if (e.status == MatchStatus.MATCH) MatchStatus.CLOSE else e.status,

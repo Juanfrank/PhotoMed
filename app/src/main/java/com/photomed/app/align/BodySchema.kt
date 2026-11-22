@@ -77,6 +77,9 @@ object BodySchema {
         return Schema(if (torso.size == 4) listOf(torso) else emptyList(), caps)
     }
 
+    /** El mismo esquema con cada punto transformado (p. ej. de la orientación de la guía al cuadro). */
+    fun Schema.map(f: (Pt) -> Pt): Schema = Schema(polygons.map { it.map(f) }, capsules.map { Capsule(f(it.a), f(it.b), it.r) }, dots.map(f))
+
     /** Esquema de la zona con lo detectado (null si la zona usa la ilustración fija o no hay datos). */
     fun of(zone: Zone, s: ZoneCriteria.Scene): Schema? = when (zone.guide) {
         GuideType.HANDS -> s.hands?.takeIf { it.isNotEmpty() }?.let { hands(it, s.classes) }

@@ -344,6 +344,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     val matchingEnabled = liveMatch
     // una sola mano / pie / pierna: los criterios de la zona piden esa, no las dos
     matcher.singleLimb = zone.hasLimbSides && limbSide != LimbSide.BOTH
+    // guía girada 90°: los criterios se miden en su orientación
+    matcher.guideRot = refOrient.rot
     val referenceMode = protoRef != null || (showGhost && ghost != null)
     matcher.useReference = referenceMode
     matcher.expression = expression
@@ -997,17 +999,21 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     val adaptSil = if (rg != null) rg.silhouette else if (adaptGuide && showGhost) refSilhouette else null
                     // sin referencia que la oriente, la guía dibujada se gira / espeja con el control de la referencia
                     val orientGuide = rg != null || (adaptPts.isEmpty() && adaptSil == null && (ghost == null || !showGhost))
+                    // manos, pies y miembros: esquema ajustado a lo que ve la cámara (sin foto superpuesta);
+                    // está en coordenadas del cuadro: se dibuja fuera del giro de la guía
+                    val schema = if (matchingEnabled && !(showGhost && ghost != null)) live?.schema?.takeIf { !it.isEmpty } else null
                     com.photomed.app.ui.compare.OrientBox(if (orientGuide) refOrient.rot else 0, orientGuide && refOrient.mirror, Modifier.fillMaxSize(),
                         fit = rg == null, fill34 = rg != null) {
+                    if (schema == null)
                     GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize(),
                         tone = tone, adaptTo = adaptPts,
                         silhouette = adaptSil,
                         side = if (zone.hasLimbSides) limbSide else LimbSide.BOTH,
                         // modo libre: contorno de la referencia (si se superpone) o de lo que se ve ahora
                         free = if (showGhost && refFree != null) refFree else live?.freeContour,
-                        // manos, pies y miembros: esquema ajustado a lo que ve la cámara (sin foto superpuesta)
-                        schema = if (matchingEnabled && !(showGhost && ghost != null)) live?.schema else null)
+                    )
                     }
+                    if (schema != null) SchemaOverlay(schema, showContour, showGrid, Modifier.fillMaxSize(), tone)
                     }
                     // línea de implantación frontal: la de la referencia (discontinua) y la actual (continua)
                     val hl = refHairline

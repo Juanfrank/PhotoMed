@@ -132,6 +132,11 @@ guía dibujada de la app (si falta un dato, se pide; nunca se acepta por defecto
 invierte los lados (vista posterior) o solo ve uno (primer plano), el que se vea entero; sin la cadera
 en el cuadro no se mide la separación del cuerpo.
 
+**Guía girada 90°** (botón «Girar la referencia 90°»): los criterios se miden en la orientación de la
+guía (la escena del cuadro, puntos y piel, se gira igual antes de evaluarla): manos o pies de lado con la
+guía girada cumplen («dedos hacia abajo» pasa a ser hacia donde apunta la guía). El esquema adaptativo
+está en coordenadas del cuadro y se dibuja fuera del giro de la guía, sobre la mano que se ve.
+
 **Guía adaptativa (`BodySchema`)**: en manos, pies y zonas del cuerpo, en cuanto se detecta la
 anatomía la ilustración fija se sustituye por un esquema dibujado sobre lo detectado (el **contorno real de cada mano**, trazado por el borde de su piel
 segmentada y separado de la otra mano por su esqueleto, con las yemas; sin segmentación, palma y falanges; contorno de cada pie y sus dedos; huesos del brazo, pierna y tronco con el
