@@ -4,6 +4,12 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Análisis facial solo en el rostro**: en Comparar y en el visor ya no se buscan surcos, arrugas ni
+  rasgos faciales en fotos de manos, pies o cuerpo (ni se espera ese análisis para alinear).
+- **Guía con la foto anterior girada**: la guía se gira con la referencia también cuando la foto anterior
+  está superpuesta (antes se quedaba vertical o se deformaba con los puntos de la foto girada y no
+  coincidía). En manos, pies y miembros, el contorno de lo que capta la cámara se ve también sobre la
+  foto anterior, para comprobar que cuadran.
 - **Dedos del pie**: se delimitan con el contorno «en nube» (una curva por dedo y un valle entre cada
   dos), el surco entre dedos que nace de cada valle con su inclinación (el borde oscuro de cada dedo) y,
   desde el dedo gordo, los surcos de dedos muy juntos. La guía dibuja la separación y la punta de cada

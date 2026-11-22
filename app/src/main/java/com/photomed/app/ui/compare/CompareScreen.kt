@@ -1,5 +1,6 @@
 package com.photomed.app.ui.compare
 
+import com.photomed.app.align.isFaceZone
 import com.photomed.app.i18n.trn
 import com.photomed.app.i18n.tr
 import com.photomed.app.i18n.trData
@@ -367,7 +368,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             fun prevOf(p: com.photomed.app.data.Photo) = allPhotos.filter { it.zone == p.zone && it.expression == p.expression && it.takenAt < p.takenAt }
                 .sortedByDescending { it.takenAt }.map { it.uri.toString() }
             val lines = HashMap<String, List<com.photomed.app.align.AnnotLine>>()
-            if (showLayers && com.photomed.app.align.PhotoAnnotator.enabled) {
+            // (solo fotos del rostro: en manos, pies o cuerpo no se analizan surcos ni arrugas)
+            if (showLayers && com.photomed.app.align.PhotoAnnotator.enabled && s.all { it.zone.isFaceZone() }) {
                 alignProgress = tr("Esperando el análisis de arrugas…")
                 kotlinx.coroutines.withTimeoutOrNull(25_000) {
                     while (true) {
@@ -485,6 +487,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         },
     ) { padding ->
         val (photos, zonesWithPhotos, visible, seq, seqKeys, n, timeline, reference, target, validAlign) = derive()
+        // capas faciales (contorno, rasgos, surcos, arrugas): solo con fotos del rostro
+        @Suppress("NAME_SHADOWING") val showLayers = showLayers && seq.orEmpty().any { it.zone.isFaceZone() }
         // referencia de arrugas: fotos anteriores del paciente en la misma zona (la más reciente primero)
         fun previousOf(p: com.photomed.app.data.Photo) = photos.filter { it.zone == p.zone && it.expression == p.expression && it.takenAt < p.takenAt }
             .sortedByDescending { it.takenAt }.map { it.uri.toString() }
@@ -496,8 +500,10 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         // anotaciones (contorno, línea del pelo, rasgos, surcos) de cada foto, en su foto corregida
         val layers = if (showLayers) layersState.value else emptySet()
         val annots: Map<String, List<com.photomed.app.align.AnnotLine>> = seq?.mapNotNull { p ->
+            // fuera del rostro no hay nada facial que analizar (sin anotaciones, sin esperar)
+            if (!p.zone.isFaceZone()) return@mapNotNull p.key to emptyList<com.photomed.app.align.AnnotLine>()
             // con el panel de capas abierto se analizan las fotos aunque no haya capas encendidas (la tabla de medidas lo necesita)
-            key("a" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, showLayers,
+            key("a" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, showLayers && p.zone.isFaceZone(),
                 previous = previousOf(p), userVersion = userVersion).value }?.let { p.key to it }
         }?.toMap().orEmpty()
         // anotaciones de cada foto (dibujo de planificación), en su foto corregida

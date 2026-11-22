@@ -1,5 +1,6 @@
 package com.photomed.app.ui.gallery
 
+import com.photomed.app.align.isFaceZone
 import com.photomed.app.ui.components.detectTapPassThrough
 import com.photomed.app.ui.components.detectZoomPanPassThrough
 import androidx.compose.runtime.mutableFloatStateOf
@@ -119,8 +120,9 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     var info by remember { mutableStateOf<Pair<Photo, PhotoInfo?>?>(null) }
     // capas de anotación y edición no destructiva (giro, espejo, recorte)
     val layersState = com.photomed.app.ui.compare.rememberAnnotLayers()
-    // capas siempre disponibles (se eligen con los chips; el botón de capas dejó sitio a pantalla completa)
-    val showLayers = true
+    // capas (contorno, rasgos, surcos, arrugas) solo en las zonas del rostro: en manos, pies o cuerpo no
+    // hay nada facial que analizar
+    val showLayers = zone.isFaceZone()
     var editing by remember { mutableStateOf(false) }
     var cropping by remember { mutableStateOf(false) }
     var editVersion by remember { mutableIntStateOf(0) }

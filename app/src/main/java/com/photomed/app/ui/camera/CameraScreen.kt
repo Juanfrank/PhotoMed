@@ -989,22 +989,28 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     // referencia girada: la guía se adapta a la referencia sin girar y se gira entera
                     // (la deformación de la guía solo admite cabezas casi verticales)
                     val rg = refGuide.takeIf { !refOrient.isIdentity && adaptGuide && showGhost && ghost != null }
+                    // con la referencia girada, sus puntos y su silueta están girados: deformar con ellos la guía
+                    // (dibujada en vertical) la tumbaría; solo se usa la guía adaptada a la referencia sin girar (rg)
+                    val refUpright = refOrient.isIdentity
                     val adaptPts = when {
                         rg != null -> rg.points
-                        adaptGuide && showGhost && refPoints.isNotEmpty() -> refPoints
+                        adaptGuide && showGhost && refUpright && refPoints.isNotEmpty() -> refPoints
                         // primera toma: con la cara dentro del marco, el contorno se ajusta a ella
                         adaptGuide && framedFace -> live?.currentPointsAll.orEmpty()
                         else -> emptyMap()
                     }
-                    val adaptSil = if (rg != null) rg.silhouette else if (adaptGuide && showGhost) refSilhouette else null
-                    // sin referencia que la oriente, la guía dibujada se gira / espeja con el control de la referencia
-                    val orientGuide = rg != null || (adaptPts.isEmpty() && adaptSil == null && (ghost == null || !showGhost))
-                    // manos, pies y miembros: esquema ajustado a lo que ve la cámara (sin foto superpuesta);
-                    // está en coordenadas del cuadro: se dibuja fuera del giro de la guía
-                    val schema = if (matchingEnabled && !(showGhost && ghost != null)) live?.schema?.takeIf { !it.isEmpty } else null
+                    val adaptSil = if (rg != null) rg.silhouette else if (adaptGuide && showGhost && refUpright) refSilhouette else null
+                    // guía no adaptada a lo que se ve: se gira / espeja como la referencia (también con la foto
+                    // anterior superpuesta: antes se quedaba sin girar y no coincidía con la foto girada)
+                    val orientGuide = rg != null || (adaptPts.isEmpty() && adaptSil == null)
+                    // manos, pies y miembros: esquema ajustado a lo que ve la cámara; está en coordenadas del cuadro
+                    // (se dibuja fuera del giro de la guía). Sin foto superpuesta sustituye a la guía; con ella se
+                    // dibujan los dos, para ver si lo que capta la cámara cuadra con la foto anterior (girada o no)
+                    val ghostShown = showGhost && ghost != null
+                    val schema = if (matchingEnabled) live?.schema?.takeIf { !it.isEmpty } else null
                     com.photomed.app.ui.compare.OrientBox(if (orientGuide) refOrient.rot else 0, orientGuide && refOrient.mirror, Modifier.fillMaxSize(),
                         fit = rg == null, fill34 = rg != null) {
-                    if (schema == null)
+                    if (schema == null || ghostShown)
                     GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize(),
                         tone = tone, adaptTo = adaptPts,
                         silhouette = adaptSil,
@@ -1013,7 +1019,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         free = if (showGhost && refFree != null) refFree else live?.freeContour,
                     )
                     }
-                    if (schema != null) SchemaOverlay(schema, showContour, showGrid, Modifier.fillMaxSize(), tone)
+                    if (schema != null) SchemaOverlay(schema, showContour, showGrid && !ghostShown, Modifier.fillMaxSize(), tone)
                     }
                     // línea de implantación frontal: la de la referencia (discontinua) y la actual (continua)
                     val hl = refHairline
