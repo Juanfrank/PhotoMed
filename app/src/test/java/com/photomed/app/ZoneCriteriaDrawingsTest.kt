@@ -64,7 +64,7 @@ class ZoneCriteriaDrawingsTest {
             val c = px[i]
             pal.minBy { (p, _) -> Math.abs(Color.red(p) - Color.red(c)) + Math.abs(Color.green(p) - Color.green(c)) + Math.abs(Color.blue(p) - Color.blue(c)) }.second.toByte()
         }
-        return ZoneCriteria.Classes(CW, CH, out)
+        return ZoneCriteria.Classes(CW, CH, out, px)
     }
 
     // ---------- figura humana de frente / de espaldas / de lado ----------
@@ -209,7 +209,7 @@ class ZoneCriteriaDrawingsTest {
     // ---------- pies ----------
     /** Dos pies vistos desde arriba (dorso) o la planta ([sole]), dedo gordo hacia dentro. */
     private fun feetScene(cut: Boolean = false, one: Boolean = false, sole: Boolean = false, strap: Boolean = false,
-                          sock: Boolean = false, toeLen: Float = 0f): Bitmap {
+                          sock: Boolean = false, toeLen: Float = 0f, flat: Boolean = false): Bitmap {
         val (b, c) = canvas()
         val dy = if (cut) 95f else 0f
         val shade = Color.rgb(206, 152, 124)
@@ -225,12 +225,19 @@ class ZoneCriteriaDrawingsTest {
             }
             c.drawPath(f, fill(SKIN))
             // cinco dedos: el gordo (más grande) del lado interno, los demás decreciendo hacia fuera
-            val rad = floatArrayOf(11f, 7.5f, 7f, 6.5f, 6f)
-            for (i in 0..4) {
-                val tx = x + inward * (32f - i * 16f); val ty = 300f + dy + toeLen * (1f - i * 0.15f) + (if (i == 0) 4f else i * -3f)
-                c.drawLine(tx, 296f + dy, tx, ty, stroke(SKIN, rad[i] * 2))
+            // dedos que sobresalen del antepié (borde en «nube»: una curva por dedo) con el surco entre dedos
+            // algo más oscuro, como en un pie real; [flat]: sin dedos distinguibles (borde liso)
+            val rad = floatArrayOf(10f, 7f, 6.5f, 6f, 5.5f)
+            val cx = floatArrayOf(31f, 11f, -6f, -22f, -36f)
+            if (!flat) for (i in 0..4) {
+                val tx = x + inward * cx[i]; val ty = 300f + dy + rad[i] * 1.3f + toeLen * (1f - i * 0.15f) + (if (i == 0) 3f else i * -2.5f)
+                c.drawLine(tx, 292f + dy, tx, ty, stroke(SKIN, rad[i] * 2))
                 c.drawCircle(tx, ty, rad[i], fill(SKIN))
                 if (!sole) c.drawCircle(tx, ty + rad[i] * 0.3f, rad[i] * 0.45f, fill(NAIL))
+            }
+            if (!flat) for (i in 0..3) {
+                val gx = x + inward * (cx[i] + cx[i + 1]) / 2
+                c.drawLine(gx, 282f + dy, gx, 304f + dy + toeLen * 0.5f, stroke(shade, 2f))
             }
             // calcetín: tapa el antepié y los dedos
             if (sock) c.drawRect(x - 46, 240f + dy, x + 46, 330f + dy + toeLen, fill(CLOTH))
@@ -307,6 +314,7 @@ class ZoneCriteriaDrawingsTest {
             fc1("modo un pie: dedos tapados", false, "que se vean los dedos", feetScene(one = true, sole = sole, sock = true))
             fc1("modo un pie: descentrado", false, "Centre", Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888).also { s2 -> Canvas(s2).apply { drawColor(BG); drawBitmap(feetScene(one = true, sole = sole), -80f, 0f, null) } })
             fc("dedos tapados (calcetín)", false, "que se vean los dedos", feetScene(sole = sole, sock = true))
+            fc("sin dedos distinguibles", false, "que se vean los dedos", feetScene(sole = sole, flat = true))
         }
         // abdomen frontal, tórax, espalda
         out += case(Zone.TORSO_FRONT, "correcta", true, null) { figure(it) }
@@ -505,6 +513,7 @@ class ZoneCriteriaDrawingsTest {
                         sc.drawCircle(X(cp.b), Y(cp.b), cp.r * tw, sp)
                     }
                     sch.dots.forEach { q -> sc.drawCircle(X(q), Y(q), 4f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }) }
+                    sch.lines.forEach { l -> l.zipWithNext { a, b -> sc.drawLine(X(a), Y(a), X(b), Y(b), sp) } }
                 }
                 // puntos de referencia adicionales (amarillo)
                 val yel = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 214, 0) }

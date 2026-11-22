@@ -4,6 +4,11 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Dedos del pie**: se delimitan con el contorno «en nube» (una curva por dedo y un valle entre cada
+  dos), el surco entre dedos que nace de cada valle con su inclinación (el borde oscuro de cada dedo) y,
+  desde el dedo gordo, los surcos de dedos muy juntos. La guía dibuja la separación y la punta de cada
+  dedo, y se pide «que se vean los dedos» si se distinguen menos de 3. Con fotos reales de pies: 5 dedos
+  exactos en 12 de 17.
 - **Pies: dedos** comprobados de forma fiable: el extremo de cada pie entero y al aire (sin calcetín,
   ropa ni calzado); ya no se exige contar cada dedo en la silueta, que con fotos reales fallaba.
 - **Veredicto estable**: los criterios de la zona deciden por mayoría de los últimos análisis; las

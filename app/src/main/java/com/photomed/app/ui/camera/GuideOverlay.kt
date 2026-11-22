@@ -874,5 +874,7 @@ private fun SchemaGuide(schema: com.photomed.app.align.BodySchema.Schema, showCo
             drawCircle(col, r, b, style = stroke)
         }
         schema.dots.forEach { drawCircle(col, 4.dp.toPx(), o(it)) }
+        // separación entre los dedos del pie
+        schema.lines.forEach { l -> l.zipWithNext { a, b -> drawLine(col, o(a), o(b), stroke.width, cap = androidx.compose.ui.graphics.StrokeCap.Round) } }
     }
 }

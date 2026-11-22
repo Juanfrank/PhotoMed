@@ -18,8 +18,10 @@ object BodySchema {
     /** Segmento con grosor (dedo, falange, miembro): de [a] a [b] con radio [r]. */
     class Capsule(val a: Pt, val b: Pt, val r: Float)
 
-    class Schema(val polygons: List<List<Pt>> = emptyList(), val capsules: List<Capsule> = emptyList(), val dots: List<Pt> = emptyList()) {
-        val isEmpty get() = polygons.isEmpty() && capsules.isEmpty() && dots.isEmpty()
+    class Schema(val polygons: List<List<Pt>> = emptyList(), val capsules: List<Capsule> = emptyList(), val dots: List<Pt> = emptyList(),
+                 /** Líneas abiertas (separación entre los dedos del pie). */
+                 val lines: List<List<Pt>> = emptyList()) {
+        val isEmpty get() = polygons.isEmpty() && capsules.isEmpty() && dots.isEmpty() && lines.isEmpty()
     }
 
     private fun d(a: Pt, b: Pt) = hypot(a.x - b.x, a.y - b.y)
@@ -53,9 +55,9 @@ object BodySchema {
         return Schema(polys, caps, dots)
     }
 
-    /** Pies: silueta de cada pie y la punta de cada dedo hallada. */
+    /** Pies: silueta de cada pie, la punta de cada dedo y la línea de separación entre dedos. */
     fun feet(feet: List<ZoneCriteria.Foot>): Schema =
-        Schema(feet.map { it.outline }, emptyList(), feet.flatMap { it.toes })
+        Schema(feet.map { it.outline }, emptyList(), feet.flatMap { it.toes }, feet.flatMap { f -> f.toeLines.map { (a, b) -> listOf(a, b) } })
 
     /** Brazos, piernas y tronco con el ángulo y la longitud de los del paciente. */
     fun body(pose: Map<String, Pt>, classes: ZoneCriteria.Classes? = null): Schema {
@@ -78,7 +80,7 @@ object BodySchema {
     }
 
     /** El mismo esquema con cada punto transformado (p. ej. de la orientación de la guía al cuadro). */
-    fun Schema.map(f: (Pt) -> Pt): Schema = Schema(polygons.map { it.map(f) }, capsules.map { Capsule(f(it.a), f(it.b), it.r) }, dots.map(f))
+    fun Schema.map(f: (Pt) -> Pt): Schema = Schema(polygons.map { it.map(f) }, capsules.map { Capsule(f(it.a), f(it.b), it.r) }, dots.map(f), lines.map { it.map(f) })
 
     /** Esquema de la zona con lo detectado (null si la zona usa la ilustración fija o no hay datos). */
     fun of(zone: Zone, s: ZoneCriteria.Scene): Schema? = when (zone.guide) {

@@ -35,7 +35,9 @@ object ZoneCriteria {
     class Hand(val points: List<Pt>, val label: String)
 
     /** Clases por píxel (como [FaceLabels]) sobre el cuadro completo. */
-    class Classes(val width: Int, val height: Int, val data: ByteArray) {
+    class Classes(val width: Int, val height: Int, val data: ByteArray,
+                  /** Color (ARGB) en la misma rejilla, para los dedos del pie (piel refinada y surcos); opcional. */
+                  val rgb: IntArray? = null) {
         fun at(x: Int, y: Int): Int = if (x in 0 until width && y in 0 until height) data[y * width + x].toInt() else FaceLabels.BG
         companion object { fun of(l: FaceLabels) = Classes(l.width, l.height, l.data) }
     }
@@ -62,7 +64,8 @@ object ZoneCriteria {
             val cl = sc.classes?.let { c ->
                 val w2 = c.height; val h2 = c.width; val d = ByteArray(w2 * h2)
                 for (y2 in 0 until h2) for (x2 in 0 until w2) d[y2 * w2 + x2] = c.data[x2 * c.width + (c.width - 1 - y2)]
-                Classes(w2, h2, d)
+                val lm = c.rgb?.let { l -> IntArray(w2 * h2).also { o -> for (y2 in 0 until h2) for (x2 in 0 until w2) o[y2 * w2 + x2] = l[x2 * c.width + (c.width - 1 - y2)] } }
+                Classes(w2, h2, d, lm)
             }
             sc = Scene(sc.pose.mapValues { r(it.value) }, sc.hands?.map { h -> Hand(h.points.map(::r), h.label) }, cl, 1f / a, sc.single)
         }
@@ -117,6 +120,8 @@ object ZoneCriteria {
     /** Dedos del pie visibles (mínimo por pie: el pequeño puede quedar oculto por el cuarto). */
     /** Fracción máxima del borde distal del pie que puede lindar con ropa o calzado. */
     const val COVERED_TIP = 0.35f
+    /** Dedos que deben distinguirse como mínimo en cada pie (curvas del contorno en nube y surcos). */
+    const val MIN_TOES = 3
 
     /** Indicaciones que impiden el disparo (vacía: la zona cumple). */
     fun hints(zone: Zone, s: Scene): List<String> {
@@ -289,7 +294,11 @@ object ZoneCriteria {
      */
     class Foot(val outline: List<Pt>, val toes: List<Pt>, val box: Blob,
                /** Fracción del borde distal que linda con ropa o calzado (dedos tapados: calcetín, zapato). */
-               val coveredTip: Float = 0f)
+               val coveredTip: Float = 0f,
+               /** Dedos distinguidos en el borde distal ([ToeDetector]); null si no se pudo analizar. */
+               val toeCount: Int? = null,
+               /** Líneas de separación entre dedos (unidades del ancho). */
+               val toeLines: List<Pair<Pt, Pt>> = emptyList())
 
     @Volatile private var feetMemo: Pair<Classes, List<Foot>>? = null
 
@@ -347,8 +356,14 @@ object ZoneCriteria {
                     break
                 }
             }
-            // los relieves del borde son una estimación (los dedos se tocan): se dibujan si parecen dedos
-            Foot(left + right.reversed(), toes.takeIf { it.size in 3..6 }.orEmpty(), g, if (seen == 0) 0f else cov / seen.toFloat())
+            // dedos: contorno en nube (una curva por dedo), surcos desde cada valle y, desde el dedo gordo,
+            // los surcos sin valle (ver ToeDetector)
+            val td = runCatching {
+                ToeDetector.detect(c.width, c.height, { x, y -> x in g.x0..g.x1 && y in g.y0..g.y1 && inG(x, y) }, c.rgb)
+            }.getOrNull()
+            fun u(p: Pair<Float, Float>) = Pt((p.first + 0.5f) * k, (p.second + 0.5f) * k)
+            Foot(left + right.reversed(), td?.tips?.map(::u) ?: toes.takeIf { it.size in 3..6 }.orEmpty(), g,
+                if (seen == 0) 0f else cov / seen.toFloat(), td?.count, td?.lines?.map { (a, b) -> u(a) to u(b) }.orEmpty())
         }
     }
 
@@ -369,7 +384,9 @@ object ZoneCriteria {
             val left = if (s.single) (b.x0 + b.x1) < c.width else i == 0
             // los dedos: el extremo distal entero y al aire (no tapado por calcetín, ropa o calzado). Contar
             // cada dedo en la silueta no es fiable con fotos reales (se tocan): no se exige un número
-            if (f.coveredTip > COVERED_TIP) out += tr("Pie de la %1\$s: que se vean los dedos", if (left) tr("izquierda") else tr("derecha"))
+            // y que se distingan los dedos: menos de MIN_TOES curvas en el borde distal es que no se ven
+            if (f.coveredTip > COVERED_TIP || (f.toeCount != null && f.toeCount < MIN_TOES))
+                out += tr("Pie de la %1\$s: que se vean los dedos", if (left) tr("izquierda") else tr("derecha"))
         }
         return out.distinct()
     }

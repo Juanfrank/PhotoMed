@@ -256,9 +256,18 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         // en las manos, la piel del mismo cuadro que los puntos (el contorno sigue a la mano sin retraso)
         if (ZoneCriteria.needsClasses(zone) && (now - lastClassesAt > 500 || handsNow)) {
             lastClassesAt = now
-            lastClasses = runCatching { hairSkin?.labels(frame) }.getOrNull()?.let { ZoneCriteria.Classes.of(it) }
+            lastClasses = runCatching { hairSkin?.labels(frame) }.getOrNull()?.let { lb ->
+                // pies: con la luminosidad del cuadro en la misma rejilla (surcos entre los dedos)
+                if (zone.guide == com.photomed.app.data.GuideType.FEET) ZoneCriteria.Classes(lb.width, lb.height, lb.data, rgbOf(frame, lb.width, lb.height))
+                else ZoneCriteria.Classes.of(lb)
+            }
         }
     }
+
+    private fun rgbOf(frame: Bitmap, w: Int, h: Int): IntArray? = runCatching {
+        val b = if (frame.width == w && frame.height == h) frame else Bitmap.createScaledBitmap(frame, w, h, true)
+        IntArray(w * h).also { b.getPixels(it, 0, w, 0, 0, w, h) }
+    }.getOrNull()
     private val smoother = LandmarkSmoother()
     private val steady = SteadyFraming()
 

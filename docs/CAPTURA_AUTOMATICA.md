@@ -119,13 +119,34 @@ guía dibujada de la app (si falta un dato, se pide; nunca se acepta por defecto
 | Zona | Se exige |
 |---|---|
 | Manos (dorso / palma) | Las **dos manos completas** (los 21 puntos de cada una dentro del cuadro), **todas las falanges visibles**: ningún dedo recogido (articulaciones ≥ 115–120°, pulgar ≥ 110°) ni acortado por estar doblado hacia la cámara (cada dedo ≥ 45 % del largo de la palma); los dedos **hacia abajo** (± 60°) y la **cara pedida** (dorso o palma) hacia la cámara. Dedos más abiertos, más largos o cortos, o la mano algo girada **no son incumplimiento**: la guía se ajusta |
-| Pies (dorso / planta) | Los **dos pies** (separados) y **completos**: la piel de cada pie no toca los bordes del cuadro salvo arriba (piernas); un pie partido por una tira cuenta como uno; **los dedos al aire**: el borde distal de cada pie linda con el fondo, no con ropa, calcetín o calzado (≤ 35 % del borde). No se cuenta cada dedo: con fotos reales los dedos se tocan y su silueta no los separa de forma fiable (probado con las fotos de internet); los relieves hallados solo se dibujan como apoyo |
+| Pies (dorso / planta) | Los **dos pies** (separados) y **completos**: la piel de cada pie no toca los bordes del cuadro salvo arriba (piernas); un pie partido por una tira cuenta como uno; **los dedos al aire** (el borde distal linda con el fondo, no con calcetín, ropa o calzado: ≤ 35 %) y **distinguibles**: al menos 3 dedos en cada pie (ver «Dedos del pie») |
 | Abdomen frontal, tórax | Hombros y caderas en el cuadro y **nivelados** (≤ 8°), **de frente**, brazos **separados** del tronco y la zona **descubierta** (≥ 70 % piel, ≤ 15 % ropa en su región; la ropa interior en la cadera es correcta) |
 | Abdomen lateral | **De lado** (hombros y caderas superpuestos), brazos **subidos o cruzados** (que no tapen el flanco) y abdomen **descubierto** |
 | Espalda, glúteos | **De espaldas** (sin cara), **enteros** (fondo a los dos lados, no un recorte) y **descubiertos**; si el detector ve hombros y caderas, además nivelados y brazos separados |
 | Muslos / piernas | Caderas, rodillas y tobillos en el cuadro, **rodillas extendidas** (≥ 150°: se admite la flexión natural), pies **algo separados** y muslos **descubiertos** |
 | Brazo (derecho / izquierdo) | Hombro, codo y muñeca de ese brazo, **codo extendido** (≥ 150°: se admite la flexión natural), **separado del eje del tronco 5–45°** (la guía, ≈ 20°, se ajusta al ángulo real) y **descubierto** (sin manga) |
 | Cuello | Hombros nivelados, de frente y cuello y escote **descubiertos** |
+
+### Dedos del pie (`ToeDetector`)
+
+Contar los dedos solo por la silueta de la segmentación falla con fotos reales (se tocan). Se combinan
+tres pasos, ajustados con 20 fotos reales de pies (de internet, solo para evaluar, fuera del repositorio):
+
+1. **Piel del pie con su propio color**: modelo de cromaticidad y luminosidad del núcleo del pie; los
+   píxeles en sombra (surcos y huecos entre dedos) quedan fuera, unido al interior de la máscara para
+   que los dedos no se separen del pie.
+2. **Contorno en nube**: el borde de la punta del pie es una curva por dedo. Se envuelve por fuera
+   (envolvente convexa) y el punto más hondo bajo cada lado es un **valle entre dos dedos**; de forma
+   recursiva, porque con dedos de distinta longitud un lado de la envolvente cubre varios valles. La
+   franja distal se amplía hasta que el borde sea continuo (dedos largos).
+3. **Surco**: de cada valle nace la línea de separación hacia dentro, con la inclinación (± 25°) en la que
+   la piel es más oscura que a sus lados (el borde de cada dedo se ve como una arruga). Si el contorno ya
+   muestra varios dedos, los tramos demasiado anchos para un dedo (el más ancho, el gordo) se revisan
+   buscando un surco sin valle (dedos muy juntos).
+
+Resultado con las 17 fotos evaluables: 5 dedos exactos en 12 y 4–5 en 14 (`ToeDetectorPhotosTest`,
+informe `pies_fotos_reales.png`). Fallan sobre todo cuando la segmentación no separa bien el pie (pies en
+el agua, entre tiras de sandalia). En la cámara, la guía dibuja la separación entre dedos y su punta.
 
 **Zona centrada**: el centro de la parte del cuerpo (manos, pies en horizontal, brazo, piernas,
 tronco, glúteos, cuello en horizontal) a menos del 13 % del centro del cuadro; si no, «Centre la zona
