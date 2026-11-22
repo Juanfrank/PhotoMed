@@ -277,4 +277,94 @@ class ZoneAutoCaptureTest {
         println(problems.joinToString("\n", "PROBLEMAS:\n"))
         assertTrue(problems.joinToString("\n"), problems.isEmpty())
     }
+
+    /**
+     * Lo que la app identifica sobre cada foto de prueba, por zona (build/reports/zone_overlays/):
+     * contornos de la cara (óvalo, ojos, cejas, nariz, labios) y pupilas, esqueleto del cuerpo, áreas
+     * donde se mide la luz, regiones de contorno de la guía (elipses, donde se buscan los bordes) y
+     * bordes de referencia, con el resultado del disparo de la primera foto.
+     */
+    @Test
+    fun drawOverlays() {
+        assumeTrue(File(root, "rostro_frontal/landmarks.json").exists())
+        val out = File("build/reports/zone_overlays").apply { mkdirs() }
+        val cache = HashMap<String, List<Sample>>()
+        for (z in Zone.entries) {
+            val spec = ZoneAlignment.of(z)
+            val ss = samplesFor(z, cache.getOrPut(dirOf(z)) { load(dirOf(z)) }).filter { !it.file.name.startsWith("pm_") }.take(12)
+            if (ss.isEmpty()) continue
+            val tw = 300; val th = 400; val cols = 4; val rows = (ss.size + cols - 1) / cols
+            val sheet = Bitmap.createBitmap(tw * cols, th * rows + 40, Bitmap.Config.ARGB_8888)
+            val c = android.graphics.Canvas(sheet); c.drawColor(android.graphics.Color.WHITE)
+            val title = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { textSize = 22f; color = android.graphics.Color.BLACK; isFakeBoldText = true }
+            c.drawText("${z.id} · detector ${spec.detector}", 10f, 28f, title)
+            ss.forEachIndexed { k, s0 ->
+                val b = bmp(s0.file); val det = detOf(s0, z)
+                val tile = Bitmap.createScaledBitmap(b, tw, th, true).copy(Bitmap.Config.ARGB_8888, true)
+                drawOverlay(android.graphics.Canvas(tile), tw, th, z, s0, det, b)
+                c.drawBitmap(tile, (k % cols * tw).toFloat(), (40 + k / cols * th).toFloat(), null)
+            }
+            File(out, "${z.id}.jpg").outputStream().use { sheet.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+        }
+    }
+
+    private fun drawOverlay(c: android.graphics.Canvas, w: Int, h: Int, z: Zone, s: Sample, det: Detection, src: Bitmap) {
+        val spec = ZoneAlignment.of(z)
+        fun P(p: Pt) = android.graphics.PointF(p.x * w, p.y * w)     // puntos en unidades del ancho
+        fun paint(col: Int, sw: Float = 2f, fill: Boolean = false) = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = col; strokeWidth = sw; style = if (fill) android.graphics.Paint.Style.FILL else android.graphics.Paint.Style.STROKE }
+        // regiones de contorno de la guía (donde se buscan los bordes con referencia)
+        val reg = paint(0x9900BCD4.toInt(), 2f)
+        spec.contours.forEach { r ->
+            c.drawOval(android.graphics.RectF((r.center.x - r.radius.x) * w, (r.center.y - r.radius.y) * w,
+                (r.center.x + r.radius.x) * w, (r.center.y + r.radius.y) * w), reg)
+        }
+        // bordes de referencia (zonas sin puntos)
+        if (!LiveMatcher.usesPoints(spec, det)) {
+            val g = ImageOps.gray(src, LiveMatcher.EDGE_W, null)
+            val dot = paint(0xFFFFEB3B.toInt(), 1f, true)
+            ContourMatch.referencePoints(g, spec.contours).forEach { e ->
+                c.drawCircle((e.x + 0.5f) / g.width * w, (e.y + 0.5f) / g.height * h, 1.6f, dot)
+            }
+        }
+        // cara: contornos por grupo
+        val groups = det.points.keys.filter { it.matches(Regex("[a-z_]+_\\d+")) }.groupBy { it.substringBeforeLast("_") }
+        val faceCols = mapOf("oval" to 0xFF00E676.toInt(), "eye_l" to 0xFF29B6F6.toInt(), "eye_r" to 0xFF29B6F6.toInt(),
+            "nose_bridge" to 0xFFFFA726.toInt(), "nose_bottom" to 0xFFFFA726.toInt())
+        if (spec.detector == Detector.FACE) groups.forEach { (g, keys) ->
+            val pts = keys.sortedBy { it.substringAfterLast("_").toInt() }.mapNotNull { det.points[it] }
+            if (pts.size < 2) return@forEach
+            val col = faceCols[g] ?: if (g.startsWith("brow")) 0xFFAB47BC.toInt() else if (g.startsWith("lip")) 0xFFEF5350.toInt() else 0xFFFFFFFF.toInt()
+            val path = android.graphics.Path().apply { moveTo(P(pts[0]).x, P(pts[0]).y); pts.drop(1).forEach { lineTo(P(it).x, P(it).y) }; if (g == "oval" || g.startsWith("eye")) close() }
+            c.drawPath(path, paint(col, 2f))
+        }
+        if (spec.detector == Detector.FACE) listOf(com.photomed.app.align.Landmarks.EYE_L, com.photomed.app.align.Landmarks.EYE_R)
+            .mapNotNull { det.points[it] }.forEach { c.drawCircle(P(it).x, P(it).y, 3f, paint(0xFFFFFFFF.toInt(), 1f, true)) }
+        // cuerpo: esqueleto
+        if (spec.detector == Detector.POSE) {
+            val L = com.photomed.app.align.Landmarks
+            val bones = listOf(L.SHOULDER_L to L.SHOULDER_R, L.SHOULDER_L to L.ELBOW_L, L.ELBOW_L to L.WRIST_L, L.SHOULDER_R to L.ELBOW_R,
+                L.ELBOW_R to L.WRIST_R, L.SHOULDER_L to L.HIP_L, L.SHOULDER_R to L.HIP_R, L.HIP_L to L.HIP_R, L.HIP_L to L.KNEE_L,
+                L.KNEE_L to L.ANKLE_L, L.HIP_R to L.KNEE_R, L.KNEE_R to L.ANKLE_R, L.ANKLE_L to L.HEEL_L, L.ANKLE_R to L.HEEL_R,
+                L.HEEL_L to L.FOOT_INDEX_L, L.HEEL_R to L.FOOT_INDEX_R, L.WRIST_L to L.INDEX_L, L.WRIST_R to L.INDEX_R)
+            val bp = paint(0xFF00E676.toInt(), 3f)
+            bones.forEach { (a, b) -> val pa = det.points[a]; val pb = det.points[b]; if (pa != null && pb != null) c.drawLine(P(pa).x, P(pa).y, P(pb).x, P(pb).y, bp) }
+            det.points.values.forEach { c.drawCircle(P(it).x, P(it).y, 3.5f, paint(0xFFFF4081.toInt(), 1f, true)) }
+        }
+        // luz: áreas de medida (rostro)
+        if (spec.detector == Detector.FACE) {
+            val (a, regional) = Standardization.lightAreas(s.w, s.h, det.points, det.yaw)
+            val lp = paint(if (regional) 0xFFFF9800.toInt() else 0xFFFFFF00.toInt(), 2f)
+            listOf(a.first, a.second, a.third).forEach { ar ->
+                val cx = ar.center.x * w; val cy = ar.center.y * w; val r = ar.radius * w
+                c.drawRect(cx - r, cy - r, cx + r, cy + r, lp)
+            }
+        }
+        // resultado de la primera foto
+        val e = first(z, s); val ok = AutoCapture.ready(e)
+        val label = if (ok) "Dispara" else e.hints.firstOrNull()?.take(34) ?: e.status.name
+        val bg = paint(if (ok) 0xCC2E7D32.toInt() else 0xCCB71C1C.toInt(), 1f, true)
+        c.drawRect(0f, h - 30f, w.toFloat(), h.toFloat(), bg)
+        c.drawText(label, 6f, h - 9f, android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = 16f })
+    }
 }

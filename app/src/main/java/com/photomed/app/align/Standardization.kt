@@ -184,6 +184,15 @@ object Standardization {
      * Centro = rostro; tercios izquierdo y derecho = «mejillas» (lados de la imagen).
      */
     fun regionLighting(rgb: IntArray, w: Int, h: Int, points: Map<String, Pt>): Lighting {
+        val (l, r, c) = regionAreas(w, h, points)
+        return Lighting(lum(rgb, w, h, l.center, l.radius), lum(rgb, w, h, r.center, r.radius), lum(rgb, w, h, c.center, c.radius), regional = true)
+    }
+
+    /** Zona donde se mide la luz: centro y radio (unidades del ancho). */
+    data class LightArea(val center: Pt, val radius: Float)
+
+    /** Áreas de [regionLighting]: «mejilla» izquierda y derecha de la imagen y centro. */
+    fun regionAreas(w: Int, h: Int, points: Map<String, Pt>): Triple<LightArea, LightArea, LightArea> {
         val hw = h / w.toFloat()
         val (x0, x1, y0, y1) = if (points.size >= 8) {
             listOf(points.values.minOf { it.x }, points.values.maxOf { it.x }, points.values.minOf { it.y }, points.values.maxOf { it.y })
@@ -191,8 +200,7 @@ object Standardization {
         val bw = (x1 - x0).coerceAtLeast(0.1f); val bh = (y1 - y0).coerceAtLeast(0.1f)
         val cy = y0 + bh * 0.55f
         val rad = (minOf(bw, bh) * 0.14f).coerceIn(0.02f, 0.08f)
-        return Lighting(lum(rgb, w, h, Pt(x0 + bw * 0.22f, cy), rad), lum(rgb, w, h, Pt(x0 + bw * 0.78f, cy), rad),
-            lum(rgb, w, h, Pt(x0 + bw * 0.5f, y0 + bh * 0.5f), rad * 1.6f), regional = true)
+        return Triple(LightArea(Pt(x0 + bw * 0.22f, cy), rad), LightArea(Pt(x0 + bw * 0.78f, cy), rad), LightArea(Pt(x0 + bw * 0.5f, y0 + bh * 0.5f), rad * 1.6f))
     }
 
     /** Centro de los puntos cuyo nombre empieza por [prefix] (contorno del ojo, base nasal…). */
@@ -210,17 +218,27 @@ object Standardization {
                  /** Giro de la cabeza: muy girada (> 40°), las mejillas proyectadas caen fuera del rostro. */
                  yaw: Float? = null): Lighting? {
         if (w <= 0 || h <= 0 || rgb.size < w * h) return null
-        if (yaw != null && abs(yaw) > 40f && points.size >= 8) return regionLighting(rgb, w, h, points)
+        val (a, regional) = lightAreas(w, h, points, yaw)
+        return Lighting(lum(rgb, w, h, a.first.center, a.first.radius), lum(rgb, w, h, a.second.center, a.second.radius),
+            lum(rgb, w, h, a.third.center, a.third.radius), regional)
+    }
+
+    /**
+     * Dónde se mide la luz (mejilla izquierda y derecha de la imagen, centro del rostro) y si es por
+     * regiones: por las mejillas entre ojo y óvalo; por regiones si la cabeza está muy girada o faltan
+     * pupilas y nariz.
+     */
+    fun lightAreas(w: Int, h: Int, points: Map<String, Pt>, yaw: Float? = null): Pair<Triple<LightArea, LightArea, LightArea>, Boolean> {
+        if (yaw != null && abs(yaw) > 40f && points.size >= 8) return regionAreas(w, h, points) to true
         val l = points[Landmarks.EYE_L] ?: centroid(points, "eye_l_")
         val r = points[Landmarks.EYE_R] ?: centroid(points, "eye_r_")
         val nose = points["nose_bottom_1"] ?: points[Landmarks.NOSE_BASE] ?: centroid(points, "nose_bottom_")
-        if (l == null || r == null || nose == null) return regionLighting(rgb, w, h, points)
+        if (l == null || r == null || nose == null) return regionAreas(w, h, points) to true
         val ovalL = points["oval_8"]; val ovalR = points["oval_28"]
-        fun lum(p: Pt, rad: Float) = lum(rgb, w, h, p, rad)
         // mejilla: a medio camino entre la pupila (bajada a la altura de la nariz) y el borde del óvalo
         fun cheek(eye: Pt, edge: Pt?): Pt = Pt(if (edge != null) (eye.x + edge.x) / 2 else eye.x, (eye.y + nose.y) / 2)
         val leftImg = if (r.x < l.x) cheek(r, ovalR) else cheek(l, ovalL)
         val rightImg = if (r.x < l.x) cheek(l, ovalL) else cheek(r, ovalR)
-        return Lighting(lum(leftImg, 0.03f), lum(rightImg, 0.03f), lum(Pt((l.x + r.x) / 2, (l.y + nose.y) / 2), 0.05f))
+        return Triple(LightArea(leftImg, 0.03f), LightArea(rightImg, 0.03f), LightArea(Pt((l.x + r.x) / 2, (l.y + nose.y) / 2), 0.05f)) to false
     }
 }
