@@ -33,14 +33,16 @@ object ProtocolReference {
                         val px = IntArray(bmp.width * bmp.height).also { bmp.getPixels(it, 0, bmp.width, 0, 0, bmp.width, bmp.height) }
                         Standardization.lighting(px, bmp.width, bmp.height, d0.points, d0.yaw)
                     } else null
-                    Triple(d0, m.referenceHairline, m.referenceProfile) to light
+                    Triple(d0, m.referenceHairline, m.referenceProfile) to (light to m.referenceSchema)
                 }
             }
         }
         val (d, hair, profile) = det.first
-        val light = det.second
-        // 2) contornos y surcos: los confirmados de la foto o, si no hay, los del análisis
-        val lines = runCatching { linesOf(context, photo) }.getOrDefault(emptyList())
+        val light = det.second.first
+        // 2) contornos y surcos del rostro: los confirmados de la foto o, si no hay, los del análisis (solo en
+        // zonas del rostro); en manos, pies y miembros, su contorno (el mismo que dibuja la cámara en vivo)
+        val faceLines = if (!photo.zone.isFaceZone()) emptyList() else runCatching { linesOf(context, photo) }.getOrDefault(emptyList())
+        val lines = faceLines + det.second.second?.let { bodyLines(it) }.orEmpty()
         val cond = withContext(Dispatchers.IO) { runCatching { repo.readInfo(photo)?.conditions }.getOrNull() }.orEmpty()
         if (d.points.isEmpty() && profile == null && lines.isEmpty()) return null
         return ProtocolRef(d.points, d.yaw, d.pitch, d.roll, d.gaze, hair, profile, lines,
@@ -61,9 +63,28 @@ object ProtocolReference {
             .map { l -> RefLine(l.layer.name, l.metrics?.name, simplify(l.points), l.closed) }
     }
 
+    /** Capa de las líneas del contorno del cuerpo (pies, manos, miembros) en la referencia. */
+    const val BODY_LAYER = "BODY"
+
+    /**
+     * Contorno del cuerpo de la referencia como líneas de guía: siluetas (cerradas), separación entre los
+     * dedos del pie y el contorno de cada miembro (los bordes de cada segmento).
+     */
+    fun bodyLines(s: BodySchema.Schema): List<RefLine> {
+        val out = ArrayList<RefLine>()
+        s.polygons.filter { it.size >= 3 }.forEach { out += RefLine(BODY_LAYER, null, simplify(it, 80), true) }
+        s.lines.filter { it.size >= 2 }.forEach { out += RefLine(BODY_LAYER, null, it, false) }
+        s.capsules.forEach { c ->
+            val dx = c.b.x - c.a.x; val dy = c.b.y - c.a.y; val l = kotlin.math.hypot(dx, dy).coerceAtLeast(1e-4f)
+            val nx = -dy / l * c.r; val ny = dx / l * c.r
+            out += RefLine(BODY_LAYER, null, listOf(Pt(c.a.x + nx, c.a.y + ny), Pt(c.b.x + nx, c.b.y + ny), Pt(c.b.x - nx, c.b.y - ny), Pt(c.a.x - nx, c.a.y - ny)), true)
+        }
+        return out
+    }
+
     /** Como mucho [MAX_LINE_PTS] puntos por línea (el archivo queda pequeño; para dibujar basta). */
-    private fun simplify(p: List<Pt>): List<Pt> = if (p.size <= MAX_LINE_PTS) p
-        else (0 until MAX_LINE_PTS).map { i -> p[i * (p.size - 1) / (MAX_LINE_PTS - 1)] }
+    private fun simplify(p: List<Pt>, max: Int = MAX_LINE_PTS): List<Pt> = if (p.size <= max) p
+        else (0 until max).map { i -> p[i * (p.size - 1) / (max - 1)] }
 
     /** Detección para la cámara a partir de la referencia guardada. */
     fun detectionOf(r: ProtocolRef) = Detection(r.points, r.yaw, r.pitch, r.roll, r.gaze)

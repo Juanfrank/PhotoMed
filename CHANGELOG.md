@@ -4,6 +4,14 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Captura más rápida**: la ráfaga de 3 tomas se pide de golpe (antes cada toma esperaba a que la anterior
+  se guardara) y solo hay que estar quieto hasta que se hacen las exposiciones (una vibración corta avisa);
+  la elección de la mejor y el guardado siguen después. El disparo automático espera menos (0,15 s) y no
+  vuelve a enfocar si ya enfocó hace menos de 2 s (antes hasta 2,5 s cada vez); el sensor de profundidad
+  se lee a la vez que la toma.
+- **Protocolos con el contorno del cuerpo**: la referencia de una toma de manos, pies o miembros guarda
+  su contorno (silueta, separación entre los dedos del pie, contorno de cada miembro) y la cámara lo usa
+  como guía en lugar de la ilustración de stock. Ya no se analizan surcos faciales en esas fotos.
 - **La guía es la captura anterior**: tras cada toma, la referencia pasa a ser la foto recién tomada (antes
   se quedaba en la primera) y su contorno es la guía aunque la foto no esté superpuesta o la asistencia esté
   apagada (antes volvía al contorno de stock).

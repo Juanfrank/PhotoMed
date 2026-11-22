@@ -173,6 +173,7 @@ import com.photomed.app.data.Zone
 import com.photomed.app.i18n.tr
 import com.photomed.app.ui.LocalRepository
 import com.photomed.app.ui.formatDate
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -328,6 +329,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     /** Primera toma (sin referencia): el rostro coincide con el marco de la guía → la guía se ajusta a la cara. */
     var framedFace by remember { mutableStateOf(false) }
     var autoArmed by remember { mutableStateOf(true) }
+    var lastFocusAt by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+    var lastFocusZoom by remember { mutableFloatStateOf(0f) }
     var live by remember { mutableStateOf<LiveFrame?>(null) }
     var focalNorm by remember { mutableStateOf<Float?>(null) }
     val tilt = rememberTilt(true)
@@ -632,6 +635,30 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         }
     }
 
+    /**
+     * Varias tomas pedidas de golpe (la cámara las encadena sin esperar a que cada una se guarde): devuelve
+     * las guardadas, en orden. [onExposed]: todas las exposiciones hechas (desde ahí no hace falta estar quieto:
+     * solo falta procesar y guardar).
+     */
+    suspend fun shootAll(files: List<File>, onExposed: () -> Unit): List<File> = kotlinx.coroutines.suspendCancellableCoroutine { c ->
+        var pending = files.size; var exposed = 0; var exposedFired = false
+        val ok = HashSet<File>()
+        fun exposedOne() { exposed++; if (exposed >= files.size && !exposedFired) { exposedFired = true; onExposed() } }
+        files.forEach { f ->
+            imageCapture.takePicture(ImageCapture.OutputFileOptions.Builder(f).build(), ContextCompat.getMainExecutor(context),
+                object : ImageCapture.OnImageSavedCallback {
+                    var started = false
+                    override fun onCaptureStarted() { started = true; exposedOne() }
+                    private fun done() {
+                        if (!started) { started = true; exposedOne() }   // dispositivos que no avisan del inicio
+                        pending--; if (pending == 0 && c.isActive) c.resume(files.filter { it in ok })
+                    }
+                    override fun onImageSaved(output: ImageCapture.OutputFileResults) { ok += f; done() }
+                    override fun onError(exception: ImageCaptureException) { f.delete(); done() }
+                })
+        }
+    }
+
     /** Una toma a [file]; true si se guardó. */
     suspend fun shoot(file: File): Boolean = kotlinx.coroutines.suspendCancellableCoroutine { c ->
         imageCapture.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(), ContextCompat.getMainExecutor(context),
@@ -720,19 +747,22 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         val stamp = System.currentTimeMillis()
         val zoomNow = zoomRatio
         scope.launch {
-            // sensor de profundidad (si el teléfono lo tiene): distancia real para la escala en mm
-            val depthMm = if (zone.isFaceZone() && com.photomed.app.align.DepthSensor.available(context,
+            // sensor de profundidad (si el teléfono lo tiene): distancia real para la escala en mm; a la vez que
+            // las tomas (antes se leía antes de disparar y retrasaba la foto)
+            val depthJob = if (zone.isFaceZone() && com.photomed.app.align.DepthSensor.available(context,
                     if (lensFacing == CameraSelector.LENS_FACING_FRONT) CameraCharacteristics.LENS_FACING_FRONT else CameraCharacteristics.LENS_FACING_BACK))
-                runCatching { ReliefCapture.depth(context, lensFacing == CameraSelector.LENS_FACING_FRONT) }.getOrNull() else null
+                async { runCatching { ReliefCapture.depth(context, lensFacing == CameraSelector.LENS_FACING_FRONT) }.getOrNull() } else null
             // Ráfaga: 3 tomas seguidas; se guarda la de mayor coincidencia (evita repetir por un parpadeo)
             val shots = if (burst) 3 else 1
             // flash de pantalla en ráfaga: la pantalla sigue en blanco de la primera a la última toma
             val holdScreen = shots > 1 && effectiveFlash == ImageCapture.FLASH_MODE_SCREEN
             if (holdScreen) screenFlash.hold()
             var moved = false
+            // quieto solo hasta que se hacen las exposiciones (no mientras se procesan y guardan)
+            var exposedAll = false
             val watch = stillOk?.let { ok -> launch {
                 var lostSince = 0L
-                while (true) {
+                while (!exposedAll) {
                     val now = System.currentTimeMillis()
                     if (ok()) lostSince = 0L
                     else if (lostSince == 0L) lostSince = now
@@ -740,15 +770,19 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     kotlinx.coroutines.delay(40)
                 }
             } }
+            val requested = (0 until shots).map { k -> File(context.cacheDir, "capture_${stamp}_$k.jpg") }
             val files = ArrayList<File>()
             try {
-                for (k in 0 until shots) {
-                    val f = File(context.cacheDir, "capture_${stamp}_$k.jpg")
-                    if (shoot(f)) files += f
+                files += shootAll(requested) {
+                    exposedAll = true
+                    if (holdScreen) screenFlash.release()
+                    // aviso: ya puede moverse (la foto se procesa y se guarda)
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
-                files.forEach { it.delete() }; throw e
+                requested.forEach { it.delete() }; throw e
             } finally {
+                exposedAll = true
                 if (holdScreen) screenFlash.release()
             }
             if (files.isEmpty()) {
@@ -767,6 +801,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 return@launch
             }
             files.filter { it !== best }.forEach { it.delete() }
+            val depthMm = depthJob?.await()
             // la línea del pelo se mide después de guardar (en segundo plano, sin omitirla nunca)
             val conds = if (depthMm == null) conditions else conditions + ("DepthSensorCm" to "%.1f".format(java.util.Locale.US, depthMm / 10))
             // Se guarda en el ámbito de la app: termina aunque se cierre la cámara.
@@ -860,11 +895,13 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     LaunchedEffect(ready, autoCapture) {
         if (!ready) { autoArmed = true; return@LaunchedEffect }
         if (autoCapture && autoArmed && !capturing) {
-            kotlinx.coroutines.delay(400)
+            kotlinx.coroutines.delay(150)
             while (zoomCtl.isSettling(System.currentTimeMillis())) kotlinx.coroutines.delay(100)
-            val focused = kotlinx.coroutines.withTimeoutOrNull(2500) {
+            // enfoque en la zona: se omite si ya enfocó hace poco con el mismo zoom (antes hasta 2,5 s cada vez)
+            val recent = System.currentTimeMillis() - lastFocusAt < 2000 && lastFocusZoom == zoomRatio
+            val focused = if (recent) true else kotlinx.coroutines.withTimeoutOrNull(1200) {
                 kotlinx.coroutines.suspendCancellableCoroutine<Boolean> { c -> focusOnPivot { ok -> if (c.isActive) c.resume(ok) } }
-            }
+            }.also { if (it == true) { lastFocusAt = System.currentTimeMillis(); lastFocusZoom = zoomRatio } }
             if (readyNow(live?.eval) && !capturing) {
                 autoArmed = false
                 if (focused == false) scope.launch { snackbar.showSnackbar(tr("Enfoque no confirmado: se tomó la foto igualmente")) }
@@ -1029,7 +1066,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     val refSchema = refSchemaState.takeIf { ghost != null }
                     com.photomed.app.ui.compare.OrientBox(if (orientGuide) refOrient.rot else 0, orientGuide && refOrient.mirror, Modifier.fillMaxSize(),
                         fit = rg == null, fill34 = rg != null) {
-                    if (refSchema == null && (schema == null || ghostShown))
+                    // protocolo con el contorno del cuerpo guardado: es la guía (no la ilustración de stock)
+                    val protoBody = protoRef?.lines?.any { it.layer == com.photomed.app.align.ProtocolReference.BODY_LAYER } == true
+                    if (refSchema == null && !protoBody && (schema == null || ghostShown))
                     GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize(),
                         tone = tone, adaptTo = adaptPts,
                         silhouette = adaptSil,
