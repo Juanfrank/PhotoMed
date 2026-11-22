@@ -4,6 +4,11 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Contorno del pie alineado con lo que se ve**: el contorno dibujado usa la segmentación más reciente
+  (cada 0,2 s en los pies) y la fusión de máscaras solo se aplica con la escena quieta (al mover la cámara
+  el contorno iba hasta 1,5 s por detrás). Con la foto anterior superpuesta se dibuja el contorno de esa foto
+  (blanco, el mismo detector que en vivo) en lugar de la guía deformada por una silueta que, con fondos no
+  lisos, no coincidía con la foto; se alinea haciendo coincidir los dos contornos.
 - **Uñas como referencia** en pies y manos (dorso): las uñas claramente visibles confirman cada dedo del
   pie, distinguen el dorso de la planta («se ven las uñas; muestre la planta») y el dorso de la palma de la
   mano, y se marcan en el esquema. Las uñas naturales, poco contrastadas, no se usan para decidir (con

@@ -320,6 +320,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var adaptGuide by remember { mutableStateOf(true) }
     /** Giro (pasos de 90°) y espejo de la referencia superpuesta, o de la guía si no hay referencia. */
     var refOrient by remember { mutableStateOf(com.photomed.app.align.ImageEdit.NONE) }
+    /** Contorno (manos, pies, miembros) de la foto anterior, en sus coordenadas (las de la foto mostrada). */
+    var refSchemaState by remember { mutableStateOf<com.photomed.app.align.BodySchema.Schema?>(null) }
     // guía adaptada a la referencia SIN girar (se dibuja girada entera cuando la referencia está girada)
     var refGuide by remember { mutableStateOf<com.photomed.app.align.LiveMatcher.GuideRef?>(null) }
     var ghostBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
@@ -354,6 +356,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
 
     // Referencia para la coincidencia en vivo: la foto superpuesta (encuadre 3:4), con el motor elegido.
     LaunchedEffect(ghost?.key, matcher, refOrient) {
+        refSchemaState = null
         val g = ghost ?: return@LaunchedEffect
         live = null
         refSilhouette = null
@@ -375,6 +378,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             refSilhouette = m.referenceSilhouette
             refFree = m.referenceFree
             refEdges = m.referenceEdges
+            refSchemaState = m.referenceSchema
             refHairline = m.referenceHairline
         }
     }
@@ -1014,9 +1018,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     // dibujan los dos, para ver si lo que capta la cámara cuadra con la foto anterior (girada o no)
                     val ghostShown = showGhost && ghost != null
                     val schema = if (matchingEnabled) live?.schema?.takeIf { !it.isEmpty } else null
+                    // con la foto anterior: su propio contorno (mismo detector que en vivo) en lugar de la guía
+                    // deformada por una silueta que con fondos no lisos no coincidía con la foto
+                    val refSchema = refSchemaState.takeIf { ghostShown && matchingEnabled }
                     com.photomed.app.ui.compare.OrientBox(if (orientGuide) refOrient.rot else 0, orientGuide && refOrient.mirror, Modifier.fillMaxSize(),
                         fit = rg == null, fill34 = rg != null) {
-                    if (schema == null || ghostShown)
+                    if (refSchema == null && (schema == null || ghostShown))
                     GuideOverlay(zone, showContour = showContour, showGrid = showGrid, modifier = Modifier.fillMaxSize(),
                         tone = tone, adaptTo = adaptPts,
                         silhouette = adaptSil,
@@ -1025,7 +1032,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         free = if (showGhost && refFree != null) refFree else live?.freeContour,
                     )
                     }
-                    if (schema != null) SchemaOverlay(schema, showContour, showGrid && !ghostShown, Modifier.fillMaxSize(), tone)
+                    if (refSchema != null) SchemaOverlay(refSchema, showContour, showGrid, Modifier.fillMaxSize(), tone, color = Color.White.copy(alpha = 0.7f))
+                    if (schema != null) SchemaOverlay(schema, showContour, showGrid && !ghostShown && refSchema == null, Modifier.fillMaxSize(), tone)
                     }
                     // línea de implantación frontal: la de la referencia (discontinua) y la actual (continua)
                     val hl = refHairline

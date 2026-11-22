@@ -850,11 +850,14 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawInk(
 
 /** Esquema ajustado a la anatomía detectada (unidades del ancho del cuadro 3:4). */
 @Composable
-fun SchemaOverlay(schema: com.photomed.app.align.BodySchema.Schema, showContour: Boolean, showGrid: Boolean, modifier: Modifier, tone: GuideTone) =
-    SchemaGuide(schema, showContour, showGrid, modifier, tone)
+fun SchemaOverlay(schema: com.photomed.app.align.BodySchema.Schema, showContour: Boolean, showGrid: Boolean, modifier: Modifier, tone: GuideTone,
+                  /** Color propio (p. ej. el contorno de la referencia, en blanco translúcido); null: el del tono. */
+                  color: Color? = null) =
+    SchemaGuide(schema, showContour, showGrid, modifier, tone, color)
 
 @Composable
-private fun SchemaGuide(schema: com.photomed.app.align.BodySchema.Schema, showContour: Boolean, showGrid: Boolean, modifier: Modifier, tone: GuideTone) {
+private fun SchemaGuide(schema: com.photomed.app.align.BodySchema.Schema, showContour: Boolean, showGrid: Boolean, modifier: Modifier, tone: GuideTone,
+                        color: Color? = null) {
     Canvas(modifier) {
         if (showGrid) drawGrid()
         if (!showContour) return@Canvas
@@ -862,7 +865,7 @@ private fun SchemaGuide(schema: com.photomed.app.align.BodySchema.Schema, showCo
         fun o(p: Pt) = Offset(p.x * w, p.y * w)
         val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round,
             join = androidx.compose.ui.graphics.StrokeJoin.Round)
-        val col = tone.color
+        val col = color ?: tone.color
         schema.polygons.forEach { poly -> if (poly.size >= 3) drawPath(smoothPath(poly.map { o(it) }, closed = true), col, style = stroke) }
         // cada segmento (falange, miembro) como una cápsula: dos bordes paralelos y extremos redondeados
         schema.capsules.forEach { c ->

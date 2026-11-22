@@ -104,7 +104,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
      * ahí se estandariza la toma.
      */
     fun setReferenceFeatures(d: Detection, hairline: List<Pt>?, profile: Map<String, Pt>?) {
-        ref = d; referenceHairline = hairline; refProfile = profile?.takeIf { isProfile && it.size >= 3 }
+        ref = d; referenceHairline = hairline; refProfile = profile?.takeIf { isProfile && it.size >= 3 }; referenceSchema = null
         referenceSilhouette = null; referenceEdges = null; referenceFree = null
         refBody = null; refGray = null; refGrayAll = null; refEdgePts = emptyList()
         frameSil = null; frameSilAt = 0L; frameBody = null; frameBodyAt = 0L
@@ -155,15 +155,23 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         return GuideRef(r.points, sil, hl)
     }
 
+    /** Contorno de la referencia (manos, pies, miembros) en sus coordenadas: se dibuja sobre la foto anterior. */
+    @Volatile var referenceSchema: BodySchema.Schema? = null
+        private set
+
     fun setReference(bmp: Bitmap) {
         featureOnly = false
+        referenceSchema = null
         ref = detector.detectFull(spec.detector, bmp)
         // zonas del cuerpo: los mismos puntos adicionales que en la toma (manos, pies, bordes)
         if (ZoneCriteria.applies(zone)) runCatching {
             val hs = if (ZoneCriteria.needsHands(zone)) handsLazy.value?.detect(bmp) else null
             val cl = if (ZoneCriteria.needsClasses(zone)) referenceClasses(bmp) else null
-            val extra = BodyPoints.of(zone, ZoneCriteria.Scene(ref.points, hs, cl, bmp.height / bmp.width.toFloat(), single = singleLimb))
+            val refScene = ZoneCriteria.Scene(ref.points, hs, cl, bmp.height / bmp.width.toFloat(), single = singleLimb)
+            val extra = BodyPoints.of(zone, refScene)
             if (extra.isNotEmpty()) ref = ref.copy(points = ref.points + extra)
+            // contorno de la referencia con el mismo detector que en vivo (sobre la propia foto: coincide con ella)
+            referenceSchema = runCatching { BodySchema.of(zone, refScene) }.getOrNull()?.takeIf { !it.isEmpty }
         }
         // Segmentación pelo / piel de la referencia (vistas faciales): óvalo ajustado al límite real de
         // la cara (la guía se adapta a él) y línea de implantación
@@ -254,17 +262,35 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             lastHands = handsLazy.value?.let { h -> runCatching { h.detect(frame) }.getOrNull() }
         }
         // en las manos, la piel del mismo cuadro que los puntos (el contorno sigue a la mano sin retraso)
-        if (ZoneCriteria.needsClasses(zone) && (now - lastClassesAt > 500 || handsNow)) {
+        // pies: cada 0,2 s (el contorno dibujado sigue al pie al mover la cámara)
+        val every = if (zone.guide == com.photomed.app.data.GuideType.FEET) 200 else 500
+        if (ZoneCriteria.needsClasses(zone) && (now - lastClassesAt > every || handsNow)) {
             lastClassesAt = now
-            lastClasses = runCatching { hairSkin?.labels(frame) }.getOrNull()?.let { lb ->
-                // pies: con el color del cuadro en la misma rejilla (piel del pie y surcos entre los dedos)
+            val raw = runCatching { hairSkin?.labels(frame) }.getOrNull()?.let { lb0 ->
+                // la rejilla con la proporción del cuadro (las coordenadas se miden en anchos del cuadro)
+                val lb = sameAspect(lb0, frame)
+                // pies y manos: con el color del cuadro en la misma rejilla (piel, surcos, uñas)
                 if (zone.guide == com.photomed.app.data.GuideType.FEET || zone.guide == com.photomed.app.data.GuideType.HANDS) ZoneCriteria.Classes(lb.width, lb.height, lb.data, rgbOf(frame, lb.width, lb.height))
                 else ZoneCriteria.Classes.of(lb)
-            }?.let { fusion.add(it) }   // estable: mayoría de las últimas segmentaciones
+            }
+            lastRawClasses = raw
+            // estable: mayoría de las últimas segmentaciones, solo con la escena quieta (si se mueve, la actual)
+            lastClasses = raw?.let { fusion.add(it) }
         }
     }
 
     private val fusion = ClassesFusion()
+    /** Última segmentación sin fusionar: para dibujar el contorno sin retraso. */
+    @Volatile private var lastRawClasses: ZoneCriteria.Classes? = null
+
+    /** Etiquetas con la proporción del cuadro (si el modelo devolviera otra, se remuestrean al ancho de la máscara). */
+    private fun sameAspect(l: FaceLabels, frame: Bitmap): FaceLabels {
+        val h2 = Math.round(l.width * frame.height / frame.width.toFloat())
+        if (h2 == l.height) return l
+        val out = ByteArray(l.width * h2)
+        for (y in 0 until h2) { val sy = (y * l.height / h2).coerceIn(0, l.height - 1); System.arraycopy(l.data, sy * l.width, out, y * l.width, l.width) }
+        return FaceLabels(l.width, h2, out)
+    }
 
     /**
      * Piel por píxel de la referencia: se segmenta una sola vez, así que una segmentación rara (un dedo
@@ -412,7 +438,10 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val q = guideRot
         // con la guía girada, los criterios se miden en su orientación y el esquema vuelve al cuadro
         val scene = with(ZoneCriteria) { ZoneCriteria.Scene(pose, lastHands, lastClasses, aspect, single = singleLimb).rotatedCcw(q) }
-        lastSchema = runCatching { BodySchema.of(zone, scene)?.let { sch -> if (q % 4 == 0) sch else with(BodySchema) { sch.map { ZoneCriteria.unrotate(it, q, aspect) } } } }.getOrNull()
+        // el contorno dibujado, con la segmentación más reciente (sin la fusión, que va por detrás si se mueve)
+        val drawScene = if (lastRawClasses === lastClasses) scene
+            else with(ZoneCriteria) { ZoneCriteria.Scene(pose, lastHands, lastRawClasses, aspect, single = singleLimb).rotatedCcw(q) }
+        lastSchema = runCatching { BodySchema.of(zone, drawScene)?.let { sch -> if (q % 4 == 0) sch else with(BodySchema) { sch.map { ZoneCriteria.unrotate(it, q, aspect) } } } }.getOrNull()
         val now = ZoneCriteria.hints(zone, scene)
         // decisión estable: la zona cumple si cumple en al menos 2 de los 3 últimos análisis (una
         // segmentación o detección suelta no cambia el veredicto ni hace parpadear las indicaciones)
