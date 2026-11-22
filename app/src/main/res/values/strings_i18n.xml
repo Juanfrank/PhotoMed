@@ -29,6 +29,7 @@
     <string name="t_07592612817c" formatted="false">Abdomen lateral derecho</string>
     <string name="t_076099a024c1" formatted="false">EEEE d \'de\' MMMM \'de\' yyyy</string>
     <string name="t_07b18ac218ae" formatted="false">Opacidad</string>
+    <string name="t_07fc11708c64" formatted="false">los glúteos</string>
     <string name="t_08963e35ae5a" formatted="false">contornos seleccionados</string>
     <string name="t_0902fcf1e707" formatted="false">Igualar el color automáticamente al alinear</string>
     <string name="t_090c510ae625" formatted="false">Quitar</string>
@@ -48,12 +49,14 @@
     <string name="t_0b3c4b7615f9" formatted="false">Surcos confirmados: se guardan en cada foto</string>
     <string name="t_0b4d1ab9ce63" formatted="false">Luz pareja entre mejillas: solo en la vista frontal (en oblicuas y perfiles cada mejilla recibe luz distinta)</string>
     <string name="t_0b5d027dbc0b" formatted="false">Tercio inferior (subnasal → mentón), mm</string>
+    <string name="t_0b6f6f4c9a07" formatted="false">Encuadre la espalda entera: hombros, cintura y los dos costados</string>
     <string name="t_0b8237d43c3b" formatted="false">Medición de relieve (pantalla)</string>
     <string name="t_0b82e54a9daa" formatted="false">Último: %1$s</string>
     <string name="t_0b90e21b7a10" formatted="false">Referencia: %1$s</string>
     <string name="t_0b964b7af186" formatted="false">Sin referencia: se estandariza la toma (pose, luz, gesto)</string>
     <string name="t_0ba2e5910750" formatted="false">Sin errores registrados</string>
     <string name="t_0c2e214fbd42" formatted="false">d MMM yyyy, HH:mm</string>
+    <string name="t_0cbe904747d3" formatted="false">De frente: que se vea la cara</string>
     <string name="t_0d03edf094d3" formatted="false">Descartar la línea</string>
     <string name="t_0d14bbd7d06c" formatted="false">caderas</string>
     <string name="t_0d30c89f2b38" formatted="false">Gire la cámara ↻</string>
@@ -114,6 +117,7 @@
     <string name="t_17ae71394b0b" formatted="false">Licencia comercial (de pago)</string>
     <string name="t_17c7a1c3439a" formatted="false">toque la misma zona de piel en cada foto</string>
     <string name="t_17f06e51bbef" formatted="false">El archivo no es un paquete de resultados de PhotoMed.</string>
+    <string name="t_17f09baf637a" formatted="false">el abdomen</string>
     <string name="t_180b5c3eca99" formatted="false">Confirmar la línea</string>
     <string name="t_184f722b9abb" formatted="false">MediaPipe no encontró la cara</string>
     <string name="t_186f52743f02" formatted="false">Pies ligeramente separados, peso distribuido; pliegue glúteo sobre la línea inferior.</string>
@@ -121,6 +125,7 @@
     <string name="t_18a1fada86e2" formatted="false">Expresión: relajar la sonrisa</string>
     <string name="t_18ec8fd63278" formatted="false">Cabeza: enderezar %1$s° (inclinada a la derecha)</string>
     <string name="t_19242be76ba9" formatted="false">Número de expediente</string>
+    <string name="t_1948b63a9da9" formatted="false">el cuello y el escote</string>
     <string name="t_195bcd630dc2" formatted="false">Coincidencia por rasgo: %1$s</string>
     <string name="t_19851ad1a9bf" formatted="false">Surco accesorio</string>
     <string name="t_19969f4a1fd7" formatted="false">%1$s, %2$d fotografías</string>
@@ -161,6 +166,7 @@
     <string name="t_2165b6dd853c" formatted="false">Mostrar en la foto: %1$s</string>
     <string name="t_218a79c95847" formatted="false">ITA° ojera / mejilla</string>
     <string name="t_21a686deba9a" formatted="false">Solo la selección: %1$s</string>
+    <string name="t_21b89cc3390d" formatted="false">el tórax</string>
     <string name="t_21d72415f1cc" formatted="false">Cuadrado</string>
     <string name="t_2287a8a894ae" formatted="false">euriprosopo (ancho)</string>
     <string name="t_22d70e41ace7" formatted="false">Editar protocolo</string>
@@ -172,8 +178,10 @@
     <string name="t_23a1ab9d310a" formatted="false">Dispara al llegar al %1$d %% de coincidencia (verde amarillento); la alineación fina se hace en Comparar.</string>
     <string name="t_23b4c5944c51" formatted="false">Corporal</string>
     <string name="t_23bfee921691" formatted="false">Fotografía %1$s, %2$s</string>
+    <string name="t_2439ac042ac4" formatted="false">Muestre los dos pies, algo separados</string>
     <string name="t_247eb52cfe22" formatted="false">Error al capturar</string>
     <string name="t_24ab142de9ab" formatted="false">Inclinación que iguala las proporciones de anchos (superior, medio, inferior) de ambos contornos.</string>
+    <string name="t_24b274ac2e7a" formatted="false">Separe un poco los pies</string>
     <string name="t_250e10a51535" formatted="false">Frontal</string>
     <string name="t_251335561371" formatted="false">más a la derecha</string>
     <string name="t_25de1b008229" formatted="false">Alto hendidura, mm</string>
@@ -273,6 +281,7 @@
     <string name="t_3b369d2fe9d5" formatted="false">occipucio</string>
     <string name="t_3b4a959db9a1" formatted="false">Presentación</string>
     <string name="t_3b4b1c48f4b4" formatted="false">Expresión: sonreír como en la referencia</string>
+    <string name="t_3b8639220f84" formatted="false">el brazo</string>
     <string name="t_3c4222417c09" formatted="false">Compartir protocolo</string>
     <string name="t_3c48d7318913" formatted="false">orbicular de los labios</string>
     <string name="t_3c5d2f55ebf7" formatted="false">Analizando arrugas y rasgos</string>
@@ -347,6 +356,7 @@
     <string name="t_4d9a7ee81a48" formatted="false">orbicular de los ojos y cigomáticos</string>
     <string name="t_4dd050a6bb8e" formatted="false">Subir la toma %1$d</string>
     <string name="t_4df95802113a" formatted="false">Tomas en orden (%1$d fotos)</string>
+    <string name="t_4e22e4ff6b0e" formatted="false">Encuadre los glúteos enteros: las dos caderas</string>
     <string name="t_4e7b9da23085" formatted="false">Disparar también casi alineado</string>
     <string name="t_4ef50f502afc" formatted="false">Expresión: subir más las cejas</string>
     <string name="t_4f56621ff92c" formatted="false">" (detalle: %1$s)"</string>
@@ -380,14 +390,17 @@
     <string name="t_564ba47b7bb1" formatted="false">derecho</string>
     <string name="t_568489c3d3c8" formatted="false">Sin logo</string>
     <string name="t_569e67fe790e" formatted="false">Capas en la imagen</string>
+    <string name="t_56cc67e3f310" formatted="false">Encuadre el brazo entero: hombro, codo y muñeca</string>
     <string name="t_575dab1075d7" formatted="false">Iniciar sesión de fotos (protocolos)</string>
     <string name="t_57d396bb6e2c" formatted="false">Abdomen lateral izquierdo</string>
     <string name="t_57d4c792a6bb" formatted="false">Altura sobre la pupila, mm</string>
     <string name="t_57f3263afaf2" formatted="false">Ajustes de comparación</string>
     <string name="t_57fb6f299e39" formatted="false">, la línea retrocede</string>
+    <string name="t_5806dae4d86f" formatted="false">Encuadre cuello y hombros</string>
     <string name="t_58308e8bae4d" formatted="false">Importar al expediente</string>
     <string name="t_5848fcb02f6d" formatted="false">cabeceo (barbilla) %1$+.0f° vs %2$+.0f°</string>
     <string name="t_5894b02eb49e" formatted="false">Activado</string>
+    <string name="t_590b29aff13f" formatted="false">Encuadre el tronco de lado: hombro y cadera</string>
     <string name="t_5920b532f4d0" formatted="false">Expresión: subir las cejas como en la referencia</string>
     <string name="t_5927a9ab246d" formatted="false">Rostro 5 vistas</string>
     <string name="t_5941607ae9e5" formatted="false">Después</string>
@@ -477,11 +490,13 @@
     <string name="t_6a8dfad2d163" formatted="false">codos</string>
     <string name="t_6a93c397012f" formatted="false">falanges, muñecas y bordes de las manos</string>
     <string name="t_6b04d1843add" formatted="false">Mirada: misma dirección</string>
+    <string name="t_6b126b27526c" formatted="false">pulgar</string>
     <string name="t_6c107d8b7f81" formatted="false">Foto %1$d, %2$s</string>
     <string name="t_6cbb8ffb6931" formatted="false">Las fotografías se guardan en la galería del teléfono, en el álbum del paciente, e incluyen estos datos como metadatos. Use “Compartir sin datos del paciente” para enviarlas anonimizadas.</string>
     <string name="t_6cbca9120f3c" formatted="false">Indicaciones sobre gestos: pulsación larga, arrastrar, pellizcar…</string>
     <string name="t_6cfddcad5beb" formatted="false">Importar %1$d foto</string>
     <string name="t_6d1c2869e948" formatted="false">Leer: %1$s</string>
+    <string name="t_6d797e76763c" formatted="false">la espalda</string>
     <string name="t_6dae4a587f52" formatted="false">Antes de empezar, revise cómo se tratan las fotografías y los datos de sus pacientes:</string>
     <string name="t_6e02dbd5caf1" formatted="false">Ojos apretados</string>
     <string name="t_6e246e71b814" formatted="false">%1$d zonas</string>
@@ -518,6 +533,8 @@
     <string name="t_75f3730849f4" formatted="false">Grosor del trazo</string>
     <string name="t_75f3b26238dd" formatted="false">Pantalla completa</string>
     <string name="t_7631302a68c3" formatted="false">Color %1$s</string>
+    <string name="t_770b19bfbc8a" formatted="false">Encuadre el brazo con la cadera de ese lado</string>
+    <string name="t_771e73c29b6f" formatted="false">Separe los brazos del cuerpo</string>
     <string name="t_772e1190da78" formatted="false">Expediente actualizado. Las fotos nuevas usarán estos datos.</string>
     <string name="t_773067c6106c" formatted="false">El archivo no es un protocolo de PhotoMed (JSON no válido).</string>
     <string name="t_77f6ff50e35d" formatted="false">Surcos detectados sin confirmar</string>
@@ -570,10 +587,12 @@
     <string name="t_8123a8bdfe6b" formatted="false">Política de privacidad</string>
     <string name="t_814bb354fdfb" formatted="false">Grado orientativo (0–5)</string>
     <string name="t_815ee15e8d98" formatted="false">Según el sistema</string>
+    <string name="t_818a6870adfc" formatted="false">Encuadre el tronco: hombros y caderas</string>
     <string name="t_81c08134212e" formatted="false">Ojos</string>
     <string name="t_81de432a2172" formatted="false">Ver detalles</string>
     <string name="t_81ee0c76034a" formatted="false">Ambas manos sobre fondo liso, dedos ligeramente separados, cámara paralela a la superficie.</string>
     <string name="t_81f060cbca57" formatted="false">estimada (30 cm)</string>
+    <string name="t_829958218146" formatted="false">Mano de la %1$s: dedos hacia abajo, como en la guía</string>
     <string name="t_82d7030f5dd9" formatted="false">Restaurar líneas eliminadas (%1$d)</string>
     <string name="t_82eb11e9105d" formatted="false">Expresión: sonreír al máximo</string>
     <string name="t_831f8c23aa69" formatted="false">No se pudo renombrar la foto</string>
@@ -598,6 +617,7 @@
     <string name="t_85cce15be7c0" formatted="false">Quitar el último punto</string>
     <string name="t_85dd3ae3427e" formatted="false">Trazado de nuevo a mano</string>
     <string name="t_85e1f72b82e9" formatted="false">Importando %1$d fotos…</string>
+    <string name="t_85fc6c9dfa30" formatted="false">Comprobando la zona…</string>
     <string name="t_8619692251dc" formatted="false">Surcos</string>
     <string name="t_863b7007bb19" formatted="false">Guardada en el álbum %1$s · casi alineada: se alinea en Comparar</string>
     <string name="t_864a0b2daf51" formatted="false">contorno mamario</string>
@@ -636,6 +656,7 @@
     <string name="t_8bfca062c8c0" formatted="false">Vibración y sonido de guía</string>
     <string name="t_8c5c68006d39" formatted="false">Se necesitan dos fotografías</string>
     <string name="t_8cc90afa4e92" formatted="false">Restablecer zoom</string>
+    <string name="t_8cd230afce43" formatted="false">Descubra %1$s (se ve ropa o no se ve la piel)</string>
     <string name="t_8cf4d45511d9" formatted="false">Ángulo goníaco</string>
     <string name="t_8d28a741b5c3" formatted="false">Cualquier región: la guía se diseña con el contorno de lo visible (fondo liso o persona); en las siguientes tomas, con el de la foto de referencia.</string>
     <string name="t_8d2aaadc2bd5" formatted="false">frontal</string>
@@ -676,6 +697,7 @@
     <string name="t_958e16aa08ff" formatted="false">Fecha de captura</string>
     <string name="t_95ed8ace6b80" formatted="false">Resultados importados: %1$d fotos</string>
     <string name="t_9648db36a28b" formatted="false">Se necesita acceso a la cámara</string>
+    <string name="t_96b793b07578" formatted="false">Codo extendido</string>
     <string name="t_96c1cef63bd2" formatted="false">Demasiada luz: %1$.0f %% (máx. %2$.0f %%)</string>
     <string name="t_96cef484773d" formatted="false">Expresión de la foto %1$d</string>
     <string name="t_97137660a9f0" formatted="false">Elegir ángulo</string>
@@ -692,7 +714,9 @@
     <string name="t_98758df61c0e" formatted="false">oreja derecha</string>
     <string name="t_992c617f83b0" formatted="false">iris (11,7 mm)</string>
     <string name="t_9963bcd72735" formatted="false">mentoniano</string>
+    <string name="t_9a251d19709b" formatted="false">De espaldas a la cámara</string>
     <string name="t_9ac90fec5bee" formatted="false">Comparar seleccionadas</string>
+    <string name="t_9ad395e69156" formatted="false">Rodillas extendidas</string>
     <string name="t_9b14bad7b6df" formatted="false">↓ Baje la cámara</string>
     <string name="t_9b6c44cdcc72" formatted="false">contornos de todo lo visible (silueta y bordes)</string>
     <string name="t_9b7b8cbacd98" formatted="false">Abajo a la derecha</string>
@@ -720,6 +744,7 @@
     <string name="t_a23190537144" formatted="false">Ancho al 25 % (sup.)</string>
     <string name="t_a276b1754a3a" formatted="false">Ayudas</string>
     <string name="t_a2eeab6cf8ab" formatted="false">Coincide · capturando</string>
+    <string name="t_a357187cb61a" formatted="false">Mano de la %1$s: muestre la palma</string>
     <string name="t_a3980dd32780" formatted="false">El nombre es obligatorio</string>
     <string name="t_a3b4b3ced269" formatted="false">Ráfaga de 3 fotos</string>
     <string name="t_a43db90c06c5" formatted="false">" · diferencia entre mejillas %1$.0f %%"</string>
@@ -734,6 +759,7 @@
     <string name="t_a5eb5d15060e" formatted="false">Comparar</string>
     <string name="t_a5f8d8f332d0" formatted="false">Última foto de la cara</string>
     <string name="t_a6b8e28b41d6" formatted="false">Relieve no guardado: demasiada luz ambiente (use penumbra)</string>
+    <string name="t_a6c31da20601" formatted="false">Mano de la %1$s: entera dentro del cuadro</string>
     <string name="t_a6e75d5e41e6" formatted="false">Importando %1$d foto…</string>
     <string name="t_a6ea4d4431ae" formatted="false">derecha de la imagen</string>
     <string name="t_a6fe655b0a42" formatted="false">Coincide con la referencia</string>
@@ -746,10 +772,12 @@
     <string name="t_a7f8444e8893" formatted="false">no disponible</string>
     <string name="t_a83ceb735905" formatted="false">Longitud del dorso (raíz → punta), mm</string>
     <string name="t_a85ae4a4d3c4" formatted="false">Usar puntos anatómicos</string>
+    <string name="t_a8a1d5b0b021" formatted="false">Separe un poco el brazo del cuerpo (≈ 20°)</string>
     <string name="t_a8cad326a759" formatted="false">Usar contornos</string>
     <string name="t_a8ef65cd3561" formatted="false">Versión %1$s</string>
     <string name="t_a8f4939cdc98" formatted="false">Color</string>
     <string name="t_a9068e529958" formatted="false">Enojo (fruncir el ceño)</string>
+    <string name="t_a90d4f39afa9" formatted="false">Encuadre los dos pies descalzos</string>
     <string name="t_a911e08a3f15" formatted="false">hombros, escápulas, cintura y caderas</string>
     <string name="t_a933ca0fbf05" formatted="false">Triángulo</string>
     <string name="t_a9a4ba0d6b05" formatted="false">Información</string>
@@ -769,6 +797,7 @@
     <string name="t_adadd16fb157" formatted="false">mandíbula, hombros y contorno cervical</string>
     <string name="t_adc6f02af7a7" formatted="false">Long.</string>
     <string name="t_add1ad2589a8" formatted="false">Arrugas y surcos</string>
+    <string name="t_ae07aa8d6aea" formatted="false">Buscando las manos…</string>
     <string name="t_ae1dc9eacb9a" formatted="false">Línea · medida</string>
     <string name="t_ae27c25805f5" formatted="false">Exp. %1$s</string>
     <string name="t_ae4adbcc6535" formatted="false">Muslos / piernas</string>
@@ -787,6 +816,8 @@
     <string name="t_b1cd095fc01d" formatted="false">Luz desigual: lado izquierdo más oscuro</string>
     <string name="t_b21c214f5b3d" formatted="false">muy profunda</string>
     <string name="t_b25b5374e7f8" formatted="false">Mismo ángulo para todas</string>
+    <string name="t_b2901825f551" formatted="false">Baje el brazo junto al cuerpo (≈ 20°)</string>
+    <string name="t_b2ad3e92e175" formatted="false">Mano de la %1$s: extienda los cinco dedos (%2$s)</string>
     <string name="t_b2e244abbb8b" formatted="false">Registrado</string>
     <string name="t_b2ed9f62c551" formatted="false">sin arruga</string>
     <string name="t_b2f092dad892" formatted="false">Sin fecha en la foto: fecha de importación</string>
@@ -811,6 +842,7 @@
     <string name="t_b74c8e681eb3" formatted="false">Puntos anatómicos</string>
     <string name="t_b7cbea7ff8fe" formatted="false">Restablecer la vista (giro, espejo y recorte manual)</string>
     <string name="t_b7d9598781c5" formatted="false">abdomen</string>
+    <string name="t_b816ce5275eb" formatted="false">Los pies dentro del cuadro</string>
     <string name="t_b819d9d561b6" formatted="false">Expresión: fruncir más los labios</string>
     <string name="t_b82536e9ccd8" formatted="false">Notas e indicaciones generales (opcional)</string>
     <string name="t_b826124188b7" formatted="false">Secuencia completada</string>
@@ -845,6 +877,7 @@
     <string name="t_bd4fa49fd746" formatted="false">Acérquese</string>
     <string name="t_bdbdb16bc541" formatted="false">Proporción inferior / superior</string>
     <string name="t_be2bc2605e83" formatted="false">Perioral</string>
+    <string name="t_be7dbbf70598" formatted="false">Pies completos: los dedos y los bordes dentro del cuadro</string>
     <string name="t_be94adf8a363" formatted="false">Alineadas %1$d fotos a la referencia (%2$s)</string>
     <string name="t_beaa8a4d3c28" formatted="false">Última toma</string>
     <string name="t_bf50dba7b949" formatted="false">Se eliminarán el expediente de %1$s y sus %2$d fotografías de la galería. Esta acción no se puede deshacer.</string>
@@ -874,6 +907,7 @@
     <string name="t_c49d60f2db0a" formatted="false">Lado del texto</string>
     <string name="t_c4c511efd137" formatted="false">Trazando y midiendo el surco…</string>
     <string name="t_c4d7cc98b8ee" formatted="false">Elija el ángulo de %1$d fotos.</string>
+    <string name="t_c4dca4f2f080" formatted="false">los muslos</string>
     <string name="t_c4e1b24dbe73" formatted="false">Expresión: separar los labios como en la referencia</string>
     <string name="t_c506d7dafb1a" formatted="false">Detector (pelo y piel): %1$s</string>
     <string name="t_c514f2ce264f" formatted="false">Protocolo «%1$s» importado: ábralo desde un expediente</string>
@@ -887,6 +921,7 @@
     <string name="t_c7074cac2c94" formatted="false">Dibuje sobre la foto</string>
     <string name="t_c7158732f612" formatted="false">Mirada al frente</string>
     <string name="t_c766fa366bed" formatted="false">En todas</string>
+    <string name="t_c7798e3867b4" formatted="false">Mano de la %1$s: muestre el dorso</string>
     <string name="t_c79155e38c96" formatted="false">Tense el cuello mostrando los dientes inferiores</string>
     <string name="t_c802c46db199" formatted="false">Volver a trazar %1$s</string>
     <string name="t_c81f5771478f" formatted="false">" (%1$d no se pudieron leer)"</string>
@@ -935,10 +970,12 @@
     <string name="t_cf8f42624c65" formatted="false">Parcialmente cubierto por barba o bigote</string>
     <string name="t_cfad6d1ed298" formatted="false">Relieve: penumbra, teléfono a 25–35 cm y sin moverse unos 2 s al disparar</string>
     <string name="t_cfe1fa235790" formatted="false">Cambiar cámara</string>
+    <string name="t_d019bc55fd4e" formatted="false">Encuadre las piernas enteras: caderas, rodillas y tobillos</string>
     <string name="t_d02bb3619494" formatted="false">depresor del ángulo de la boca</string>
     <string name="t_d03dbd16cbea" formatted="false">Abajo</string>
     <string name="t_d07b2f59af76" formatted="false">Foto anterior superpuesta</string>
     <string name="t_d11aacc843c5" formatted="false">nasal (líneas nasales)</string>
+    <string name="t_d15a45406be6" formatted="false">Póngase de lado a la cámara</string>
     <string name="t_d18106e60221" formatted="false">%1$s (copia)</string>
     <string name="t_d194abdfdc4c" formatted="false">Arrugar la nariz</string>
     <string name="t_d1cb9a9304f9" formatted="false">Aléjese</string>
@@ -1018,6 +1055,7 @@
     <string name="t_e2c3ffae0535" formatted="false">Los controles se ocultan solos: toque para verlos. En la cuadrícula, mantenga pulsada una foto y arrástrela para reordenar. Ajustes y recorte en ⋮.</string>
     <string name="t_e3334765d36a" formatted="false">Coincidencia %1$d %%</string>
     <string name="t_e35bfade0a18" formatted="false">más arriba</string>
+    <string name="t_e36c46f3b65a" formatted="false">Muestre las dos manos enteras</string>
     <string name="t_e3753322bef0" formatted="false">amarillo</string>
     <string name="t_e3851fd945d3" formatted="false">Cuello y escote</string>
     <string name="t_e3a2e5e446eb" formatted="false">Ojo izquierdo</string>
@@ -1056,6 +1094,7 @@
     <string name="t_e95de47186f8" formatted="false">Tórax / mamas</string>
     <string name="t_e9720e5c3a18" formatted="false">Se borrarán los trazos confirmados de esta foto (también de sus metadatos), con sus ediciones y surcos añadidos, y se volverá a analizar.</string>
     <string name="t_ea006bbc3ae7" formatted="false">Importar</string>
+    <string name="t_ea00a871d7c8" formatted="false">Junte un poco los pies</string>
     <string name="t_ea00baff4378" formatted="false">Mueva la cámara a la derecha →</string>
     <string name="t_ea0e80b70740" formatted="false">Rasgos</string>
     <string name="t_ea10026ef986" formatted="false">Condiciones de captura distintas: %1$s</string>
@@ -1070,9 +1109,11 @@
     <string name="t_ec616f599f8c" formatted="false">No se pudo leer la imagen</string>
     <string name="t_ecffc6c021fa" formatted="false">Esperando el análisis de arrugas…</string>
     <string name="t_ed1c5e218500" formatted="false">Con fotos</string>
+    <string name="t_edd238ac88c2" formatted="false">Hombros nivelados</string>
     <string name="t_ee18e51f8a8f" formatted="false">%1$s · exposición %2$+.2f EV · temperatura %3$+.1f · tinte %4$+.1f</string>
     <string name="t_ee51647e18ca" formatted="false">Fecha de captura: %1$s</string>
     <string name="t_eea99f7aadf4" formatted="false">Flecha</string>
+    <string name="t_eec7a537b03e" formatted="false">De frente a la cámara</string>
     <string name="t_eed4c0f9f797" formatted="false">Oblicuo 45° derecho</string>
     <string name="t_ef1c5d74174c" formatted="false">Consentimiento</string>
     <string name="t_ef36078c712d" formatted="false">Cerrar las medidas</string>
@@ -1122,6 +1163,7 @@
     <string name="t_f80dc59c97dc" formatted="false">Nombre del protocolo</string>
     <string name="t_f80e874fb0b7" formatted="false">ΔE*ab frente a la mejilla</string>
     <string name="t_f823987a03ce" formatted="false">hiperleptoprosopo (muy largo)</string>
+    <string name="t_f8732946e59b" formatted="false">Suba o cruce los brazos: que no tapen el abdomen</string>
     <string name="t_f892ea479f7e" formatted="false">pliegues glúteos</string>
     <string name="t_f8c2c6c3d17b" formatted="false">Contorno</string>
     <string name="t_f8c6d2c8e9f1" formatted="false">Nota</string>
@@ -1144,6 +1186,7 @@
     <string name="t_fcc6849ad1b6" formatted="false">Recortar según la alineación</string>
     <string name="t_fcffe4ff76d1" formatted="false">Brazos a los lados; complejos areola-pezón sobre las marcas.</string>
     <string name="t_fd22026d48ff" formatted="false">Reposo</string>
+    <string name="t_fd34c795be45" formatted="false">Caderas niveladas</string>
     <string name="t_fd5316cbb849" formatted="false">hombros</string>
     <string name="t_fdf1055e24e6" formatted="false">vértice</string>
     <string name="t_fe18f806b021" formatted="false">Usted es responsable de obtener el consentimiento informado y de cumplir la normativa de datos de salud.</string>

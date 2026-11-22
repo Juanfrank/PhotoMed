@@ -44,6 +44,10 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     private val hairSkinLazy = lazy { appContext?.let { HairSkinSegmenter.createOrNull(it) } }
     private val hairSkin: HairSkinSegmenter? get() = hairSkinLazy.value
     private val tracksHairline = HairSkin.appliesTo(zone)
+    /** Manos (solo en las zonas de manos) y clases por píxel recientes para los criterios de la zona. */
+    private val handsLazy = lazy { if (ZoneCriteria.needsHands(zone)) appContext?.let { HandDetector.createOrNull(it) } else null }
+    private var lastHands: List<ZoneCriteria.Hand>? = null; private var lastHandsAt = 0L
+    private var lastClasses: ZoneCriteria.Classes? = null; private var lastClassesAt = 0L
     /** Línea de implantación frontal de la referencia (rostro frontal y frente). */
     @Volatile var referenceHairline: List<Pt>? = null
         private set
@@ -199,6 +203,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             if (now - lastFreeAt > 600) { lastFreeAt = now; lastFree = runCatching { FreeContour.from(frame) { b -> segmenter?.segment(b) } }.getOrNull() }
             lastFree
         }
+        eval = withCriteria(eval, frame, cur)
         return LiveFrame(eval, method = "estandarización", currentPointsAll = cur.points, standard = true, freeContour = free, light = light,
             hairline = if (smooth) hairlineOf(frame, cur) else null,
             headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze)
@@ -271,6 +276,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val shown = if (drawKeys.size > MAX_DRAWN) drawKeys.filterIndexed { i, _ -> i % (drawKeys.size / MAX_DRAWN + 1) == 0 } else drawKeys
         val light = if (measureLight && spec.detector == Detector.FACE)
             runCatching { Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points, cur.yaw) }.getOrNull() else null
+        eval = withCriteria(eval, frame, cur)
         return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points, headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze,
             hairline = if (smooth) hairlineOf(frame, cur) else null, light = light)
     }
@@ -319,7 +325,31 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         return liveHairline
     }
 
-    override fun close() { detector.close(); runCatching { segmenterOrNull?.close() }; runCatching { if (hairSkinLazy.isInitialized()) hairSkinLazy.value?.close() } }
+    /**
+     * Criterios clínicos de la zona ([ZoneCriteria]) sobre el cuadro: si no se cumplen, la coincidencia no
+     * llega a «coincide» y se muestran sus indicaciones. Manos cada 0,25 s y segmentación cada 0,5 s.
+     */
+    private fun withCriteria(e: MatchEval, frame: Bitmap, cur: Detection): MatchEval {
+        if (!ZoneCriteria.applies(zone)) return e
+        val now = System.currentTimeMillis()
+        if (ZoneCriteria.needsHands(zone) && now - lastHandsAt > 250) {
+            lastHandsAt = now
+            lastHands = handsLazy.value?.let { h -> runCatching { h.detect(frame) }.getOrNull() }
+        }
+        if (ZoneCriteria.needsClasses(zone) && now - lastClassesAt > 500) {
+            lastClassesAt = now
+            lastClasses = runCatching { hairSkin?.labels(frame) }.getOrNull()?.let { ZoneCriteria.Classes.of(it) }
+        }
+        // con referencia por bordes no se buscaron puntos: los criterios del cuerpo los necesitan
+        val pose = if (spec.detector != Detector.POSE) emptyMap()
+            else cur.points.ifEmpty { if (ZoneCriteria.needsHands(zone)) emptyMap() else runCatching { detected(frame, true).points }.getOrDefault(emptyMap()) }
+        val hints = ZoneCriteria.hints(zone, ZoneCriteria.Scene(pose, lastHands, lastClasses, frame.height / frame.width.toFloat()))
+        if (hints.isEmpty()) return e
+        return e.copy(status = if (e.status == MatchStatus.MATCH) MatchStatus.CLOSE else e.status,
+            quality = e.quality.coerceAtMost(0.75f), hints = e.hints + hints)
+    }
+
+    override fun close() { detector.close(); runCatching { if (handsLazy.isInitialized()) handsLazy.value?.close() }; runCatching { segmenterOrNull?.close() }; runCatching { if (hairSkinLazy.isInitialized()) hairSkinLazy.value?.close() } }
 
     companion object {
         const val EDGE_W = 96

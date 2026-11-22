@@ -77,7 +77,8 @@ class ZoneAutoCaptureTest {
         Zone.FREE -> "rostro_frontal"
     }
 
-    class Sample(val file: File, val w: Int, val h: Int, val face: Detection, val pose: Detection)
+    class Sample(val file: File, val w: Int, val h: Int, val face: Detection, val pose: Detection,
+                 val hands: List<com.photomed.app.align.ZoneCriteria.Hand>? = null, val classes: com.photomed.app.align.ZoneCriteria.Classes? = null)
 
     private fun load(dir: String): List<Sample> {
         val d = File(root, dir); val js = File(d, "landmarks.json")
@@ -95,7 +96,14 @@ class ZoneAutoCaptureTest {
                 Detection(LandmarkDetector.poseKeys((0 until a.length()).associateWith { i -> a.getJSONArray(i).let {
                     Triple(it.getDouble(0).toFloat(), it.getDouble(1).toFloat() * h / w, it.getDouble(2).toFloat()) } }))
             } ?: Detection.EMPTY
-            Sample(File(d, e.optString("image", name)), w, h, face, pose)
+            val hands = e.optJSONArray("hands")?.let { a -> (0 until a.length()).map { i -> a.getJSONObject(i).let { o ->
+                val pts = o.getJSONArray("points")
+                com.photomed.app.align.ZoneCriteria.Hand((0 until pts.length()).map { j -> pts.getJSONArray(j).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1).toFloat() * h / w) } }, o.getString("label"))
+            } } }
+            val classes = e.optString("classes", "").takeIf { it.length == 96 * 128 }?.let { str ->
+                com.photomed.app.align.ZoneCriteria.Classes(96, 128, ByteArray(str.length) { (str[it] - '0').toByte() })
+            }
+            Sample(File(d, e.optString("image", name)), w, h, face, pose, hands, classes)
         }.toList()
     }
 
@@ -128,6 +136,11 @@ class ZoneAutoCaptureTest {
         for (k in 0..12) e = sf.update(ImageOps.luma(shifted(b, if (k % 2 == 0) move else -move), LiveMatcher.EDGE_W), k * 100L)
         return e!!
     }
+
+    /** Criterios clínicos de la zona sobre la foto (pose, manos y piel/ropa calculadas con MediaPipe). */
+    private fun criteria(z: Zone, s: Sample): List<String> =
+        com.photomed.app.align.ZoneCriteria.hints(z, com.photomed.app.align.ZoneCriteria.Scene(
+            if (ZoneAlignment.of(z).detector == Detector.POSE) s.pose.points else emptyMap(), s.hands, s.classes, s.h / s.w.toFloat()))
 
     /** Primera foto completa: por quietud si no hay puntos que comprobar, si no la estandarización. */
     private fun first(z: Zone, s: Sample): MatchEval =
@@ -176,7 +189,8 @@ class ZoneAutoCaptureTest {
         else -> all
     }
 
-    data class Row(val zone: Zone, val images: Int, val detected: Int, val firstN: Int, val firstReady: Int, val geomOk: Int, val unexplained: Int, val wrongViewReady: Int?,
+    data class Row(val zone: Zone, val images: Int, val detected: Int, val firstN: Int, val firstReady: Int, val geomOk: Int, val unexplained: Int,
+                   val criteriaN: Int, val criteriaOk: Int, val criteriaNotes: String, val wrongViewReady: Int?,
                    val steadyMovingReady: Int, val steadyN: Int, val refSame: Int, val refMoved: Int, val refN: Int, val notes: String)
 
     @Test
@@ -194,7 +208,15 @@ class ZoneAutoCaptureTest {
             // 1) primera foto (sin referencia). Las vistas completas del rostro necesitan la cara (el
             // perfil sin cara usa la silueta de ML Kit, que no corre en la JVM: se omite)
             val firstSet = ss.filterIndexed { i, s -> SteadyFraming.applies(z, dets[i]) || dets[i].points.size >= LiveDecision.MIN_POINTS }
-            val firstEvals = firstSet.map { first(z, it) }
+            // criterios clínicos de la zona (manos completas, zona descubierta, postura…): la toma solo
+            // dispara si además los cumple
+            val hasCriteria = com.photomed.app.align.ZoneCriteria.applies(z)
+            val crit = if (hasCriteria) firstSet.map { criteria(z, it) } else firstSet.map { emptyList<String>() }
+            val critOk = crit.count { it.isEmpty() }
+            val critNotes = crit.flatten().groupingBy { it.take(48) }.eachCount().entries.sortedByDescending { it.value }.take(3)
+                .joinToString("; ") { "${it.key} (${it.value})" }
+            val firstEvals = firstSet.mapIndexed { i, it -> first(z, it).let { e -> if (crit[i].isEmpty()) e else e.copy(status = if (e.status == com.photomed.app.align.MatchStatus.MATCH) com.photomed.app.align.MatchStatus.CLOSE else e.status,
+                quality = e.quality.coerceAtMost(0.75f), hints = e.hints + crit[i]) } }
             val firstReady = firstEvals.count { AutoCapture.ready(it) }
             // fotos que cumplen la geometría de la vista (sin indicaciones de cabeza, barbilla o lado):
             // si las hay, alguna debe disparar (el resto falla por luz, expresión o mirada)
@@ -244,15 +266,16 @@ class ZoneAutoCaptureTest {
                 val e = first(z, s0); val d = detOf(s0, z)
                 println("DBG ${z.id} ${s0.file.name} yaw=${d.yaw} pose=${d.pose?.yaw} side=${Standardization.facingSide(d.points)} pitch=${d.pitch} roll=${d.roll} gaze=${d.gaze} ${e.status} q=${"%.2f".format(e.quality)} ${e.hints}")
             }
-            rows += Row(z, ss.size, detected, firstSet.size, firstReady, geomOk, unexplained, wrong, steadyMoving, steadySet.size.coerceAtMost(8), same, mov, n, hints)
+            rows += Row(z, ss.size, detected, firstSet.size, firstReady, geomOk, unexplained,
+                if (hasCriteria) firstSet.size else 0, critOk, critNotes, wrong, steadyMoving, steadySet.size.coerceAtMost(8), same, mov, n, hints)
         }
         val md = buildString {
             appendLine("# Captura automática por zona (fotos de internet)\n")
-            appendLine("| Zona | Detector | Imágenes | Con puntos | 1.ª foto: dispara | 1.ª foto: cumplen la geometría | 1.ª foto moviendo el teléfono: dispara | Vista equivocada: dispara | Referencia, mismo encuadre: dispara | Referencia, movido: dispara | Indicaciones más frecuentes al no disparar |")
-            appendLine("|---|---|---|---|---|---|---|---|---|---|---|")
+            appendLine("| Zona | Detector | Imágenes | Con puntos | Cumplen los criterios clínicos | Criterios incumplidos más frecuentes | 1.ª foto: dispara | 1.ª foto: cumplen la geometría | 1.ª foto moviendo el teléfono: dispara | Vista equivocada: dispara | Referencia, mismo encuadre: dispara | Referencia, movido: dispara | Indicaciones más frecuentes al no disparar |")
+            appendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
             rows.forEach { r ->
                 val det = ZoneAlignment.of(r.zone).detector
-                appendLine("| ${r.zone.id} | $det | ${r.images} | ${if (det == Detector.NONE) "—" else "${r.detected}"} | ${r.firstReady}/${r.firstN} | ${r.geomOk}/${r.firstN} | " +
+                appendLine("| ${r.zone.id} | $det | ${r.images} | ${if (det == Detector.NONE) "—" else "${r.detected}"} | ${if (r.criteriaN > 0) "${r.criteriaOk}/${r.criteriaN}" else "—"} | ${r.criteriaNotes} | ${r.firstReady}/${r.firstN} | ${r.geomOk}/${r.firstN} | " +
                     "${if (r.steadyN > 0) "${r.steadyMovingReady}/${r.steadyN}" else "—"} | ${r.wrongViewReady?.toString() ?: "—"} | " +
                     "${r.refSame}/${r.refN} | ${r.refMoved}/${r.refN} | ${r.notes} |")
             }
@@ -268,7 +291,9 @@ class ZoneAutoCaptureTest {
                 if (r.refN == 0) "${r.zone.id}: ninguna imagen utilizable con referencia" else null,
                 if (r.refN > 0 && r.refSame < r.refN * 0.9) "${r.zone.id}: con referencia y el mismo encuadre dispara solo ${r.refSame}/${r.refN}" else null,
                 if (r.refMoved > 0) "${r.zone.id}: con referencia dispara aunque el paciente se haya movido (${r.refMoved}/${r.refN})" else null,
-                if (r.geomOk > 0 && r.firstReady == 0) "${r.zone.id}: la primera foto nunca dispara aunque ${r.geomOk} fotos cumplen la geometría" else null,
+                // con criterios clínicos, que no dispare es lo esperado si las fotos no los cumplen
+                if (r.criteriaN == 0 && r.geomOk > 0 && r.firstReady == 0) "${r.zone.id}: la primera foto nunca dispara aunque ${r.geomOk} fotos cumplen la geometría" else null,
+                if (r.criteriaN > 0 && r.firstReady > r.criteriaOk) "${r.zone.id}: dispara con fotos que no cumplen los criterios clínicos" else null,
                 if (r.unexplained > 0) "${r.zone.id}: ${r.unexplained} rechazos sin indicación" else null,
                 if (r.steadyMovingReady > 0) "${r.zone.id}: dispara moviendo el teléfono (${r.steadyMovingReady}/${r.steadyN})" else null,
                 if ((r.wrongViewReady ?: 0) > 0) "${r.zone.id}: dispara con la vista equivocada (${r.wrongViewReady})" else null,
@@ -361,8 +386,9 @@ class ZoneAutoCaptureTest {
             }
         }
         // resultado de la primera foto
-        val e = first(z, s); val ok = AutoCapture.ready(e)
-        val label = if (ok) "Dispara" else e.hints.firstOrNull()?.take(34) ?: e.status.name
+        val e = first(z, s); val crit = if (com.photomed.app.align.ZoneCriteria.applies(z)) criteria(z, s) else emptyList()
+        val ok = AutoCapture.ready(e) && crit.isEmpty()
+        val label = if (ok) "Dispara" else (crit.firstOrNull() ?: e.hints.firstOrNull())?.take(34) ?: e.status.name
         val bg = paint(if (ok) 0xCC2E7D32.toInt() else 0xCCB71C1C.toInt(), 1f, true)
         c.drawRect(0f, h - 30f, w.toFloat(), h.toFloat(), bg)
         c.drawText(label, 6f, h - 9f, android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = 16f })

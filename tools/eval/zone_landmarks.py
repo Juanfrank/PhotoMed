@@ -19,6 +19,10 @@ ZONES = ROOT / "app/src/test/resources/stock/zones"
 face = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=str(ROOT / "app/src/main/assets/face_landmarker.task")),
     num_faces=1, min_face_detection_confidence=0.5, output_facial_transformation_matrixes=True))
+hands = vision.HandLandmarker.create_from_options(vision.HandLandmarkerOptions(
+    base_options=BaseOptions(model_asset_path=str(ROOT / "app/src/main/assets/hand_landmarker.task")), num_hands=2))
+segm = vision.ImageSegmenter.create_from_options(vision.ImageSegmenterOptions(
+    base_options=BaseOptions(model_asset_path=str(ROOT / "app/src/main/assets/selfie_multiclass.tflite")), output_category_mask=True))
 pose = vision.PoseLandmarker.create_from_options(vision.PoseLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=str(ROOT / "app/build/models/pose_landmarker_full.task")), num_poses=1))
 
@@ -43,6 +47,12 @@ def analyze(img):
     p = pose.detect(im)
     if p.pose_landmarks:
         out["pose"] = [[q.x, q.y, q.visibility] for q in p.pose_landmarks[0]]
+    # manos (21 puntos, etiqueta de MediaPipe) y clases por píxel (piel, ropa…) a 96×128, como la app
+    hr = hands.detect(im)
+    out["hands"] = [{"label": hd[0].category_name, "points": [[q.x, q.y] for q in lm]} for lm, hd in zip(hr.hand_landmarks, hr.handedness)]
+    cm = segm.segment(im).category_mask.numpy_view()
+    small = cv2.resize(cm.astype(np.uint8), (96, 128), interpolation=cv2.INTER_NEAREST)
+    out["classes"] = "".join(str(int(v)) for v in small.flatten())
     return out
 
 

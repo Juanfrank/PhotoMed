@@ -110,3 +110,41 @@ amarillos); abajo, si la primera foto dispara o la primera indicación por la qu
 Limitación: en las zonas que se deciden por la quietud del encuadre (cuerpo, cuero cabelludo, ojo,
 modo libre) la app no comprueba que se vea la zona correcta, solo que el encuadre esté quieto y con
 detalle; el encuadre lo decide quien toma la foto con la guía.
+
+## Criterios clínicos por zona (`ZoneCriteria`)
+
+Además del encuadre, la toma no se dispara hasta que la zona está como pide la fotografía clínica y la
+guía dibujada de la app (si falta un dato, se pide; nunca se acepta por defecto):
+
+| Zona | Se exige |
+|---|---|
+| Manos (dorso / palma) | Las **dos manos completas** (los 21 puntos de cada una dentro del cuadro), los **cinco dedos extendidos** (articulaciones de cada dedo ≥ 150–155°, pulgar ≥ 140°), los dedos **hacia abajo** como en la guía (± 35°) y la **cara pedida** (dorso o palma) hacia la cámara |
+| Pies (dorso / planta) | Los **dos pies** (separados) y **completos**: la piel de cada pie no toca los bordes del cuadro salvo arriba (piernas); un pie partido por una tira cuenta como uno |
+| Abdomen frontal, tórax | Hombros y caderas en el cuadro y **nivelados** (≤ 5°), **de frente**, brazos **separados** del tronco y la zona **descubierta** (≥ 70 % piel, ≤ 15 % ropa en su región; la ropa interior en la cadera es correcta) |
+| Abdomen lateral | **De lado** (hombros y caderas superpuestos), brazos **subidos o cruzados** (que no tapen el flanco) y abdomen **descubierto** |
+| Espalda, glúteos | **De espaldas** (sin cara), **enteros** (fondo a los dos lados, no un recorte) y **descubiertos**; si el detector ve hombros y caderas, además nivelados y brazos separados |
+| Muslos / piernas | Caderas, rodillas y tobillos en el cuadro, **rodillas extendidas** (≥ 165°), pies **algo separados** y muslos **descubiertos** |
+| Brazo (derecho / izquierdo) | Hombro, codo y muñeca de ese brazo, **codo extendido** (≥ 165°), **separado del cuerpo 10–30°** (como la guía, ≈ 20°) y **descubierto** (sin manga) |
+| Cuello | Hombros nivelados, de frente y cuello y escote **descubiertos** |
+
+Datos en el teléfono: puntos del cuerpo (ML Kit Pose), manos (**MediaPipe Hand Landmarker**, modelo
+oficial incluido en la app) y piel / ropa por píxel (segmentación multiclase de MediaPipe, ya incluida).
+
+### Prueba con dibujos propios
+
+`ZoneCriteriaDrawingsTest` dibuja (en código, sin fotos de terceros) cada zona del cuerpo en la toma
+correcta y en tomas incorrectas, y comprueba que la correcta se acepta y cada incorrecta se rechaza con
+su indicación: dedo doblado (anular, pulgar), una sola mano, dedos fuera del cuadro, dedos hacia
+arriba, dorso en lugar de palma y al revés; pies cortados, un solo pie (también partido por una tira);
+abdomen con camiseta, brazos sobre el abdomen, hombros inclinados, de espaldas; lateral con los brazos
+tapando el flanco o de frente; espalda de frente o recortada; glúteos con pantalón o de frente; piernas
+con la rodilla flexionada, con pantalón, con los pies juntos o fuera del cuadro; brazo con el codo
+doblado, pegado al cuerpo, a 60° o con manga; cuello con jersey de cuello alto o hombros inclinados. Los
+puntos salen de la geometría del dibujo y la piel y la ropa se clasifican a partir de sus **píxeles**.
+Imágenes: `app/build/reports/zone_criteria/`.
+
+Con las fotos de internet (tabla de arriba), casi ninguna cumple estos criterios (ropa, manos o pies
+incompletos, brazo recortado o con el codo doblado, espaldas recortadas): ya no disparan.
+
+Limitación: la planta y el dorso del pie no se distinguen (no hay un detector de puntos del pie); lo
+decide quien encuadra con la guía.

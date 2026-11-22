@@ -30,6 +30,11 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 - **Menú de exportación**: cambiar de opción ya no lo devuelve arriba.
 - **Comparar**: interruptor para encender y apagar el ajuste de color junto al de alineación, y
   botón «Confirmar surcos» bajo las fotos (antes solo dentro de la tabla de medidas).
+- **Criterios clínicos por zona del cuerpo** (la toma no se dispara sin cumplirlos): manos completas
+  con los cinco dedos extendidos y la cara pedida (palma o dorso), los dos pies completos, abdomen,
+  tórax, espalda, glúteos, muslos, brazo y cuello descubiertos, brazo con el codo extendido y separado
+  ≈ 20° del cuerpo, rodillas extendidas, de lado / de espaldas cuando toca. Nuevo detector de manos
+  (MediaPipe Hand Landmarker). Probado con dibujos propios de cada toma correcta e incorrecta.
 - **Captura automática verificada en las 30 zonas** con fotos reales (ver `docs/CAPTURA_AUTOMATICA.md`),
   con estas correcciones:
   - Espalda, glúteos, manos, pies, cuero cabelludo, ojo, modo libre y primeros planos sin cara
