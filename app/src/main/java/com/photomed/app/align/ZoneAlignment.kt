@@ -35,7 +35,13 @@ data class ZoneAlignment(
         private fun List<ContourRegion>.mirrored(m: Boolean) =
             if (!m) this else map { it.copy(center = Pt(1f - it.center.x, it.center.y)) }
 
-        fun of(zone: Zone): ZoneAlignment {
+        /** Con los puntos adicionales de las zonas del cuerpo ([BodyPoints]: manos, pies, bordes de miembros y tronco). */
+        fun of(zone: Zone): ZoneAlignment = base(zone).let { a ->
+            val extra = BodyPoints.keysFor(zone.guide)
+            if (extra.isEmpty()) a else a.copy(landmarks = a.landmarks + extra)
+        }
+
+        private fun base(zone: Zone): ZoneAlignment {
             val L = Landmarks
             return when (zone.guide) {
                 GuideType.FACE_FRONT -> ZoneAlignment(

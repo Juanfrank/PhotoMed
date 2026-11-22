@@ -963,6 +963,7 @@
     <string name="t_ceae33ba7e46" formatted="false">Spine on the midline, arms relaxed.</string>
     <string name="t_cebb3bbb7161" formatted="false">«%1$s» retraced</string>
     <string name="t_cec05b55650a" formatted="false">" · %1$d taken here"</string>
+    <string name="t_cee46d2afa7d" formatted="false">Center the area in the frame</string>
     <string name="t_cefd84dbdb1b" formatted="false">Could not save the line</string>
     <string name="t_cf3a2d1b5fbe" formatted="false">Automatic alignment</string>
     <string name="t_cf3dc15b515d" formatted="false">Sequence %1$d/%2$d · %3$s</string>

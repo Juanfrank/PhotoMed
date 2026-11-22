@@ -115,14 +115,73 @@ object ZoneCriteria {
     const val ARM_ABD_MIN = 5f
     const val ARM_ABD_MAX = 45f
     /** Dedos del pie visibles (mínimo por pie: el pequeño puede quedar oculto por el cuarto). */
-    const val MIN_TOES = 4
+    /** Fracción máxima del borde distal del pie que puede lindar con ropa o calzado. */
+    const val COVERED_TIP = 0.35f
 
     /** Indicaciones que impiden el disparo (vacía: la zona cumple). */
-    fun hints(zone: Zone, s: Scene): List<String> = when (zone.guide) {
-        GuideType.HANDS -> hands(zone, s)
-        GuideType.FEET -> feet(s)
-        in SKIN_ZONES -> body(zone, s)
-        else -> emptyList()
+    fun hints(zone: Zone, s: Scene): List<String> {
+        val h = when (zone.guide) {
+            GuideType.HANDS -> hands(zone, s)
+            GuideType.FEET -> feet(s)
+            in SKIN_ZONES -> body(zone, s)
+            else -> emptyList()
+        }
+        return h + listOfNotNull(centerHint(zone, s))
+    }
+
+    /** Tolerancia del centrado de la zona: desvío máximo de su centro respecto al del cuadro (fracción de cada lado). */
+    const val CENTER_TOL = 0.13f
+
+    /**
+     * Caja de la parte del cuerpo de la zona (unidades del ancho; y hasta [Scene.aspect]) y qué ejes
+     * deben quedar centrados (x, y); null si no se ha encontrado la parte.
+     */
+    fun partBox(zone: Zone, s: Scene): Pair<FloatArray, BooleanArray>? {
+        val p = s.pose; val L = Landmarks
+        fun box(pts: List<Pt>, x: Boolean = true, y: Boolean = true) = pts.takeIf { it.size >= 2 }?.let { q ->
+            floatArrayOf(q.minOf { it.x }, q.minOf { it.y }, q.maxOf { it.x }, q.maxOf { it.y }) to booleanArrayOf(x, y)
+        }
+        fun pts(vararg k: String) = k.mapNotNull { p[it] }
+        return when (zone.guide) {
+            GuideType.HANDS -> {
+                val hs = s.hands ?: return null
+                val chosen = if (s.single) hs.maxByOrNull { dist(it.points[0], it.points[9]) }?.let { listOf(it) } ?: return null
+                    else hs.sortedBy { it.points[0].x }.take(2)
+                box(chosen.flatMap { it.points })
+            }
+            GuideType.FEET -> {
+                val c = s.classes ?: return null
+                val fs = feetOf(c).sortedByDescending { it.box.area }.take(if (s.single) 1 else 2)
+                if (fs.isEmpty()) return null
+                val k = c.width.toFloat()
+                // en vertical las piernas salen por arriba: solo se centra en horizontal
+                floatArrayOf(fs.minOf { it.box.x0 } / k, fs.minOf { it.box.y0 } / k, (fs.maxOf { it.box.x1 } + 1) / k, (fs.maxOf { it.box.y1 } + 1) / k) to booleanArrayOf(true, false)
+            }
+            GuideType.ARM -> {
+                val arms = listOf(pts(L.SHOULDER_R, L.ELBOW_R, L.WRIST_R), pts(L.SHOULDER_L, L.ELBOW_L, L.WRIST_L)).filter { it.size == 3 }
+                val want = if (zone == Zone.ARM_R) 0 else 1
+                val arm = listOf(pts(L.SHOULDER_R, L.ELBOW_R, L.WRIST_R), pts(L.SHOULDER_L, L.ELBOW_L, L.WRIST_L))[want].takeIf { it.size == 3 } ?: arms.firstOrNull()
+                arm?.let { box(it) }
+            }
+            GuideType.LEGS -> if (s.single) {
+                listOf(pts(L.HIP_L, L.KNEE_L, L.ANKLE_L), pts(L.HIP_R, L.KNEE_R, L.ANKLE_R)).filter { it.size == 3 }
+                    .maxByOrNull { dist(it[0], it[2]) }?.let { box(it) }
+            } else box(pts(L.HIP_L, L.HIP_R, L.KNEE_L, L.KNEE_R, L.ANKLE_L, L.ANKLE_R))
+            GuideType.TORSO_FRONT, GuideType.BREASTS, GuideType.BACK, GuideType.TORSO_SIDE ->
+                pts(L.SHOULDER_L, L.SHOULDER_R, L.HIP_L, L.HIP_R).takeIf { it.size >= 3 }?.let { box(it) }
+            GuideType.GLUTES -> pts(L.HIP_L, L.HIP_R, L.KNEE_L, L.KNEE_R).takeIf { it.size == 4 }?.let { box(it) }
+            GuideType.NECK -> pts(L.SHOULDER_L, L.SHOULDER_R).takeIf { it.size == 2 }?.let { box(it, y = false) }
+            else -> null
+        }
+    }
+
+    /** «Centre la zona»: el centro de la parte del cuerpo lejos del centro del cuadro (en la orientación de la guía). */
+    fun centerHint(zone: Zone, s: Scene): String? {
+        val (b, axes) = partBox(zone, s) ?: return null
+        val cx = (b[0] + b[2]) / 2; val cy = (b[1] + b[3]) / 2
+        val offX = axes[0] && abs(cx - 0.5f) > CENTER_TOL
+        val offY = axes[1] && abs(cy - s.aspect / 2) > CENTER_TOL * s.aspect
+        return if (offX || offY) tr("Centre la zona en el cuadro") else null
     }
 
     // ---------------- manos ----------------
@@ -228,9 +287,19 @@ object ZoneCriteria {
      * halladas en el borde distal (abajo, como en la guía) como salientes separados por los surcos
      * entre dedos.
      */
-    class Foot(val outline: List<Pt>, val toes: List<Pt>, val box: Blob)
+    class Foot(val outline: List<Pt>, val toes: List<Pt>, val box: Blob,
+               /** Fracción del borde distal que linda con ropa o calzado (dedos tapados: calcetín, zapato). */
+               val coveredTip: Float = 0f)
 
+    @Volatile private var feetMemo: Pair<Classes, List<Foot>>? = null
+
+    /** Pies de [c] (se calcula una vez por máscara: los criterios y el esquema la comparten). */
     fun feetOf(c: Classes): List<Foot> {
+        feetMemo?.let { (k, v) -> if (k === c) return v }
+        return computeFeet(c).also { feetMemo = c to it }
+    }
+
+    private fun computeFeet(c: Classes): List<Foot> {
         val (blobs, lab) = labeled(c)
         // un mismo pie puede quedar partido (tira de una sandalia): se agrupan las manchas que se solapan en x
         val groupOf = IntArray(blobs.size); val groups = ArrayList<Blob>()
@@ -264,7 +333,22 @@ object ZoneCriteria {
                 if (toes.isNotEmpty() && (g.x0 + i) * k - toes.last().x < 0.025f) continue
                 toes += Pt((g.x0 + i) * k, y * k)
             }
-            Foot(left + right.reversed(), toes, g)
+            // lo que hay justo después del borde distal (fuera del pie): fondo (dedos al aire) o ropa / calzado
+            var cov = 0; var seen = 0
+            val reach = maxOf(2, (0.012f * c.height).toInt())
+            for (i in bottom.indices) {
+                val y = bottom[i]; if (y < 0 || y < g.y1 - 0.14f * c.height) continue
+                val x = g.x0 + i
+                for (d in 1..reach) {
+                    val yy = y + d; if (yy >= c.height) break
+                    if (inG(x, yy)) continue
+                    val q = c.at(x, yy)
+                    seen++; if (q == FaceLabels.CLOTHES || q == FaceLabels.OTHER) cov++
+                    break
+                }
+            }
+            // los relieves del borde son una estimación (los dedos se tocan): se dibujan si parecen dedos
+            Foot(left + right.reversed(), toes.takeIf { it.size in 3..6 }.orEmpty(), g, if (seen == 0) 0f else cov / seen.toFloat())
         }
     }
 
@@ -283,7 +367,9 @@ object ZoneCriteria {
             if (b.x0 < mx || b.x1 > c.width - 1 - mx || b.y1 > c.height - 1 - my) { out += tr("Pies completos: los dedos y los bordes dentro del cuadro"); return@forEachIndexed }
             // las falanges: los dedos deben verse (su número y su forma son los del paciente)
             val left = if (s.single) (b.x0 + b.x1) < c.width else i == 0
-            if (f.toes.size < MIN_TOES) out += tr("Pie de la %1\$s: que se vean los dedos", if (left) tr("izquierda") else tr("derecha"))
+            // los dedos: el extremo distal entero y al aire (no tapado por calcetín, ropa o calzado). Contar
+            // cada dedo en la silueta no es fiable con fotos reales (se tocan): no se exige un número
+            if (f.coveredTip > COVERED_TIP) out += tr("Pie de la %1\$s: que se vean los dedos", if (left) tr("izquierda") else tr("derecha"))
         }
         return out.distinct()
     }
@@ -447,7 +533,11 @@ object ZoneCriteria {
                     if (abd > ARM_ABD_MAX) out += tr("Baje el brazo junto al cuerpo (≈ 20°)")
                 }   // sin la cadera (primer plano del brazo) no se mide la separación
                 val hw = hypot(e.x - a.x, e.y - a.y) * 0.18f
-                uncovered(c, trn("el brazo"), c?.let { skinClothesAlong(it, a, w, hw) })?.let { out += it }
+                // a lo largo del brazo y del antebrazo (con el codo algo flexionado, la recta hombro–muñeca se sale)
+                uncovered(c, trn("el brazo"), c?.let { cl ->
+                    val u = skinClothesAlong(cl, a, e, hw); val f = skinClothesAlong(cl, e, w, hw)
+                    minOf(u.first, f.first) to maxOf(u.second, f.second)
+                })?.let { out += it }
             }
             GuideType.NECK -> {
                 if (!has(p, L.SHOULDER_L, L.SHOULDER_R)) return listOf(tr("Encuadre cuello y hombros"))

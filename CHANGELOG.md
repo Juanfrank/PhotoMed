@@ -4,6 +4,14 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Pies: dedos** comprobados de forma fiable: el extremo de cada pie entero y al aire (sin calcetín,
+  ropa ni calzado); ya no se exige contar cada dedo en la silueta, que con fotos reales fallaba.
+- **Veredicto estable**: los criterios de la zona deciden por mayoría de los últimos análisis; las
+  indicaciones ya no cambian una y otra vez con la misma imagen, y los pies se calculan una vez por
+  máscara.
+- **Zona centrada** en el cuadro (manos, pies, brazo, piernas, tronco…): si no, «Centre la zona».
+- **Más puntos de referencia** en manos (21 por mano), pies (punta, centro y bordes) y brazos, piernas
+  y tronco (bordes a ¼, ½ y ¾): la alineación con la referencia usa muchos más puntos.
 - **Giros de 90° de la guía**: el contorno ajustado ya no se gira con la guía (quedaba atravesado sobre
   la mano) y los criterios de manos, pies y cuerpo se miden en la orientación de la guía girada.
 - **Una sola mano, pie o pierna**: con el selector Derecha / Izquierda ya no se piden las dos. El

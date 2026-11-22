@@ -158,6 +158,13 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     fun setReference(bmp: Bitmap) {
         featureOnly = false
         ref = detector.detectFull(spec.detector, bmp)
+        // zonas del cuerpo: los mismos puntos adicionales que en la toma (manos, pies, bordes)
+        if (ZoneCriteria.applies(zone)) runCatching {
+            val hs = if (ZoneCriteria.needsHands(zone)) handsLazy.value?.detect(bmp) else null
+            val cl = if (ZoneCriteria.needsClasses(zone)) hairSkin?.labels(bmp)?.let { ZoneCriteria.Classes.of(it) } else null
+            val extra = BodyPoints.of(zone, ZoneCriteria.Scene(ref.points, hs, cl, bmp.height / bmp.width.toFloat(), single = singleLimb))
+            if (extra.isNotEmpty()) ref = ref.copy(points = ref.points + extra)
+        }
         // Segmentación pelo / piel de la referencia (vistas faciales): óvalo ajustado al límite real de
         // la cara (la guía se adapta a él) y línea de implantación
         val faceView = zone.guide == com.photomed.app.data.GuideType.FACE_FRONT || zone.guide == com.photomed.app.data.GuideType.FACE_OBLIQUE
@@ -227,8 +234,30 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
 
     /** Detección del cuadro; en vivo, suavizada en el tiempo (One-Euro) para que la guía y las indicaciones no tiemblen. */
     private fun detected(frame: Bitmap, smooth: Boolean): Detection {
-        val d = detector.detectFull(spec.detector, frame)
+        var d = detector.detectFull(spec.detector, frame)
+        // zonas del cuerpo: más puntos de referencia (manos, pies, bordes de miembros y tronco)
+        if (ZoneCriteria.applies(zone)) {
+            refreshScene(frame)
+            val extra = runCatching { BodyPoints.of(zone, ZoneCriteria.Scene(d.points, lastHands, lastClasses, frame.height / frame.width.toFloat(), single = singleLimb)) }
+                .getOrDefault(emptyMap())
+            if (extra.isNotEmpty()) d = d.copy(points = d.points + extra)
+        }
         return if (smooth) smoother.smooth(d, System.currentTimeMillis()) else d
+    }
+
+    /** Manos y piel por píxel del cuadro (como mucho cada 150 / 500 ms; en las manos, la piel con las manos). */
+    private fun refreshScene(frame: Bitmap) {
+        val now = System.currentTimeMillis()
+        var handsNow = false
+        if (ZoneCriteria.needsHands(zone) && now - lastHandsAt > 150) {
+            lastHandsAt = now; handsNow = true
+            lastHands = handsLazy.value?.let { h -> runCatching { h.detect(frame) }.getOrNull() }
+        }
+        // en las manos, la piel del mismo cuadro que los puntos (el contorno sigue a la mano sin retraso)
+        if (ZoneCriteria.needsClasses(zone) && (now - lastClassesAt > 500 || handsNow)) {
+            lastClassesAt = now
+            lastClasses = runCatching { hairSkin?.labels(frame) }.getOrNull()?.let { ZoneCriteria.Classes.of(it) }
+        }
     }
     private val smoother = LandmarkSmoother()
     private val steady = SteadyFraming()
@@ -339,16 +368,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
      */
     private fun withCriteria(e: MatchEval, frame: Bitmap, cur: Detection): MatchEval {
         if (!ZoneCriteria.applies(zone)) { lastSchema = null; return e }
-        val now = System.currentTimeMillis()
-        if (ZoneCriteria.needsHands(zone) && now - lastHandsAt > 250) {
-            lastHandsAt = now
-            lastHands = handsLazy.value?.let { h -> runCatching { h.detect(frame) }.getOrNull() }
-        }
-        // en las manos, la piel del mismo cuadro que los puntos (el contorno sigue a la mano sin retraso)
-        if (ZoneCriteria.needsClasses(zone) && (now - lastClassesAt > 500 || (ZoneCriteria.needsHands(zone) && lastHandsAt == now))) {
-            lastClassesAt = now
-            lastClasses = runCatching { hairSkin?.labels(frame) }.getOrNull()?.let { ZoneCriteria.Classes.of(it) }
-        }
+        refreshScene(frame)
         // con referencia por bordes no se buscaron puntos: los criterios del cuerpo los necesitan
         val pose = if (spec.detector != Detector.POSE) emptyMap()
             else cur.points.ifEmpty { if (ZoneCriteria.needsHands(zone)) emptyMap() else runCatching { detected(frame, true).points }.getOrDefault(emptyMap()) }
@@ -357,11 +377,21 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         // con la guía girada, los criterios se miden en su orientación y el esquema vuelve al cuadro
         val scene = with(ZoneCriteria) { ZoneCriteria.Scene(pose, lastHands, lastClasses, aspect, single = singleLimb).rotatedCcw(q) }
         lastSchema = runCatching { BodySchema.of(zone, scene)?.let { sch -> if (q % 4 == 0) sch else with(BodySchema) { sch.map { ZoneCriteria.unrotate(it, q, aspect) } } } }.getOrNull()
-        val hints = ZoneCriteria.hints(zone, scene)
-        if (hints.isEmpty()) return e
+        val now = ZoneCriteria.hints(zone, scene)
+        // decisión estable: la zona cumple si cumple en al menos 2 de los 3 últimos análisis (una
+        // segmentación o detección suelta no cambia el veredicto ni hace parpadear las indicaciones)
+        synchronized(votes) {
+            votes.addLast(now.isEmpty()); while (votes.size > 3) votes.removeFirst()
+            if (now.isNotEmpty()) lastCriteriaHints = now
+            val ok = votes.size >= 2 && votes.count { it } >= 2
+            if (ok) return e
+        }
+        val hints = now.ifEmpty { lastCriteriaHints }.ifEmpty { listOf(ZoneCriteria.HINT_ANALYZING) }
         return e.copy(status = if (e.status == MatchStatus.MATCH) MatchStatus.CLOSE else e.status,
             quality = e.quality.coerceAtMost(0.75f), hints = e.hints + hints)
     }
+    private val votes = ArrayDeque<Boolean>()
+    private var lastCriteriaHints: List<String> = emptyList()
 
     override fun close() { detector.close(); runCatching { if (handsLazy.isInitialized()) handsLazy.value?.close() }; runCatching { segmenterOrNull?.close() }; runCatching { if (hairSkinLazy.isInitialized()) hairSkinLazy.value?.close() } }
 

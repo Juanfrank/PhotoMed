@@ -201,7 +201,7 @@ class ZoneCriteriaDrawingsTest {
         // mano derecha del paciente a la izquierda de la imagen; MediaPipe la etiqueta «Left» (supone espejo)
         val leftImgThumb = if (palm) -1f else 1f
         val hs = ArrayList<ZoneCriteria.Hand>()
-        hs += ZoneCriteria.Hand(hand(c, 80f, wy, leftImgThumb, bent, up, nails = !palm, spread = spread, lenK = lenK, rotDeg = -rotDeg), "Left")
+        hs += ZoneCriteria.Hand(hand(c, if (oneHand) 150f else 80f, wy, leftImgThumb, bent, up, nails = !palm, spread = spread, lenK = lenK, rotDeg = -rotDeg), "Left")
         if (!oneHand) hs += ZoneCriteria.Hand(hand(c, 220f, wy, -leftImgThumb, emptySet(), up, nails = !palm, spread = spread, lenK = lenK, rotDeg = rotDeg), "Right")
         return b to hs
     }
@@ -242,16 +242,30 @@ class ZoneCriteriaDrawingsTest {
             }
         }
         // pie derecho del paciente a la izquierda de la imagen: dedo gordo hacia dentro (+1)
-        foot(90f, 1f); if (!one) foot(210f, -1f)
+        foot(if (one) 150f else 90f, 1f); if (!one) foot(210f, -1f)
         // tira de sandalia que cruza el pie (lo parte en dos manchas de piel)
         if (strap) c.drawRect(0f, 200f + dy, W.toFloat(), 228f + dy, fill(CLOTH))
         return b
     }
 
     // ---------- casos ----------
-    private fun case(z: Zone, name: String, ok: Boolean, expect: String?, draw: (Canvas) -> Map<String, Pt>): Case {
-        val (b, c) = canvas(); val p = draw(c)
-        return Case(z, name, ok, expect, b, ZoneCriteria.Scene(p, null, classes(b)))
+    /**
+     * Caso de una zona del cuerpo. Con [center], el dibujo se desplaza para que la parte del cuerpo de
+     * la zona quede en el centro del cuadro (como se encuadra con la guía).
+     */
+    private fun case(z: Zone, name: String, ok: Boolean, expect: String?, center: Boolean = true, single: Boolean = false,
+                     pose: (Map<String, Pt>) -> Map<String, Pt> = { it }, draw: (Canvas) -> Map<String, Pt>): Case {
+        var dx = 0f; var dy = 0f
+        if (center) {
+            val (b0, c0) = canvas(); val p0 = pose(draw(c0))
+            ZoneCriteria.partBox(z, ZoneCriteria.Scene(p0, null, classes(b0), single = single))?.let { (bx, axes) ->
+                if (axes[0]) dx = (0.5f - (bx[0] + bx[2]) / 2) * W
+                if (axes[1]) dy = (H / W.toFloat() / 2 - (bx[1] + bx[3]) / 2) * W
+            }
+        }
+        val (b, c) = canvas(); c.translate(dx, dy)
+        val p = pose(draw(c)).mapValues { (_, q) -> Pt(q.x + dx / W, q.y + dy / W) }
+        return Case(z, name, ok, expect, b, ZoneCriteria.Scene(p, null, classes(b), single = single))
     }
 
     private fun cases(): List<Case> {
@@ -274,6 +288,8 @@ class ZoneCriteriaDrawingsTest {
             hc1("modo una mano: anular recogido", false, "falanges", handsScene(palm, oneHand = true, bent = setOf(3)))
             hc("dedos fuera del cuadro", false, "entera dentro del cuadro", handsScene(palm, shiftY = 215f))
             hc("dedos hacia arriba", false, "dedos hacia abajo", handsScene(palm, up = true))
+            hc1("modo una mano: descentrada", false, "Centre", run { val (b, hs) = handsScene(palm, oneHand = true); val s2 = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+                Canvas(s2).apply { drawColor(BG); drawBitmap(b, -75f, 0f, null) }; s2 to hs.map { h -> ZoneCriteria.Hand(h.points.map { Pt(it.x - 0.25f, it.y) }, h.label) } })
             hc(if (palm) "se ve el dorso" else "se ve la palma", false, if (palm) "muestre la palma" else "muestre el dorso", handsScene(!palm))
         }
         // pies
@@ -289,20 +305,22 @@ class ZoneCriteriaDrawingsTest {
             fc1("modo un pie: un pie", true, null, feetScene(one = true, sole = sole))
             fc1("modo un pie: partido por una tira", true, null, feetScene(one = true, sole = sole, strap = true))
             fc1("modo un pie: dedos tapados", false, "que se vean los dedos", feetScene(one = true, sole = sole, sock = true))
+            fc1("modo un pie: descentrado", false, "Centre", Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888).also { s2 -> Canvas(s2).apply { drawColor(BG); drawBitmap(feetScene(one = true, sole = sole), -80f, 0f, null) } })
             fc("dedos tapados (calcetín)", false, "que se vean los dedos", feetScene(sole = sole, sock = true))
         }
         // abdomen frontal, tórax, espalda
         out += case(Zone.TORSO_FRONT, "correcta", true, null) { figure(it) }
-        out += case(Zone.TORSO_FRONT, "con camiseta", false, "Descubra", { figure(it, shirt = true) })
-        out += case(Zone.TORSO_FRONT, "brazos sobre el abdomen", false, "Separe los brazos", { figure(it, armsCover = true) })
+        out += case(Zone.TORSO_FRONT, "con camiseta", false, "Descubra", draw = { figure(it, shirt = true) })
+        out += case(Zone.TORSO_FRONT, "brazos sobre el abdomen", false, "Separe los brazos", draw = { figure(it, armsCover = true) })
         out += case(Zone.TORSO_FRONT, "hombros algo inclinados (5°, se acepta)", true, null) { figure(it, tiltDeg = 5f) }
-        out += case(Zone.TORSO_FRONT, "hombros inclinados", false, "Hombros nivelados", { figure(it, tiltDeg = 12f) })
-        out += case(Zone.TORSO_FRONT, "de espaldas", false, "De frente", { figure(it, back = true) })
+        out += case(Zone.TORSO_FRONT, "hombros inclinados", false, "Hombros nivelados", draw = { figure(it, tiltDeg = 12f) })
+        out += case(Zone.TORSO_FRONT, "de espaldas", false, "De frente", draw = { figure(it, back = true) })
+        out += case(Zone.TORSO_FRONT, "descentrado", false, "Centre", center = false) { figure(it, cx = 230f) }
         out += case(Zone.BREASTS, "correcta", true, null) { figure(it) }
-        out += case(Zone.BREASTS, "con camiseta", false, "Descubra", { figure(it, shirt = true) })
+        out += case(Zone.BREASTS, "con camiseta", false, "Descubra", draw = { figure(it, shirt = true) })
         out += case(Zone.BACK, "correcta", true, null) { figure(it, back = true) }
-        out += case(Zone.BACK, "con camiseta", false, "Descubra", { figure(it, back = true, shirt = true) })
-        out += case(Zone.BACK, "de frente", false, "De espaldas", { figure(it) })
+        out += case(Zone.BACK, "con camiseta", false, "Descubra", draw = { figure(it, back = true, shirt = true) })
+        out += case(Zone.BACK, "de frente", false, "De espaldas", draw = { figure(it) })
         // sin puntos del cuerpo (de espaldas el detector no ve a la persona): por la región de la guía
         fun noPose(z: Zone, name: String, ok: Boolean, expect: String?, draw: (Canvas) -> Unit) {
             val (b, c) = canvas(); draw(c); out += Case(z, name, ok, expect, b, ZoneCriteria.Scene(emptyMap(), null, classes(b)))
@@ -313,25 +331,25 @@ class ZoneCriteriaDrawingsTest {
         // abdomen lateral
         for (z in listOf(Zone.TORSO_SIDE, Zone.TORSO_SIDE_L)) {
             out += case(z, "correcta (brazos arriba)", true, null) { side(it) }
-            out += case(z, "brazos tapando el flanco", false, "brazos", { side(it, armsDown = true) })
-            out += case(z, "con camiseta", false, "Descubra", { side(it, shirt = true) })
-            out += case(z, "de frente", false, "de lado", { side(it, frontal = true) })
+            out += case(z, "brazos tapando el flanco", false, "brazos", draw = { side(it, armsDown = true) })
+            out += case(z, "con camiseta", false, "Descubra", draw = { side(it, shirt = true) })
+            out += case(z, "de frente", false, "de lado", draw = { side(it, frontal = true) })
         }
         // glúteos
         out += case(Zone.GLUTES, "correcta", true, null) { figure(it, back = true, shorts = false) }
-        out += case(Zone.GLUTES, "con pantalón", false, "Descubra", { figure(it, back = true, pants = true) })
-        out += case(Zone.GLUTES, "de frente", false, "De espaldas", { figure(it, shorts = false) })
+        out += case(Zone.GLUTES, "con pantalón", false, "Descubra", draw = { figure(it, back = true, pants = true) })
+        out += case(Zone.GLUTES, "de frente", false, "De espaldas", draw = { figure(it, shorts = false) })
         // piernas
         out += case(Zone.LEGS, "correcta", true, null) { figure(it, top = 10f, scale = 0.92f) }
         out += case(Zone.LEGS, "rodillas con flexión natural (se ajusta)", true, null) { figure(it, top = 10f, scale = 0.92f, kneeBend = 15f, feetGap = 70f) }
-        out += case(Zone.LEGS, "rodilla flexionada", false, "Rodillas", { figure(it, top = 10f, scale = 0.92f, kneeBend = 45f) })
-        out += case(Zone.LEGS, "con pantalón", false, "Descubra", { figure(it, top = 10f, scale = 0.92f, pants = true) })
-        out += case(Zone.LEGS, "pies juntos", false, "Separe un poco los pies", { figure(it, top = 10f, scale = 0.92f, feetGap = 0f) })
-        out += case(Zone.LEGS, "pies fuera del cuadro", false, "Los pies dentro", { figure(it, top = 50f, scale = 0.98f) })
+        out += case(Zone.LEGS, "rodilla flexionada", false, "Rodillas", draw = { figure(it, top = 10f, scale = 0.92f, kneeBend = 45f) })
+        out += case(Zone.LEGS, "con pantalón", false, "Descubra", draw = { figure(it, top = 10f, scale = 0.92f, pants = true) })
+        out += case(Zone.LEGS, "pies juntos", false, "Separe un poco los pies", draw = { figure(it, top = 10f, scale = 0.92f, feetGap = 0f) })
+        out += case(Zone.LEGS, "pies fuera del cuadro", false, "Los pies dentro", center = false) { figure(it, top = 50f, scale = 0.98f) }
+        out += case(Zone.LEGS, "descentradas", false, "Centre", center = false) { figure(it, top = 10f, scale = 0.92f, cx = 80f) }
         // modo de una sola pierna: el detector solo ve esa pierna
         fun oneLeg(name: String, ok: Boolean, expect: String?, draw: (Canvas) -> Map<String, Pt>) {
-            val (b, c) = canvas(); val p = draw(c).filterKeys { it !in setOf(L.HIP_R, L.KNEE_R, L.ANKLE_R) }
-            out += Case(Zone.LEGS, name, ok, expect, b, ZoneCriteria.Scene(p, null, classes(b), single = true))
+            out += case(Zone.LEGS, name, ok, expect, single = true, pose = { p -> p.filterKeys { it !in setOf(L.HIP_R, L.KNEE_R, L.ANKLE_R) } }, draw = draw)
         }
         oneLeg("modo una pierna: correcta", true, null) { figure(it, top = 10f, scale = 0.92f) }
         oneLeg("modo una pierna: rodilla flexionada", false, "Rodillas") { figure(it, top = 10f, scale = 0.92f, kneeBend = 45f) }
@@ -341,24 +359,24 @@ class ZoneCriteriaDrawingsTest {
             out += case(z, "correcta (≈ 20°)", true, null) { figure(it, armAbd = 20f) }
             out += case(z, "brazo a 35° (se ajusta)", true, null) { figure(it, armAbd = 35f) }
             out += case(z, "codo con flexión natural (se ajusta)", true, null) { figure(it, armAbd = 20f, elbowBend = 18f) }
-            out += case(z, "codo doblado", false, "Codo extendido", { figure(it, armAbd = 20f, elbowBend = 50f) })
-            out += case(z, "brazo pegado al cuerpo", false, "Separe un poco el brazo", { figure(it, armAbd = 1f) })
-            out += case(z, "brazo a 60°", false, "Baje el brazo", { figure(it, armAbd = 60f) })
-            out += case(z, "con manga", false, "Descubra", { figure(it, armAbd = 20f, sleeve = true) })
+            out += case(z, "codo doblado", false, "Codo extendido", draw = { figure(it, armAbd = 20f, elbowBend = 50f) })
+            out += case(z, "brazo pegado al cuerpo", false, "Separe un poco el brazo", draw = { figure(it, armAbd = 1f) })
+            out += case(z, "brazo a 60°", false, "Baje el brazo", draw = { figure(it, armAbd = 60f) })
+            out += case(z, "con manga", false, "Descubra", draw = { figure(it, armAbd = 20f, sleeve = true) })
+            out += case(z, "brazo descentrado", false, "Centre", center = false) { figure(it, armAbd = 20f) }
             // primer plano del brazo: sin caderas ni el otro brazo
             val keep = if (z == Zone.ARM_R) setOf(L.SHOULDER_R, L.ELBOW_R, L.WRIST_R, L.INDEX_R) else setOf(L.SHOULDER_L, L.ELBOW_L, L.WRIST_L, L.INDEX_L)
-            run { val (b, c) = canvas(); val p = figure(c, armAbd = 20f).filterKeys { it in keep }
-                out += Case(z, "solo ese brazo (sin cadera)", true, null, b, ZoneCriteria.Scene(p, null, classes(b))) }
+            out += case(z, "solo ese brazo (sin cadera)", true, null, pose = { p -> p.filterKeys { it in keep } }) { figure(it, armAbd = 20f) }
             // de espaldas el detector invierte izquierda y derecha: solo se ve entero el otro «lado»
             val swap = mapOf(L.SHOULDER_L to L.SHOULDER_R, L.ELBOW_L to L.ELBOW_R, L.WRIST_L to L.WRIST_R, L.INDEX_L to L.INDEX_R)
                 .let { m -> m + m.entries.associate { (a, b) -> b to a } }
-            run { val (b, c) = canvas(); val p = figure(c, armAbd = 20f).filterKeys { it in keep }.mapKeys { swap[it.key] ?: it.key }
-                out += Case(z, "solo ese brazo, lado invertido por el detector", true, null, b, ZoneCriteria.Scene(p, null, classes(b))) }
+            out += case(z, "solo ese brazo, lado invertido por el detector", true, null,
+                pose = { p -> p.filterKeys { it in keep }.mapKeys { swap[it.key] ?: it.key } }) { figure(it, armAbd = 20f) }
         }
         // cuello
         out += case(Zone.NECK, "correcta", true, null) { figure(it, top = 60f, scale = 1.6f) }
-        out += case(Zone.NECK, "hombros inclinados", false, "Hombros nivelados", { figure(it, top = 60f, scale = 1.6f, tiltDeg = 12f) })
-        out += case(Zone.NECK, "con jersey de cuello alto", false, "Descubra", { c -> figure(c, top = 60f, scale = 1.6f).also { c.drawRect(120f, 120f, 180f, 200f, fill(CLOTH)); c.drawRect(60f, 170f, 240f, 260f, fill(CLOTH)) } })
+        out += case(Zone.NECK, "hombros inclinados", false, "Hombros nivelados", draw = { figure(it, top = 60f, scale = 1.6f, tiltDeg = 12f) })
+        out += case(Zone.NECK, "con jersey de cuello alto", false, "Descubra", draw = { c -> figure(c, top = 60f, scale = 1.6f).also { c.drawRect(120f, 120f, 180f, 200f, fill(CLOTH)); c.drawRect(60f, 170f, 240f, 260f, fill(CLOTH)) } })
         return out
     }
 
@@ -425,6 +443,27 @@ class ZoneCriteriaDrawingsTest {
         }
     }
 
+    /** Puntos de referencia adicionales de las zonas del cuerpo (manos, pies, bordes de miembros y tronco). */
+    @Test
+    fun bodyZonesHaveManyReferencePoints() {
+        val bp = com.photomed.app.align.BodyPoints
+        val (hb, hs) = handsScene(true)
+        val hp = bp.of(Zone.HANDS_PALMAR, ZoneCriteria.Scene(emptyMap(), hs, classes(hb)))
+        assertTrue("manos: ${hp.size} puntos", hp.size == 42)
+        val fb = feetScene()
+        val fp = bp.of(Zone.FEET_DORSAL, ZoneCriteria.Scene(emptyMap(), null, classes(fb)))
+        assertTrue("pies: ${fp.keys}", fp.size >= 10)
+        // la punta de cada pie, abajo (en los dedos)
+        assertTrue("punta del pie: ${fp["pie_a_punta"]}", (fp["pie_a_punta"]?.y ?: 0f) > 0.95f)
+        for ((z, min) in listOf(Zone.ARM_R to 8, Zone.LEGS to 18, Zone.TORSO_FRONT to 4)) {
+            val c = case(z, "puntos", true, null) { figure(it, armAbd = 20f, top = if (z == Zone.LEGS) 10f else 40f, scale = if (z == Zone.LEGS) 0.92f else 1f) }
+            val extra = bp.of(z, c.scene)
+            assertTrue("${z.id}: ${extra.size} puntos de borde (${extra.keys})", extra.size >= min)
+            // todos en el borde: dentro del cuadro y dentro de la clase cuerpo justo antes
+            assertTrue("${z.id}: claves de la alineación", extra.keys.all { it in com.photomed.app.align.ZoneAlignment.of(z).landmarks })
+        }
+    }
+
     private fun inside(poly: List<Pt>, q: Pt): Boolean {
         var c = false; var j = poly.size - 1
         for (i in poly.indices) {
@@ -467,6 +506,9 @@ class ZoneCriteriaDrawingsTest {
                     }
                     sch.dots.forEach { q -> sc.drawCircle(X(q), Y(q), 4f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }) }
                 }
+                // puntos de referencia adicionales (amarillo)
+                val yel = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 214, 0) }
+                com.photomed.app.align.BodyPoints.of(cs0.zone, cs0.scene).values.forEach { q -> sc.drawCircle(x + q.x * tw, y + q.y * tw, 2.5f, yel) }
                 val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 64, 129) }
                 cs0.scene.pose.values.forEach { p -> sc.drawCircle(x + p.x * tw, y + p.y * tw, 3.5f, dot) }
                 cs0.scene.hands?.forEach { h -> h.points.forEach { p -> sc.drawCircle(x + p.x * tw, y + p.y * tw, 2.5f, dot) } }

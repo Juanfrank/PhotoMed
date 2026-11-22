@@ -119,13 +119,26 @@ guía dibujada de la app (si falta un dato, se pide; nunca se acepta por defecto
 | Zona | Se exige |
 |---|---|
 | Manos (dorso / palma) | Las **dos manos completas** (los 21 puntos de cada una dentro del cuadro), **todas las falanges visibles**: ningún dedo recogido (articulaciones ≥ 115–120°, pulgar ≥ 110°) ni acortado por estar doblado hacia la cámara (cada dedo ≥ 45 % del largo de la palma); los dedos **hacia abajo** (± 60°) y la **cara pedida** (dorso o palma) hacia la cámara. Dedos más abiertos, más largos o cortos, o la mano algo girada **no son incumplimiento**: la guía se ajusta |
-| Pies (dorso / planta) | Los **dos pies** (separados) y **completos**: la piel de cada pie no toca los bordes del cuadro salvo arriba (piernas); un pie partido por una tira cuenta como uno; **los dedos se ven** (≥ 4 relieves en el borde distal de cada pie, no tapados por calcetín o ropa). La forma y el largo de los dedos no importan |
+| Pies (dorso / planta) | Los **dos pies** (separados) y **completos**: la piel de cada pie no toca los bordes del cuadro salvo arriba (piernas); un pie partido por una tira cuenta como uno; **los dedos al aire**: el borde distal de cada pie linda con el fondo, no con ropa, calcetín o calzado (≤ 35 % del borde). No se cuenta cada dedo: con fotos reales los dedos se tocan y su silueta no los separa de forma fiable (probado con las fotos de internet); los relieves hallados solo se dibujan como apoyo |
 | Abdomen frontal, tórax | Hombros y caderas en el cuadro y **nivelados** (≤ 8°), **de frente**, brazos **separados** del tronco y la zona **descubierta** (≥ 70 % piel, ≤ 15 % ropa en su región; la ropa interior en la cadera es correcta) |
 | Abdomen lateral | **De lado** (hombros y caderas superpuestos), brazos **subidos o cruzados** (que no tapen el flanco) y abdomen **descubierto** |
 | Espalda, glúteos | **De espaldas** (sin cara), **enteros** (fondo a los dos lados, no un recorte) y **descubiertos**; si el detector ve hombros y caderas, además nivelados y brazos separados |
 | Muslos / piernas | Caderas, rodillas y tobillos en el cuadro, **rodillas extendidas** (≥ 150°: se admite la flexión natural), pies **algo separados** y muslos **descubiertos** |
 | Brazo (derecho / izquierdo) | Hombro, codo y muñeca de ese brazo, **codo extendido** (≥ 150°: se admite la flexión natural), **separado del eje del tronco 5–45°** (la guía, ≈ 20°, se ajusta al ángulo real) y **descubierto** (sin manga) |
 | Cuello | Hombros nivelados, de frente y cuello y escote **descubiertos** |
+
+**Zona centrada**: el centro de la parte del cuerpo (manos, pies en horizontal, brazo, piernas,
+tronco, glúteos, cuello en horizontal) a menos del 13 % del centro del cuadro; si no, «Centre la zona
+en el cuadro».
+
+**Decisión estable**: la zona cumple los criterios si cumple en al menos 2 de los 3 últimos análisis;
+una segmentación o detección suelta no cambia el veredicto ni hace parpadear las indicaciones. Los pies
+de una máscara se calculan una sola vez (criterios, esquema y puntos la comparten).
+
+**Más puntos de referencia (`BodyPoints`)** para alinear con la referencia y comprobar la toma: los 21
+puntos de cada mano; punta, centro y bordes interno y externo (a media longitud y en el antepié) de
+cada pie; y los bordes del contorno a ¼, ½ y ¾ del brazo, antebrazo, muslo, pierna y tronco, a cada
+lado. Se calculan igual en la referencia y en la toma (lados por la imagen).
 
 **Una sola extremidad**: con el selector «Derecha / Izquierda» de manos, pies y piernas se exige una
 (completa y con sus falanges), no las dos. En el brazo se evalúa el brazo pedido o, si el detector
