@@ -490,10 +490,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             e to e?.let { repo.photos(it, zone) }.orEmpty()
         }
         exp = e; photos = list
-        // protocolo con referencia: la referencia es la del protocolo, no una foto del expediente
-        if (protoRef == null && (ghost == null || photos.none { it.key == ghost?.key }))
-            ghost = photos.lastOrNull { LimbSide.ofFileName(it.displayName, zone) == limbSide && it.expression == expression }
+        // protocolo con referencia: la referencia es la del protocolo, no una foto del expediente. Si no, la
+        // referencia es siempre la captura anterior (la más reciente del mismo lado y expresión): tras cada toma
+        // pasa a ser la recién tomada (antes se quedaba en la primera)
+        if (protoRef == null) {
+            val newest = photos.lastOrNull { LimbSide.ofFileName(it.displayName, zone) == limbSide && it.expression == expression }
                 ?: photos.lastOrNull { it.expression == expression } ?: photos.lastOrNull()
+            if (newest?.key != ghost?.key) ghost = newest
+        }
     }
 
     val previewView = remember {
@@ -998,18 +1002,19 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     androidx.compose.runtime.CompositionLocalProvider(LocalGuideLines provides linesVisible) {
                     // referencia girada: la guía se adapta a la referencia sin girar y se gira entera
                     // (la deformación de la guía solo admite cabezas casi verticales)
-                    val rg = refGuide.takeIf { !refOrient.isIdentity && adaptGuide && showGhost && ghost != null }
+                    // (la guía sigue a la captura anterior aunque su foto no esté superpuesta)
+                    val rg = refGuide.takeIf { !refOrient.isIdentity && adaptGuide && ghost != null }
                     // con la referencia girada, sus puntos y su silueta están girados: deformar con ellos la guía
                     // (dibujada en vertical) la tumbaría; solo se usa la guía adaptada a la referencia sin girar (rg)
                     val refUpright = refOrient.isIdentity
                     val adaptPts = when {
                         rg != null -> rg.points
-                        adaptGuide && showGhost && refUpright && refPoints.isNotEmpty() -> refPoints
+                        adaptGuide && ghost != null && refUpright && refPoints.isNotEmpty() -> refPoints
                         // primera toma: con la cara dentro del marco, el contorno se ajusta a ella
                         adaptGuide && framedFace -> live?.currentPointsAll.orEmpty()
                         else -> emptyMap()
                     }
-                    val adaptSil = if (rg != null) rg.silhouette else if (adaptGuide && showGhost && refUpright) refSilhouette else null
+                    val adaptSil = if (rg != null) rg.silhouette else if (adaptGuide && ghost != null && refUpright) refSilhouette else null
                     // guía no adaptada a lo que se ve: se gira / espeja como la referencia (también con la foto
                     // anterior superpuesta: antes se quedaba sin girar y no coincidía con la foto girada)
                     val orientGuide = rg != null || (adaptPts.isEmpty() && adaptSil == null)
@@ -1020,7 +1025,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     val schema = if (matchingEnabled) live?.schema?.takeIf { !it.isEmpty } else null
                     // con la foto anterior: su propio contorno (mismo detector que en vivo) en lugar de la guía
                     // deformada por una silueta que con fondos no lisos no coincidía con la foto
-                    val refSchema = refSchemaState.takeIf { ghostShown && matchingEnabled }
+                    // contorno de la captura anterior: es la guía en cuanto hay una (superpuesta o no, con o sin asistencia)
+                    val refSchema = refSchemaState.takeIf { ghost != null }
                     com.photomed.app.ui.compare.OrientBox(if (orientGuide) refOrient.rot else 0, orientGuide && refOrient.mirror, Modifier.fillMaxSize(),
                         fit = rg == null, fill34 = rg != null) {
                     if (refSchema == null && (schema == null || ghostShown))

@@ -4,6 +4,9 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **La guía es la captura anterior**: tras cada toma, la referencia pasa a ser la foto recién tomada (antes
+  se quedaba en la primera) y su contorno es la guía aunque la foto no esté superpuesta o la asistencia esté
+  apagada (antes volvía al contorno de stock).
 - **Contorno del pie alineado con lo que se ve**: el contorno dibujado usa la segmentación más reciente
   (cada 0,2 s en los pies) y la fusión de máscaras solo se aplica con la escena quieta (al mover la cámara
   el contorno iba hasta 1,5 s por detrás). Con la foto anterior superpuesta se dibuja el contorno de esa foto
