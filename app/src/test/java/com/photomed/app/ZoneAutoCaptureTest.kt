@@ -352,7 +352,7 @@ class ZoneAutoCaptureTest {
             det.points.values.forEach { c.drawCircle(P(it).x, P(it).y, 3.5f, paint(0xFFFF4081.toInt(), 1f, true)) }
         }
         // luz: áreas de medida (rostro)
-        if (spec.detector == Detector.FACE) {
+        if (spec.detector == Detector.FACE && det.points.size >= LiveDecision.MIN_POINTS) {
             val (a, regional) = Standardization.lightAreas(s.w, s.h, det.points, det.yaw)
             val lp = paint(if (regional) 0xFFFF9800.toInt() else 0xFFFFFF00.toInt(), 2f)
             listOf(a.first, a.second, a.third).forEach { ar ->

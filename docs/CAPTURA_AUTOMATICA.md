@@ -15,8 +15,10 @@ python3 tools/eval/zone_landmarks.py             # puntos (y primeros planos y e
 gradle :app:testDebugUnitTest --tests '*ZoneAutoCaptureTest'   # informe: app/build/reports/zone_autocapture.md
 ```
 
-Las imágenes se revisaron a mano (se descartaron animales, pinturas, estatuas, duplicados y fotos que
-no muestran la zona). Los primeros planos (frente, periocular, labios, ojo) son recortes de las fotos
+Las imágenes se revisaron a mano una por una con criterio estricto: solo quedan fotos reales en las
+que la zona se ve clara y encuadrada como en una foto clínica (se descartaron animales, pinturas,
+estatuas, muñecas, dibujos y esquemas, composiciones con diagramas, paisajes con la persona diminuta,
+peinados en lugar de cuero cabelludo, vistas que no son la de la zona y duplicados). Los primeros planos (frente, periocular, labios, ojo) son recortes de las fotos
 frontales, como los encuadraría la cámara; los lados izquierdos, espejos de los derechos (y, para
 comprobar la simetría de la lógica, también los puntos reflejados de cada original).
 
@@ -34,32 +36,32 @@ comprobar la simetría de la lógica, también los puntos reflejados de cada ori
 | Zona | Detector | Imágenes | Con puntos | 1.ª foto: dispara | 1.ª foto: cumplen la geometría | 1.ª foto moviendo el teléfono: dispara | Vista equivocada: dispara | Referencia, mismo encuadre: dispara | Referencia, movido: dispara | Indicaciones más frecuentes al no disparar |
 |---|---|---|---|---|---|---|---|---|---|---|
 | rostro_frontal | FACE | 28 | 28 | 5/28 | 6/28 | — | — | 12/12 | 0/12 | Luz desigual: lado derecho más oscuro (9); Expresión: relajar la sonrisa (9); Luz desigual: lado izquierdo más oscuro (6) |
-| rostro_oblicuo_der | FACE | 21 | 20 | 0/20 | 0/20 | — | 0 | 12/12 | 0/12 | Poca luz en el rostro (5); Expresión: relajar la sonrisa (3); Cabeza: girar más (1° de 45°) (3) |
-| rostro_oblicuo_izq | FACE | 17 | 17 | 1/17 | 1/17 | — | 0 | 12/12 | 0/12 | Barbilla: subir 8° (Frankfort) (3); Expresión: relajar la sonrisa (3); Poca luz en el rostro (3) |
-| rostro_perfil_der | FACE | 24 | 13 | 1/13 | 1/13 | — | 0 | 12/12 | 0/12 | Cabeza: enderezar 4° (inclinada a la izq (2); Poca luz en el rostro (2); Demasiada luz: sin flash (2) |
-| rostro_perfil_izq | FACE | 27 | 16 | 2/16 | 2/16 | — | 0 | 12/12 | 0/12 | Poca luz en el rostro (3); Cabeza: enderezar 19° (inclinada a la de (2); Barbilla: bajar 9° (Frankfort) (2) |
-| tercio_superior | FACE | 28 | 11 | 21/28 | 21/28 | 0/8 | — | 12/12 | 0/12 | Luz desigual: lado derecho más oscuro (3); Cabeza: enderezar 7° (inclinada a la izq (2); Luz desigual: lado izquierdo más oscuro (2) |
-| periocular | FACE | 28 | 26 | 10/28 | 10/28 | 0/2 | — | 12/12 | 0/12 | Luz desigual: lado derecho más oscuro (6); Luz desigual: lado izquierdo más oscuro (6); Mirada: al frente (5) |
-| ojo_der | NONE | 28 | — | 28/28 | 28/28 | 0/8 | — | 12/12 | 0/12 |  |
-| ojo_izq | NONE | 28 | — | 28/28 | 28/28 | 0/8 | — | 12/12 | 0/12 |  |
-| labios | FACE | 28 | 18 | 11/28 | 11/28 | 0/8 | — | 12/12 | 0/12 | Luz desigual: lado derecho más oscuro (9); Mirada: al frente (5); Cabeza: girar a la derecha 6° (3) |
-| cuello | POSE | 11 | 8 | 11/11 | 11/11 | 0/8 | — | 11/11 | 0/11 |  |
-| cuero_cabelludo_vertice | NONE | 15 | — | 14/15 | 14/15 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
-| cuero_cabelludo_corona | NONE | 15 | — | 14/15 | 14/15 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
-| cuero_cabelludo_parietal_der | NONE | 15 | — | 14/15 | 14/15 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
-| cuero_cabelludo_parietal_izq | NONE | 15 | — | 14/15 | 14/15 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
-| abdomen_frontal | POSE | 9 | 9 | 9/9 | 9/9 | 0/8 | — | 9/9 | 0/9 |  |
-| abdomen_lateral | POSE | 11 | 7 | 10/11 | 10/11 | 0/8 | — | 11/11 | 0/11 | Mantenga el teléfono quieto (1) |
-| abdomen_lateral_izq | POSE | 14 | 8 | 12/14 | 12/14 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (2) |
-| torax_mamas | POSE | 15 | 13 | 15/15 | 15/15 | 0/8 | — | 12/12 | 0/12 |  |
-| espalda | POSE | 13 | 1 | 13/13 | 13/13 | 0/8 | — | 12/12 | 0/12 |  |
-| gluteos | POSE | 6 | 2 | 6/6 | 6/6 | 0/6 | — | 6/6 | 0/6 |  |
-| muslos | POSE | 15 | 12 | 14/15 | 14/15 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
-| brazo_der | POSE | 10 | 9 | 9/10 | 9/10 | 0/8 | — | 10/10 | 0/10 | Mantenga el teléfono quieto (1) |
-| brazo_izq | POSE | 14 | 10 | 13/14 | 13/14 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
-| manos_dorso | POSE | 12 | 2 | 12/12 | 12/12 | 0/8 | — | 12/12 | 0/12 |  |
-| manos_palma | POSE | 6 | 1 | 5/6 | 5/6 | 0/6 | — | 6/6 | 0/6 | Encuadre la zona dentro de la guía (1) |
-| pies_dorso | POSE | 14 | 0 | 12/14 | 12/14 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (2) |
+| rostro_oblicuo_der | FACE | 12 | 11 | 0/11 | 0/11 | — | 0 | 12/12 | 0/12 | Poca luz en el rostro (4); Cabeza: girar más (25° de 45°) (2); Cabeza: girar más (24° de 45°) (2) |
+| rostro_oblicuo_izq | FACE | 11 | 11 | 1/11 | 1/11 | — | 0 | 11/11 | 0/11 | Poca luz en el rostro (4); Barbilla: bajar 8° (Frankfort) (2); Cabeza: girar más (22° de 45°) (1) |
+| rostro_perfil_der | FACE | 16 | 5 | 1/5 | 1/5 | — | 0 | 12/12 | 0/12 | Cabeza: girar hasta el perfil (faltan 9° (1); Cabeza: enderezar 16° (inclinada a la de (1); Cabeza: girar hasta el perfil (faltan 18 (1) |
+| rostro_perfil_izq | FACE | 16 | 6 | 2/6 | 2/6 | — | 0 | 12/12 | 0/12 | Cabeza: enderezar 7° (inclinada a la der (2); Barbilla: bajar 13° (Frankfort) (1); Cabeza: enderezar 7° (inclinada a la izq (1) |
+| tercio_superior | FACE | 28 | 8 | 23/28 | 23/28 | 0/8 | — | 12/12 | 0/12 | Luz desigual: lado derecho más oscuro (3); Cabeza: enderezar 7° (inclinada a la izq (2); Cabeza: girar a la derecha 6° (1) |
+| periocular | FACE | 27 | 27 | 6/27 | 6/27 | — | — | 12/12 | 0/12 | Luz desigual: lado derecho más oscuro (7); Luz desigual: lado izquierdo más oscuro (7); Mirada: al frente (4) |
+| ojo_der | NONE | 26 | — | 26/26 | 26/26 | 0/8 | — | 12/12 | 0/12 |  |
+| ojo_izq | NONE | 26 | — | 26/26 | 26/26 | 0/8 | — | 12/12 | 0/12 |  |
+| labios | FACE | 28 | 17 | 12/28 | 12/28 | 0/8 | — | 12/12 | 0/12 | Luz desigual: lado derecho más oscuro (6); Luz desigual: lado izquierdo más oscuro (5); Mirada: al frente (3) |
+| cuello | POSE | 8 | 6 | 8/8 | 8/8 | 0/8 | — | 8/8 | 0/8 |  |
+| cuero_cabelludo_vertice | NONE | 8 | — | 7/8 | 7/8 | 0/8 | — | 8/8 | 0/8 | Mantenga el teléfono quieto (1) |
+| cuero_cabelludo_corona | NONE | 8 | — | 7/8 | 7/8 | 0/8 | — | 8/8 | 0/8 | Mantenga el teléfono quieto (1) |
+| cuero_cabelludo_parietal_der | NONE | 8 | — | 7/8 | 7/8 | 0/8 | — | 8/8 | 0/8 | Mantenga el teléfono quieto (1) |
+| cuero_cabelludo_parietal_izq | NONE | 8 | — | 7/8 | 7/8 | 0/8 | — | 8/8 | 0/8 | Mantenga el teléfono quieto (1) |
+| abdomen_frontal | POSE | 10 | 7 | 10/10 | 10/10 | 0/8 | — | 10/10 | 0/10 |  |
+| abdomen_lateral | POSE | 8 | 5 | 7/8 | 7/8 | 0/8 | — | 8/8 | 0/8 | Mantenga el teléfono quieto (1) |
+| abdomen_lateral_izq | POSE | 9 | 6 | 8/9 | 8/9 | 0/8 | — | 9/9 | 0/9 | Mantenga el teléfono quieto (1) |
+| torax_mamas | POSE | 11 | 9 | 11/11 | 11/11 | 0/8 | — | 11/11 | 0/11 |  |
+| espalda | POSE | 10 | 1 | 10/10 | 10/10 | 0/8 | — | 10/10 | 0/10 |  |
+| gluteos | POSE | 5 | 2 | 5/5 | 5/5 | 0/5 | — | 5/5 | 0/5 |  |
+| muslos | POSE | 8 | 6 | 7/8 | 7/8 | 0/8 | — | 8/8 | 0/8 | Mantenga el teléfono quieto (1) |
+| brazo_der | POSE | 14 | 7 | 14/14 | 14/14 | 0/8 | — | 12/12 | 0/12 |  |
+| brazo_izq | POSE | 20 | 8 | 20/20 | 20/20 | 0/8 | — | 12/12 | 0/12 |  |
+| manos_dorso | POSE | 15 | 0 | 15/15 | 15/15 | 0/8 | — | 12/12 | 0/12 |  |
+| manos_palma | POSE | 6 | 0 | 5/6 | 5/6 | 0/6 | — | 6/6 | 0/6 | Encuadre la zona dentro de la guía (1) |
+| pies_dorso | POSE | 12 | 0 | 11/12 | 11/12 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
 | pies_planta | POSE | 8 | 0 | 8/8 | 8/8 | 0/8 | — | 8/8 | 0/8 |  |
 | libre | NONE | 28 | — | 27/28 | 27/28 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
 

@@ -57,6 +57,10 @@ def crop(img, x0, y0, x1, y1):
     return img[b:min(h, int(b + ch)), a:min(w, int(a + cw))]
 
 
+# fotos frontales que no sirven para un primer plano (gafas de sol, ojo cerrado)
+CLOSEUP_SKIP = {"periocular": {"s_p_1043471_r0"}, "ojo": {"s_p_1043471_r0", "s_p_1858175_r0"}}
+
+
 def closeups():
     """Primeros planos a partir de las fotos frontales (como se encuadran en la cámara)."""
     src = ZONES / "rostro_frontal"
@@ -75,12 +79,16 @@ def closeups():
         oval_l, oval_r = P[234][0], P[454][0]
         brows = [70, 63, 105, 66, 107, 336, 296, 334, 293, 300]
         top = P[10][1] - (P[152][1] - P[10][1]) * 0.15
-        cv2.imwrite(str(ZONES / "tercio_superior" / f.name), crop(img, oval_l, top, oval_r, P[6][1]))
+        def put(z, im):
+            if f.stem in CLOSEUP_SKIP.get(z, set()):
+                (ZONES / z / f.name).unlink(missing_ok=True); return
+            cv2.imwrite(str(ZONES / z / f.name), im)
+        put("tercio_superior", crop(img, oval_l, top, oval_r, P[6][1]))
         x0, _, x1, _ = box(brows + [33, 133, 362, 263])
-        cv2.imwrite(str(ZONES / "periocular" / f.name), crop(img, oval_l, P[105][1] - (P[1][1] - P[105][1]) * 0.4, oval_r, P[1][1]))
-        cv2.imwrite(str(ZONES / "labios" / f.name), crop(img, P[61][0] - (P[291][0] - P[61][0]) * 0.6, P[4][1], P[291][0] + (P[291][0] - P[61][0]) * 0.6, P[152][1]))
+        put("periocular", crop(img, oval_l, P[105][1] - (P[1][1] - P[105][1]) * 0.4, oval_r, P[1][1]))
+        put("labios", crop(img, P[61][0] - (P[291][0] - P[61][0]) * 0.6, P[4][1], P[291][0] + (P[291][0] - P[61][0]) * 0.6, P[152][1]))
         # ojo derecho del paciente (izquierda de la imagen)
-        cv2.imwrite(str(ZONES / "ojo" / f.name), crop(img, P[127][0], P[105][1] - (P[159][1] - P[105][1]), P[6][0], P[50][1]))
+        put("ojo", crop(img, P[127][0], P[105][1] - (P[159][1] - P[105][1]), P[6][0], P[50][1]))
 
 
 PAIRS = []
