@@ -4,6 +4,11 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Siluetas flexibles en manos, pies y cuerpo**: la guía ya no es un dibujo fijo; se ajusta a la mano,
+  los pies o el cuerpo detectados (largo y ángulo de cada dedo, giro de la mano, ángulo del brazo).
+  Solo se exige lo clínico: que se vean **todas las falanges** (sin dedos recogidos, puño ni dedos
+  ocultos), que se vean **los dedos de los pies** (no un calcetín) y la postura general (márgenes más
+  amplios para hombros, codo, rodillas y separación del brazo).
 - **Pantallas principales** (Expedientes y Protocolos) con el logo y el nombre de la app y debajo la
   sección. El buscador de expedientes pasa bajo la barra: ya no queda recortado por arriba.
 - **Protocolos: luz por defecto** en cada toma nueva de rostro (luz mínima 35 % y diferencia entre

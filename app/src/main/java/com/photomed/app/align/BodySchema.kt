@@ -1,0 +1,70 @@
+package com.photomed.app.align
+
+import com.photomed.app.data.GuideType
+import com.photomed.app.data.Zone
+import kotlin.math.hypot
+
+/**
+ * Esquema de la guía ajustado a la anatomía del paciente (zonas no faciales). La ilustración fija de
+ * la guía no puede girar ni alargar un dedo o un miembro; cuando la cámara ve la zona, se dibuja este
+ * esquema sobre lo detectado: cada dedo de la mano con su ángulo y su longitud (21 puntos de la mano),
+ * cada pie con su silueta y la punta de cada dedo, y brazos, piernas y tronco con los suyos (puntos
+ * del cuerpo). Así la diferencia de ángulo o de longitud con la ilustración no es un incumplimiento:
+ * los criterios ([ZoneCriteria]) solo exigen que las partes existan y estén como pide la toma.
+ *
+ * Coordenadas en unidades del ancho del cuadro (como los puntos).
+ */
+object BodySchema {
+    /** Segmento con grosor (dedo, falange, miembro): de [a] a [b] con radio [r]. */
+    class Capsule(val a: Pt, val b: Pt, val r: Float)
+
+    class Schema(val polygons: List<List<Pt>> = emptyList(), val capsules: List<Capsule> = emptyList(), val dots: List<Pt> = emptyList()) {
+        val isEmpty get() = polygons.isEmpty() && capsules.isEmpty() && dots.isEmpty()
+    }
+
+    private fun d(a: Pt, b: Pt) = hypot(a.x - b.x, a.y - b.y)
+
+    /** Manos: palma (muñeca, base del pulgar y nudillos) y cada falange de cada dedo, con su grosor. */
+    fun hands(hands: List<ZoneCriteria.Hand>): Schema {
+        val polys = ArrayList<List<Pt>>(); val caps = ArrayList<Capsule>(); val dots = ArrayList<Pt>()
+        for (h in hands) {
+            val p = h.points; if (p.size < 21) continue
+            val palm = d(p[0], p[9]).coerceAtLeast(1e-4f)
+            polys += listOf(p[0], p[1], p[2], p[5], p[9], p[13], p[17])
+            val r = palm * 0.11f
+            for (chain in listOf(listOf(1, 2, 3, 4), listOf(5, 6, 7, 8), listOf(9, 10, 11, 12), listOf(13, 14, 15, 16), listOf(17, 18, 19, 20))) {
+                for (i in 1 until chain.size) caps += Capsule(p[chain[i - 1]], p[chain[i]], r * (if (chain[0] == 1) 1.15f else 1f) * (1f - 0.12f * (i - 1)))
+                dots += p[chain.last()]
+            }
+        }
+        return Schema(polys, caps, dots)
+    }
+
+    /** Pies: silueta de cada pie y la punta de cada dedo hallada. */
+    fun feet(feet: List<ZoneCriteria.Foot>): Schema =
+        Schema(feet.map { it.outline }, emptyList(), feet.flatMap { it.toes })
+
+    /** Brazos, piernas y tronco con el ángulo y la longitud de los del paciente. */
+    fun body(pose: Map<String, Pt>): Schema {
+        val L = Landmarks
+        val sw = listOfNotNull(pose[L.SHOULDER_L], pose[L.SHOULDER_R]).let { if (it.size == 2) d(it[0], it[1]) else 0.25f }
+        val caps = ArrayList<Capsule>()
+        fun bone(a: String, b: String, k: Float) { val pa = pose[a]; val pb = pose[b]; if (pa != null && pb != null) caps += Capsule(pa, pb, sw * k) }
+        bone(L.SHOULDER_L, L.ELBOW_L, 0.17f); bone(L.ELBOW_L, L.WRIST_L, 0.13f)
+        bone(L.SHOULDER_R, L.ELBOW_R, 0.17f); bone(L.ELBOW_R, L.WRIST_R, 0.13f)
+        bone(L.HIP_L, L.KNEE_L, 0.26f); bone(L.KNEE_L, L.ANKLE_L, 0.18f)
+        bone(L.HIP_R, L.KNEE_R, 0.26f); bone(L.KNEE_R, L.ANKLE_R, 0.18f)
+        bone(L.ANKLE_L, L.FOOT_INDEX_L, 0.08f); bone(L.ANKLE_R, L.FOOT_INDEX_R, 0.08f)
+        val torso = listOf(L.SHOULDER_R, L.SHOULDER_L, L.HIP_L, L.HIP_R).mapNotNull { pose[it] }
+        return Schema(if (torso.size == 4) listOf(torso) else emptyList(), caps)
+    }
+
+    /** Esquema de la zona con lo detectado (null si la zona usa la ilustración fija o no hay datos). */
+    fun of(zone: Zone, s: ZoneCriteria.Scene): Schema? = when (zone.guide) {
+        GuideType.HANDS -> s.hands?.takeIf { it.isNotEmpty() }?.let { hands(it) }
+        GuideType.FEET -> s.classes?.let { feet(ZoneCriteria.feetOf(it)) }?.takeIf { !it.isEmpty }
+        GuideType.TORSO_FRONT, GuideType.TORSO_SIDE, GuideType.BREASTS, GuideType.BACK, GuideType.GLUTES,
+        GuideType.LEGS, GuideType.ARM, GuideType.NECK -> s.pose.takeIf { it.size >= 4 }?.let { body(it) }?.takeIf { !it.isEmpty }
+        else -> null
+    }
+}

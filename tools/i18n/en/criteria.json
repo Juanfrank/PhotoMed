@@ -7,7 +7,6 @@
   "izquierda": "left",
   "derecha": "right",
   "Mano de la %1$s: entera dentro del cuadro": "Hand on the %1$s: fully inside the frame",
-  "Mano de la %1$s: extienda los cinco dedos (%2$s)": "Hand on the %1$s: extend all five fingers (%2$s)",
   "Mano de la %1$s: dedos hacia abajo, como en la guía": "Hand on the %1$s: fingers pointing down, as in the guide",
   "Mano de la %1$s: muestre la palma": "Hand on the %1$s: show the palm",
   "Mano de la %1$s: muestre el dorso": "Hand on the %1$s: show the back of the hand",
@@ -47,5 +46,7 @@
   "De frente: que se vea la cara": "Facing forward: the face must be visible",
   "Comprobando la zona…": "Checking the area…",
   "Buscando las manos…": "Looking for the hands…",
-  "Muestre las dos manos enteras": "Show both whole hands"
+  "Muestre las dos manos enteras": "Show both whole hands",
+  "Mano de la %1$s: que se vean las falanges de todos los dedos (%2$s)": "Hand on the %1$s: all phalanges of every finger must be visible (%2$s)",
+  "Pie de la %1$s: que se vean los dedos": "Foot on the %1$s: the toes must be visible"
 }

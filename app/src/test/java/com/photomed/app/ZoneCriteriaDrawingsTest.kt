@@ -35,6 +35,8 @@ import kotlin.math.sin
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ZoneCriteriaDrawingsTest {
     private val W = 300; private val H = 400
+    /** Resolución de las clases por píxel (como la máscara de la segmentación de un cuadro de la cámara). */
+    private val CW = 192; private val CH = 256
     private val BG = Color.rgb(205, 215, 228); private val SKIN = Color.rgb(222, 170, 140)
     private val FACE = Color.rgb(230, 182, 152); private val CLOTH = Color.rgb(52, 84, 160); private val NAIL = Color.rgb(245, 225, 220)
     private val L = Landmarks
@@ -53,14 +55,14 @@ class ZoneCriteriaDrawingsTest {
 
     /** Clases por píxel a partir del color del dibujo (piel, piel del rostro, ropa, fondo), a 96×128. */
     private fun classes(b: Bitmap): ZoneCriteria.Classes {
-        val s = Bitmap.createScaledBitmap(b, 96, 128, false)
-        val px = IntArray(96 * 128).also { s.getPixels(it, 0, 96, 0, 0, 96, 128) }
+        val s = Bitmap.createScaledBitmap(b, CW, CH, false)
+        val px = IntArray(CW * CH).also { s.getPixels(it, 0, CW, 0, 0, CW, CH) }
         val pal = listOf(BG to FaceLabels.BG, SKIN to FaceLabels.BODY_SKIN, NAIL to FaceLabels.BODY_SKIN, FACE to FaceLabels.FACE_SKIN, CLOTH to FaceLabels.CLOTHES)
         val out = ByteArray(px.size) { i ->
             val c = px[i]
             pal.minBy { (p, _) -> Math.abs(Color.red(p) - Color.red(c)) + Math.abs(Color.green(p) - Color.green(c)) + Math.abs(Color.blue(p) - Color.blue(c)) }.second.toByte()
         }
-        return ZoneCriteria.Classes(96, 128, out)
+        return ZoneCriteria.Classes(CW, CH, out)
     }
 
     // ---------- figura humana de frente / de espaldas / de lado ----------
@@ -153,57 +155,59 @@ class ZoneCriteriaDrawingsTest {
      * hacia fuera de la imagen (−1 izquierda, +1 derecha). [bent]: índices de dedos doblados (0 pulgar…4 meñique).
      * [label]: etiqueta de MediaPipe. [nails]: uñas visibles (dorso).
      */
-    private fun hand(c: Canvas, wx: Float, wy: Float, thumbSide: Float, bent: Set<Int> = emptySet(), up: Boolean = false, nails: Boolean = false): List<Pt> {
+    private fun hand(c: Canvas, wx: Float, wy: Float, thumbSide: Float, bent: Set<Int> = emptySet(), up: Boolean = false, nails: Boolean = false,
+                     spread: Float = 5f, lenK: Float = 1f, rotDeg: Float = 0f): List<Pt> {
         val dir = if (up) -1f else 1f
-        val pts = ArrayList<Pt>(21)
-        // muñeca y palma redondeada, algo más ancha en los nudillos
-        c.drawRect(wx - 22, wy - dir * 30, wx + 22, wy, fill(SKIN))
-        val palm = Path().apply {
-            moveTo(wx - 26, wy); lineTo(wx + 26, wy); lineTo(wx + 33, wy + dir * 66); quadTo(wx, wy + dir * 76, wx - 33, wy + dir * 66); close()
-        }
-        c.drawPath(palm, fill(SKIN))
-        pts += u(wx, wy)
-        // pulgar: nace en el lateral de la palma (lado [thumbSide]) y va hacia fuera y hacia los dedos
+        val loc = ArrayList<Pt>(21)                     // en px, mano con los dedos hacia abajo
+        loc += Pt(wx, wy)
+        // pulgar: nace en el lateral de la palma y va hacia fuera y hacia los dedos
         val tb = Pt(wx + thumbSide * 22, wy + dir * 22)
-        val thumbBent = 0 in bent
-        val tj = (0..3).map { i ->
-            if (thumbBent && i >= 2) Pt(tb.x + thumbSide * 13f * 1 - thumbSide * 9f * (i - 1), tb.y + dir * (15f * 1 + 12f * (i - 1)))
-            else Pt(tb.x + thumbSide * 13f * i, tb.y + dir * 15f * i)
-        }
-        val tp = stroke(SKIN, 17f); for (i in 0 until 3) c.drawLine(tj[i].x, tj[i].y, tj[i + 1].x, tj[i + 1].y, tp)
-        if (nails && !thumbBent) c.drawCircle(tj[3].x, tj[3].y, 4.5f, fill(NAIL))
-        pts += tj.map { u(it.x, it.y) }
-        // cuatro dedos, ligeramente abiertos en abanico, del lado del pulgar al meñique
+        for (i in 0..3) loc += if (0 in bent && i >= 2) Pt(tb.x + thumbSide * 13f - thumbSide * 9f * (i - 1), tb.y + dir * (15f + 12f * (i - 1)))
+            else Pt(tb.x + thumbSide * 13f * lenK * i, tb.y + dir * 15f * lenK * i)
+        // cuatro dedos en abanico ([spread]° entre dedos vecinos), de longitud × [lenK]
         for (f in 1..4) {
-            val off = thumbSide * (21f - (f - 1) * 14f)
-            val spread = Math.toRadians((thumbSide * (f - 2.5f) * -5f).toDouble())
-            val base = Pt(wx + off, wy + dir * 68)
-            val seg = if (f == 2) 21f else if (f == 4) 15f else 19f
-            val ux = sin(spread).toFloat(); val uy = cos(spread).toFloat()
+            val base = Pt(wx + thumbSide * (21f - (f - 1) * 14f), wy + dir * 68)
+            val seg = (if (f == 2) 21f else if (f == 4) 15f else 19f) * lenK
+            val a = Math.toRadians((thumbSide * (2.5f - f) * spread).toDouble())
+            val ux = sin(a).toFloat(); val uy = cos(a).toFloat()
             val js = (0..3).map { j -> Pt(base.x + ux * seg * j, base.y + dir * uy * seg * j) }.toMutableList()
             if (f in bent) { js[2] = Pt(base.x - thumbSide * 3, base.y + dir * seg * 1.1f); js[3] = Pt(base.x - thumbSide * 2, base.y + dir * seg * 0.4f) }
-            val fp = stroke(SKIN, 13f); for (j in 0 until 3) c.drawLine(js[j].x, js[j].y, js[j + 1].x, js[j + 1].y, fp)
-            if (nails && f !in bent) c.drawCircle(js[3].x, js[3].y - dir * 2, 4f, fill(NAIL))
-            pts += js.map { u(it.x, it.y) }
+            loc += js
         }
-        return pts
+        // giro de toda la mano alrededor de la muñeca
+        val r = Math.toRadians(rotDeg.toDouble()); val cr = cos(r).toFloat(); val sr = sin(r).toFloat()
+        val p = loc.map { q -> Pt(wx + (q.x - wx) * cr - (q.y - wy) * sr, wy + (q.x - wx) * sr + (q.y - wy) * cr) }
+        // dibujo: muñeca, palma (muñeca, base del pulgar y nudillos) y cada falange
+        val wv = Pt(-sr * dir, cr * dir)   // dirección de la mano
+        c.drawLine(p[0].x, p[0].y, p[0].x - wv.x * 30, p[0].y - wv.y * 30, stroke(SKIN, 44f))
+        val palm = Path().apply { moveTo(p[0].x, p[0].y); for (i in listOf(1, 2, 5, 9, 13, 17)) lineTo(p[i].x, p[i].y); close() }
+        c.drawPath(palm, fill(SKIN)); c.drawPath(palm, stroke(SKIN, 22f))
+        for (chain in listOf(listOf(1, 2, 3, 4), listOf(5, 6, 7, 8), listOf(9, 10, 11, 12), listOf(13, 14, 15, 16), listOf(17, 18, 19, 20))) {
+            val w = if (chain[0] == 1) 17f else 13f
+            for (i in 1 until chain.size) c.drawLine(p[chain[i - 1]].x, p[chain[i - 1]].y, p[chain[i]].x, p[chain[i]].y, stroke(SKIN, w))
+            val fi = (chain[0] - 1) / 4
+            if (nails && fi !in bent) c.drawCircle(p[chain.last()].x, p[chain.last()].y, 4f, fill(NAIL))
+        }
+        return p.map { u(it.x, it.y) }
     }
 
     /** Dos manos lado a lado; [palm]: palmas a la cámara (pulgares hacia fuera) o dorsos (pulgares hacia dentro). */
-    private fun handsScene(palm: Boolean, bent: Set<Int> = emptySet(), oneHand: Boolean = false, shiftY: Float = 0f, up: Boolean = false): Pair<Bitmap, List<ZoneCriteria.Hand>> {
+    private fun handsScene(palm: Boolean, bent: Set<Int> = emptySet(), oneHand: Boolean = false, shiftY: Float = 0f, up: Boolean = false,
+                           spread: Float = 5f, lenK: Float = 1f, rotDeg: Float = 0f): Pair<Bitmap, List<ZoneCriteria.Hand>> {
         val (b, c) = canvas()
         val wy = (if (up) 300f else 110f) + shiftY
         // mano derecha del paciente a la izquierda de la imagen; MediaPipe la etiqueta «Left» (supone espejo)
         val leftImgThumb = if (palm) -1f else 1f
         val hs = ArrayList<ZoneCriteria.Hand>()
-        hs += ZoneCriteria.Hand(hand(c, 80f, wy, leftImgThumb, bent, up, nails = !palm), "Left")
-        if (!oneHand) hs += ZoneCriteria.Hand(hand(c, 220f, wy, -leftImgThumb, emptySet(), up, nails = !palm), "Right")
+        hs += ZoneCriteria.Hand(hand(c, 80f, wy, leftImgThumb, bent, up, nails = !palm, spread = spread, lenK = lenK, rotDeg = -rotDeg), "Left")
+        if (!oneHand) hs += ZoneCriteria.Hand(hand(c, 220f, wy, -leftImgThumb, emptySet(), up, nails = !palm, spread = spread, lenK = lenK, rotDeg = rotDeg), "Right")
         return b to hs
     }
 
     // ---------- pies ----------
     /** Dos pies vistos desde arriba (dorso) o la planta ([sole]), dedo gordo hacia dentro. */
-    private fun feetScene(cut: Boolean = false, one: Boolean = false, sole: Boolean = false, strap: Boolean = false): Bitmap {
+    private fun feetScene(cut: Boolean = false, one: Boolean = false, sole: Boolean = false, strap: Boolean = false,
+                          sock: Boolean = false, toeLen: Float = 0f): Bitmap {
         val (b, c) = canvas()
         val dy = if (cut) 95f else 0f
         val shade = Color.rgb(206, 152, 124)
@@ -219,12 +223,15 @@ class ZoneCriteriaDrawingsTest {
             }
             c.drawPath(f, fill(SKIN))
             // cinco dedos: el gordo (más grande) del lado interno, los demás decreciendo hacia fuera
-            val rad = floatArrayOf(13f, 9.5f, 9f, 8f, 7f)
+            val rad = floatArrayOf(11f, 7.5f, 7f, 6.5f, 6f)
             for (i in 0..4) {
-                val tx = x + inward * (28f - i * 15f); val ty = 304f + dy + (if (i == 0) 4f else i * -2f)
+                val tx = x + inward * (32f - i * 16f); val ty = 300f + dy + toeLen * (1f - i * 0.15f) + (if (i == 0) 4f else i * -3f)
+                c.drawLine(tx, 296f + dy, tx, ty, stroke(SKIN, rad[i] * 2))
                 c.drawCircle(tx, ty, rad[i], fill(SKIN))
-                if (!sole) c.drawCircle(tx, ty + rad[i] * 0.35f, rad[i] * 0.45f, fill(NAIL))
+                if (!sole) c.drawCircle(tx, ty + rad[i] * 0.3f, rad[i] * 0.45f, fill(NAIL))
             }
+            // calcetín: tapa el antepié y los dedos
+            if (sock) c.drawRect(x - 46, 240f + dy, x + 46, 330f + dy + toeLen, fill(CLOTH))
             if (sole) {
                 // almohadillas del talón y del antepié, arco plantar
                 c.drawOval(x - 24, 105f + dy, x + 24, 165f + dy, stroke(shade, 3f))
@@ -251,8 +258,13 @@ class ZoneCriteriaDrawingsTest {
         for ((z, palm) in listOf(Zone.HANDS_PALMAR to true, Zone.HANDS_DORSAL to false)) {
             fun hc(name: String, ok: Boolean, expect: String?, r: Pair<Bitmap, List<ZoneCriteria.Hand>>) = out.add(Case(z, name, ok, expect, r.first, ZoneCriteria.Scene(emptyMap(), r.second, classes(r.first))))
             hc("correcta", true, null, handsScene(palm))
-            hc("anular doblado", false, "extienda los cinco dedos", handsScene(palm, bent = setOf(3)))
-            hc("pulgar doblado", false, "pulgar", handsScene(palm, bent = setOf(0)))
+            hc("dedos más abiertos (se ajusta)", true, null, handsScene(palm, spread = 16f))
+            hc("dedos más largos (se ajusta)", true, null, handsScene(palm, lenK = 1.25f))
+            hc("dedos más cortos (se ajusta)", true, null, handsScene(palm, lenK = 0.85f))
+            hc("manos giradas 30° (se ajusta)", true, null, handsScene(palm, rotDeg = 30f))
+            hc("anular recogido", false, "falanges", handsScene(palm, bent = setOf(3)))
+            hc("pulgar recogido", false, "pulgar", handsScene(palm, bent = setOf(0)))
+            hc("puño", false, "falanges", handsScene(palm, bent = setOf(0, 1, 2, 3, 4)))
             hc("una sola mano", false, "dos manos", handsScene(palm, oneHand = true))
             hc("dedos fuera del cuadro", false, "entera dentro del cuadro", handsScene(palm, shiftY = 215f))
             hc("dedos hacia arriba", false, "dedos hacia abajo", handsScene(palm, up = true))
@@ -266,12 +278,15 @@ class ZoneCriteriaDrawingsTest {
             fc("dedos fuera del cuadro", false, "completos", feetScene(cut = true, sole = sole))
             fc("un solo pie", false, "dos pies", feetScene(one = true, sole = sole))
             fc("un solo pie partido por una tira", false, "dos pies", feetScene(one = true, sole = sole, strap = true))
+            fc("dedos más largos (se ajusta)", true, null, feetScene(sole = sole, toeLen = 12f))
+            fc("dedos tapados (calcetín)", false, "que se vean los dedos", feetScene(sole = sole, sock = true))
         }
         // abdomen frontal, tórax, espalda
         out += case(Zone.TORSO_FRONT, "correcta", true, null) { figure(it) }
         out += case(Zone.TORSO_FRONT, "con camiseta", false, "Descubra", { figure(it, shirt = true) })
         out += case(Zone.TORSO_FRONT, "brazos sobre el abdomen", false, "Separe los brazos", { figure(it, armsCover = true) })
-        out += case(Zone.TORSO_FRONT, "hombros inclinados", false, "Hombros nivelados", { figure(it, tiltDeg = 9f) })
+        out += case(Zone.TORSO_FRONT, "hombros algo inclinados (5°, se acepta)", true, null) { figure(it, tiltDeg = 5f) }
+        out += case(Zone.TORSO_FRONT, "hombros inclinados", false, "Hombros nivelados", { figure(it, tiltDeg = 12f) })
         out += case(Zone.TORSO_FRONT, "de espaldas", false, "De frente", { figure(it, back = true) })
         out += case(Zone.BREASTS, "correcta", true, null) { figure(it) }
         out += case(Zone.BREASTS, "con camiseta", false, "Descubra", { figure(it, shirt = true) })
@@ -298,21 +313,24 @@ class ZoneCriteriaDrawingsTest {
         out += case(Zone.GLUTES, "de frente", false, "De espaldas", { figure(it, shorts = false) })
         // piernas
         out += case(Zone.LEGS, "correcta", true, null) { figure(it, top = 10f, scale = 0.92f) }
-        out += case(Zone.LEGS, "rodilla flexionada", false, "Rodillas", { figure(it, top = 10f, scale = 0.92f, kneeBend = 35f) })
+        out += case(Zone.LEGS, "rodillas con flexión natural (se ajusta)", true, null) { figure(it, top = 10f, scale = 0.92f, kneeBend = 15f, feetGap = 70f) }
+        out += case(Zone.LEGS, "rodilla flexionada", false, "Rodillas", { figure(it, top = 10f, scale = 0.92f, kneeBend = 45f) })
         out += case(Zone.LEGS, "con pantalón", false, "Descubra", { figure(it, top = 10f, scale = 0.92f, pants = true) })
         out += case(Zone.LEGS, "pies juntos", false, "Separe un poco los pies", { figure(it, top = 10f, scale = 0.92f, feetGap = 0f) })
         out += case(Zone.LEGS, "pies fuera del cuadro", false, "Los pies dentro", { figure(it, top = 50f, scale = 0.98f) })
         // brazos
         for (z in listOf(Zone.ARM_R, Zone.ARM_L)) {
             out += case(z, "correcta (≈ 20°)", true, null) { figure(it, armAbd = 20f) }
+            out += case(z, "brazo a 35° (se ajusta)", true, null) { figure(it, armAbd = 35f) }
+            out += case(z, "codo con flexión natural (se ajusta)", true, null) { figure(it, armAbd = 20f, elbowBend = 18f) }
             out += case(z, "codo doblado", false, "Codo extendido", { figure(it, armAbd = 20f, elbowBend = 50f) })
-            out += case(z, "brazo pegado al cuerpo", false, "Separe un poco el brazo", { figure(it, armAbd = 3f) })
+            out += case(z, "brazo pegado al cuerpo", false, "Separe un poco el brazo", { figure(it, armAbd = 1f) })
             out += case(z, "brazo a 60°", false, "Baje el brazo", { figure(it, armAbd = 60f) })
             out += case(z, "con manga", false, "Descubra", { figure(it, armAbd = 20f, sleeve = true) })
         }
         // cuello
         out += case(Zone.NECK, "correcta", true, null) { figure(it, top = 60f, scale = 1.6f) }
-        out += case(Zone.NECK, "hombros inclinados", false, "Hombros nivelados", { figure(it, top = 60f, scale = 1.6f, tiltDeg = 9f) })
+        out += case(Zone.NECK, "hombros inclinados", false, "Hombros nivelados", { figure(it, top = 60f, scale = 1.6f, tiltDeg = 12f) })
         out += case(Zone.NECK, "con jersey de cuello alto", false, "Descubra", { c -> figure(c, top = 60f, scale = 1.6f).also { c.drawRect(120f, 120f, 180f, 200f, fill(CLOTH)); c.drawRect(60f, 170f, 240f, 260f, fill(CLOTH)) } })
         return out
     }
@@ -335,7 +353,20 @@ class ZoneCriteriaDrawingsTest {
                 if (!right) bad += "${z.id} · ${cs0.name}: esperado ${if (cs0.ok) "aceptar" else "rechazar con «${cs0.expect}»"}, obtenido ${if (accepted) "aceptada" else hints}"
                 val x = (i % cols) * tw; val y = 34 + (i / cols) * th
                 sc.drawBitmap(Bitmap.createScaledBitmap(cs0.bmp, tw, 300, true), x.toFloat(), y.toFloat(), null)
-                // dibujo de los puntos
+                // esquema de la guía ajustado a lo detectado (blanco) y puntos (rosa)
+                com.photomed.app.align.BodySchema.of(cs0.zone, cs0.scene)?.let { sch ->
+                    val sp = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 2f }
+                    fun X(p: Pt) = x + p.x * tw
+                    fun Y(p: Pt) = y + p.y * tw
+                    sch.polygons.forEach { poly -> val path = Path(); poly.forEachIndexed { k, q -> if (k == 0) path.moveTo(X(q), Y(q)) else path.lineTo(X(q), Y(q)) }; path.close(); sc.drawPath(path, sp) }
+                    sch.capsules.forEach { cp ->
+                        val dx = (cp.b.x - cp.a.x) * tw; val dy = (cp.b.y - cp.a.y) * tw; val len = kotlin.math.hypot(dx, dy).coerceAtLeast(1e-3f)
+                        val nx = -dy / len * cp.r * tw; val ny = dx / len * cp.r * tw
+                        sc.drawLine(X(cp.a) + nx, Y(cp.a) + ny, X(cp.b) + nx, Y(cp.b) + ny, sp); sc.drawLine(X(cp.a) - nx, Y(cp.a) - ny, X(cp.b) - nx, Y(cp.b) - ny, sp)
+                        sc.drawCircle(X(cp.b), Y(cp.b), cp.r * tw, sp)
+                    }
+                    sch.dots.forEach { q -> sc.drawCircle(X(q), Y(q), 4f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }) }
+                }
                 val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 64, 129) }
                 cs0.scene.pose.values.forEach { p -> sc.drawCircle(x + p.x * tw, y + p.y * tw, 3.5f, dot) }
                 cs0.scene.hands?.forEach { h -> h.points.forEach { p -> sc.drawCircle(x + p.x * tw, y + p.y * tw, 2.5f, dot) } }

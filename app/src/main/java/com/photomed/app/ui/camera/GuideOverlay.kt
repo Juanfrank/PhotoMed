@@ -109,7 +109,16 @@ fun GuideOverlay(
     side: LimbSide = LimbSide.BOTH,
     /** Modo libre: contorno de lo visible (referencia o cuadro actual). */
     free: com.photomed.app.align.FreeContour? = null,
+    /**
+     * Esquema ajustado a lo que ve la cámara (manos, pies, miembros): sustituye a la ilustración fija,
+     * con el ángulo y la longitud de cada dedo o miembro del paciente (ver [com.photomed.app.align.BodySchema]).
+     */
+    schema: com.photomed.app.align.BodySchema.Schema? = null,
 ) {
+    if (schema != null && !schema.isEmpty) {
+        SchemaGuide(schema, showContour, showGrid, modifier, tone)
+        return
+    }
     if (zone.guide == com.photomed.app.data.GuideType.FREE) {
         FreeGuide(free, showContour, showGrid, modifier, tone)
         return
@@ -836,5 +845,30 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawInk(
     val k = density
     drawIntoCanvas { c ->
         com.photomed.app.align.InkRenderer.draw(c.nativeCanvas, strokes, unit, { p -> val o = map(p); android.graphics.PointF(o.x, o.y) }, textScale = k)
+    }
+}
+
+/** Esquema ajustado a la anatomía detectada (unidades del ancho del cuadro 3:4). */
+@Composable
+private fun SchemaGuide(schema: com.photomed.app.align.BodySchema.Schema, showContour: Boolean, showGrid: Boolean, modifier: Modifier, tone: GuideTone) {
+    Canvas(modifier) {
+        if (showGrid) drawGrid()
+        if (!showContour) return@Canvas
+        val w = size.width
+        fun o(p: Pt) = Offset(p.x * w, p.y * w)
+        val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            join = androidx.compose.ui.graphics.StrokeJoin.Round)
+        val col = tone.color
+        schema.polygons.forEach { poly -> if (poly.size >= 3) drawPath(smoothPath(poly.map { o(it) }, closed = true), col, style = stroke) }
+        // cada segmento (falange, miembro) como una cápsula: dos bordes paralelos y extremos redondeados
+        schema.capsules.forEach { c ->
+            val a = o(c.a); val b = o(c.b); val r = c.r * w
+            val dx = b.x - a.x; val dy = b.y - a.y; val len = kotlin.math.hypot(dx, dy).coerceAtLeast(1e-3f)
+            val nx = -dy / len * r; val ny = dx / len * r
+            drawLine(col, Offset(a.x + nx, a.y + ny), Offset(b.x + nx, b.y + ny), stroke.width, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            drawLine(col, Offset(a.x - nx, a.y - ny), Offset(b.x - nx, b.y - ny), stroke.width, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            drawCircle(col, r, b, style = stroke)
+        }
+        schema.dots.forEach { drawCircle(col, 4.dp.toPx(), o(it)) }
     }
 }

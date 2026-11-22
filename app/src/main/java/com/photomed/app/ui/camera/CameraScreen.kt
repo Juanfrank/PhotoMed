@@ -1002,7 +1002,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         silhouette = adaptSil,
                         side = if (zone.hasLimbSides) limbSide else LimbSide.BOTH,
                         // modo libre: contorno de la referencia (si se superpone) o de lo que se ve ahora
-                        free = if (showGhost && refFree != null) refFree else live?.freeContour)
+                        free = if (showGhost && refFree != null) refFree else live?.freeContour,
+                        // manos, pies y miembros: esquema ajustado a lo que ve la cámara (sin foto superpuesta)
+                        schema = if (matchingEnabled && !(showGhost && ghost != null)) live?.schema else null)
                     }
                     }
                     // línea de implantación frontal: la de la referencia (discontinua) y la actual (continua)

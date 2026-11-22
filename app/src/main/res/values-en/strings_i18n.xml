@@ -647,6 +647,7 @@
     <string name="t_8a19b4a51fac" formatted="false">Dorsum width (middle), mm</string>
     <string name="t_8a695023a201" formatted="false">Analyzing wrinkles and features…</string>
     <string name="t_8a850948781b" formatted="false">Alignment</string>
+    <string name="t_8a947c1d5a0e" formatted="false">Foot on the %1$s: the toes must be visible</string>
     <string name="t_8b3e31080154" formatted="false">%1$d more hints: %2$s</string>
     <string name="t_8b466bbdf18d" formatted="false">Auto-capture on match</string>
     <string name="t_8b6f303fb29c" formatted="false">Above the right brow tail (lateral canthus), mm</string>
@@ -741,6 +742,7 @@
     <string name="t_a1e56a034b63" formatted="false">nasal base</string>
     <string name="t_a1e9db9161f2" formatted="false">Width at 50 % (middle)</string>
     <string name="t_a217f294e4f4" formatted="false">Do not match: %1$s (expression, pose or a local change different from the rest)</string>
+    <string name="t_a220d67b2bd7" formatted="false">Hand on the %1$s: all phalanges of every finger must be visible (%2$s)</string>
     <string name="t_a23190537144" formatted="false">Width at 25 % (upper)</string>
     <string name="t_a276b1754a3a" formatted="false">Tips</string>
     <string name="t_a2eeab6cf8ab" formatted="false">Match · capturing</string>
@@ -817,7 +819,6 @@
     <string name="t_b21c214f5b3d" formatted="false">very deep</string>
     <string name="t_b25b5374e7f8" formatted="false">Same view for all</string>
     <string name="t_b2901825f551" formatted="false">Lower the arm next to the body (≈ 20°)</string>
-    <string name="t_b2ad3e92e175" formatted="false">Hand on the %1$s: extend all five fingers (%2$s)</string>
     <string name="t_b2e244abbb8b" formatted="false">Recorded</string>
     <string name="t_b2ed9f62c551" formatted="false">no wrinkle</string>
     <string name="t_b2f092dad892" formatted="false">No date in the photo: import date</string>

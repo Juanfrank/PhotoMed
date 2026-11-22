@@ -118,14 +118,20 @@ guía dibujada de la app (si falta un dato, se pide; nunca se acepta por defecto
 
 | Zona | Se exige |
 |---|---|
-| Manos (dorso / palma) | Las **dos manos completas** (los 21 puntos de cada una dentro del cuadro), los **cinco dedos extendidos** (articulaciones de cada dedo ≥ 150–155°, pulgar ≥ 140°), los dedos **hacia abajo** como en la guía (± 35°) y la **cara pedida** (dorso o palma) hacia la cámara |
-| Pies (dorso / planta) | Los **dos pies** (separados) y **completos**: la piel de cada pie no toca los bordes del cuadro salvo arriba (piernas); un pie partido por una tira cuenta como uno |
-| Abdomen frontal, tórax | Hombros y caderas en el cuadro y **nivelados** (≤ 5°), **de frente**, brazos **separados** del tronco y la zona **descubierta** (≥ 70 % piel, ≤ 15 % ropa en su región; la ropa interior en la cadera es correcta) |
+| Manos (dorso / palma) | Las **dos manos completas** (los 21 puntos de cada una dentro del cuadro), **todas las falanges visibles**: ningún dedo recogido (articulaciones ≥ 115–120°, pulgar ≥ 110°) ni acortado por estar doblado hacia la cámara (cada dedo ≥ 45 % del largo de la palma); los dedos **hacia abajo** (± 60°) y la **cara pedida** (dorso o palma) hacia la cámara. Dedos más abiertos, más largos o cortos, o la mano algo girada **no son incumplimiento**: la guía se ajusta |
+| Pies (dorso / planta) | Los **dos pies** (separados) y **completos**: la piel de cada pie no toca los bordes del cuadro salvo arriba (piernas); un pie partido por una tira cuenta como uno; **los dedos se ven** (≥ 4 relieves en el borde distal de cada pie, no tapados por calcetín o ropa). La forma y el largo de los dedos no importan |
+| Abdomen frontal, tórax | Hombros y caderas en el cuadro y **nivelados** (≤ 8°), **de frente**, brazos **separados** del tronco y la zona **descubierta** (≥ 70 % piel, ≤ 15 % ropa en su región; la ropa interior en la cadera es correcta) |
 | Abdomen lateral | **De lado** (hombros y caderas superpuestos), brazos **subidos o cruzados** (que no tapen el flanco) y abdomen **descubierto** |
 | Espalda, glúteos | **De espaldas** (sin cara), **enteros** (fondo a los dos lados, no un recorte) y **descubiertos**; si el detector ve hombros y caderas, además nivelados y brazos separados |
-| Muslos / piernas | Caderas, rodillas y tobillos en el cuadro, **rodillas extendidas** (≥ 165°), pies **algo separados** y muslos **descubiertos** |
-| Brazo (derecho / izquierdo) | Hombro, codo y muñeca de ese brazo, **codo extendido** (≥ 165°), **separado del cuerpo 10–30°** (como la guía, ≈ 20°) y **descubierto** (sin manga) |
+| Muslos / piernas | Caderas, rodillas y tobillos en el cuadro, **rodillas extendidas** (≥ 150°: se admite la flexión natural), pies **algo separados** y muslos **descubiertos** |
+| Brazo (derecho / izquierdo) | Hombro, codo y muñeca de ese brazo, **codo extendido** (≥ 150°: se admite la flexión natural), **separado del eje del tronco 5–45°** (la guía, ≈ 20°, se ajusta al ángulo real) y **descubierto** (sin manga) |
 | Cuello | Hombros nivelados, de frente y cuello y escote **descubiertos** |
+
+**Guía adaptativa (`BodySchema`)**: en manos, pies y zonas del cuerpo, en cuanto se detecta la
+anatomía la ilustración fija se sustituye por un esquema dibujado sobre lo detectado (palma, cada
+falange como cápsula, yemas; contorno de cada pie y sus dedos; huesos del brazo, pierna y tronco con el
+grosor según el ancho de hombros). Así la guía se adapta a la longitud y al ángulo reales de cada dedo o
+miembro, y solo se exige lo clínico: que existan y se vean todas las falanges y la postura general.
 
 Datos en el teléfono: puntos del cuerpo (ML Kit Pose), manos (**MediaPipe Hand Landmarker**, modelo
 oficial incluido en la app) y piel / ropa por píxel (segmentación multiclase de MediaPipe, ya incluida).
@@ -134,14 +140,14 @@ oficial incluido en la app) y piel / ropa por píxel (segmentación multiclase d
 
 `ZoneCriteriaDrawingsTest` dibuja (en código, sin fotos de terceros) cada zona del cuerpo en la toma
 correcta y en tomas incorrectas, y comprueba que la correcta se acepta y cada incorrecta se rechaza con
-su indicación: dedo doblado (anular, pulgar), una sola mano, dedos fuera del cuadro, dedos hacia
-arriba, dorso en lugar de palma y al revés; pies cortados, un solo pie (también partido por una tira);
+su indicación. Se aceptan (la guía se ajusta): dedos más abiertos, más largos o más cortos, manos giradas 30°, dedos de los pies más largos, hombros a 5°, flexión natural de rodillas y codo, brazo a 35°. Se rechazan: dedo recogido (anular, pulgar), puño, una sola mano, dedos fuera del cuadro, dedos hacia
+arriba, dorso en lugar de palma y al revés; pies cortados, dedos tapados por un calcetín, un solo pie (también partido por una tira);
 abdomen con camiseta, brazos sobre el abdomen, hombros inclinados, de espaldas; lateral con los brazos
 tapando el flanco o de frente; espalda de frente o recortada; glúteos con pantalón o de frente; piernas
 con la rodilla flexionada, con pantalón, con los pies juntos o fuera del cuadro; brazo con el codo
 doblado, pegado al cuerpo, a 60° o con manga; cuello con jersey de cuello alto o hombros inclinados. Los
 puntos salen de la geometría del dibujo y la piel y la ropa se clasifican a partir de sus **píxeles**.
-Imágenes: `app/build/reports/zone_criteria/`.
+Imágenes (con el esquema adaptativo en blanco): `app/build/reports/zone_criteria/`.
 
 Con las fotos de internet (tabla de arriba), casi ninguna cumple estos criterios (ropa, manos o pies
 incompletos, brazo recortado o con el codo doblado, espaldas recortadas): ya no disparan.

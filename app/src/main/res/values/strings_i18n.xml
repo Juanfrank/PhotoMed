@@ -647,6 +647,7 @@
     <string name="t_8a19b4a51fac" formatted="false">Ancho del dorso (mitad), mm</string>
     <string name="t_8a695023a201" formatted="false">Analizando arrugas y rasgos…</string>
     <string name="t_8a850948781b" formatted="false">Alineación</string>
+    <string name="t_8a947c1d5a0e" formatted="false">Pie de la %1$s: que se vean los dedos</string>
     <string name="t_8b3e31080154" formatted="false">%1$d indicaciones más: %2$s</string>
     <string name="t_8b466bbdf18d" formatted="false">Disparo automático al coincidir</string>
     <string name="t_8b6f303fb29c" formatted="false">Sobre la cola de la ceja derecha (canto externo), mm</string>
@@ -741,6 +742,7 @@
     <string name="t_a1e56a034b63" formatted="false">base nasal</string>
     <string name="t_a1e9db9161f2" formatted="false">Ancho al 50 % (medio)</string>
     <string name="t_a217f294e4f4" formatted="false">No coinciden: %1$s (expresión, pose o cambio local distinto del resto)</string>
+    <string name="t_a220d67b2bd7" formatted="false">Mano de la %1$s: que se vean las falanges de todos los dedos (%2$s)</string>
     <string name="t_a23190537144" formatted="false">Ancho al 25 % (sup.)</string>
     <string name="t_a276b1754a3a" formatted="false">Ayudas</string>
     <string name="t_a2eeab6cf8ab" formatted="false">Coincide · capturando</string>
@@ -817,7 +819,6 @@
     <string name="t_b21c214f5b3d" formatted="false">muy profunda</string>
     <string name="t_b25b5374e7f8" formatted="false">Mismo ángulo para todas</string>
     <string name="t_b2901825f551" formatted="false">Baje el brazo junto al cuerpo (≈ 20°)</string>
-    <string name="t_b2ad3e92e175" formatted="false">Mano de la %1$s: extienda los cinco dedos (%2$s)</string>
     <string name="t_b2e244abbb8b" formatted="false">Registrado</string>
     <string name="t_b2ed9f62c551" formatted="false">sin arruga</string>
     <string name="t_b2f092dad892" formatted="false">Sin fecha en la foto: fecha de importación</string>
