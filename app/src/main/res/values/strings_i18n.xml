@@ -57,6 +57,7 @@
     <string name="t_0ba2e5910750" formatted="false">Sin errores registrados</string>
     <string name="t_0c2e214fbd42" formatted="false">d MMM yyyy, HH:mm</string>
     <string name="t_0cbe904747d3" formatted="false">De frente: que se vea la cara</string>
+    <string name="t_0ce5df425650" formatted="false">Encuadre la pierna entera: cadera, rodilla y tobillo</string>
     <string name="t_0d03edf094d3" formatted="false">Descartar la línea</string>
     <string name="t_0d14bbd7d06c" formatted="false">caderas</string>
     <string name="t_0d30c89f2b38" formatted="false">Gire la cámara ↻</string>
@@ -158,6 +159,7 @@
     <string name="t_1f8666e583a9" formatted="false">Luz desigual entre mejillas (máx. %1$.0f %%)</string>
     <string name="t_2032f4971074" formatted="false">No hay fotos de esta zona en el expediente.</string>
     <string name="t_204e71f59454" formatted="false">Pupilas sobre la línea horizontal; tomar en reposo y sonriendo.</string>
+    <string name="t_20af9c28638c" formatted="false">Encuadre el pie descalzo</string>
     <string name="t_20d371afcbd3" formatted="false">, la línea avanza</string>
     <string name="t_211dfdb3d5e7" formatted="false">brazo</string>
     <string name="t_2127f6a61b69" formatted="false">Nuevo protocolo</string>
@@ -533,7 +535,6 @@
     <string name="t_75f3730849f4" formatted="false">Grosor del trazo</string>
     <string name="t_75f3b26238dd" formatted="false">Pantalla completa</string>
     <string name="t_7631302a68c3" formatted="false">Color %1$s</string>
-    <string name="t_770b19bfbc8a" formatted="false">Encuadre el brazo con la cadera de ese lado</string>
     <string name="t_771e73c29b6f" formatted="false">Separe los brazos del cuerpo</string>
     <string name="t_772e1190da78" formatted="false">Expediente actualizado. Las fotos nuevas usarán estos datos.</string>
     <string name="t_773067c6106c" formatted="false">El archivo no es un protocolo de PhotoMed (JSON no válido).</string>
@@ -1121,6 +1122,7 @@
     <string name="t_ef927bc3c4f0" formatted="false">Compartir (anonimizada)</string>
     <string name="t_ef92cad31e39" formatted="false">Girar 45° mostrando el lado derecho; punta nasal alineada con la mejilla.</string>
     <string name="t_efa18afb7486" formatted="false">Eliminar seleccionadas</string>
+    <string name="t_efd66a3aeb59" formatted="false">Muestre la mano entera</string>
     <string name="t_f008941e1774" formatted="false">Siguiente</string>
     <string name="t_f06791aef8c4" formatted="false">Aún no hay protocolos</string>
     <string name="t_f072e439380c" formatted="false">Compartir resultados (sin datos del paciente)</string>

@@ -127,9 +127,14 @@ guía dibujada de la app (si falta un dato, se pide; nunca se acepta por defecto
 | Brazo (derecho / izquierdo) | Hombro, codo y muñeca de ese brazo, **codo extendido** (≥ 150°: se admite la flexión natural), **separado del eje del tronco 5–45°** (la guía, ≈ 20°, se ajusta al ángulo real) y **descubierto** (sin manga) |
 | Cuello | Hombros nivelados, de frente y cuello y escote **descubiertos** |
 
+**Una sola extremidad**: con el selector «Derecha / Izquierda» de manos, pies y piernas se exige una
+(completa y con sus falanges), no las dos. En el brazo se evalúa el brazo pedido o, si el detector
+invierte los lados (vista posterior) o solo ve uno (primer plano), el que se vea entero; sin la cadera
+en el cuadro no se mide la separación del cuerpo.
+
 **Guía adaptativa (`BodySchema`)**: en manos, pies y zonas del cuerpo, en cuanto se detecta la
-anatomía la ilustración fija se sustituye por un esquema dibujado sobre lo detectado (palma, cada
-falange como cápsula, yemas; contorno de cada pie y sus dedos; huesos del brazo, pierna y tronco con el
+anatomía la ilustración fija se sustituye por un esquema dibujado sobre lo detectado (el **contorno real de cada mano**, trazado por el borde de su piel
+segmentada y separado de la otra mano por su esqueleto, con las yemas; sin segmentación, palma y falanges; contorno de cada pie y sus dedos; huesos del brazo, pierna y tronco con el
 grosor según el ancho de hombros). Así la guía se adapta a la longitud y al ángulo reales de cada dedo o
 miembro, y solo se exige lo clínico: que existan y se vean todas las falanges y la postura general.
 

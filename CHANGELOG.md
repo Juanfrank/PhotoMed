@@ -4,6 +4,12 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Una sola mano, pie o pierna**: con el selector Derecha / Izquierda ya no se piden las dos. El
+  brazo se reconoce también de espaldas (el detector invierte los lados) y en primer plano (sin cadera).
+- **Botón de disparo automático** (barra superior): ya funciona también en la primera toma, sin foto
+  previa ni referencia (antes quedaba desactivado).
+- **Contorno de ajuste de la mano**: sigue el borde real de la mano que se ve (antes iba por el eje de
+  los dedos y quedaba más estrecho); el grosor de brazos y piernas se mide en la piel.
 - **Siluetas flexibles en manos, pies y cuerpo**: la guía ya no es un dibujo fijo; se ajusta a la mano,
   los pies o el cuerpo detectados (largo y ángulo de cada dedo, giro de la mano, ángulo del brazo).
   Solo se exige lo clínico: que se vean **todas las falanges** (sin dedos recogidos, puño ni dedos

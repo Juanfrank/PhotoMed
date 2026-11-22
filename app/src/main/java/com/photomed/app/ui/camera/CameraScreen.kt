@@ -342,6 +342,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     val lastAnalysis = remember { AtomicLong(0L) }
     // Asistencia en vivo: con referencia (foto superpuesta) iguala el encuadre; sin ella, estandariza la toma.
     val matchingEnabled = liveMatch
+    // una sola mano / pie / pierna: los criterios de la zona piden esa, no las dos
+    matcher.singleLimb = zone.hasLimbSides && limbSide != LimbSide.BOTH
     val referenceMode = protoRef != null || (showGhost && ghost != null)
     matcher.useReference = referenceMode
     matcher.expression = expression
@@ -880,8 +882,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             }
             IconToggleButton(
                 checked = autoCapture,
+                // también en la primera toma (sin foto previa): la guía y los criterios de la zona deciden
                 onCheckedChange = { autoCapture = it; if (step?.autoCapture == null) prefs.edit().putBoolean("auto_capture", it).apply() },
-                enabled = photos.isNotEmpty() || protoRef != null,
             ) {
                 Icon(Icons.Default.AutoMode, if (autoCapture) tr("Disparo automático activado") else tr("Disparo automático desactivado"),
                     tint = if (autoCapture) GuideTone.MATCH.color else Color.White)

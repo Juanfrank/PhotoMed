@@ -41,11 +41,17 @@ object ZoneCriteria {
     }
 
     /** Lo que se ve en el cuadro; [aspect] = alto / ancho (3:4 → 4/3). */
-    class Scene(val pose: Map<String, Pt>, val hands: List<Hand>?, val classes: Classes?, val aspect: Float = 4f / 3f)
+    /**
+     * Lo que se ve en el cuadro; [aspect] = alto / ancho (3:4 → 4/3). [single]: modo de una sola
+     * extremidad (selector «Derecha / Izquierda» de manos, pies y piernas): se exige una, no las dos.
+     */
+    class Scene(val pose: Map<String, Pt>, val hands: List<Hand>?, val classes: Classes?, val aspect: Float = 4f / 3f,
+                val single: Boolean = false)
 
     /** Datos que necesita cada zona (para calcular solo lo necesario en cada cuadro). */
     fun needsHands(zone: Zone) = zone.guide == GuideType.HANDS
-    fun needsClasses(zone: Zone) = zone.guide in SKIN_ZONES || zone.guide == GuideType.FEET
+    /** En las manos, la piel sirve para que el contorno del esquema siga el borde real de cada mano. */
+    fun needsClasses(zone: Zone) = zone.guide in SKIN_ZONES || zone.guide == GuideType.FEET || zone.guide == GuideType.HANDS
     fun applies(zone: Zone) = needsHands(zone) || needsClasses(zone) || zone.guide in POSE_RULES
 
     private val SKIN_ZONES = setOf(GuideType.TORSO_FRONT, GuideType.TORSO_SIDE, GuideType.BREASTS, GuideType.BACK,
@@ -129,11 +135,13 @@ object ZoneCriteria {
 
     private fun hands(zone: Zone, s: Scene): List<String> {
         val hs = s.hands ?: return listOf(HINT_HANDS_SEARCH)
-        if (hs.size < 2) return listOf(HINT_BOTH_HANDS)
+        if (s.single && hs.isEmpty()) return listOf(tr("Muestre la mano entera"))
+        if (!s.single && hs.size < 2) return listOf(HINT_BOTH_HANDS)
         val out = ArrayList<String>()
-        // de izquierda a derecha de la imagen
-        hs.sortedBy { it.points[0].x }.take(2).forEachIndexed { i, h ->
-            val side = if (i == 0) tr("izquierda") else tr("derecha")
+        // una sola mano: la más grande del cuadro; dos: de izquierda a derecha de la imagen
+        val chosen = if (s.single) listOf(hs.maxBy { dist(it.points[0], it.points[9]) }) else hs.sortedBy { it.points[0].x }.take(2)
+        chosen.forEachIndexed { i, h ->
+            val side = if (s.single) (if (h.points[0].x < 0.5f) tr("izquierda") else tr("derecha")) else if (i == 0) tr("izquierda") else tr("derecha")
             if (h.points.any { it.x < HAND_MARGIN || it.x > 1f - HAND_MARGIN || it.y < HAND_MARGIN * s.aspect || it.y > s.aspect * (1f - HAND_MARGIN) })
                 out += tr("Mano de la %1\$s: entera dentro del cuadro", side)
             val bent = bentFingers(h)
@@ -229,18 +237,20 @@ object ZoneCriteria {
 
     private fun feet(s: Scene): List<String> {
         val c = s.classes ?: return listOf(HINT_ANALYZING)
-        if (skinBlobs(c).isEmpty()) return listOf(tr("Encuadre los dos pies descalzos"))
+        if (skinBlobs(c).isEmpty()) return listOf(if (s.single) tr("Encuadre el pie descalzo") else tr("Encuadre los dos pies descalzos"))
         val mx = (FEET_MARGIN * c.width).toInt().coerceAtLeast(1); val my = (FEET_MARGIN * c.height).toInt().coerceAtLeast(1)
         val out = ArrayList<String>()
         val feet = feetOf(c).sortedByDescending { it.box.area }
         val two = feet.size >= 2 && feet[1].box.area > feet[0].box.area * 0.35f &&
             abs((feet[0].box.x0 + feet[0].box.x1) - (feet[1].box.x0 + feet[1].box.x1)) / 2f >= 0.2f * c.width
-        if (!two) out += tr("Muestre los dos pies, algo separados")
-        feet.take(2).sortedBy { it.box.x0 }.forEachIndexed { i, f ->
+        if (s.single) { if (feet.isEmpty()) out += tr("Encuadre el pie descalzo") }
+        else if (!two) out += tr("Muestre los dos pies, algo separados")
+        feet.take(if (s.single) 1 else 2).sortedBy { it.box.x0 }.forEachIndexed { i, f ->
             val b = f.box
             if (b.x0 < mx || b.x1 > c.width - 1 - mx || b.y1 > c.height - 1 - my) { out += tr("Pies completos: los dedos y los bordes dentro del cuadro"); return@forEachIndexed }
             // las falanges: los dedos deben verse (su número y su forma son los del paciente)
-            if (f.toes.size < MIN_TOES) out += tr("Pie de la %1\$s: que se vean los dedos", if (i == 0) tr("izquierda") else tr("derecha"))
+            val left = if (s.single) (b.x0 + b.x1) < c.width else i == 0
+            if (f.toes.size < MIN_TOES) out += tr("Pie de la %1\$s: que se vean los dedos", if (left) tr("izquierda") else tr("derecha"))
         }
         return out.distinct()
     }
@@ -361,6 +371,7 @@ object ZoneCriteria {
                 uncovered(c, trn("los glúteos"), c?.let { skinClothes(it, minOf(hl.x, hr.x) - w * 0.2f, hy - (ky - hy) * 0.1f, maxOf(hl.x, hr.x) + w * 0.2f, hy + (ky - hy) * 0.45f) })?.let { out += it }
             }
             GuideType.LEGS -> {
+                if (s.single) return singleLeg(s)
                 if (!has(p, L.HIP_L, L.HIP_R, L.KNEE_L, L.KNEE_R, L.ANKLE_L, L.ANKLE_R)) return listOf(tr("Encuadre las piernas enteras: caderas, rodillas y tobillos"))
                 val ok = listOf(L.HIP_L to L.KNEE_L to L.ANKLE_L, L.HIP_R to L.KNEE_R to L.ANKLE_R).all { (hk, a) ->
                     angle(p[hk.first]!!, p[hk.second]!!, p[a]!!) >= KNEE_DEG
@@ -382,10 +393,13 @@ object ZoneCriteria {
                 }
             }
             GuideType.ARM -> {
-                val r = zone == Zone.ARM_R
+                // el lado según el detector se invierte de espaldas (vista posterior) y en primeros planos
+                // solo se ve un brazo: se evalúa el brazo pedido si está entero y, si no, el que se vea entero
+                val r0 = zone == Zone.ARM_R
+                val whole = { right: Boolean -> if (right) has(p, L.SHOULDER_R, L.ELBOW_R, L.WRIST_R) else has(p, L.SHOULDER_L, L.ELBOW_L, L.WRIST_L) }
+                val r = if (whole(r0)) r0 else if (whole(!r0)) !r0 else return listOf(tr("Encuadre el brazo entero: hombro, codo y muñeca"))
                 val sh = if (r) L.SHOULDER_R else L.SHOULDER_L; val el = if (r) L.ELBOW_R else L.ELBOW_L
                 val wr = if (r) L.WRIST_R else L.WRIST_L; val hp = if (r) L.HIP_R else L.HIP_L
-                if (!has(p, sh, el, wr)) return listOf(tr("Encuadre el brazo entero: hombro, codo y muñeca"))
                 val a = p[sh]!!; val e = p[el]!!; val w = p[wr]!!
                 if (angle(a, e, w) < ELBOW_DEG) out += tr("Codo extendido")
                 // separación del cuerpo: ángulo entre el eje del tronco (centro de hombros → centro de caderas,
@@ -398,7 +412,7 @@ object ZoneCriteria {
                     val abd = angle(ax, a, w)
                     if (abd < ARM_ABD_MIN) out += tr("Separe un poco el brazo del cuerpo (≈ 20°)")
                     if (abd > ARM_ABD_MAX) out += tr("Baje el brazo junto al cuerpo (≈ 20°)")
-                } ?: run { out += tr("Encuadre el brazo con la cadera de ese lado") }
+                }   // sin la cadera (primer plano del brazo) no se mide la separación
                 val hw = hypot(e.x - a.x, e.y - a.y) * 0.18f
                 uncovered(c, trn("el brazo"), c?.let { skinClothesAlong(it, a, w, hw) })?.let { out += it }
             }
@@ -415,6 +429,116 @@ object ZoneCriteria {
             else -> {}
         }
         return out.distinct()
+    }
+
+    /** Una sola pierna: la de cadera, rodilla y tobillo visibles (la más completa), extendida y descubierta. */
+    private fun singleLeg(s: Scene): List<String> {
+        val p = s.pose; val L = Landmarks; val c = s.classes
+        val legs = listOf(Triple(L.HIP_L, L.KNEE_L, L.ANKLE_L), Triple(L.HIP_R, L.KNEE_R, L.ANKLE_R)).filter { (h, k, a) -> has(p, h, k, a) }
+        val leg = legs.maxByOrNull { (h, _, a) -> dist(p[h]!!, p[a]!!) } ?: return listOf(tr("Encuadre la pierna entera: cadera, rodilla y tobillo"))
+        val h = p[leg.first]!!; val k = p[leg.second]!!; val a = p[leg.third]!!
+        val out = ArrayList<String>()
+        if (angle(h, k, a) < KNEE_DEG) out += tr("Rodillas extendidas")
+        if (a.y > s.aspect * 0.97f) out += tr("Los pies dentro del cuadro")
+        if (c == null) out += HINT_ANALYZING else {
+            val f = skinClothesAlong(c, Pt(h.x + (k.x - h.x) * 0.35f, h.y + (k.y - h.y) * 0.35f), k, dist(h, k) * 0.12f)
+            uncovered(c, trn("los muslos"), f)?.let { out += it }
+        }
+        return out
+    }
+
+    /**
+     * Contorno real (borde de la piel) de una mano: la mancha de piel que contiene la palma, limitada a
+     * la mano (sin el antebrazo: se corta poco después de la muñeca) y recorrida por su borde exterior.
+     * En unidades del ancho; null si la segmentación no la separa.
+     */
+    fun handOutline(c: Classes, h: Hand): List<Pt>? {
+        val p = h.points; if (p.size < 21) return null
+        val k = c.width.toFloat()
+        val palm = dist(p[0], p[9]).coerceAtLeast(1e-4f)
+        val ux = (p[9].x - p[0].x) / palm; val uy = (p[9].y - p[0].y) / palm
+        val m = palm * 0.45f
+        val bx0 = p.minOf { it.x } - m; val bx1 = p.maxOf { it.x } + m; val by0 = p.minOf { it.y } - m; val by1 = p.maxOf { it.y } + m
+        // cerca del esqueleto de ESTA mano (falanges y palma): si las dos manos se tocan, no se funden
+        val bones = listOf(0 to 1, 1 to 2, 2 to 3, 3 to 4, 0 to 5, 5 to 6, 6 to 7, 7 to 8, 5 to 9, 9 to 10, 10 to 11, 11 to 12,
+            9 to 13, 13 to 14, 14 to 15, 15 to 16, 13 to 17, 0 to 17, 17 to 18, 18 to 19, 19 to 20, 0 to 9, 0 to 13, 1 to 5)
+        val reach = 0.3f * palm
+        fun segD(q: Pt, a: Pt, b: Pt): Float {
+            val vx = b.x - a.x; val vy = b.y - a.y; val l2 = vx * vx + vy * vy
+            val t = if (l2 < 1e-9f) 0f else (((q.x - a.x) * vx + (q.y - a.y) * vy) / l2).coerceIn(0f, 1f)
+            return hypot(q.x - a.x - vx * t, q.y - a.y - vy * t)
+        }
+        val inHand = { x: Int, y: Int ->
+            val px = (x + 0.5f) / k; val py = (y + 0.5f) / k; val q = Pt(px, py)
+            px in bx0..bx1 && py in by0..by1 && ((px - p[0].x) * ux + (py - p[0].y) * uy) >= -0.12f * palm && isSkin(c.at(x, y)) &&
+                bones.any { (i, j) -> segD(q, p[i], p[j]) <= reach }
+        }
+        // semilla: el centro de la palma (o un nudillo si ahí no hay piel)
+        val seeds = listOf(Pt(p[0].x * 0.4f + p[9].x * 0.6f, p[0].y * 0.4f + p[9].y * 0.6f), p[9], p[5], p[13], p[0])
+        val seed = seeds.map { (it.x * k).toInt() to (it.y * k).toInt() }.firstOrNull { (x, y) -> inHand(x, y) } ?: return null
+        val pts = traceComponent(c.width, c.height, inHand, seed) ?: return null
+        // la mancha debe ser del tamaño de una mano (no un trozo ni media escena)
+        val area = pts.second
+        if (area < 0.25f * palm * palm * k * k || area > 6f * palm * palm * k * k) return null
+        return pts.first.map { (x, y) -> Pt((x + 0.5f) / k, (y + 0.5f) / k) }
+    }
+
+    /**
+     * Borde exterior (recorrido de Moore, en el sentido de las agujas del reloj) de la componente 8-conexa
+     * de [inside] que contiene [seed], simplificado a ~1 punto cada 2 píxeles; con su área en píxeles.
+     */
+    fun traceComponent(w: Int, h: Int, inside: (Int, Int) -> Boolean, seed: Pair<Int, Int>): Pair<List<Pair<Int, Int>>, Int>? {
+        val comp = BooleanArray(w * h); val stack = IntArray(w * h); var sp = 0; var area = 0
+        fun ok(x: Int, y: Int) = x in 0 until w && y in 0 until h && inside(x, y)
+        if (!ok(seed.first, seed.second)) return null
+        comp[seed.second * w + seed.first] = true; stack[sp++] = seed.second * w + seed.first
+        while (sp > 0) {
+            val q = stack[--sp]; area++
+            val x = q % w; val y = q / w
+            for (dy in -1..1) for (dx in -1..1) {
+                val xx = x + dx; val yy = y + dy
+                if ((dx != 0 || dy != 0) && ok(xx, yy) && !comp[yy * w + xx]) { comp[yy * w + xx] = true; stack[sp++] = yy * w + xx }
+            }
+        }
+        val start = comp.indexOfFirst { it }
+        val sx = start % w; val sy = start / w
+        // vecinos en el sentido de las agujas del reloj (y hacia abajo): O, NO, N, NE, E, SE, S, SO
+        val dxs = intArrayOf(-1, -1, 0, 1, 1, 1, 0, -1); val dys = intArrayOf(0, -1, -1, -1, 0, 1, 1, 1)
+        fun inC(x: Int, y: Int) = x in 0 until w && y in 0 until h && comp[y * w + x]
+        val out = ArrayList<Pair<Int, Int>>()
+        var cx = sx; var cy = sy; var back = 0   // se entra desde el oeste (fondo: es el primer píxel de su fila)
+        val maxSteps = 4 * (w + h) * 4
+        var steps = 0
+        do {
+            if (steps % 2 == 0) out += cx to cy
+            var moved = false
+            for (i in 1..8) {
+                val d = (back + i) % 8
+                val nx = cx + dxs[d]; val ny = cy + dys[d]
+                if (inC(nx, ny)) {
+                    val pd = (back + i - 1) % 8
+                    val bx = cx + dxs[pd] - nx; val by = cy + dys[pd] - ny
+                    back = (0 until 8).first { dxs[it] == bx && dys[it] == by }
+                    cx = nx; cy = ny; moved = true; break
+                }
+            }
+            if (!moved) break   // píxel aislado
+            steps++
+        } while ((cx != sx || cy != sy) && steps < maxSteps)
+        return if (out.size >= 8) out to area else null
+    }
+
+    /** Medio grosor de la piel perpendicular al segmento [a]→[b] en su punto medio (unidades del ancho); null si no se mide. */
+    fun halfWidth(c: Classes, a: Pt, b: Pt): Float? {
+        val k = c.width.toFloat(); val len = dist(a, b).coerceAtLeast(1e-4f)
+        val nx = -(b.y - a.y) / len; val ny = (b.x - a.x) / len
+        val ws = listOf(0.35f, 0.5f, 0.65f).mapNotNull { t ->
+            val mx = a.x + (b.x - a.x) * t; val my = a.y + (b.y - a.y) * t
+            if (!isSkin(c.at((mx * k).toInt(), (my * k).toInt()))) return@mapNotNull null
+            fun reach(sg: Int): Float { var d = 0f; val step = 1f / k; while (d < len) { val x = mx + nx * d * sg; val y = my + ny * d * sg; if (!isSkin(c.at((x * k).toInt(), (y * k).toInt()))) break; d += step }; return d }
+            (reach(1) + reach(-1)) / 2
+        }
+        return ws.sorted().getOrNull(ws.size / 2)?.takeIf { it > 0f && it < len }
     }
 
     val HINT_ANALYZING get() = tr("Comprobando la zona…")

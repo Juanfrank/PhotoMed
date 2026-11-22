@@ -57,6 +57,7 @@
     <string name="t_0ba2e5910750" formatted="false">No errors logged</string>
     <string name="t_0c2e214fbd42" formatted="false">MMM d, yyyy, HH:mm</string>
     <string name="t_0cbe904747d3" formatted="false">Facing forward: the face must be visible</string>
+    <string name="t_0ce5df425650" formatted="false">Frame the whole leg: hip, knee and ankle</string>
     <string name="t_0d03edf094d3" formatted="false">Discard the line</string>
     <string name="t_0d14bbd7d06c" formatted="false">hips</string>
     <string name="t_0d30c89f2b38" formatted="false">Rotate the camera ↻</string>
@@ -158,6 +159,7 @@
     <string name="t_1f8666e583a9" formatted="false">Uneven lighting across cheeks (max. %1$.0f %%)</string>
     <string name="t_2032f4971074" formatted="false">There are no photos of this area in the patient record.</string>
     <string name="t_204e71f59454" formatted="false">Pupils on the horizontal line; take at rest and smiling.</string>
+    <string name="t_20af9c28638c" formatted="false">Frame the bare foot</string>
     <string name="t_20d371afcbd3" formatted="false">, hairline advancing</string>
     <string name="t_211dfdb3d5e7" formatted="false">arm</string>
     <string name="t_2127f6a61b69" formatted="false">New protocol</string>
@@ -533,7 +535,6 @@
     <string name="t_75f3730849f4" formatted="false">Stroke width</string>
     <string name="t_75f3b26238dd" formatted="false">Full screen</string>
     <string name="t_7631302a68c3" formatted="false">Color %1$s</string>
-    <string name="t_770b19bfbc8a" formatted="false">Frame the arm with the hip on that side</string>
     <string name="t_771e73c29b6f" formatted="false">Move the arms away from the body</string>
     <string name="t_772e1190da78" formatted="false">Patient record updated. New photos will use this data.</string>
     <string name="t_773067c6106c" formatted="false">The file is not a PhotoMed protocol (invalid JSON).</string>
@@ -1121,6 +1122,7 @@
     <string name="t_ef927bc3c4f0" formatted="false">Share (anonymized)</string>
     <string name="t_ef92cad31e39" formatted="false">Turn 45° showing the right side; nasal tip aligned with the cheek.</string>
     <string name="t_efa18afb7486" formatted="false">Delete selected</string>
+    <string name="t_efd66a3aeb59" formatted="false">Show the whole hand</string>
     <string name="t_f008941e1774" formatted="false">Next</string>
     <string name="t_f06791aef8c4" formatted="false">No protocols yet</string>
     <string name="t_f072e439380c" formatted="false">Share results (without patient data)</string>

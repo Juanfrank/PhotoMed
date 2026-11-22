@@ -41,12 +41,14 @@
   "Codo extendido": "Elbow straight",
   "Separe un poco el brazo del cuerpo (≈ 20°)": "Move the arm slightly away from the body (≈ 20°)",
   "Baje el brazo junto al cuerpo (≈ 20°)": "Lower the arm next to the body (≈ 20°)",
-  "Encuadre el brazo con la cadera de ese lado": "Frame the arm with the hip on that side",
   "Encuadre cuello y hombros": "Frame the neck and shoulders",
   "De frente: que se vea la cara": "Facing forward: the face must be visible",
   "Comprobando la zona…": "Checking the area…",
   "Buscando las manos…": "Looking for the hands…",
   "Muestre las dos manos enteras": "Show both whole hands",
   "Mano de la %1$s: que se vean las falanges de todos los dedos (%2$s)": "Hand on the %1$s: all phalanges of every finger must be visible (%2$s)",
-  "Pie de la %1$s: que se vean los dedos": "Foot on the %1$s: the toes must be visible"
+  "Pie de la %1$s: que se vean los dedos": "Foot on the %1$s: the toes must be visible",
+  "Muestre la mano entera": "Show the whole hand",
+  "Encuadre el pie descalzo": "Frame the bare foot",
+  "Encuadre la pierna entera: cadera, rodilla y tobillo": "Frame the whole leg: hip, knee and ankle"
 }

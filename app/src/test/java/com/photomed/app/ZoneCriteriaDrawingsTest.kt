@@ -266,6 +266,10 @@ class ZoneCriteriaDrawingsTest {
             hc("pulgar recogido", false, "pulgar", handsScene(palm, bent = setOf(0)))
             hc("puño", false, "falanges", handsScene(palm, bent = setOf(0, 1, 2, 3, 4)))
             hc("una sola mano", false, "dos manos", handsScene(palm, oneHand = true))
+            // modo de una sola mano (selector Derecha / Izquierda): basta una, y debe cumplir igual
+            fun hc1(name: String, ok: Boolean, expect: String?, r: Pair<Bitmap, List<ZoneCriteria.Hand>>) = out.add(Case(z, name, ok, expect, r.first, ZoneCriteria.Scene(emptyMap(), r.second, classes(r.first), single = true)))
+            hc1("modo una mano: una mano", true, null, handsScene(palm, oneHand = true))
+            hc1("modo una mano: anular recogido", false, "falanges", handsScene(palm, oneHand = true, bent = setOf(3)))
             hc("dedos fuera del cuadro", false, "entera dentro del cuadro", handsScene(palm, shiftY = 215f))
             hc("dedos hacia arriba", false, "dedos hacia abajo", handsScene(palm, up = true))
             hc(if (palm) "se ve el dorso" else "se ve la palma", false, if (palm) "muestre la palma" else "muestre el dorso", handsScene(!palm))
@@ -279,6 +283,10 @@ class ZoneCriteriaDrawingsTest {
             fc("un solo pie", false, "dos pies", feetScene(one = true, sole = sole))
             fc("un solo pie partido por una tira", false, "dos pies", feetScene(one = true, sole = sole, strap = true))
             fc("dedos más largos (se ajusta)", true, null, feetScene(sole = sole, toeLen = 12f))
+            fun fc1(name: String, ok: Boolean, expect: String?, b: Bitmap) = out.add(Case(z, name, ok, expect, b, ZoneCriteria.Scene(emptyMap(), null, classes(b), single = true)))
+            fc1("modo un pie: un pie", true, null, feetScene(one = true, sole = sole))
+            fc1("modo un pie: partido por una tira", true, null, feetScene(one = true, sole = sole, strap = true))
+            fc1("modo un pie: dedos tapados", false, "que se vean los dedos", feetScene(one = true, sole = sole, sock = true))
             fc("dedos tapados (calcetín)", false, "que se vean los dedos", feetScene(sole = sole, sock = true))
         }
         // abdomen frontal, tórax, espalda
@@ -318,6 +326,14 @@ class ZoneCriteriaDrawingsTest {
         out += case(Zone.LEGS, "con pantalón", false, "Descubra", { figure(it, top = 10f, scale = 0.92f, pants = true) })
         out += case(Zone.LEGS, "pies juntos", false, "Separe un poco los pies", { figure(it, top = 10f, scale = 0.92f, feetGap = 0f) })
         out += case(Zone.LEGS, "pies fuera del cuadro", false, "Los pies dentro", { figure(it, top = 50f, scale = 0.98f) })
+        // modo de una sola pierna: el detector solo ve esa pierna
+        fun oneLeg(name: String, ok: Boolean, expect: String?, draw: (Canvas) -> Map<String, Pt>) {
+            val (b, c) = canvas(); val p = draw(c).filterKeys { it !in setOf(L.HIP_R, L.KNEE_R, L.ANKLE_R) }
+            out += Case(Zone.LEGS, name, ok, expect, b, ZoneCriteria.Scene(p, null, classes(b), single = true))
+        }
+        oneLeg("modo una pierna: correcta", true, null) { figure(it, top = 10f, scale = 0.92f) }
+        oneLeg("modo una pierna: rodilla flexionada", false, "Rodillas") { figure(it, top = 10f, scale = 0.92f, kneeBend = 45f) }
+        oneLeg("modo una pierna: con pantalón", false, "Descubra") { figure(it, top = 10f, scale = 0.92f, pants = true) }
         // brazos
         for (z in listOf(Zone.ARM_R, Zone.ARM_L)) {
             out += case(z, "correcta (≈ 20°)", true, null) { figure(it, armAbd = 20f) }
@@ -327,12 +343,55 @@ class ZoneCriteriaDrawingsTest {
             out += case(z, "brazo pegado al cuerpo", false, "Separe un poco el brazo", { figure(it, armAbd = 1f) })
             out += case(z, "brazo a 60°", false, "Baje el brazo", { figure(it, armAbd = 60f) })
             out += case(z, "con manga", false, "Descubra", { figure(it, armAbd = 20f, sleeve = true) })
+            // primer plano del brazo: sin caderas ni el otro brazo
+            val keep = if (z == Zone.ARM_R) setOf(L.SHOULDER_R, L.ELBOW_R, L.WRIST_R, L.INDEX_R) else setOf(L.SHOULDER_L, L.ELBOW_L, L.WRIST_L, L.INDEX_L)
+            run { val (b, c) = canvas(); val p = figure(c, armAbd = 20f).filterKeys { it in keep }
+                out += Case(z, "solo ese brazo (sin cadera)", true, null, b, ZoneCriteria.Scene(p, null, classes(b))) }
+            // de espaldas el detector invierte izquierda y derecha: solo se ve entero el otro «lado»
+            val swap = mapOf(L.SHOULDER_L to L.SHOULDER_R, L.ELBOW_L to L.ELBOW_R, L.WRIST_L to L.WRIST_R, L.INDEX_L to L.INDEX_R)
+                .let { m -> m + m.entries.associate { (a, b) -> b to a } }
+            run { val (b, c) = canvas(); val p = figure(c, armAbd = 20f).filterKeys { it in keep }.mapKeys { swap[it.key] ?: it.key }
+                out += Case(z, "solo ese brazo, lado invertido por el detector", true, null, b, ZoneCriteria.Scene(p, null, classes(b))) }
         }
         // cuello
         out += case(Zone.NECK, "correcta", true, null) { figure(it, top = 60f, scale = 1.6f) }
         out += case(Zone.NECK, "hombros inclinados", false, "Hombros nivelados", { figure(it, top = 60f, scale = 1.6f, tiltDeg = 12f) })
         out += case(Zone.NECK, "con jersey de cuello alto", false, "Descubra", { c -> figure(c, top = 60f, scale = 1.6f).also { c.drawRect(120f, 120f, 180f, 200f, fill(CLOTH)); c.drawRect(60f, 170f, 240f, 260f, fill(CLOTH)) } })
         return out
+    }
+
+    /** El contorno del esquema de la mano sigue el borde real de la mano dibujada (no el eje de los dedos). */
+    @Test
+    fun handSchemaOutlineFollowsTheHand() {
+        for (variant in listOf(mapOf<String, Float>(), mapOf("spread" to 16f), mapOf("rot" to 30f), mapOf("len" to 1.25f))) {
+            val (b, hs) = handsScene(true, spread = variant["spread"] ?: 5f, rotDeg = variant["rot"] ?: 0f, lenK = variant["len"] ?: 1f)
+            val c = classes(b)
+            for (h in hs) {
+                val o = ZoneCriteria.handOutline(c, h)
+                assertTrue("sin contorno de la mano ($variant)", o != null && o.size >= 20)
+                val p = h.points
+                val palm = kotlin.math.hypot(p[0].x - p[9].x, p[0].y - p[9].y)
+                // cada yema y cada nudillo, dentro del contorno o a menos de un dedo de su borde
+                for (i in listOf(4, 8, 12, 16, 20, 5, 9, 13, 17)) {
+                    val near = o!!.minOf { kotlin.math.hypot(it.x - p[i].x, it.y - p[i].y) }
+                    assertTrue("punto $i fuera del contorno ($variant)", inside(o, p[i]) || near < palm * 0.15f)
+                }
+                // el contorno no se va de la mano: su caja apenas excede la de los puntos (más el grosor del dedo)
+                val m = palm * 0.35f
+                assertTrue("contorno más ancho que la mano ($variant): ${o!!.minOf { it.x } - p.minOf { it.x }} ${o.maxOf { it.x } - p.maxOf { it.x }} m=$m", o!!.minOf { it.x } > p.minOf { it.x } - m && o.maxOf { it.x } < p.maxOf { it.x } + m)
+                assertTrue("contorno más largo que la mano ($variant)", o.maxOf { it.y } < p.maxOf { it.y } + m)
+            }
+        }
+    }
+
+    private fun inside(poly: List<Pt>, q: Pt): Boolean {
+        var c = false; var j = poly.size - 1
+        for (i in poly.indices) {
+            val a = poly[i]; val b = poly[j]
+            if ((a.y > q.y) != (b.y > q.y) && q.x < (b.x - a.x) * (q.y - a.y) / (b.y - a.y) + a.x) c = !c
+            j = i
+        }
+        return c
     }
 
     @Test

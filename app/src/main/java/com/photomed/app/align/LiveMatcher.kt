@@ -52,6 +52,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     private var lastClasses: ZoneCriteria.Classes? = null; private var lastClassesAt = 0L
     /** Esquema de la guía del último cuadro (null: la ilustración fija). */
     @Volatile private var lastSchema: BodySchema.Schema? = null
+    /** Modo de una sola extremidad (mano, pie o pierna): los criterios piden una, no las dos. */
+    @Volatile var singleLimb: Boolean = false
     /** Línea de implantación frontal de la referencia (rostro frontal y frente). */
     @Volatile var referenceHairline: List<Pt>? = null
         private set
@@ -340,14 +342,15 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             lastHandsAt = now
             lastHands = handsLazy.value?.let { h -> runCatching { h.detect(frame) }.getOrNull() }
         }
-        if (ZoneCriteria.needsClasses(zone) && now - lastClassesAt > 500) {
+        // en las manos, la piel del mismo cuadro que los puntos (el contorno sigue a la mano sin retraso)
+        if (ZoneCriteria.needsClasses(zone) && (now - lastClassesAt > 500 || (ZoneCriteria.needsHands(zone) && lastHandsAt == now))) {
             lastClassesAt = now
             lastClasses = runCatching { hairSkin?.labels(frame) }.getOrNull()?.let { ZoneCriteria.Classes.of(it) }
         }
         // con referencia por bordes no se buscaron puntos: los criterios del cuerpo los necesitan
         val pose = if (spec.detector != Detector.POSE) emptyMap()
             else cur.points.ifEmpty { if (ZoneCriteria.needsHands(zone)) emptyMap() else runCatching { detected(frame, true).points }.getOrDefault(emptyMap()) }
-        val scene = ZoneCriteria.Scene(pose, lastHands, lastClasses, frame.height / frame.width.toFloat())
+        val scene = ZoneCriteria.Scene(pose, lastHands, lastClasses, frame.height / frame.width.toFloat(), single = singleLimb)
         lastSchema = runCatching { BodySchema.of(zone, scene) }.getOrNull()
         val hints = ZoneCriteria.hints(zone, scene)
         if (hints.isEmpty()) return e
