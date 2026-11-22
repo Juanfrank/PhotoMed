@@ -28,6 +28,17 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 - **Transiciones más fluidas**: el GIF pasa de ~14 a 25 cuadros/s y el movimiento acelera y frena
   suavemente (antes arrancaba y paraba de golpe y el MP4 repetía los pasos del GIF de forma desigual).
 - **Menú de exportación**: cambiar de opción ya no lo devuelve arriba.
+- **Comparar**: interruptor para encender y apagar el ajuste de color junto al de alineación, y
+  botón «Confirmar surcos» bajo las fotos (antes solo dentro de la tabla de medidas).
+- **Captura automática verificada en las 30 zonas** con fotos reales (ver `docs/CAPTURA_AUTOMATICA.md`),
+  con estas correcciones:
+  - Espalda, glúteos, manos, pies, cuero cabelludo, ojo, modo libre y primeros planos sin cara
+    detectada: la primera foto se dispara con el encuadre quieto (antes nunca se disparaba).
+  - Con referencia: en zonas sin puntos coincide por la geometría de los bordes (antes casi nunca en
+    piel, pelo o manos) y ya no espera puntos que la referencia no tiene.
+  - Mirada medida respecto del centro de los párpados (antes una mirada al frente salía «hacia arriba»)
+    y exigida solo de frente; perfil a partir de 55° (MediaPipe no estima más) y del lado correcto; una
+    foto frontal ya no se acepta como perfil; luz pareja entre mejillas solo de frente.
 - **Luz del rostro**: ya no se queda «midiendo». En primeros planos (labios, ojo, frente) o con la
   cara parcial se mide por regiones; sin pupilas se usan los contornos de los ojos. La luz pareja entre
   mejillas solo se pide en la vista frontal (en oblicuas y perfiles cada mejilla recibe luz distinta).
