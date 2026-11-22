@@ -73,6 +73,9 @@ object ImageOps {
 
     fun gray(bmp: Bitmap, width: Int): GrayImage = grayRaw(bmp, width).standardized()
 
+    /** Luminancia 0..1 sin estandarizar, a [width] px de ancho (encuadre 3:4). */
+    fun luma(bmp: Bitmap, width: Int): GrayImage = grayRaw(bmp, width)
+
     private fun grayRaw(bmp: Bitmap, width: Int): GrayImage {
         val small = Bitmap.createScaledBitmap(bmp, width, width * 4 / 3, true)
         val px = IntArray(small.width * small.height)

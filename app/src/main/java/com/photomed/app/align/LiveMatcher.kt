@@ -180,8 +180,12 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val cur = detected(frame, smooth)
         // luz: también sin la cara entera (primeros planos), por regiones
         val light = if (spec.detector == Detector.FACE)
-            runCatching { Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) }.getOrNull() else null
+            runCatching { Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points, cur.yaw) }.getOrNull() else null
         var eval = withDiagnostic(Standardization.evaluate(zone, cur, light, expression), cur)
+        // sin puntos que comprobar (zonas sin detector, cuerpo de espaldas, manos, pies, primeros
+        // planos sin cara): dispara con el encuadre quieto; si no, se reinicia
+        if (SteadyFraming.applies(zone, cur)) eval = steady.update(ImageOps.luma(frame, EDGE_W), System.currentTimeMillis())
+        else steady.reset()
         // Perfil sin rostro detectado: si la silueta muestra un perfil hacia el lado de la vista
         // (nariz y mentón en el borde anterior), se acepta como perfil
         if (isProfile && cur.points.size < LiveDecision.MIN_POINTS) {
@@ -214,10 +218,11 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         return if (smooth) smoother.smooth(d, System.currentTimeMillis()) else d
     }
     private val smoother = LandmarkSmoother()
+    private val steady = SteadyFraming()
 
     fun analyze(frame: Bitmap, smooth: Boolean = true): LiveFrame {
         if (!useReference) return standardize(frame, smooth)
-        val byFeatures = featureOnly && (ref.points.size >= LiveDecision.MIN_POINTS || refProfile != null)
+        val byFeatures = featureOnly && (usesPoints(spec, ref) || refProfile != null)
         val refG = refGray ?: if (byFeatures) GrayImage(1, 1) else return standardize(frame, smooth)
         var eval: MatchEval
         val method: String
@@ -225,7 +230,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val total: Int
         var cur = Detection.EMPTY
         val rp = refProfile
-        if (spec.detector != Detector.NONE && ref.points.size >= LiveDecision.MIN_POINTS &&
+        if (usesPoints(spec, ref) &&
             !(isProfile && rp != null && detected(frame, smooth).also { cur = it }.points.size < LiveDecision.MIN_POINTS)) {
             // Zona con detector y referencia con puntos: solo coincide si el cuadro también los tiene.
             if (cur.points.isEmpty()) cur = detected(frame, smooth)
@@ -258,14 +263,14 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             val r = edges.align(refUse, g, last, if (last != null) EdgeAligner.Window.NARROW else EdgeAligner.Window.LIVE, levels = 2)
             val t = if (EdgeAligner.isConfident(r.score)) r.transform else null
             last = t ?: last
-            eval = LiveMatch.evaluate(t, spec.pivot, matched, ContourMatch.fraction(refEdgePts, g), threshold, gate = true)
+            eval = edgeEval(t, r.score, ContourMatch.fraction(refEdgePts, g), spec.pivot, matched, threshold)
             method = "puntos de contorno"; total = refEdgePts.size
         }
         matched = eval.status == MatchStatus.MATCH
         eval = withDiagnostic(eval, cur)
         val shown = if (drawKeys.size > MAX_DRAWN) drawKeys.filterIndexed { i, _ -> i % (drawKeys.size / MAX_DRAWN + 1) == 0 } else drawKeys
         val light = if (measureLight && spec.detector == Detector.FACE)
-            runCatching { Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points) }.getOrNull() else null
+            runCatching { Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points, cur.yaw) }.getOrNull() else null
         return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points, headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze,
             hairline = if (smooth) hairlineOf(frame, cur) else null, light = light)
     }
@@ -318,6 +323,27 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
 
     companion object {
         const val EDGE_W = 96
+
+        /**
+         * Con referencia: ¿se comparan puntos? Solo si la referencia tiene los de ESTA zona (no basta
+         * con cualquier punto del cuerpo: si no, se quedaba esperando unos puntos que no existen); si no,
+         * se alinean los bordes de la imagen.
+         */
+        /** Confianza mínima de la alineación de bordes para decidir solo por su geometría. */
+        const val EDGE_MATCH_SCORE = 0.6f
+
+        /**
+         * Coincidencia por bordes (con referencia, sin puntos). Con la alineación segura, decide su
+         * geometría (desplazamiento, escala y giro dentro de tolerancia): el % de bordes coincidentes,
+         * corregido por azar, sale bajo en escenas con mucha textura (piel, pelo, manos) incluso con la
+         * misma imagen. Si la alineación no es segura, decide ese % como antes.
+         */
+        fun edgeEval(t: Similarity?, score: Float, fraction: Float, pivot: Pt, matched: Boolean, threshold: Float): MatchEval =
+            if (t != null && score >= EDGE_MATCH_SCORE) LiveMatch.evaluate(t, pivot, matched, null, threshold, gate = true)
+            else LiveMatch.evaluate(t, pivot, matched, fraction, threshold, gate = true)
+
+        fun usesPoints(spec: ZoneAlignment, ref: Detection) =
+            spec.detector != Detector.NONE && spec.landmarks.count { it in ref.points } >= LiveDecision.MIN_POINTS
         const val MAX_DRAWN = 36
     }
 }

@@ -17,6 +17,7 @@ import com.photomed.app.align.MatchEval
 import com.photomed.app.align.MatchStatus
 import com.photomed.app.align.Pt
 import com.photomed.app.align.Standardization
+import com.photomed.app.align.SteadyFraming
 import com.photomed.app.align.ZoneAlignment
 import com.photomed.app.data.Zone
 import org.json.JSONObject
@@ -94,7 +95,7 @@ class ZoneAutoCaptureTest {
                 Detection(LandmarkDetector.poseKeys((0 until a.length()).associateWith { i -> a.getJSONArray(i).let {
                     Triple(it.getDouble(0).toFloat(), it.getDouble(1).toFloat() * h / w, it.getDouble(2).toFloat()) } }))
             } ?: Detection.EMPTY
-            Sample(File(d, name), w, h, face, pose)
+            Sample(File(d, e.optString("image", name)), w, h, face, pose)
         }.toList()
     }
 
@@ -108,15 +109,29 @@ class ZoneAutoCaptureTest {
     private fun light(s: Sample, det: Detection): Standardization.Lighting? {
         val b = bmp(s.file)
         val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
-        return Standardization.lighting(px, b.width, b.height, det.points)
+        return Standardization.lighting(px, b.width, b.height, det.points, det.yaw)
     }
 
-    /** Primera foto, sin referencia: lo que hace LiveMatcher.standardize + AutoCapture.ready. */
+    /** Primera foto, sin referencia, con puntos: Standardization (LiveMatcher.standardize). */
     private fun standard(z: Zone, s: Sample): MatchEval {
         val det = detOf(s, z)
         val l = if (ZoneAlignment.of(z).detector == Detector.FACE) light(s, det) else null
         return Standardization.evaluate(z, det, l)
     }
+
+    /**
+     * Primera foto por quietud del encuadre (SteadyFraming, como LiveMatcher.standardize): 1,2 s de
+     * cuadros cada 100 ms; [move]: desplazamiento de cada cuadro (temblor de la mano o movimiento).
+     */
+    private fun steadyRun(b: Bitmap, move: Float): MatchEval {
+        val sf = SteadyFraming(); var e: MatchEval? = null
+        for (k in 0..12) e = sf.update(ImageOps.luma(shifted(b, if (k % 2 == 0) move else -move), LiveMatcher.EDGE_W), k * 100L)
+        return e!!
+    }
+
+    /** Primera foto completa: por quietud si no hay puntos que comprobar, si no la estandarización. */
+    private fun first(z: Zone, s: Sample): MatchEval =
+        if (SteadyFraming.applies(z, detOf(s, z))) steadyRun(bmp(s.file), 0.001f) else standard(z, s)
 
     /** Con referencia (puntos): LiveDecision, como LiveMatcher.analyze con detector. */
     private fun withRef(z: Zone, ref: Detection, cur: Detection) =
@@ -131,7 +146,7 @@ class ZoneAutoCaptureTest {
         val g = ImageOps.gray(cur, LiveMatcher.EDGE_W, null)
         val r = EdgeAligner(spec.contours).align(refAll, g, null, EdgeAligner.Window.LIVE, levels = 2)
         val t = if (EdgeAligner.isConfident(r.score)) r.transform else null
-        return LiveMatch.evaluate(t, spec.pivot, false, ContourMatch.fraction(refPts, g), LiveMatch.DEFAULT_THRESHOLD, gate = true)
+        return LiveMatcher.edgeEval(t, r.score, ContourMatch.fraction(refPts, g), spec.pivot, false, LiveMatch.DEFAULT_THRESHOLD)
     }
 
     /** Puntos desplazados y escalados respecto del centro (paciente que se mueve / cámara que se aleja). */
@@ -161,8 +176,8 @@ class ZoneAutoCaptureTest {
         else -> all
     }
 
-    data class Row(val zone: Zone, val images: Int, val detected: Int, val firstReady: Int, val wrongViewReady: Int?,
-                   val refSame: Int, val refMoved: Int, val refN: Int, val notes: String)
+    data class Row(val zone: Zone, val images: Int, val detected: Int, val firstN: Int, val firstReady: Int, val geomOk: Int, val unexplained: Int, val wrongViewReady: Int?,
+                   val steadyMovingReady: Int, val steadyN: Int, val refSame: Int, val refMoved: Int, val refN: Int, val notes: String)
 
     @Test
     fun everyZoneAutoCaptures() {
@@ -176,39 +191,70 @@ class ZoneAutoCaptureTest {
             val ss = samplesFor(z, all)
             val dets = ss.map { detOf(it, z) }
             val detected = if (spec.detector == Detector.NONE) ss.size else dets.count { it.points.size >= LiveDecision.MIN_POINTS }
-            // 1) primera foto (sin referencia)
-            val firstReady = if (spec.detector == Detector.NONE) 0 else ss.count { AutoCapture.ready(standard(z, it)) }
+            // 1) primera foto (sin referencia). Las vistas completas del rostro necesitan la cara (el
+            // perfil sin cara usa la silueta de ML Kit, que no corre en la JVM: se omite)
+            val firstSet = ss.filterIndexed { i, s -> SteadyFraming.applies(z, dets[i]) || dets[i].points.size >= LiveDecision.MIN_POINTS }
+            val firstEvals = firstSet.map { first(z, it) }
+            val firstReady = firstEvals.count { AutoCapture.ready(it) }
+            // fotos que cumplen la geometría de la vista (sin indicaciones de cabeza, barbilla o lado):
+            // si las hay, alguna debe disparar (el resto falla por luz, expresión o mirada)
+            val geometric = listOf("Cabeza", "Barbilla", "Cara:", "Perfil", "No se detecta", "Mantenga", "Encuadre")
+            val geomOk = firstEvals.count { e -> e.hints.none { h -> geometric.any { h.startsWith(it) } } }
+            // rechazos sin explicación (sin indicación): serían un error
+            val unexplained = firstEvals.count { !AutoCapture.ready(it) && it.hints.isEmpty() }
+            // por quietud: moviendo el teléfono (3 % por cuadro) no debe disparar; ni con la cámara tapada
+            val steadySet = firstSet.filter { SteadyFraming.applies(z, detOf(it, z)) }
+            val steadyMoving = steadySet.take(8).count { AutoCapture.ready(steadyRun(bmp(it.file), 0.03f)) }
             // vista equivocada: fotos frontales en las zonas de oblicuo/perfil (no debe disparar)
-            val wrong = if (z in setOf(Zone.FACE_OBLIQUE_R, Zone.FACE_OBLIQUE_L, Zone.FACE_PROFILE_R, Zone.FACE_PROFILE_L))
-                frontal.count { AutoCapture.ready(standard(z, it)) } else null
-            // 2) con referencia: el mismo encuadre dispara; movido 15 % y alejado ×0,8, no
+            // y el lado contrario (perfil u oblicuo izquierdo en la zona derecha y al revés)
+            val opposite = when (z) {
+                Zone.FACE_OBLIQUE_R -> Zone.FACE_OBLIQUE_L; Zone.FACE_OBLIQUE_L -> Zone.FACE_OBLIQUE_R
+                Zone.FACE_PROFILE_R -> Zone.FACE_PROFILE_L; Zone.FACE_PROFILE_L -> Zone.FACE_PROFILE_R; else -> null
+            }
+            val wrong = opposite?.let { o ->
+                frontal.count { AutoCapture.ready(standard(z, it)) } +
+                    samplesFor(o, cache.getOrPut(dirOf(o)) { load(dirOf(o)) }).filter { detOf(it, o).points.size >= LiveDecision.MIN_POINTS }
+                        .count { AutoCapture.ready(standard(z, it)) }
+            }
+            // 2) con referencia (como LiveMatcher.analyze): con puntos en la referencia, LiveDecision; si
+            // no, alineación por bordes. El mismo encuadre dispara; movido 15 % y alejado ×0,8, no
             var same = 0; var mov = 0; var n = 0
+            val refFails = ArrayList<String>()
             for ((i, s) in ss.withIndex().take(12)) {
-                if (spec.detector == Detector.NONE) {
-                    val b = bmp(s.file); n++
-                    if (AutoCapture.ready(withRefEdges(z, b, shifted(b, 0.01f)), protocol = true)) same++
-                    if (AutoCapture.ready(withRefEdges(z, b, shifted(b, 0.15f, 0.8f)), protocol = true)) mov++
-                } else {
-                    val d = dets[i]; if (d.points.size < LiveDecision.MIN_POINTS) continue
-                    n++
-                    if (AutoCapture.ready(withRef(z, d, d), protocol = true)) same++
+                val d = dets[i]; n++
+                if (LiveMatcher.usesPoints(spec, d)) {
+                    val e = withRef(z, d, d)
+                    if (AutoCapture.ready(e, protocol = true)) same++
+                    else refFails += "puntos ${e.status} ${"%.2f".format(e.pointFraction ?: -1f)} ${e.hints.take(2)}"
                     if (AutoCapture.ready(withRef(z, d, moved(d, 0.15f, 0.8f)), protocol = true)) mov++
+                } else {
+                    val b = bmp(s.file)
+                    val e = withRefEdges(z, b, shifted(b, 0.01f))
+                    if (AutoCapture.ready(e, protocol = true)) same++
+                    else refFails += "bordes ${e.status} ${"%.2f".format(e.pointFraction ?: -1f)} ${e.hints.take(2)}"
+                    if (AutoCapture.ready(withRefEdges(z, b, shifted(b, 0.15f, 0.8f)), protocol = true)) mov++
                 }
             }
             // indicaciones más frecuentes de las que no dispararon (para el informe)
-            val hints = if (spec.detector == Detector.NONE) emptyList() else ss.map { standard(z, it) }.filter { !AutoCapture.ready(it) }
-                .flatMap { it.hints }.groupingBy { it.substringBefore(" ").substringBefore(":") + ": " + it.substringAfter(": ").take(28) }.eachCount()
+            val hints = firstSet.map { first(z, it) }.filter { !AutoCapture.ready(it) }
+                .flatMap { it.hints }.groupingBy { it.take(40) }.eachCount()
                 .entries.sortedByDescending { it.value }.take(3).joinToString("; ") { "${it.key} (${it.value})" }
-            rows += Row(z, ss.size, detected, firstReady, wrong, same, mov, n, hints)
+            if (refFails.isNotEmpty()) println("REF ${z.id}: " + refFails.joinToString(" | "))
+            if (System.getenv("PM_ZONE_DEBUG") != null && spec.detector == Detector.FACE) firstSet.forEach { s0 ->
+                val e = first(z, s0); val d = detOf(s0, z)
+                println("DBG ${z.id} ${s0.file.name} yaw=${d.yaw} pose=${d.pose?.yaw} side=${Standardization.facingSide(d.points)} pitch=${d.pitch} roll=${d.roll} gaze=${d.gaze} ${e.status} q=${"%.2f".format(e.quality)} ${e.hints}")
+            }
+            rows += Row(z, ss.size, detected, firstSet.size, firstReady, geomOk, unexplained, wrong, steadyMoving, steadySet.size.coerceAtMost(8), same, mov, n, hints)
         }
         val md = buildString {
             appendLine("# Captura automática por zona (fotos de internet)\n")
-            appendLine("| Zona | Detector | Imágenes | Detectadas | 1.ª foto: dispara | Vista equivocada dispara | Con referencia: mismo encuadre | Con referencia: movido | Indicaciones más frecuentes al no disparar |")
-            appendLine("|---|---|---|---|---|---|---|---|---|")
+            appendLine("| Zona | Detector | Imágenes | Con puntos | 1.ª foto: dispara | 1.ª foto: cumplen la geometría | 1.ª foto moviendo el teléfono: dispara | Vista equivocada: dispara | Referencia, mismo encuadre: dispara | Referencia, movido: dispara | Indicaciones más frecuentes al no disparar |")
+            appendLine("|---|---|---|---|---|---|---|---|---|---|---|")
             rows.forEach { r ->
                 val det = ZoneAlignment.of(r.zone).detector
-                appendLine("| ${r.zone.id} | $det | ${r.images} | ${r.detected} | ${if (det == Detector.NONE) "—" else "${r.firstReady}/${r.images}"} | " +
-                    "${r.wrongViewReady?.let { "$it/${frontal.size}" } ?: "—"} | ${r.refSame}/${r.refN} | ${r.refMoved}/${r.refN} | ${r.notes} |")
+                appendLine("| ${r.zone.id} | $det | ${r.images} | ${if (det == Detector.NONE) "—" else "${r.detected}"} | ${r.firstReady}/${r.firstN} | ${r.geomOk}/${r.firstN} | " +
+                    "${if (r.steadyN > 0) "${r.steadyMovingReady}/${r.steadyN}" else "—"} | ${r.wrongViewReady?.toString() ?: "—"} | " +
+                    "${r.refSame}/${r.refN} | ${r.refMoved}/${r.refN} | ${r.notes} |")
             }
         }
         File("build/reports").mkdirs(); File("build/reports/zone_autocapture.md").writeText(md)
@@ -222,7 +268,9 @@ class ZoneAutoCaptureTest {
                 if (r.refN == 0) "${r.zone.id}: ninguna imagen utilizable con referencia" else null,
                 if (r.refN > 0 && r.refSame < r.refN * 0.9) "${r.zone.id}: con referencia y el mismo encuadre dispara solo ${r.refSame}/${r.refN}" else null,
                 if (r.refMoved > 0) "${r.zone.id}: con referencia dispara aunque el paciente se haya movido (${r.refMoved}/${r.refN})" else null,
-                if (det != Detector.NONE && r.firstReady == 0) "${r.zone.id}: la primera foto (sin referencia) nunca dispara" else null,
+                if (r.geomOk > 0 && r.firstReady == 0) "${r.zone.id}: la primera foto nunca dispara aunque ${r.geomOk} fotos cumplen la geometría" else null,
+                if (r.unexplained > 0) "${r.zone.id}: ${r.unexplained} rechazos sin indicación" else null,
+                if (r.steadyMovingReady > 0) "${r.zone.id}: dispara moviendo el teléfono (${r.steadyMovingReady}/${r.steadyN})" else null,
                 if ((r.wrongViewReady ?: 0) > 0) "${r.zone.id}: dispara con la vista equivocada (${r.wrongViewReady})" else null,
             )
         }

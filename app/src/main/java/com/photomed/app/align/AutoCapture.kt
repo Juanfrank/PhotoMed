@@ -13,7 +13,9 @@ object AutoCapture {
         else -> (eval.pointFraction?.let { it / eval.threshold.coerceAtLeast(0.05f) } ?: eval.quality).coerceIn(0f, 0.95f)
     }
 
-    fun ready(eval: MatchEval?, lightOk: Boolean = true, nearCapture: Boolean = true, protocol: Boolean = false): Boolean =
-        eval != null && eval.expressionOk && lightOk &&
+    fun ready(eval: MatchEval?, lightOk: Boolean = true, nearCapture: Boolean = true, protocol: Boolean = false,
+              /** Otras condiciones del encuadre (p. ej. el ángulo de la cámara en el cuero cabelludo). */
+              framingOk: Boolean = true): Boolean =
+        eval != null && eval.expressionOk && lightOk && framingOk &&
             (eval.status == MatchStatus.MATCH || (nearCapture && !protocol && (degree(eval) ?: 0f) >= 0.8f))
 }

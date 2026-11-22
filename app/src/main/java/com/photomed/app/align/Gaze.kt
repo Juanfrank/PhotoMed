@@ -21,7 +21,9 @@ object Gaze {
         val top = c.minOf { it.y }; val bottom = c.maxOf { it.y }
         val halfW = hypot(r.x - l.x, r.y - l.y) / 2
         if (halfW < 1e-4f) return null
-        return Eye(Pt((l.x + r.x) / 2, (l.y + r.y) / 2), halfW, ((bottom - top) / 2).coerceAtLeast(halfW * 0.25f), c)
+        // centro: horizontal entre las comisuras; vertical entre los párpados (el iris queda por encima de
+        // la línea de las comisuras: medido desde ella, una mirada al frente salía ≈ −0,5 «hacia arriba»)
+        return Eye(Pt((l.x + r.x) / 2, (top + bottom) / 2), halfW, ((bottom - top) / 2).coerceAtLeast(halfW * 0.25f), c)
     }
 
     private fun norm(e: Eye, iris: Pt) = Pt((iris.x - e.center.x) / e.halfW, (iris.y - e.center.y) / e.halfH)

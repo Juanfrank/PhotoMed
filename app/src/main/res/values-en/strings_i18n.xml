@@ -892,6 +892,7 @@
     <string name="t_c81f5771478f" formatted="false">" (%1$d could not be read)"</string>
     <string name="t_c8b670ee5707" formatted="false">Upper/lower ratio</string>
     <string name="t_c90bc1798963" formatted="false">Eyes and brows</string>
+    <string name="t_c957a98f6d23" formatted="false">Hold the phone still</string>
     <string name="t_c9624b4244e6" formatted="false">Overlay</string>
     <string name="t_c9917a9212d9" formatted="false">Feet (plantar)</string>
     <string name="t_c9add3494705" formatted="false">Facial</string>
@@ -1127,6 +1128,7 @@
     <string name="t_f90294325f09" formatted="false">Indicative measurements from a single photo: scale from the iris diameter (11.7 mm), width and depth from the shadow profile (shape from shading) and Lemperle-style grade. They depend on lighting and pose: compare photos taken the same way. They do not replace profilometry or clinical assessment.</string>
     <string name="t_f97234567a18" formatted="false">skull contour, part, vertex and hair pattern</string>
     <string name="t_f988427901ff" formatted="false">Align again to apply the changes.</string>
+    <string name="t_f9a57bc18458" formatted="false">Frame the area inside the guide</string>
     <string name="t_f9a5ca47037e" formatted="false">Reset to 80 %</string>
     <string name="t_fa50c3889d86" formatted="false">, chosen %1$d</string>
     <string name="t_fa53653fbe43" formatted="false">Left</string>

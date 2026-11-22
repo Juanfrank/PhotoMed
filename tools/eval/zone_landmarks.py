@@ -83,6 +83,7 @@ def closeups():
         cv2.imwrite(str(ZONES / "ojo" / f.name), crop(img, P[127][0], P[105][1] - (P[159][1] - P[105][1]), P[6][0], P[50][1]))
 
 
+PAIRS = []
 MIRROR = ("rostro_oblicuo", "rostro_perfil", "ojo", "brazo", "abdomen_lateral")
 
 
@@ -99,6 +100,35 @@ def mirrors():
                 if img is not None: cv2.imwrite(str(m), cv2.flip(img, 1))
 
 
+def mirror_pairs():
+    """Pareja izquierda ↔ derecha de cada punto de la malla, de las caras frontales del conjunto: malla
+    media centrada, reflejada y emparejada por el punto más cercano (iris 468–472 ↔ 473–477)."""
+    d = json.loads((ZONES / "rostro_frontal" / "landmarks.json").read_text())
+    meshes = []
+    for v in d.values():
+        if not v["face"]: continue
+        P = np.array(v["face"]["mesh"])[:468] * [v["w"], v["h"]]
+        if abs(P[1, 0] - (P[234, 0] + P[454, 0]) / 2) > 0.03 * (P[454, 0] - P[234, 0]): continue   # solo de frente
+        P = (P - P[1]) / (P[454, 0] - P[234, 0]); meshes.append(P)
+    M = np.mean(meshes, 0)
+    R = M * [-1, 1]
+    pairs = np.array([int(np.argmin(((M - r) ** 2).sum(1))) for r in R])
+    sym = float(np.mean(pairs[pairs] == np.arange(len(pairs))))
+    pairs = list(pairs) + [473, 474, 475, 476, 477, 468, 469, 470, 471, 472]
+    print(f"parejas de la malla: {len(meshes)} caras de frente, simetría {sym:.3f}")
+    return pairs
+
+
+def mirror_face(face, pairs):
+    """Malla y matriz de la cara reflejada (x → 1 − x, puntos izquierda ↔ derecha)."""
+    mesh = face["mesh"]
+    out = {"mesh": [[1 - mesh[pairs[i]][0], mesh[pairs[i]][1]] for i in range(len(mesh))], "matrix": None}
+    if face.get("matrix"):
+        M = np.array(face["matrix"]).reshape(4, 4).T; S = np.diag([-1, 1, 1, 1])
+        out["matrix"] = [float(v) for v in (S @ M @ S).T.flatten()]
+    return out
+
+
 def main():
     closeups()
     mirrors()
@@ -108,8 +138,30 @@ def main():
             img = cv2.imread(str(f))
             if img is None: continue
             img = frame34(img)
+            a = analyze(img)
+            if f.name.startswith("m_") and a["face"] is None:
+                # espejo sin cara: el detector es sensible al encuadre; se prueba algo más abierto
+                for pad in (0.12, 0.25):
+                    h, w = img.shape[:2]
+                    big = cv2.copyMakeBorder(img, int(h * pad), int(h * pad), int(w * pad), int(w * pad), cv2.BORDER_REPLICATE)
+                    b = analyze(big)
+                    if b["face"] is not None:
+                        img, a = big, b; break
             cv2.imwrite(str(f), img)        # la prueba usa la imagen tal como se analizó (3:4)
-            res[f.name] = analyze(img)
+            res[f.name] = a
+        # espejos en los que el detector no ve la cara: los puntos reflejados de la original
+        if d.name in MIRROR and (ZONES / "rostro_frontal" / "landmarks.json").exists():
+            pairs = PAIRS[0] if PAIRS else PAIRS.append(mirror_pairs()) or PAIRS[0]
+            for n, v in res.items():
+                o = res.get(n[2:]) if n.startswith("m_") else None
+                if v["face"] is None and o and o["face"] and o["w"] == v["w"] and o["h"] == v["h"]:
+                    v["face"] = mirror_face(o["face"], pairs); v["mirrored_points"] = True
+            # además, de cada original con cara, su reflejo exacto (pm_…: imagen m_…, puntos reflejados):
+            # lo que dispara en un lado debe disparar en el otro (simetría de la lógica)
+            for n, o in list(res.items()):
+                m = res.get("m_" + n)
+                if not n.startswith("m_") and o["face"] and m and o["w"] == m["w"] and o["h"] == m["h"]:
+                    res["pm_" + n] = {"w": o["w"], "h": o["h"], "image": "m_" + n, "face": mirror_face(o["face"], pairs), "pose": None}
         (d / "landmarks.json").write_text(json.dumps(res))
         nf = sum(1 for v in res.values() if v["face"]); npz = sum(1 for v in res.values() if v["pose"])
         print(f"{d.name}: {len(res)} imágenes, cara en {nf}, cuerpo en {npz}")

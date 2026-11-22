@@ -31,7 +31,7 @@ object ProtocolReference {
                     // luz del rostro en la foto (como la mide la cámara en vivo)
                     val light = if (photo.zone.isFaceZone() && d0.points.isNotEmpty()) {
                         val px = IntArray(bmp.width * bmp.height).also { bmp.getPixels(it, 0, bmp.width, 0, 0, bmp.width, bmp.height) }
-                        Standardization.lighting(px, bmp.width, bmp.height, d0.points)
+                        Standardization.lighting(px, bmp.width, bmp.height, d0.points, d0.yaw)
                     } else null
                     Triple(d0, m.referenceHairline, m.referenceProfile) to light
                 }

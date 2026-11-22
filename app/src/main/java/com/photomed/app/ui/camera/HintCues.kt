@@ -140,6 +140,8 @@ object HintText {
         trn("Perfil: alinee la oreja y el plano de Frankfort con la guía"),
         trn("No se detecta el rostro del paciente"),
         trn("No se detecta el cuerpo del paciente"),
+        trn("Mantenga el teléfono quieto"),
+        trn("Encuadre la zona dentro de la guía"),
         trn("Mirada: al frente"),
         trn("Luz desigual: lado izquierdo más oscuro"),
         trn("Luz desigual: lado derecho más oscuro"),

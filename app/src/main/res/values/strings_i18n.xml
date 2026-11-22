@@ -892,6 +892,7 @@
     <string name="t_c81f5771478f" formatted="false">" (%1$d no se pudieron leer)"</string>
     <string name="t_c8b670ee5707" formatted="false">Proporción sup./inf.</string>
     <string name="t_c90bc1798963" formatted="false">Ojos y cejas</string>
+    <string name="t_c957a98f6d23" formatted="false">Mantenga el teléfono quieto</string>
     <string name="t_c9624b4244e6" formatted="false">Superponer</string>
     <string name="t_c9917a9212d9" formatted="false">Pies (planta)</string>
     <string name="t_c9add3494705" formatted="false">Facial</string>
@@ -1127,6 +1128,7 @@
     <string name="t_f90294325f09" formatted="false">Medidas orientativas desde una sola foto: escala por el diámetro del iris (11,7 mm), ancho y profundidad por el perfil de sombra (forma a partir del sombreado) y grado al estilo de Lemperle. Dependen de la luz y la pose: compare fotos tomadas igual. No sustituyen a la perfilometría ni a la valoración clínica.</string>
     <string name="t_f97234567a18" formatted="false">contorno del cráneo, raya, vértice y patrón del cabello</string>
     <string name="t_f988427901ff" formatted="false">Vuelva a alinear para aplicar los cambios.</string>
+    <string name="t_f9a57bc18458" formatted="false">Encuadre la zona dentro de la guía</string>
     <string name="t_f9a5ca47037e" formatted="false">Restablecer 80 %</string>
     <string name="t_fa50c3889d86" formatted="false">, elegida %1$d</string>
     <string name="t_fa53653fbe43" formatted="false">Izquierda</string>

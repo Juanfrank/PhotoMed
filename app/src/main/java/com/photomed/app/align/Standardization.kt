@@ -10,7 +10,9 @@ import kotlin.math.abs
  * estándares de fotografía clínica (DiBernardo et al., Plast Reconstr Surg 1998; Yavuzer et al.,
  * Ann Plast Surg 2001; guías fotográficas de la ASPS):
  * - Vista estándar: giro de la cabeza 0° (frontal), 45° (oblicuo, hacia el lado de la zona) o
- *   ≥ 70° (perfil; los detectores pierden el rostro cerca de 90°).
+ *   perfil (MediaPipe estima ≈ 55–60° en un perfil verdadero y pierde el rostro cerca de 90°, donde se
+ *   usa la silueta: se acepta ≥ [PROFILE_MIN_YAW], o ≥ [PROFILE_MIN_YAW_GEOM] con la punta nasal en el
+ *   borde del óvalo).
  * - Plano de Frankfort horizontal: cabeceo ≈ 0°; cabeza sin inclinación lateral.
  * - Iluminación uniforme: diferencia de luminancia entre mejillas ≤ 15 %; exposición del rostro
  *   correcta (L* 35–85).
@@ -24,7 +26,7 @@ object Standardization {
     fun target(zone: Zone): Target? = when (zone.guide) {
         GuideType.FACE_FRONT, GuideType.FOREHEAD, GuideType.PERIOCULAR, GuideType.LIPS -> Target(0f, 5f, 0)
         GuideType.FACE_OBLIQUE -> Target(45f, 8f, if (zone.mirrored) -1 else 1)
-        GuideType.FACE_PROFILE -> Target(null, 0f, if (zone.mirrored) -1 else 1, minYaw = 70f)
+        GuideType.FACE_PROFILE -> Target(null, 0f, if (zone.mirrored) -1 else 1, minYaw = PROFILE_MIN_YAW)
         else -> null
     }
 
@@ -49,6 +51,11 @@ object Standardization {
             else -> null
         }
     }
+
+    /** Perfil: giro mínimo estimado por MediaPipe (se satura ≈ 55–60° en un perfil verdadero). */
+    const val PROFILE_MIN_YAW = 55f
+    /** …o este giro con la punta nasal en el borde del óvalo ([facingSide] ≥ 0,95): perfil por geometría. */
+    const val PROFILE_MIN_YAW_GEOM = 48f
 
     const val PITCH_TOL = 7f
     const val ROLL_TOL = 4f
@@ -91,7 +98,14 @@ object Standardization {
             val side = facingSide(det.points) ?: 0f
             val sideSign = if (side > 0.08f) 1 else if (side < -0.08f) -1 else 0
             if (t.minYaw != null) {
-                if (yawAbs < t.minYaw) { hints += "Cabeza: girar hasta el perfil (faltan %.0f°)".format(t.minYaw - yawAbs); off += 1f }
+                // lo que falta para el perfil pesa por grados: una vista frontal no es «casi» un perfil
+                val geomProfile = yawAbs >= PROFILE_MIN_YAW_GEOM && abs(side) >= 0.95f
+                if (yawAbs < t.minYaw && !geomProfile) { hints += "Cabeza: girar hasta el perfil (faltan %.0f°)".format(t.minYaw - yawAbs); off += 1f + (t.minYaw - yawAbs) / 10f }
+                // perfil del lado contrario (derecho ↔ izquierdo): no es la vista pedida
+                if (sideSign != 0 && sideSign != t.side) {
+                    hints += if (t.side > 0) trn("Cara: mirar a la derecha de la imagen") else trn("Cara: mirar a la izquierda de la imagen")
+                    off += 2f + yawAbs / 10f
+                }
             } else if (t.yaw == 0f) {
                 if (yawAbs > t.yawTol) {
                     hints += (if (sideSign > 0) "Cabeza: girar a la izquierda %.0f°" else "Cabeza: girar a la derecha %.0f°").format(yawAbs)
@@ -121,7 +135,10 @@ object Standardization {
                 h.forEach { hints += it; off += 0.8f }
             }
         }
-        det.gaze?.let { g ->
+        // mirada al frente: solo en las vistas frontales. Con la cabeza girada (oblicuo, perfil), los ojos
+        // que miran al frente de la cara proyectan el iris desplazado dentro del contorno del ojo; «iris
+        // centrado» significaría mirar a la cámara. (Con referencia se compara la mirada entre fotos.)
+        det.gaze?.takeIf { t?.yaw == 0f }?.let { g ->
             if (kotlin.math.abs(g.x) > Gaze.TOL_X * 1.2f || kotlin.math.abs(g.y) > Gaze.TOL_Y * 1.2f) {
                 hints += trn("Mirada: al frente")
                 off += 0.6f
@@ -130,7 +147,8 @@ object Standardization {
         lighting?.let { l ->
             val m = maxOf(l.leftCheek, l.rightCheek)
             // la diferencia entre mejillas solo con las mejillas localizadas (no por regiones)
-            if (!l.regional && m > 0f && abs(l.leftCheek - l.rightCheek) / m > LIGHT_ASYM) {
+            // y solo en las vistas frontales: en oblicuos y perfiles una mejilla queda de lado
+            if (!l.regional && t?.yaw == 0f && m > 0f && abs(l.leftCheek - l.rightCheek) / m > LIGHT_ASYM) {
                 hints += if (l.leftCheek < l.rightCheek) trn("Luz desigual: lado izquierdo más oscuro") else trn("Luz desigual: lado derecho más oscuro")
                 off += 0.5f
             }
@@ -188,8 +206,11 @@ object Standardization {
      * pupilas o la nariz se usan los contornos de los ojos y de la nariz y, si tampoco están, la luz
      * por regiones ([regionLighting]): siempre hay medida cuando hay imagen.
      */
-    fun lighting(rgb: IntArray, w: Int, h: Int, points: Map<String, Pt>): Lighting? {
+    fun lighting(rgb: IntArray, w: Int, h: Int, points: Map<String, Pt>,
+                 /** Giro de la cabeza: muy girada (> 40°), las mejillas proyectadas caen fuera del rostro. */
+                 yaw: Float? = null): Lighting? {
         if (w <= 0 || h <= 0 || rgb.size < w * h) return null
+        if (yaw != null && abs(yaw) > 40f && points.size >= 8) return regionLighting(rgb, w, h, points)
         val l = points[Landmarks.EYE_L] ?: centroid(points, "eye_l_")
         val r = points[Landmarks.EYE_R] ?: centroid(points, "eye_r_")
         val nose = points["nose_bottom_1"] ?: points[Landmarks.NOSE_BASE] ?: centroid(points, "nose_bottom_")
