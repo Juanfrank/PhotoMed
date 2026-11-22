@@ -157,6 +157,21 @@ antepié, cada pie nombrado por su mitad de la imagen, y tolerancia de 5 % para 
 (3 % para los puntos anatómicos). Resultado: 0 cambios de veredicto en 50 cuadros y 38/50 coincidencias;
 fallan las fotos con el pie cortado por el borde, pies diminutos en arena o plantas cruzadas.
 
+### Uñas (`Nails`)
+
+La uña solo se ve por el dorso, en la falange distal: una placa de color distinto de la piel que la rodea
+en el mismo dedo (anillo de piel alrededor de la placa, sin el fondo junto a la punta). Evaluado con fotos
+reales (`NailsPhotosTest`, informe `unas.png`): las uñas pintadas o muy marcadas destacan con claridad
+(ΔE 15–50) y ninguna planta muestra 3 así; las uñas naturales dan un contraste parecido al de las yemas de
+la planta (ΔE 3–8), así que con el color solo no se distinguen de forma fiable. Por eso se usan solo las
+claramente visibles (ΔE ≥ 15):
+
+- **Pies**: cada uña es un dedo (confirman el recuento si el contorno se quedó corto); en la toma de
+  planta, 3 o más uñas en un pie avisan «se ven las uñas; muestre la planta».
+- **Manos (dorso)**: 3 o más uñas en una mano confirman el dorso aunque la orientación de los puntos diga
+  otra cosa (y en la toma de palma, avisan de que se ve el dorso).
+- Se dibujan en el esquema como puntos de referencia.
+
 **Zona centrada**: el centro de la parte del cuerpo (manos, pies en horizontal, brazo, piernas,
 tronco, glúteos, cuello en horizontal) a menos del 13 % del centro del cuadro; si no, «Centre la zona
 en el cuadro».

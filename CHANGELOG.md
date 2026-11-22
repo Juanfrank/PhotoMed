@@ -4,6 +4,10 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Uñas como referencia** en pies y manos (dorso): las uñas claramente visibles confirman cada dedo del
+  pie, distinguen el dorso de la planta («se ven las uñas; muestre la planta») y el dorso de la palma de la
+  mano, y se marcan en el esquema. Las uñas naturales, poco contrastadas, no se usan para decidir (con
+  fotos reales se confunden con las yemas).
 - **Comparar fotos tomadas con la referencia girada**: cada toma guarda la foto de referencia usada y su
   giro (y espejo). Al alinear, el giro entre dos fotos se calcula por esa cadena y se deshace antes (la
   alineación solo busca giros pequeños); la foto se muestra alineada con el giro incluido.

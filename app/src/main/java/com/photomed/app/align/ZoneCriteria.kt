@@ -127,7 +127,7 @@ object ZoneCriteria {
     fun hints(zone: Zone, s: Scene): List<String> {
         val h = when (zone.guide) {
             GuideType.HANDS -> hands(zone, s)
-            GuideType.FEET -> feet(s)
+            GuideType.FEET -> feet(zone, s)
             in SKIN_ZONES -> body(zone, s)
             else -> emptyList()
         }
@@ -248,7 +248,10 @@ object ZoneCriteria {
             val fromDown = abs(Math.toDegrees(atan2(d.x.toDouble(), d.y.toDouble()))).toFloat()
             if (d.y <= 0f || fromDown > FINGERS_DOWN_DEG) out += tr("Mano de la %1\$s: dedos hacia abajo, como en la guía", side)
             val wantPalm = zone == Zone.HANDS_PALMAR
-            if (palmFacing(h) != wantPalm) out += if (wantPalm) tr("Mano de la %1\$s: muestre la palma", side) else tr("Mano de la %1\$s: muestre el dorso", side)
+            // uñas claramente visibles (3 o más): es el dorso, aunque la orientación de los puntos diga otra cosa
+            val nails = s.classes?.let { c -> c.rgb?.let { rgb -> Nails.ofHand(rgb, c.width, c.height, h.points, STRONG_NAIL_DE).count { it != null } } } ?: 0
+            val palm = if (nails >= DORSAL_NAILS) false else palmFacing(h)
+            if (palm != wantPalm) out += if (wantPalm) tr("Mano de la %1\$s: muestre la palma", side) else tr("Mano de la %1\$s: muestre el dorso", side)
         }
         return out
     }
@@ -298,7 +301,9 @@ object ZoneCriteria {
                /** Dedos distinguidos en el borde distal ([ToeDetector]); null si no se pudo analizar. */
                val toeCount: Int? = null,
                /** Líneas de separación entre dedos (unidades del ancho). */
-               val toeLines: List<Pair<Pt, Pt>> = emptyList())
+               val toeLines: List<Pair<Pt, Pt>> = emptyList(),
+               /** Uñas claramente visibles (contraste fuerte: ver [STRONG_NAIL_DE]), centro en unidades del ancho. */
+               val nails: List<Pt> = emptyList())
 
     @Volatile private var feetMemo: Pair<Classes, List<Foot>>? = null
 
@@ -362,12 +367,34 @@ object ZoneCriteria {
                 ToeDetector.detect(c.width, c.height, { x, y -> x in g.x0..g.x1 && y in g.y0..g.y1 && inG(x, y) }, c.rgb)
             }.getOrNull()
             fun u(p: Pair<Float, Float>) = Pt((p.first + 0.5f) * k, (p.second + 0.5f) * k)
-            Foot(left + right.reversed(), td?.tips?.map(::u) ?: toes.takeIf { it.size in 3..6 }.orEmpty(), g,
+            val f0 = Foot(left + right.reversed(), td?.tips?.map(::u) ?: toes.takeIf { it.size in 3..6 }.orEmpty(), g,
                 if (seen == 0) 0f else cov / seen.toFloat(), td?.count, td?.lines?.map { (a, b) -> u(a) to u(b) }.orEmpty())
+            // uñas: solo las de contraste fuerte (esmalte o uña muy marcada; las naturales se confunden con las
+            // yemas de la planta). Cada una es un dedo: confirman el recuento si el contorno se quedó corto
+            val nails = runCatching { footNails(c, f0, STRONG_NAIL_DE) }.getOrDefault(emptyList()).map { Pt(it.x * k, it.y * k) }
+            Foot(f0.outline, f0.toes, g, f0.coveredTip, f0.toeCount?.let { maxOf(it, nails.size.coerceAtMost(5)) }, f0.toeLines, nails)
         }
     }
 
-    private fun feet(s: Scene): List<String> {
+    /**
+     * Uñas de los dedos de un pie ([Nails]): detrás de la punta de cada dedo (hacia el tobillo, arriba en la
+     * orientación de la guía), del ancho de un dedo (la separación entre puntas vecinas). Vacío sin color.
+     */
+    fun footNails(c: Classes, f: Foot, minDe: Float = Nails.MIN_DE): List<Nails.Nail> {
+        val rgb = c.rgb ?: return emptyList()
+        val k = c.width.toFloat()
+        val tips = f.toes.sortedBy { it.x }; if (tips.isEmpty()) return emptyList()
+        val gaps = tips.zipWithNext { a, b -> (b.x - a.x) * k }.sorted()
+        val tw = (gaps.getOrNull(gaps.size / 2) ?: ((f.box.x1 - f.box.x0) / 5f)).coerceAtLeast(4f)
+        return tips.mapNotNull { t -> Nails.find(rgb, c.width, c.height, t.x * k, t.y * k, 0f, 1f, tw, minDe = minDe) }
+    }
+
+    /** Contraste (ΔE) de una uña claramente visible: con fotos reales, ninguna planta llega a 3 así. */
+    const val STRONG_NAIL_DE = 15f
+    /** Uñas claramente visibles en un pie que indican que se ve el dorso (no la planta). */
+    const val DORSAL_NAILS = 3
+
+    private fun feet(zone: Zone, s: Scene): List<String> {
         val c = s.classes ?: return listOf(HINT_ANALYZING)
         if (skinBlobs(c).isEmpty()) return listOf(if (s.single) tr("Encuadre el pie descalzo") else tr("Encuadre los dos pies descalzos"))
         val mx = (FEET_MARGIN * c.width).toInt().coerceAtLeast(1); val my = (FEET_MARGIN * c.height).toInt().coerceAtLeast(1)
@@ -387,6 +414,9 @@ object ZoneCriteria {
             // y que se distingan los dedos: menos de MIN_TOES curvas en el borde distal es que no se ven
             if (f.coveredTip > COVERED_TIP || (f.toeCount != null && f.toeCount < MIN_TOES))
                 out += tr("Pie de la %1\$s: que se vean los dedos", if (left) tr("izquierda") else tr("derecha"))
+            // planta pedida pero se ven las uñas: es el dorso (la uña solo se ve por arriba)
+            if (zone == Zone.FEET_PLANTAR && f.nails.size >= DORSAL_NAILS)
+                out += tr("Pie de la %1\$s: se ven las uñas; muestre la planta", if (left) tr("izquierda") else tr("derecha"))
         }
         return out.distinct()
     }

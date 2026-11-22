@@ -36,6 +36,9 @@ object BodySchema {
             val p = h.points; if (p.size < 21) continue
             val palm = d(p[0], p[9]).coerceAtLeast(1e-4f)
             val outline = classes?.let { runCatching { ZoneCriteria.handOutline(it, h) }.getOrNull() }
+            // uñas claramente visibles (dorso): se marcan como punto de referencia
+            classes?.rgb?.let { rgb -> Nails.ofHand(rgb, classes.width, classes.height, p, ZoneCriteria.STRONG_NAIL_DE).filterNotNull()
+                .forEach { n -> dots += Pt(n.x / classes.width, n.y / classes.width) } }
             if (outline != null) {
                 polys += outline
                 listOf(4, 8, 12, 16, 20).forEach { dots += p[it] }
@@ -57,7 +60,7 @@ object BodySchema {
 
     /** Pies: silueta de cada pie, la punta de cada dedo y la línea de separación entre dedos. */
     fun feet(feet: List<ZoneCriteria.Foot>): Schema =
-        Schema(feet.map { it.outline }, emptyList(), feet.flatMap { it.toes }, feet.flatMap { f -> f.toeLines.map { (a, b) -> listOf(a, b) } })
+        Schema(feet.map { it.outline }, emptyList(), feet.flatMap { it.toes } + feet.flatMap { it.nails }, feet.flatMap { f -> f.toeLines.map { (a, b) -> listOf(a, b) } })
 
     /** Brazos, piernas y tronco con el ángulo y la longitud de los del paciente. */
     fun body(pose: Map<String, Pt>, classes: ZoneCriteria.Classes? = null): Schema {

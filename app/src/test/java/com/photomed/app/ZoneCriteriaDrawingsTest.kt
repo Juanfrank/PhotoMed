@@ -233,7 +233,7 @@ class ZoneCriteriaDrawingsTest {
                 val tx = x + inward * cx[i]; val ty = 300f + dy + rad[i] * 1.3f + toeLen * (1f - i * 0.15f) + (if (i == 0) 3f else i * -2.5f)
                 c.drawLine(tx, 292f + dy, tx, ty, stroke(SKIN, rad[i] * 2))
                 c.drawCircle(tx, ty, rad[i], fill(SKIN))
-                if (!sole) c.drawCircle(tx, ty + rad[i] * 0.3f, rad[i] * 0.45f, fill(NAIL))
+                if (!sole) c.drawCircle(tx, ty + rad[i] * 0.15f, rad[i] * 0.62f, fill(NAIL))
             }
             if (!flat) for (i in 0..3) {
                 val gx = x + inward * (cx[i] + cx[i + 1]) / 2
@@ -315,6 +315,8 @@ class ZoneCriteriaDrawingsTest {
             fc1("modo un pie: descentrado", false, "Centre", Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888).also { s2 -> Canvas(s2).apply { drawColor(BG); drawBitmap(feetScene(one = true, sole = sole), -80f, 0f, null) } })
             fc("dedos tapados (calcetín)", false, "que se vean los dedos", feetScene(sole = sole, sock = true))
             fc("sin dedos distinguibles", false, "que se vean los dedos", feetScene(sole = sole, flat = true))
+            // la planta pedida y se ven las uñas (es el dorso)
+            if (sole) fc("se ve el dorso (uñas)", false, "muestre la planta", feetScene(sole = false))
         }
         // abdomen frontal, tórax, espalda
         out += case(Zone.TORSO_FRONT, "correcta", true, null) { figure(it) }
