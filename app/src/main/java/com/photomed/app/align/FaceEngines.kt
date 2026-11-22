@@ -62,6 +62,17 @@ object FaceMeshMap {
         return out
     }
 
+    /**
+     * Detección a partir de la salida de MediaPipe: malla ([xy] normalizada, [count] puntos) y matriz de
+     * transformación facial ([matrix], o null). La misma conversión en el dispositivo y en las pruebas.
+     */
+    fun detectionOf(xy: (Int) -> Pair<Float, Float>, count: Int, w: Int, h: Int, matrix: FloatArray?): Detection {
+        val pts = toKeys(xy, count, w, h)
+        val e = matrix?.let { euler(it) }
+        // Cabeceo en la convención de ML Kit (positivo = barbilla arriba); la matriz de MediaPipe usa la opuesta.
+        return Detection(pts, e?.first, e?.second?.let { -it }, e?.third)
+    }
+
     /** Guiñada, cabeceo y alabeo (°) de la matriz 4×4 de transformación facial (column-major). */
     fun euler(m: FloatArray): Triple<Float, Float, Float> {
         fun r(i: Int, j: Int) = m[j * 4 + i]
@@ -89,11 +100,8 @@ class MediaPipeFace(context: Context) : Closeable {
         val argb = if (bmp.config == Bitmap.Config.ARGB_8888) bmp else bmp.copy(Bitmap.Config.ARGB_8888, false)
         val r = lm.detect(BitmapImageBuilder(argb).build())
         val face = r.faceLandmarks().firstOrNull() ?: return Detection.EMPTY
-        val pts = FaceMeshMap.toKeys({ i -> face[i].x() to face[i].y() }, face.size, bmp.width, bmp.height)
         val m = r.facialTransformationMatrixes().orElse(null)?.firstOrNull()
-        val e = m?.let { FaceMeshMap.euler(it) }
-        // Cabeceo en la convención de ML Kit (positivo = barbilla arriba); la matriz de MediaPipe usa la opuesta.
-        return Detection(pts, e?.first, e?.second?.let { -it }, e?.third)
+        return FaceMeshMap.detectionOf({ i -> face[i].x() to face[i].y() }, face.size, bmp.width, bmp.height, m)
     }
 
     /** Malla completa (478 puntos; x e y divididas por el ancho de la imagen) o null sin rostro. */

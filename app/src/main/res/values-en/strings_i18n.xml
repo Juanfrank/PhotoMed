@@ -45,6 +45,7 @@
     <string name="t_0a9fc4c16b25" formatted="false">Chin forward, shoulders relaxed.</string>
     <string name="t_0aed0ac4e795" formatted="false">Start the protocol %1$s</string>
     <string name="t_0b25fd170cc1" formatted="false">Left profile at 90°, arms raised above the head (armpit visible).</string>
+    <string name="t_0b3c4b7615f9" formatted="false">Folds confirmed: saved in each photo</string>
     <string name="t_0b4d1ab9ce63" formatted="false">Even lighting across cheeks: frontal view only (in oblique and profile views each cheek gets different light)</string>
     <string name="t_0b5d027dbc0b" formatted="false">Lower third (subnasale → chin), mm</string>
     <string name="t_0b8237d43c3b" formatted="false">Relief measurement (screen)</string>
@@ -97,6 +98,7 @@
     <string name="t_1409f2deba17" formatted="false">Automatic detection</string>
     <string name="t_1434aafdff99" formatted="false">Profile: no face mesh; the neck and double chin are measured from the silhouette.</string>
     <string name="t_145687c7dfc5" formatted="false">Strokes saved in the app; could not be written to %1$d photo(s)</string>
+    <string name="t_14627a06347f" formatted="false">Folds confirmed in all %1$d photos</string>
     <string name="t_1534ef8d044e" formatted="false">Could not get the full face mesh%1$s: only the folds are measured (nasolabial, marionette, tear trough); forehead, glabellar lines, crow\'s feet and dark circles need the mesh.</string>
     <string name="t_15609a434b4a" formatted="false">Expression: %1$s</string>
     <string name="t_156b6e765065" formatted="false">Adjust the pose</string>
@@ -237,6 +239,7 @@
     <string name="t_32eb60561cba" formatted="false">Posterior view: patient seated with their back to the camera; camera behind and slightly above (≈ 35° downward); crown whorl on the mark, nape and shoulders at the bottom.</string>
     <string name="t_335b37132835" formatted="false">Aligned: %1$s</string>
     <string name="t_3360cf63b9b0" formatted="false">Leg</string>
+    <string name="t_3372cafb8d8b" formatted="false">Color adjustment</string>
     <string name="t_33bcf26552cb" formatted="false">Hairline not available. %1$s</string>
     <string name="t_34612878e638" formatted="false">Camera: tilt up</string>
     <string name="t_34935d17221f" formatted="false">Fifth 1 (edge → lateral canthus) (ideal 20 %), %</string>
@@ -517,6 +520,7 @@
     <string name="t_7631302a68c3" formatted="false">Color %1$s</string>
     <string name="t_772e1190da78" formatted="false">Patient record updated. New photos will use this data.</string>
     <string name="t_773067c6106c" formatted="false">The file is not a PhotoMed protocol (invalid JSON).</string>
+    <string name="t_77f6ff50e35d" formatted="false">Detected folds not confirmed</string>
     <string name="t_7806b477e24d" formatted="false">, number %1$d in the sequence</string>
     <string name="t_78204b4b705d" formatted="false">Regenerate the traces?</string>
     <string name="t_78230a632ffa" formatted="false">Fifth 2 (eye) (ideal 20 %), %</string>
@@ -706,6 +710,7 @@
     <string name="t_9f0a54155487" formatted="false">Crown</string>
     <string name="t_9f494a0c7bc4" formatted="false">Expand</string>
     <string name="t_9feef613aeb8" formatted="false">Share</string>
+    <string name="t_a01bdd27a45d" formatted="false">Confirm folds</string>
     <string name="t_a02f2403db18" formatted="false">alignment applied</string>
     <string name="t_a0eacbeb1067" formatted="false">Could not align: %1$s</string>
     <string name="t_a1e2bf1981b7" formatted="false">Upper third (hair → brows), mm</string>
@@ -743,6 +748,7 @@
     <string name="t_a85ae4a4d3c4" formatted="false">Use anatomical landmarks</string>
     <string name="t_a8cad326a759" formatted="false">Use contours</string>
     <string name="t_a8ef65cd3561" formatted="false">Version %1$s</string>
+    <string name="t_a8f4939cdc98" formatted="false">Color</string>
     <string name="t_a9068e529958" formatted="false">Anger (frown)</string>
     <string name="t_a911e08a3f15" formatted="false">shoulders, shoulder blades, waist and hips</string>
     <string name="t_a933ca0fbf05" formatted="false">Triangle</string>

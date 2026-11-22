@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Verified
 import com.photomed.app.align.ColorAdjust
 import androidx.compose.material.icons.filled.Straighten
 import com.photomed.app.ui.components.SafeBottomSheet
@@ -181,6 +182,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     var measure by remember { mutableStateOf(false) }
     var colorDialog by remember { mutableStateOf(false) }
     var colorAdjusts by remember { mutableStateOf<Map<String, ColorAdjust>>(emptyMap()) }
+    /** Igualación de color visible (se puede apagar sin perderla, como la alineación). */
+    var useColor by remember { mutableStateOf(true) }
+    val shownColors: Map<String, ColorAdjust> = if (useColor) colorAdjusts else emptyMap()
     var contourOutlines by remember { mutableStateOf<Map<String, List<Pt>>>(emptyMap()) }
     var conditionsWarning by remember { mutableStateOf<String?>(null) }
     var hairlineInfo by remember { mutableStateOf<String?>(null) }
@@ -400,7 +404,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                         .getOrNull()?.let { p.key to it }
                 }.toMap()
                 if (alignToken != token) return@launch
-                if (adj.isNotEmpty()) { colorAdjusts = adj; colorNote = " · " + tr("color igualado") }
+                if (adj.isNotEmpty()) { colorAdjusts = adj; useColor = true; colorNote = " · " + tr("color igualado") }
                 alignProgress = null
             }
             val msg = when {
@@ -487,7 +491,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         val aligning = alignJob?.isActive == true
         // Modelos (con perspectiva y color corregidos) de cada foto de la secuencia.
         val models: Map<String, Any> = seq?.associate { p ->
-            p.key to key(p.key) { rememberCorrected(p.uri, resultOf(p)?.keystoneDeg ?: 0f, Perspective.DEFAULT_FOCAL, colorAdjusts[p.key]) }
+            p.key to key(p.key) { rememberCorrected(p.uri, resultOf(p)?.keystoneDeg ?: 0f, Perspective.DEFAULT_FOCAL, shownColors[p.key]) }
         }.orEmpty()
         // anotaciones (contorno, línea del pelo, rasgos, surcos) de cada foto, en su foto corregida
         val layers = if (showLayers) layersState.value else emptySet()
@@ -537,6 +541,23 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 Text(tr("Atención: compara expresiones distintas (%1\$s); las arrugas dinámicas solo se comparan con la misma expresión.", ex.joinToString(" / ") { it.label }),
                     color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = Md3Spacing.marginCompact, vertical = 2.dp))
+            }
+            // surcos detectados: confirmarlos aquí mismo (quedan guardados en cada foto y no se vuelven a
+            // analizar), sin abrir la tabla de medidas
+            if (showLayers && seq != null && seq.none { annots[it.key] == null } && seq.any { annots[it.key].orEmpty().isNotEmpty() }) {
+                val allConfirmed by androidx.compose.runtime.produceState(false, seq.map { it.key }, userVersion) {
+                    value = withContext(Dispatchers.IO) { seq.all { com.photomed.app.align.ConfirmedTraces.of(context, it.uri.toString()) != null } }
+                }
+                Row(Modifier.fillMaxWidth().padding(horizontal = Md3Spacing.marginCompact, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(if (allConfirmed) Icons.Default.Verified else Icons.Default.Info, null, Modifier.size(18.dp),
+                        tint = if (allConfirmed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (allConfirmed) tr("Surcos confirmados en las %1\$d fotos", seq.size) else tr("Surcos detectados sin confirmar"),
+                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f).padding(start = 6.dp))
+                    if (!allConfirmed) androidx.compose.material3.FilledTonalButton(onClick = {
+                        mutateTraces(seq, { previousOf(it) }) { it }
+                        scope.launch { snackbar.showSnackbar(tr("Surcos confirmados: se guardan en cada foto")) }
+                    }) { Text(tr("Confirmar surcos")) }
+                }
             }
             // análisis de arrugas y rasgos en curso: barra de proceso visible
             if (showLayers && seq != null && seq.any { annots[it.key] == null }) Row(
@@ -773,6 +794,16 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                                 else tr("Alineado"), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
                             Switch(checked = useAligned, onCheckedChange = null)
                         }
+                    }
+                    // igualación de color: encender y apagar junto a la alineación
+                    if (colorAdjusts.isNotEmpty()) Row(
+                        Modifier.toggleable(useColor, role = Role.Switch) { useColor = it }
+                            .semantics { contentDescription = tr("Ajuste de color") },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Default.Palette, null, Modifier.size(18.dp).padding(end = 2.dp))
+                        Text(tr("Color"), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 4.dp))
+                        Switch(checked = useColor, onCheckedChange = null)
                     }
                     // detalles de la alineación y avisos: detrás del botón de información (ocupaban mucho)
                     val gazeIssues = if (validAlign && options.gaze) s.drop(1).mapIndexedNotNull { i, p ->
@@ -1042,14 +1073,14 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         val diagram = if (showLayers) layersState.value else emptySet()
         ExportSheet(
             initialView = viewLayers.value,
-            count = seq.size, aligned = shown.isNotEmpty(), colorMatched = colorAdjusts.isNotEmpty(), cropped = crop != null,
+            count = seq.size, aligned = shown.isNotEmpty(), colorMatched = shownColors.isNotEmpty(), cropped = crop != null,
             onDismiss = { exportSheet = false },
             // vista previa del GIF: las fotos ajustadas (alineación, recorte, color) en tamaño reducido
             loadPreview = { pv ->
                 val labels = stampLabels(seq.map { it.takenAt })
                 seq.mapIndexed { i, p ->
                     val d = labels[i]
-                    CompareExport.render(context, p, shown[p.key], colorAdjusts[p.key], width = 300, crop = effectiveCrop(),
+                    CompareExport.render(context, p, shown[p.key], shownColors[p.key], width = 300, crop = effectiveCrop(),
                         annots = exportAnnots[p.key], layers = diagram,
                         orient = com.photomed.app.align.ImageEdit(viewRot, viewMirror), annotAlpha = annotAlpha.value,
                         view = pv, ink = exportInk[p.key].orEmpty()) to
@@ -1061,7 +1092,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                 val anonymize = ch.anonymize
                 val dir = java.io.File(context.cacheDir, "share/export").apply { deleteRecursively(); mkdirs() }
                 val order = displayOrder(seq.map { it.key }, gridOrder, manualOrder).map { k -> seq.indexOfFirst { it.key == k } }
-                val r = CompareExport.build(context, repo, seq, shown, colorAdjusts,
+                val r = CompareExport.build(context, repo, seq, shown, shownColors,
                     individual = ch.kind == ExportKind.INDIVIDUAL, grid = ch.kind == ExportKind.GRID, anonymize = anonymize, dir = dir,
                     onProgress = progress, side = ch.kind == ExportKind.SIDE, gif = ch.gif.takeIf { ch.kind.animated }, mp4 = ch.kind == ExportKind.MP4, watermark = ch.watermark,
                     gifTiming = ch.timing, crop = effectiveCrop(), labels = stampLabels(seq.map { it.takenAt }), order = order,
@@ -1083,7 +1114,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
 
     if (colorDialog && reference != null && target != null) {
         ColorMatchDialog(reference, target, onDismiss = { colorDialog = false }, onApply = {
-            colorDialog = false; colorAdjusts = colorAdjusts + (target.key to it)
+            colorDialog = false; colorAdjusts = colorAdjusts + (target.key to it); useColor = true
             scope.launch { snackbar.showSnackbar(tr("Color igualado: %1\$s", it.describe())) }
         })
     }

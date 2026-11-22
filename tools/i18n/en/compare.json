@@ -263,5 +263,11 @@
   "ΔL* frente a la mejilla": "ΔL* vs. cheek",
   "“antes” sin encuadre confirmado": "“before” without confirmed framing",
   "“después” sin encuadre confirmado": "“after” without confirmed framing",
-  "✱ Parcialmente cubierto por barba o bigote: se mide solo la parte visible.": "✱ Partially covered by beard or mustache: only the visible part is measured."
+  "✱ Parcialmente cubierto por barba o bigote: se mide solo la parte visible.": "✱ Partially covered by beard or mustache: only the visible part is measured.",
+  "Ajuste de color": "Color adjustment",
+  "Color": "Color",
+  "Surcos confirmados en las %1$d fotos": "Folds confirmed in all %1$d photos",
+  "Surcos detectados sin confirmar": "Detected folds not confirmed",
+  "Surcos confirmados: se guardan en cada foto": "Folds confirmed: saved in each photo",
+  "Confirmar surcos": "Confirm folds"
 }

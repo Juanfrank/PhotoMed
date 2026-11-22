@@ -77,11 +77,7 @@ data class GuideTone(val color: Color) {
         }
 
         /** Grado de coincidencia 0..1 (1 = coincide); null sin detección. */
-        fun degree(eval: com.photomed.app.align.MatchEval?): Float? = when {
-            eval == null || eval.status == com.photomed.app.align.MatchStatus.SEARCHING -> null
-            eval.status == com.photomed.app.align.MatchStatus.MATCH -> 1f
-            else -> (eval.pointFraction?.let { it / eval.threshold.coerceAtLeast(0.05f) } ?: eval.quality).coerceIn(0f, 0.95f)
-        }
+        fun degree(eval: com.photomed.app.align.MatchEval?): Float? = com.photomed.app.align.AutoCapture.degree(eval)
 
         /** Rojo (0) → naranja (0,5) → verde (1). */
         fun gradient(d: Float): Color = if (d < 0.5f) androidx.compose.ui.graphics.lerp(FAR.color, CLOSE.color, d / 0.5f)

@@ -45,6 +45,7 @@
     <string name="t_0a9fc4c16b25" formatted="false">Mentón al frente, hombros relajados.</string>
     <string name="t_0aed0ac4e795" formatted="false">Iniciar el protocolo %1$s</string>
     <string name="t_0b25fd170cc1" formatted="false">Perfil izquierdo a 90°, brazos elevados por encima de la cabeza (axila visible).</string>
+    <string name="t_0b3c4b7615f9" formatted="false">Surcos confirmados: se guardan en cada foto</string>
     <string name="t_0b4d1ab9ce63" formatted="false">Luz pareja entre mejillas: solo en la vista frontal (en oblicuas y perfiles cada mejilla recibe luz distinta)</string>
     <string name="t_0b5d027dbc0b" formatted="false">Tercio inferior (subnasal → mentón), mm</string>
     <string name="t_0b8237d43c3b" formatted="false">Medición de relieve (pantalla)</string>
@@ -97,6 +98,7 @@
     <string name="t_1409f2deba17" formatted="false">Detección automática</string>
     <string name="t_1434aafdff99" formatted="false">Perfil: sin malla facial; el cuello y la papada se miden por la silueta.</string>
     <string name="t_145687c7dfc5" formatted="false">Trazos guardados en la app; no se pudieron escribir en %1$d foto(s)</string>
+    <string name="t_14627a06347f" formatted="false">Surcos confirmados en las %1$d fotos</string>
     <string name="t_1534ef8d044e" formatted="false">No se pudo obtener la malla facial completa%1$s: solo se miden los surcos (nasogeniano, marioneta, valle lagrimal); frente, ceño, patas de gallo y ojeras necesitan la malla.</string>
     <string name="t_15609a434b4a" formatted="false">Expresión: %1$s</string>
     <string name="t_156b6e765065" formatted="false">Ajuste la pose</string>
@@ -237,6 +239,7 @@
     <string name="t_32eb60561cba" formatted="false">Vista posterior: paciente sentado de espaldas; cámara detrás y algo por encima (≈ 35° hacia abajo); remolino de la coronilla en la marca, nuca y hombros abajo.</string>
     <string name="t_335b37132835" formatted="false">Alineado: %1$s</string>
     <string name="t_3360cf63b9b0" formatted="false">Pierna</string>
+    <string name="t_3372cafb8d8b" formatted="false">Ajuste de color</string>
     <string name="t_33bcf26552cb" formatted="false">Línea del pelo no disponible. %1$s</string>
     <string name="t_34612878e638" formatted="false">Cámara: inclinar hacia arriba</string>
     <string name="t_34935d17221f" formatted="false">Quinto 1 (borde → canto externo) (ideal 20 %), %</string>
@@ -517,6 +520,7 @@
     <string name="t_7631302a68c3" formatted="false">Color %1$s</string>
     <string name="t_772e1190da78" formatted="false">Expediente actualizado. Las fotos nuevas usarán estos datos.</string>
     <string name="t_773067c6106c" formatted="false">El archivo no es un protocolo de PhotoMed (JSON no válido).</string>
+    <string name="t_77f6ff50e35d" formatted="false">Surcos detectados sin confirmar</string>
     <string name="t_7806b477e24d" formatted="false">, número %1$d de la secuencia</string>
     <string name="t_78204b4b705d" formatted="false">¿Regenerar los trazos?</string>
     <string name="t_78230a632ffa" formatted="false">Quinto 2 (ojo) (ideal 20 %), %</string>
@@ -706,6 +710,7 @@
     <string name="t_9f0a54155487" formatted="false">Corona (coronilla)</string>
     <string name="t_9f494a0c7bc4" formatted="false">Desplegar</string>
     <string name="t_9feef613aeb8" formatted="false">Compartir</string>
+    <string name="t_a01bdd27a45d" formatted="false">Confirmar surcos</string>
     <string name="t_a02f2403db18" formatted="false">alineación aplicada</string>
     <string name="t_a0eacbeb1067" formatted="false">No se pudo alinear: %1$s</string>
     <string name="t_a1e2bf1981b7" formatted="false">Tercio superior (pelo → cejas), mm</string>
@@ -743,6 +748,7 @@
     <string name="t_a85ae4a4d3c4" formatted="false">Usar puntos anatómicos</string>
     <string name="t_a8cad326a759" formatted="false">Usar contornos</string>
     <string name="t_a8ef65cd3561" formatted="false">Versión %1$s</string>
+    <string name="t_a8f4939cdc98" formatted="false">Color</string>
     <string name="t_a9068e529958" formatted="false">Enojo (fruncir el ceño)</string>
     <string name="t_a911e08a3f15" formatted="false">hombros, escápulas, cintura y caderas</string>
     <string name="t_a933ca0fbf05" formatted="false">Triángulo</string>

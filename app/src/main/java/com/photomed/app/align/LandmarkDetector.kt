@@ -89,10 +89,7 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
                 lastError = "MediaPipe: " + e.javaClass.simpleName
                 null
             }
-            if (mp != null && mp.points.isNotEmpty()) {
-                val pose = runCatching { HeadPose.fit(FaceKeys.canonical(mp.points)) }.getOrNull()
-                return mp.copy(gaze = runCatching { Gaze.fromIris(mp.points) }.getOrNull(), pose = pose)
-            }
+            if (mp != null && mp.points.isNotEmpty()) return withPoseAndGaze(mp)
         }
         val d = detectFace(bmp)
         if (d.points.isEmpty()) return d
@@ -142,26 +139,38 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
     private fun detectPose(bmp: Bitmap): Map<String, Pt> {
         val p = Tasks.await(pose.process(InputImage.fromBitmap(bmp, 0)), ML_KIT_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
         val w = bmp.width.toFloat()
-        val out = mutableMapOf<String, Pt>()
-        mapOf(
-            PoseLandmark.NOSE to Landmarks.NOSE,
-            PoseLandmark.LEFT_EAR to Landmarks.EAR_L, PoseLandmark.RIGHT_EAR to Landmarks.EAR_R,
-            PoseLandmark.LEFT_MOUTH to Landmarks.MOUTH_L, PoseLandmark.RIGHT_MOUTH to Landmarks.MOUTH_R,
-            PoseLandmark.LEFT_SHOULDER to Landmarks.SHOULDER_L, PoseLandmark.RIGHT_SHOULDER to Landmarks.SHOULDER_R,
-            PoseLandmark.LEFT_ELBOW to Landmarks.ELBOW_L, PoseLandmark.RIGHT_ELBOW to Landmarks.ELBOW_R,
-            PoseLandmark.LEFT_WRIST to Landmarks.WRIST_L, PoseLandmark.RIGHT_WRIST to Landmarks.WRIST_R,
-            PoseLandmark.LEFT_INDEX to Landmarks.INDEX_L, PoseLandmark.RIGHT_INDEX to Landmarks.INDEX_R,
-            PoseLandmark.LEFT_PINKY to Landmarks.PINKY_L, PoseLandmark.RIGHT_PINKY to Landmarks.PINKY_R,
-            PoseLandmark.LEFT_THUMB to Landmarks.THUMB_L, PoseLandmark.RIGHT_THUMB to Landmarks.THUMB_R,
-            PoseLandmark.LEFT_HIP to Landmarks.HIP_L, PoseLandmark.RIGHT_HIP to Landmarks.HIP_R,
-            PoseLandmark.LEFT_KNEE to Landmarks.KNEE_L, PoseLandmark.RIGHT_KNEE to Landmarks.KNEE_R,
-            PoseLandmark.LEFT_ANKLE to Landmarks.ANKLE_L, PoseLandmark.RIGHT_ANKLE to Landmarks.ANKLE_R,
-            PoseLandmark.LEFT_HEEL to Landmarks.HEEL_L, PoseLandmark.RIGHT_HEEL to Landmarks.HEEL_R,
-            PoseLandmark.LEFT_FOOT_INDEX to Landmarks.FOOT_INDEX_L, PoseLandmark.RIGHT_FOOT_INDEX to Landmarks.FOOT_INDEX_R,
-        ).forEach { (type, key) ->
-            p.getPoseLandmark(type)?.takeIf { it.inFrameLikelihood >= 0.8f }?.position?.let { out[key] = Pt(it.x / w, it.y / w) }
+        // los tipos de PoseLandmark de ML Kit son los índices de BlazePose (los mismos de MediaPipe Pose)
+        return poseKeys(POSE_KEYS.keys.mapNotNull { t -> p.getPoseLandmark(t)?.let { t to Triple(it.position.x / w, it.position.y / w, it.inFrameLikelihood) } }.toMap())
+    }
+
+    companion object {
+        /** Índice de BlazePose (= tipo de PoseLandmark de ML Kit) → nombre del punto en la app. */
+        val POSE_KEYS: Map<Int, String> = linkedMapOf(
+            0 to Landmarks.NOSE, 7 to Landmarks.EAR_L, 8 to Landmarks.EAR_R, 9 to Landmarks.MOUTH_L, 10 to Landmarks.MOUTH_R,
+            11 to Landmarks.SHOULDER_L, 12 to Landmarks.SHOULDER_R, 13 to Landmarks.ELBOW_L, 14 to Landmarks.ELBOW_R,
+            15 to Landmarks.WRIST_L, 16 to Landmarks.WRIST_R, 17 to Landmarks.PINKY_L, 18 to Landmarks.PINKY_R,
+            19 to Landmarks.INDEX_L, 20 to Landmarks.INDEX_R, 21 to Landmarks.THUMB_L, 22 to Landmarks.THUMB_R,
+            23 to Landmarks.HIP_L, 24 to Landmarks.HIP_R, 25 to Landmarks.KNEE_L, 26 to Landmarks.KNEE_R,
+            27 to Landmarks.ANKLE_L, 28 to Landmarks.ANKLE_R, 29 to Landmarks.HEEL_L, 30 to Landmarks.HEEL_R,
+            31 to Landmarks.FOOT_INDEX_L, 32 to Landmarks.FOOT_INDEX_R,
+        )
+
+        /** Probabilidad mínima de que el punto esté dentro del cuadro para usarlo. */
+        const val POSE_MIN_IN_FRAME = 0.8f
+
+        /** Puntos del cuerpo: índice de BlazePose → (x, y en unidades del ancho, probabilidad en el cuadro). */
+        fun poseKeys(byIndex: Map<Int, Triple<Float, Float, Float>>): Map<String, Pt> =
+            POSE_KEYS.mapNotNull { (i, key) -> byIndex[i]?.takeIf { it.third >= POSE_MIN_IN_FRAME }?.let { key to Pt(it.first, it.second) } }.toMap()
+
+        /** Rostro de MediaPipe listo para usar: contornos en orden canónico, pose geométrica y mirada. */
+        fun withPoseAndGaze(mp: Detection): Detection {
+            val pose = runCatching { HeadPose.fit(FaceKeys.canonical(mp.points)) }.getOrNull()
+            return mp.copy(gaze = runCatching { Gaze.fromIris(mp.points) }.getOrNull(), pose = pose)
         }
-        return out
+
+        /** Como [detectFull] para el rostro con MediaPipe (pruebas): pose, mirada y contornos canónicos. */
+        fun finishFace(mp: Detection): Detection = if (mp.points.isEmpty()) mp
+            else withPoseAndGaze(mp).let { it.copy(points = FaceKeys.canonical(it.points)) }
     }
 
     override fun close() {

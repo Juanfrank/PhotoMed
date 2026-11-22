@@ -835,8 +835,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     }
     fun readyNow(e: com.photomed.app.align.MatchEval?) =
         // la expresión pedida es obligatoria (también con «casi alineada»); con protocolo, también su luz
-        e != null && e.expressionOk && lightIssue(live) == null &&
-            (e.status == MatchStatus.MATCH || (nearCapture && step == null && (GuideTone.degree(e) ?: 0f) >= 0.8f))
+        com.photomed.app.align.AutoCapture.ready(e, lightOk = lightIssue(live) == null, nearCapture = nearCapture, protocol = step != null)
     val ready = matchingEnabled && readyNow(live?.eval)
     LaunchedEffect(ready, autoCapture) {
         if (!ready) { autoArmed = true; return@LaunchedEffect }
