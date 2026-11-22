@@ -6,9 +6,9 @@ import kotlin.math.sqrt
 
 /**
  * Primera foto (sin referencia) en zonas donde no hay puntos que comprobar: cuero cabelludo, ojo y
- * modo libre (sin detector), y espalda, glúteos, manos, pies o primeros planos del rostro cuando el
- * detector no encuentra el cuerpo o la cara (el detector de cuerpo localiza a la persona por la
- * cara: de espaldas o en primer plano no la ve). Se dispara cuando el encuadre queda quieto
+ * modo libre (sin detector), las zonas del cuerpo (el detector de cuerpo localiza a la persona por
+ * la cara: de espaldas o en primer plano no la ve, y la pose no dice nada del encuadre) y los
+ * primeros planos del rostro cuando no se encuentra la cara. Se dispara cuando el encuadre queda quieto
  * [holdMs] y hay imagen con detalle (no una pared lisa o la cámara tapada): quien encuadra con la
  * guía decide el encuadre y la app elige el instante sin movimiento.
  *
@@ -78,11 +78,11 @@ class SteadyFraming(private val holdMs: Long = 700) {
         /** ¿La primera foto de [zone] se decide por la quietud del encuadre (ver la clase)? */
         fun applies(zone: com.photomed.app.data.Zone, det: Detection): Boolean {
             val spec = ZoneAlignment.of(zone)
-            val few = det.points.size < LiveDecision.MIN_POINTS
             return when (spec.detector) {
-                Detector.NONE -> true
-                Detector.POSE -> few
-                Detector.FACE -> few && zone.guide in CLOSE_UPS
+                // sin detector y en el cuerpo, siempre: la pose no dice nada del encuadre (y el detector
+                // de cuerpo a veces «ve» una persona diminuta en una mano o un pie)
+                Detector.NONE, Detector.POSE -> true
+                Detector.FACE -> det.points.size < LiveDecision.MIN_POINTS && zone.guide in CLOSE_UPS
             }
         }
     }

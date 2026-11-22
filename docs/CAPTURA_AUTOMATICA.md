@@ -43,22 +43,22 @@ comprobar la simetría de la lógica, también los puntos reflejados de cada ori
 | ojo_der | NONE | 28 | — | 28/28 | 28/28 | 0/8 | — | 12/12 | 0/12 |  |
 | ojo_izq | NONE | 28 | — | 28/28 | 28/28 | 0/8 | — | 12/12 | 0/12 |  |
 | labios | FACE | 28 | 18 | 11/28 | 11/28 | 0/8 | — | 12/12 | 0/12 | Luz desigual: lado derecho más oscuro (9); Mirada: al frente (5); Cabeza: girar a la derecha 6° (3) |
-| cuello | POSE | 11 | 8 | 11/11 | 11/11 | 0/3 | — | 11/11 | 0/11 |  |
+| cuello | POSE | 11 | 8 | 11/11 | 11/11 | 0/8 | — | 11/11 | 0/11 |  |
 | cuero_cabelludo_vertice | NONE | 15 | — | 14/15 | 14/15 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
 | cuero_cabelludo_corona | NONE | 15 | — | 14/15 | 14/15 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
 | cuero_cabelludo_parietal_der | NONE | 15 | — | 14/15 | 14/15 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
 | cuero_cabelludo_parietal_izq | NONE | 15 | — | 14/15 | 14/15 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
-| abdomen_frontal | POSE | 9 | 9 | 9/9 | 9/9 | — | — | 9/9 | 0/9 |  |
-| abdomen_lateral | POSE | 11 | 7 | 11/11 | 11/11 | 0/4 | — | 11/11 | 0/11 |  |
-| abdomen_lateral_izq | POSE | 14 | 8 | 13/14 | 13/14 | 0/6 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
-| torax_mamas | POSE | 15 | 13 | 15/15 | 15/15 | 0/2 | — | 12/12 | 0/12 |  |
+| abdomen_frontal | POSE | 9 | 9 | 9/9 | 9/9 | 0/8 | — | 9/9 | 0/9 |  |
+| abdomen_lateral | POSE | 11 | 7 | 10/11 | 10/11 | 0/8 | — | 11/11 | 0/11 | Mantenga el teléfono quieto (1) |
+| abdomen_lateral_izq | POSE | 14 | 8 | 12/14 | 12/14 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (2) |
+| torax_mamas | POSE | 15 | 13 | 15/15 | 15/15 | 0/8 | — | 12/12 | 0/12 |  |
 | espalda | POSE | 13 | 1 | 13/13 | 13/13 | 0/8 | — | 12/12 | 0/12 |  |
-| gluteos | POSE | 6 | 2 | 6/6 | 6/6 | 0/4 | — | 6/6 | 0/6 |  |
-| muslos | POSE | 15 | 12 | 15/15 | 15/15 | 0/3 | — | 12/12 | 0/12 |  |
-| brazo_der | POSE | 10 | 9 | 10/10 | 10/10 | 0/1 | — | 10/10 | 0/10 |  |
-| brazo_izq | POSE | 14 | 10 | 14/14 | 14/14 | 0/4 | — | 12/12 | 0/12 |  |
+| gluteos | POSE | 6 | 2 | 6/6 | 6/6 | 0/6 | — | 6/6 | 0/6 |  |
+| muslos | POSE | 15 | 12 | 14/15 | 14/15 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
+| brazo_der | POSE | 10 | 9 | 9/10 | 9/10 | 0/8 | — | 10/10 | 0/10 | Mantenga el teléfono quieto (1) |
+| brazo_izq | POSE | 14 | 10 | 13/14 | 13/14 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
 | manos_dorso | POSE | 12 | 2 | 12/12 | 12/12 | 0/8 | — | 12/12 | 0/12 |  |
-| manos_palma | POSE | 6 | 1 | 5/6 | 5/6 | 0/5 | — | 6/6 | 0/6 | Encuadre la zona dentro de la guía (1) |
+| manos_palma | POSE | 6 | 1 | 5/6 | 5/6 | 0/6 | — | 6/6 | 0/6 | Encuadre la zona dentro de la guía (1) |
 | pies_dorso | POSE | 14 | 0 | 12/14 | 12/14 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (2) |
 | pies_planta | POSE | 8 | 0 | 8/8 | 8/8 | 0/8 | — | 8/8 | 0/8 |  |
 | libre | NONE | 28 | — | 27/28 | 27/28 | 0/8 | — | 12/12 | 0/12 | Mantenga el teléfono quieto (1) |
@@ -85,7 +85,7 @@ cabeza inclinada, giro fuera de 45° ± 8°): toda foto que cumple la geometría
 6. **Cuerpo de espaldas, manos, pies, cuero cabelludo, ojo y modo libre: nunca disparaban sin
    referencia**. El detector de cuerpo localiza a la persona por la cara (de espaldas o en primer
    plano no la ve: espalda 1 de 13, manos 2 de 12, pies 0 de 14) y en las zonas sin detector no había
-   nada que evaluar. Ahora, sin puntos que comprobar, dispara cuando el encuadre queda **quieto
+   nada que evaluar. Ahora, en el cuerpo y sin puntos que comprobar, dispara cuando el encuadre queda **quieto
    0,7 s** con imagen con detalle (no con el teléfono en movimiento ni con la cámara tapada); en el
    cuero cabelludo, además, con el ángulo de la cámara que pide cada vista.
 7. **Con referencia, esperaba puntos que no existían**: si la foto de referencia tenía algún punto del
@@ -95,3 +95,16 @@ cabeza inclinada, giro fuera de 45° ± 8°): toda foto que cumple la geometría
    azar, sale bajo en escenas con mucha textura (piel, pelo, manos) incluso con la misma imagen (0,00–0,55).
    Con la alineación de bordes segura decide su geometría (desplazamiento, escala y giro); si no, ese %
    como antes. Con el mismo encuadre: manos 6/12 → 12/12, pies 6/12 → 12/12, palmas 0/6 → 6/6.
+
+## Ver lo que la app identifica
+
+`ZoneAutoCaptureTest.drawOverlays` dibuja sobre cada foto de prueba lo que usa la cámara
+(`app/build/reports/zone_overlays/<zona>.jpg`): contornos de la cara (óvalo en verde, ojos en azul,
+cejas en violeta, nariz en naranja, labios en rojo) y pupilas; esqueleto del cuerpo; áreas donde se
+mide la luz (cuadros amarillos; naranjas si es por regiones); regiones de contorno de la guía de la
+zona (elipses celestes, donde se buscan los bordes con referencia) y bordes de referencia (puntos
+amarillos); abajo, si la primera foto dispara o la primera indicación por la que no.
+
+Limitación: en las zonas que se deciden por la quietud del encuadre (cuerpo, cuero cabelludo, ojo,
+modo libre) la app no comprueba que se vea la zona correcta, solo que el encuadre esté quieto y con
+detalle; el encuadre lo decide quien toma la foto con la guía.
