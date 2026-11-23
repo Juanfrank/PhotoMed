@@ -58,5 +58,6 @@
   "Encuadre el cuero cabelludo (no se ve el pelo)": "Frame the scalp (the hair is not visible)",
   "Acérquese: encuadre solo la zona (se ve la cara entera)": "Move closer: frame only the area (the whole face is visible)",
   "Acérquese: encuadre un solo ojo": "Move closer: frame a single eye",
-  "Encuadre los labios (se ven los ojos o la frente)": "Frame the lips (the eyes or the forehead are visible)"
+  "Encuadre los labios (se ven los ojos o la frente)": "Frame the lips (the eyes or the forehead are visible)",
+  "Mano a la %1$s de la imagen: que se vean todos los dedos extendidos, hacia abajo": "Hand on the %1$s of the image: all fingers must be visible, extended and pointing down"
 }

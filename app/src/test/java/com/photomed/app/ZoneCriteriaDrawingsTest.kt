@@ -291,6 +291,15 @@ class ZoneCriteriaDrawingsTest {
             hc("una sola mano", false, "dos manos", handsScene(palm, oneHand = true))
             // modo de una sola mano (selector Derecha / Izquierda): basta una, y debe cumplir igual
             fun hc1(name: String, ok: Boolean, expect: String?, r: Pair<Bitmap, List<ZoneCriteria.Hand>>) = out.add(Case(z, name, ok, expect, r.first, ZoneCriteria.Scene(emptyMap(), r.second, classes(r.first), single = true)))
+            // sin los puntos del detector de manos (primeros planos, algunas luces): por la piel
+            fun hs(name: String, ok: Boolean, expect: String?, b: Bitmap, single: Boolean = false) =
+                out.add(Case(z, "sin puntos: $name", ok, expect, b, ZoneCriteria.Scene(emptyMap(), null, classes(b), single = single)))
+            hs("correcta", true, null, handsScene(palm).first)
+            hs("dedos más abiertos", true, null, handsScene(palm, spread = 16f).first)
+            hs("puño", false, "dedos", handsScene(palm, bent = setOf(0, 1, 2, 3, 4)).first)
+            hs("una sola mano", false, "dos manos", handsScene(palm, oneHand = true).first)
+            hs("dedos fuera del cuadro", false, "entera dentro del cuadro", handsScene(palm, shiftY = 215f).first)
+            hs("son los pies", false, "dedos", feetScene())
             hc1("modo una mano: una mano", true, null, handsScene(palm, oneHand = true))
             hc1("modo una mano: anular recogido", false, "falanges", handsScene(palm, oneHand = true, bent = setOf(3)))
             hc("dedos fuera del cuadro", false, "entera dentro del cuadro", handsScene(palm, shiftY = 215f))
@@ -374,6 +383,14 @@ class ZoneCriteriaDrawingsTest {
             out += case(z, "brazo a 60°", false, "Baje el brazo", draw = { figure(it, armAbd = 60f) })
             out += case(z, "con manga", false, "Descubra", draw = { figure(it, armAbd = 20f, sleeve = true) })
             out += case(z, "brazo descentrado", false, "Centre", center = false) { figure(it, armAbd = 20f) }
+            // primer plano del brazo sin ningún punto del cuerpo (el detector no lo ve): por la piel
+            fun armClose(name: String, ok: Boolean, expect: String?, draw: (Canvas) -> Unit) {
+                val (bm, cv) = canvas(); draw(cv); out += Case(z, "sin puntos: $name", ok, expect, bm, ZoneCriteria.Scene(emptyMap(), null, classes(bm)))
+            }
+            armClose("brazo recto", true, null) { it.drawLine(150f, 10f, 160f, 390f, stroke(SKIN, 56f)) }
+            armClose("codo doblado", false, "Codo extendido") { it.drawLine(150f, 10f, 140f, 210f, stroke(SKIN, 56f)); it.drawLine(140f, 210f, 270f, 360f, stroke(SKIN, 50f)) }
+            armClose("con manga", false, "brazo") { it.drawLine(150f, 10f, 160f, 390f, stroke(SKIN, 56f)); it.drawRect(100f, 0f, 210f, 230f, fill(CLOTH)) }
+            armClose("solo un trozo", false, "brazo entero") { it.drawLine(150f, 150f, 152f, 260f, stroke(SKIN, 56f)) }
             // primer plano del brazo: sin caderas ni el otro brazo
             val keep = if (z == Zone.ARM_R) setOf(L.SHOULDER_R, L.ELBOW_R, L.WRIST_R, L.INDEX_R) else setOf(L.SHOULDER_L, L.ELBOW_L, L.WRIST_L, L.INDEX_L)
             out += case(z, "solo ese brazo (sin cadera)", true, null, pose = { p -> p.filterKeys { it in keep } }) { figure(it, armAbd = 20f) }
@@ -388,6 +405,16 @@ class ZoneCriteriaDrawingsTest {
         out += case(Zone.NECK, "hombros inclinados", false, "Hombros nivelados", draw = { figure(it, top = 60f, scale = 1.6f, tiltDeg = 12f) })
         out += case(Zone.NECK, "con jersey de cuello alto", false, "Descubra", draw = { c -> figure(c, top = 60f, scale = 1.6f).also { c.drawRect(120f, 120f, 180f, 200f, fill(CLOTH)); c.drawRect(60f, 170f, 240f, 260f, fill(CLOTH)) } })
         return out
+    }
+
+    /** Profundidad de los surcos entre dedos: mano (dedos largos) frente a pie (dedos cortos), sin puntos de la mano. */
+    @Test
+    fun digitDepthSeparatesHandsFromFeet() {
+        val hand = ZoneCriteria.feetOf(classes(handsScene(true).first)).map { it.digitDepth }
+        val foot = ZoneCriteria.feetOf(classes(feetScene())).map { it.digitDepth }
+        println("PROFUNDIDAD manos $hand pies $foot")
+        assertTrue("manos $hand", hand.isNotEmpty() && hand.all { it >= 0.3f })
+        assertTrue("pies $foot", foot.isNotEmpty() && foot.all { it < 0.3f })
     }
 
     /** El contorno del esquema de la mano sigue el borde real de la mano dibujada (no el eje de los dedos). */

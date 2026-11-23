@@ -229,7 +229,13 @@ object ZoneCriteria {
         fun pts(vararg k: String) = k.mapNotNull { p[it] }
         return when (zone.guide) {
             GuideType.HANDS -> {
-                val hs = s.hands ?: return null
+                val need = if (s.single) 1 else 2
+                val hs = s.hands?.takeIf { it.size >= need } ?: return s.classes?.let { c ->
+                    // sin los puntos de la mano: las manos por la piel
+                    val fs = skinHands(c).sortedByDescending { it.box.area }.take(need).takeIf { it.isNotEmpty() } ?: return null
+                    val k = c.width.toFloat()
+                    floatArrayOf(fs.minOf { it.box.x0 } / k, fs.minOf { it.box.y0 } / k, (fs.maxOf { it.box.x1 } + 1) / k, (fs.maxOf { it.box.y1 } + 1) / k) to booleanArrayOf(true, false)
+                }
                 val chosen = if (s.single) hs.maxByOrNull { dist(it.points[0], it.points[9]) }?.let { listOf(it) } ?: return null
                     else hs.sortedBy { it.points[0].x }.take(2)
                 box(chosen.flatMap { it.points })
@@ -328,8 +334,44 @@ object ZoneCriteria {
         return out
     }
 
+    /** Profundidad mínima de los surcos entre dedos para que una mancha de piel sea una mano (los pies, ≈ 0,1). */
+    const val HAND_DIGIT_DEPTH = 0.35f
+    /** Dedos mínimos de una mano reconocida por la piel. */
+    const val HAND_MIN_FINGERS = 4
+
+    /** Manos reconocidas por la piel (sin los puntos del detector): manchas con dedos largos (surcos hondos). */
+    fun skinHands(c: Classes): List<Foot> = feetOf(c).filter { it.digitDepth >= HAND_DIGIT_DEPTH && (it.toeCount ?: 0) >= 3 }
+
+    /**
+     * Manos sin los puntos del detector de manos (que falla en primeros planos y con algunas luces): por la
+     * piel, como los pies. Cada mano es una mancha de piel con los dedos hacia abajo: entera (solo puede salir
+     * del cuadro por la muñeca, arriba), con los dedos extendidos (surcos hondos, ≥ 4 dedos) y, si se ven
+     * claramente las uñas, por el dorso.
+     */
+    private fun handsFromSkin(zone: Zone, s: Scene, c: Classes): List<String> {
+        val need = if (s.single) 1 else 2
+        // manchas grandes de piel (manos o no); las que tienen dedos, primero
+        val blobs = feetOf(c).sortedWith(compareByDescending<Foot> { it.digitDepth >= HAND_DIGIT_DEPTH }.thenByDescending { it.box.area }).take(need)
+        if (blobs.size < need) return listOf(if (s.single) tr("Muestre la mano entera") else HINT_BOTH_HANDS)
+        val mx = (HAND_MARGIN * c.width).toInt().coerceAtLeast(1); val my = (HAND_MARGIN * c.height).toInt().coerceAtLeast(1)
+        val out = ArrayList<String>()
+        blobs.sortedBy { it.box.x0 }.forEach { f ->
+            val b = f.box
+            val side = if ((b.x0 + b.x1) < c.width) tr("izquierda") else tr("derecha")
+            if (b.x0 < mx || b.x1 > c.width - 1 - mx || b.y1 > c.height - 1 - my) out += tr("Mano a la %1\$s de la imagen: entera dentro del cuadro", side)
+            else if (f.digitDepth < HAND_DIGIT_DEPTH || (f.toeCount ?: 0) < HAND_MIN_FINGERS)
+                out += tr("Mano a la %1\$s de la imagen: que se vean todos los dedos extendidos, hacia abajo", side)
+            if (zone == Zone.HANDS_PALMAR && f.nails.size >= DORSAL_NAILS) out += tr("Mano a la %1\$s de la imagen: muestre la palma", side)
+        }
+        return out
+    }
+
     private fun hands(zone: Zone, s: Scene): List<String> {
-        val hs = s.hands ?: return listOf(HINT_HANDS_SEARCH)
+        val hs0 = s.hands
+        val need = if (s.single) 1 else 2
+        // sin las manos del detector: por la piel (si hay máscara)
+        if ((hs0 == null || hs0.size < need) && s.classes != null) return handsFromSkin(zone, s, s.classes)
+        val hs = hs0 ?: return listOf(HINT_HANDS_SEARCH)
         if (s.single && hs.isEmpty()) return listOf(tr("Muestre la mano entera"))
         if (!s.single && hs.size < 2) return listOf(HINT_BOTH_HANDS)
         val out = ArrayList<String>()
@@ -401,7 +443,9 @@ object ZoneCriteria {
                /** Líneas de separación entre dedos (unidades del ancho). */
                val toeLines: List<Pair<Pt, Pt>> = emptyList(),
                /** Uñas claramente visibles (contraste fuerte: ver [STRONG_NAIL_DE]), centro en unidades del ancho. */
-               val nails: List<Pt> = emptyList())
+               val nails: List<Pt> = emptyList(),
+               /** Profundidad de los surcos entre dedos (anchos): mano ≥ 0,3, pie ≈ 0,1 ([ToeDetector.Toes.depth]). */
+               val digitDepth: Float = 0f)
 
     @Volatile private var feetMemo: Pair<Classes, List<Foot>>? = null
 
@@ -470,7 +514,7 @@ object ZoneCriteria {
             // uñas: solo las de contraste fuerte (esmalte o uña muy marcada; las naturales se confunden con las
             // yemas de la planta). Cada una es un dedo: confirman el recuento si el contorno se quedó corto
             val nails = runCatching { footNails(c, f0, STRONG_NAIL_DE) }.getOrDefault(emptyList()).map { Pt(it.x * k, it.y * k) }
-            Foot(f0.outline, f0.toes, g, f0.coveredTip, f0.toeCount?.let { maxOf(it, nails.size.coerceAtMost(5)) }, f0.toeLines, nails)
+            Foot(f0.outline, f0.toes, g, f0.coveredTip, f0.toeCount?.let { maxOf(it, nails.size.coerceAtMost(5)) }, f0.toeLines, nails, td?.depth ?: 0f)
         }
     }
 
@@ -661,7 +705,9 @@ object ZoneCriteria {
                 // solo se ve un brazo: se evalúa el brazo pedido si está entero y, si no, el que se vea entero
                 val r0 = zone == Zone.ARM_R
                 val whole = { right: Boolean -> if (right) has(p, L.SHOULDER_R, L.ELBOW_R, L.WRIST_R) else has(p, L.SHOULDER_L, L.ELBOW_L, L.WRIST_L) }
-                val r = if (whole(r0)) r0 else if (whole(!r0)) !r0 else return listOf(tr("Encuadre el brazo entero: hombro, codo y muñeca"))
+                val r = if (whole(r0)) r0 else if (whole(!r0)) !r0
+                    // sin los puntos del brazo (primer plano): por la piel
+                    else return c?.let { armFromSkin(it, s) } ?: listOf(tr("Encuadre el brazo entero: hombro, codo y muñeca"))
                 val sh = if (r) L.SHOULDER_R else L.SHOULDER_L; val el = if (r) L.ELBOW_R else L.ELBOW_L
                 val wr = if (r) L.WRIST_R else L.WRIST_L; val hp = if (r) L.HIP_R else L.HIP_L
                 val a = p[sh]!!; val e = p[el]!!; val w = p[wr]!!
@@ -697,6 +743,58 @@ object ZoneCriteria {
             else -> {}
         }
         return out.distinct()
+    }
+
+    /** Largo mínimo de un brazo reconocido por la piel (fracción de la diagonal del cuadro) y alargamiento mínimo. */
+    const val ARM_MIN_LENGTH = 0.55f
+    const val ARM_MIN_ELONGATION = 3.0f
+    /** Desviación máxima de la línea central de un brazo recto (fracción de su largo): codo extendido. */
+    const val ARM_MAX_BEND = 0.09f
+
+    /**
+     * Brazo sin los puntos del cuerpo (primer plano): la mayor mancha de piel, alargada y que recorre buena
+     * parte del cuadro (si una manga lo tapa, queda corta), con su línea central recta (codo extendido) y sin
+     * ropa encima. La separación del cuerpo no se puede medir sin el tronco.
+     */
+    private fun armFromSkin(c: Classes, s: Scene): List<String> {
+        // con la cara a la vista no es un primer plano del brazo
+        if (faceSkinAll(c) > 0.12f) return listOf(tr("Encuadre el brazo entero: hombro, codo y muñeca"))
+        val (blobs, lab) = labeled(c, 0.03f)
+        val bi = blobs.indices.maxByOrNull { blobs[it].area } ?: return listOf(tr("Encuadre el brazo entero: hombro, codo y muñeca"))
+        // ejes principales de la mancha
+        var n = 0; var sx = 0.0; var sy = 0.0
+        for (i in lab.indices) if (lab[i] == bi) { n++; sx += i % c.width; sy += i / c.width }
+        val mx = sx / n; val my = sy / n
+        var cxx = 0.0; var cyy = 0.0; var cxy = 0.0
+        for (i in lab.indices) if (lab[i] == bi) { val dx = i % c.width - mx; val dy = i / c.width - my; cxx += dx * dx; cyy += dy * dy; cxy += dx * dy }
+        cxx /= n; cyy /= n; cxy /= n
+        val tr2 = cxx + cyy; val det = cxx * cyy - cxy * cxy
+        val l1 = tr2 / 2 + Math.sqrt(maxOf(0.0, tr2 * tr2 / 4 - det)); val l2 = maxOf(1e-6, tr2 / 2 - Math.sqrt(maxOf(0.0, tr2 * tr2 / 4 - det)))
+        val ang = 0.5 * Math.atan2(2 * cxy, cxx - cyy); val ux = Math.cos(ang); val uy = Math.sin(ang)
+        // largo a lo largo del eje y línea central por tramos
+        var tMin = Double.MAX_VALUE; var tMax = -Double.MAX_VALUE
+        for (i in lab.indices) if (lab[i] == bi) { val t = (i % c.width - mx) * ux + (i / c.width - my) * uy; if (t < tMin) tMin = t; if (t > tMax) tMax = t }
+        val len = tMax - tMin; val diag = hypot(c.width.toDouble(), c.height.toDouble())
+        if (len < ARM_MIN_LENGTH * diag || Math.sqrt(l1 / l2) < ARM_MIN_ELONGATION) return listOf(tr("Encuadre el brazo entero: hombro, codo y muñeca"))
+        val bins = 12; val sum = DoubleArray(bins); val cnt = IntArray(bins)
+        for (i in lab.indices) if (lab[i] == bi) {
+            val dx = i % c.width - mx; val dy = i / c.width - my
+            val t = dx * ux + dy * uy; val q = -dx * uy + dy * ux
+            val b = ((t - tMin) / (len + 1e-6) * bins).toInt().coerceIn(0, bins - 1); sum[b] += q; cnt[b]++
+        }
+        val centre = (0 until bins).filter { cnt[it] > 0 }.map { sum[it] / cnt[it] }
+        val out = ArrayList<String>()
+        // recta por los extremos de la línea central: la mayor desviación es la flexión del codo
+        if (centre.size >= 4) {
+            val a = centre.first(); val b = centre.last(); val k = centre.size - 1
+            val dev = centre.indices.maxOf { i -> abs(centre[i] - (a + (b - a) * i / k)) }
+            if (dev > ARM_MAX_BEND * len) out += tr("Codo extendido")
+        }
+        // ropa sobre el brazo: ropa junto a la mancha a lo largo de su eje (una manga corta el brazo)
+        val box = blobs[bi]
+        val f = skinClothes(c, box.x0 / c.width.toFloat(), box.y0 / c.width.toFloat(), (box.x1 + 1) / c.width.toFloat(), (box.y1 + 1) / c.width.toFloat())
+        if (f.second > MAX_CLOTHES) out += tr("Descubra %1\$s (se ve ropa o no se ve la piel)", tr(trn("el brazo")))
+        return out
     }
 
     /** Una sola pierna: la de cadera, rodilla y tobillo visibles (la más completa), extendida y descubierta. */

@@ -172,6 +172,19 @@ claramente visibles (ΔE ≥ 15):
   otra cosa (y en la toma de palma, avisan de que se ve el dorso).
 - Se dibujan en el esquema como puntos de referencia.
 
+### Zonas del cuerpo sin los puntos del detector
+
+- **Manos** (el detector de manos falla en primeros planos y con algunas luces): por la piel, como los
+  pies. Cada mano es una mancha de piel con los dedos hacia abajo: entera (solo sale del cuadro por la
+  muñeca), con los dedos extendidos (contorno en nube con ≥ 4 dedos y surcos hondos: profundidad ≥ 0,35
+  anchos; en los pies ≈ 0,1, así un par de pies no pasa por manos) y, con uñas claramente visibles, por el
+  dorso. Contorno y centrado también sin puntos.
+- **Brazo en primer plano** (sin puntos del cuerpo): la mayor mancha de piel del cuerpo (sin cara a la
+  vista), alargada (≥ 3:1) y que recorre ≥ 55 % de la diagonal (una manga la corta), con su línea central
+  recta (codo extendido, desviación ≤ 9 % del largo) y sin ropa encima.
+- **Luz desigual entre mejillas**: solo en el rostro frontal (en los primeros planos las mejillas quedan en
+  el borde o fuera); **mirada al frente**: no en los labios.
+
 ### Precisión entre zonas (`crossZonePrecision`)
 
 La primera foto de cada zona (con sus criterios) se evalúa sobre las fotos de prueba de **las demás zonas**:

@@ -33,6 +33,11 @@ object ToeDetector {
         val lines: List<Pair<Pair<Float, Float>, Pair<Float, Float>>>,
         /** Contorno distal (para dibujar la nube), en píxeles. */
         val edge: List<Pair<Float, Float>>,
+        /**
+         * Profundidad de los surcos entre dedos, en anchos del pie / de la mano (mediana): los dedos de la mano
+         * son largos (surcos hondos, ≥ 0,3), los del pie cortos (≈ 0,1).
+         */
+        val depth: Float = 0f,
     )
 
     const val SMOOTH = 0.015f
@@ -90,7 +95,7 @@ object ToeDetector {
         // franja distal: se amplía hasta que el borde sea un tramo continuo (con dedos largos, una franja
         // corta los cortaría por la mitad y quedarían las puntas sueltas)
         var seg: List<Int> = emptyList()
-        for (band in floatArrayOf(BAND, 0.6f, 0.8f, 1.0f)) {
+        for (band in floatArrayOf(BAND, 0.6f, 0.8f, 1.0f, 1.4f, 1.8f)) {
             val distal = BooleanArray(n) { cy[it] > tip - band * fw }
             seg = longestRun(distal) ?: return null
             if (seg.size >= 0.85f * distal.count { it }) break
@@ -194,7 +199,12 @@ object ToeDetector {
         val tips = bounds.zipWithNext().mapNotNull { (a, b) ->
             seg.indices.filter { px[it] > a && px[it] < b }.maxByOrNull { py[it] }?.let { px[it] to py[it] }
         }
-        return Toes(cuts.size + 1, tips, lines, seg.indices.map { px[it] to py[it] })
+        // profundidad de cada valle: de la punta más corta de sus dos vecinas al fondo del valle
+        val depths = vs.mapNotNull { (i, _) ->
+            val l = tips.lastOrNull { it.first < px[i] }; val r = tips.firstOrNull { it.first > px[i] }
+            if (l == null || r == null) null else (minOf(l.second, r.second) - py[i]) / fw
+        }.sorted()
+        return Toes(cuts.size + 1, tips, lines, seg.indices.map { px[it] to py[it] }, depths.getOrNull(depths.size / 2) ?: 0f)
     }
 
     /**

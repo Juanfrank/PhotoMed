@@ -4,6 +4,13 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Manos sin el detector de manos**: cuando no encuentra las manos (primeros planos, algunas luces), se
+  evalúan por la piel: mano entera, dedos extendidos (contorno en nube con surcos hondos, que la distinguen
+  de un pie) y palma o dorso por las uñas. Antes la toma se quedaba en «Buscando las manos…».
+- **Brazo en primer plano sin puntos del cuerpo**: se evalúa por la piel (brazo entero, codo recto, sin
+  manga). Antes pedía siempre «Encuadre el brazo entero».
+- **Primeros planos del rostro**: sin el aviso de luz desigual entre mejillas (solo en el rostro frontal) y,
+  en los labios, sin exigir la mirada al frente.
 - **Más precisión en las zonas que no son el rostro frontal**: el ojo, el cuero cabelludo, los labios, la
   zona periocular y la frente disparaban con casi cualquier escena quieta (también con fotos de manos o
   pies). Ahora se comprueba el contenido (piel de la cara que llena el cuadro, pelo en el cuero cabelludo,

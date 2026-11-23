@@ -38,7 +38,7 @@ class ToeDetectorPhotosTest {
             val mpx = IntArray(w * h).also { mk.getPixels(it, 0, w, 0, 0, w, h) }
             val c = ZoneCriteria.Classes(w, h, ByteArray(w * h) { Color.red(mpx[it]).toByte() }, rgb)
             val feet = ZoneCriteria.feetOf(c)
-            lines += "$n: " + feet.joinToString { "${it.toeCount ?: "-"}" }
+            lines += "$n: " + feet.joinToString { "${it.toeCount ?: "-"}" } + "  profundidad " + feet.joinToString { "%.2f".format(it.digitDepth) }
             val out = img.copy(Bitmap.Config.ARGB_8888, true); val cv = Canvas(out)
             val k = w.toFloat()
             val pc = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.CYAN; style = Paint.Style.STROKE; strokeWidth = 2f }

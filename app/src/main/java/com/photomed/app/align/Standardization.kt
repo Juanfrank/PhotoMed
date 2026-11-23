@@ -138,7 +138,8 @@ object Standardization {
         // mirada al frente: solo en las vistas frontales. Con la cabeza girada (oblicuo, perfil), los ojos
         // que miran al frente de la cara proyectan el iris desplazado dentro del contorno del ojo; «iris
         // centrado» significaría mirar a la cámara. (Con referencia se compara la mirada entre fotos.)
-        det.gaze?.takeIf { t?.yaw == 0f }?.let { g ->
+        // (no en los labios: la mirada no cambia la zona; en la frente sí, mirar arriba la arruga)
+        det.gaze?.takeIf { t?.yaw == 0f && zone != Zone.LIPS }?.let { g ->
             if (kotlin.math.abs(g.x) > Gaze.TOL_X * 1.2f || kotlin.math.abs(g.y) > Gaze.TOL_Y * 1.2f) {
                 hints += trn("Mirada: al frente")
                 off += 0.6f
@@ -148,7 +149,8 @@ object Standardization {
             val m = maxOf(l.leftCheek, l.rightCheek)
             // la diferencia entre mejillas solo con las mejillas localizadas (no por regiones)
             // y solo en las vistas frontales: en oblicuos y perfiles una mejilla queda de lado
-            if (!l.regional && t?.yaw == 0f && m > 0f && abs(l.leftCheek - l.rightCheek) / m > LIGHT_ASYM) {
+            // (solo en el rostro frontal: en los primeros planos las mejillas quedan en el borde o fuera)
+            if (zone == Zone.FACE_FRONTAL && !l.regional && t?.yaw == 0f && m > 0f && abs(l.leftCheek - l.rightCheek) / m > LIGHT_ASYM) {
                 hints += if (l.leftCheek < l.rightCheek) trn("Luz desigual: lado izquierdo más oscuro") else trn("Luz desigual: lado derecho más oscuro")
                 off += 0.5f
             }

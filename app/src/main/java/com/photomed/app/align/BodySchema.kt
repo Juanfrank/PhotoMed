@@ -88,6 +88,8 @@ object BodySchema {
     /** Esquema de la zona con lo detectado (null si la zona usa la ilustración fija o no hay datos). */
     fun of(zone: Zone, s: ZoneCriteria.Scene): Schema? = when (zone.guide) {
         GuideType.HANDS -> s.hands?.takeIf { it.isNotEmpty() }?.let { hands(it, s.classes) }
+            // sin los puntos de la mano: su contorno por la piel, con la separación entre dedos
+            ?: s.classes?.let { feet(ZoneCriteria.skinHands(it)) }?.takeIf { !it.isEmpty }
         GuideType.FEET -> s.classes?.let { feet(ZoneCriteria.feetOf(it)) }?.takeIf { !it.isEmpty }
         GuideType.TORSO_FRONT, GuideType.TORSO_SIDE, GuideType.BREASTS, GuideType.BACK, GuideType.GLUTES,
         GuideType.LEGS, GuideType.ARM, GuideType.NECK -> s.pose.takeIf { it.size >= 4 }?.let { body(it, s.classes) }?.takeIf { !it.isEmpty }
