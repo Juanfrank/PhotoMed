@@ -2,7 +2,7 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
-## 2.46 — 21 de noviembre de 2026
+## 2.47 — 23 de noviembre de 2026
 
 - **Corregido: palma y dorso de las manos estaban invertidos** con los puntos del detector de manos. Con
   fotos reales (11k Hands y Pexels) la etiqueta derecha/izquierda del detector, en los cuadros sin espejar
@@ -24,6 +24,8 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
   lateral se comprueba en el pie, no en la pierna que sale por el borde.
 - **Menos disparos por error**: un primer plano de una mano o de unos pies ya no se toma como espalda,
   glúteos o brazo. Entre zonas, de 63 a 57 falsos disparos en 3974 casos.
+
+## 2.46 — 21 de noviembre de 2026
 
 - **Manos sin el detector de manos**: cuando no encuentra las manos (primeros planos, algunas luces), se
   evalúan por la piel: mano entera, dedos extendidos (contorno en nube con surcos hondos, que la distinguen
