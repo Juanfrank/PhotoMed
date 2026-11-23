@@ -4,6 +4,19 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **De frente o de espaldas, fiable**: se decide por el lado de cada hombro que da el detector del cuerpo
+  (de frente el hombro izquierdo queda a la derecha de la imagen; de espaldas, a la izquierda) y, si están
+  superpuestos, por la cabeza en la segmentación (cara o pelo). Antes se usaba la «nariz», que el detector
+  supone también de espaldas: las fotos de espalda se rechazaban con «De espaldas a la cámara» y el tórax
+  las aceptaba. Con fotos reales de culturistas, ningún error.
+- **Brazo**: exige la vista posterior del protocolo (de frente avisa «De espaldas a la cámara").
+- **Tórax**: un sujetador o un bikini a la altura de las areolas pide descubrir el tórax.
+- **Espalda**: la cintura del pantalón ya no cuenta como ropa sobre la espalda.
+- **Pies juntos por las piernas** (rodillas o tobillos que se tocan): se separan en dos pies. El margen
+  lateral se comprueba en el pie, no en la pierna que sale por el borde.
+- **Menos disparos por error**: un primer plano de una mano o de unos pies ya no se toma como espalda,
+  glúteos o brazo. Entre zonas, de 63 a 57 falsos disparos en 3974 casos.
+
 - **Manos sin el detector de manos**: cuando no encuentra las manos (primeros planos, algunas luces), se
   evalúan por la piel: mano entera, dedos extendidos (contorno en nube con surcos hondos, que la distinguen
   de un pie) y palma o dorso por las uñas. Antes la toma se quedaba en «Buscando las manos…».

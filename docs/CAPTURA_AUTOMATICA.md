@@ -261,3 +261,22 @@ incompletos, brazo recortado o con el codo doblado, espaldas recortadas): ya no 
 
 Limitación: la planta y el dorso del pie no se distinguen (no hay un detector de puntos del pie); lo
 decide quien encuadra con la guía.
+
+## Evaluación con fotos etiquetadas (culturismo, pedicura, manicura)
+
+`ZoneEvalTest` evalúa fotos de internet etiquetadas a mano (`stock/zones/eval_labels.json`, fuera del
+repositorio): por zona, cuántas fotos que cumplen se aceptan, cuántas que muestran la zona sin cumplir se
+rechazan, el motivo de cada rechazo y qué otras zonas las aceptarían. Las fotos de pies se evalúan también
+giradas 180° (la guía se puede girar). Informe: `build/reports/zone_eval.md`.
+
+Conclusiones de la primera ronda:
+
+- **Pedicura**: casi todas las fotos promocionales recortan los dedos o los pies por el borde o los muestran
+  juntos; se rechazan, con razón. Sirvieron para separar dos pies unidos por las piernas y para medir el
+  margen lateral solo en el pie.
+- **Culturismo**: las vistas de espalda se rechazaban porque el detector del cuerpo «ve» la nariz también
+  de espaldas. Ahora la orientación sale del lado de los hombros (sin un error en estas fotos) y la espalda
+  pasa de 1 a 3 aceptadas de 5; el tórax deja de aceptar espaldas y el brazo deja de aceptar vistas de frente.
+  Límite conocido: a la resolución de la segmentación (96 px) un bikini pequeño se ve como piel.
+- **Manicura**: manos sueltas recortadas (rechazadas) y escenas con personas como negativos; un primer plano
+  de una mano ya no dispara glúteos ni espalda.

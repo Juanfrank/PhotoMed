@@ -340,6 +340,29 @@ object ZoneCriteria {
     const val HAND_MIN_FINGERS = 4
 
     /** Manos reconocidas por la piel (sin los puntos del detector): manchas con dedos largos (surcos hondos). */
+    /** ¿Lo que se ve son pies (piel que acaba en ≥ 4 dedos cortos, poco hondos)? Para los primeros planos sin puntos. */
+    private fun footLike(s: Scene): Boolean {
+        val c = s.classes ?: return false
+        fun toes(k: Classes, n: Int) = computeFeet(k).count { (it.toeCount ?: 0) >= 4 && it.digitDepth < HAND_DIGIT_DEPTH } >= n
+        footMemo?.let { (k, v) -> if (k === c) return v }
+        // los dedos abajo (como en la guía de los pies) o arriba (foto hecha desde el paciente; ahí se exigen
+        // los dos pies: una espalda con los brazos levantados, girada, también acaba en salientes)
+        return (toes(c, 1) || toes(rotated180(c), 2)).also { footMemo = c to it }
+    }
+    @Volatile private var footMemo: Pair<Classes, Boolean>? = null
+
+    private fun rotated180(c: Classes) = Classes(c.width, c.height, c.data.reversedArray(), c.rgb?.reversedArray())
+
+    /** ¿Lo que se ve es una mano (detector de manos o piel con dedos hondos)? Para descartar primeros planos. */
+    private fun handLike(s: Scene): Boolean {
+        // la mano domina el cuadro (los puños de una pose de espaldas no cuentan): ≥ 30 % del ancho de largo
+        // según el detector, o la mancha con dedos es la mayor parte de la piel
+        if (s.hands.orEmpty().any { h -> h.points.isNotEmpty() && (h.points.maxOf { it.x } - h.points.minOf { it.x }).coerceAtLeast(h.points.maxOf { it.y } - h.points.minOf { it.y }) >= 0.3f }) return true
+        val c = s.classes ?: return false
+        val skin = feetOf(c).sumOf { it.box.area }.coerceAtLeast(1)
+        return skinHands(c).any { it.box.area >= 0.5f * skin }
+    }
+
     fun skinHands(c: Classes): List<Foot> = feetOf(c).filter { it.digitDepth >= HAND_DIGIT_DEPTH && (it.toeCount ?: 0) >= 3 }
 
     /**
@@ -707,6 +730,8 @@ object ZoneCriteria {
                 // de espaldas el detector de cuerpo no suele ver a la persona (la localiza por la cara):
                 // la espalda descubierta se comprueba en la región de la guía
                 if (zone.guide == GuideType.BACK && !has(p, L.SHOULDER_L, L.SHOULDER_R, L.HIP_L, L.HIP_R)) {
+                    // un primer plano de una mano también es piel en el centro: si la piel tiene dedos, no es la espalda
+                    if (handLike(s) || footLike(s)) return listOf(tr("Encuadre la espalda entera: hombros, cintura y los dos costados"))
                     if (facingCamera(p, c) ?: (L.NOSE in p || (c != null && faceSkinAll(c) > 0.12f))) out += tr("De espaldas a la cámara")
                     if (c != null && !(sidesClear(c, 0.5f) && sidesClear(c, 0.7f))) out += tr("Encuadre la espalda entera: hombros, cintura y los dos costados")
                     uncovered(c, trn("la espalda"), c?.let { skinClothes(it, 0.30f, 0.25f * s.aspect, 0.70f, 0.62f * s.aspect) })?.let { out += it }
@@ -760,6 +785,7 @@ object ZoneCriteria {
             }
             GuideType.GLUTES -> {
                 if (!has(p, L.HIP_L, L.HIP_R, L.KNEE_L, L.KNEE_R)) {
+                    if (handLike(s) || footLike(s)) return listOf(tr("Encuadre los glúteos enteros: las dos caderas"))
                     // de espaldas: región de la guía (los glúteos en el centro del cuadro)
                     if (facingCamera(p, c) ?: (L.NOSE in p || (c != null && faceSkinAll(c) > 0.12f))) out += tr("De espaldas a la cámara")
                     if (c != null && !sidesClear(c, 0.5f)) out += tr("Encuadre los glúteos enteros: las dos caderas")
@@ -801,7 +827,7 @@ object ZoneCriteria {
                 val whole = { right: Boolean -> if (right) has(p, L.SHOULDER_R, L.ELBOW_R, L.WRIST_R) else has(p, L.SHOULDER_L, L.ELBOW_L, L.WRIST_L) }
                 val r = if (whole(r0)) r0 else if (whole(!r0)) !r0
                     // sin los puntos del brazo (primer plano): por la piel
-                    else return c?.let { armFromSkin(it, s) } ?: listOf(tr("Encuadre el brazo entero: hombro, codo y muñeca"))
+                    else return c?.takeIf { !footLike(s) }?.let { armFromSkin(it, s) } ?: listOf(tr("Encuadre el brazo entero: hombro, codo y muñeca"))
                 val sh = if (r) L.SHOULDER_R else L.SHOULDER_L; val el = if (r) L.ELBOW_R else L.ELBOW_L
                 val wr = if (r) L.WRIST_R else L.WRIST_L; val hp = if (r) L.HIP_R else L.HIP_L
                 val a = p[sh]!!; val e = p[el]!!; val w = p[wr]!!
