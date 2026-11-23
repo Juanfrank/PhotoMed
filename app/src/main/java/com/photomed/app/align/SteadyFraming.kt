@@ -9,31 +9,48 @@ import kotlin.math.sqrt
  * modo libre (sin detector), las zonas del cuerpo (el detector de cuerpo localiza a la persona por
  * la cara: de espaldas o en primer plano no la ve, y la pose no dice nada del encuadre) y los
  * primeros planos del rostro cuando no se encuentra la cara. Se dispara cuando el encuadre queda quieto
- * [holdMs] y hay imagen con detalle (no una pared lisa o la cámara tapada): quien encuadra con la
+ * [holdMs] (medio segundo) y hay imagen con detalle (no una pared lisa o la cámara tapada): quien encuadra con la
  * guía decide el encuadre y la app elige el instante sin movimiento.
  *
  * Movimiento entre cuadros: diferencia media de luminancia relativa al gradiente medio (≈ píxeles
  * de desplazamiento a [width] px de ancho), independiente del contraste de la escena.
  */
-class SteadyFraming(private val holdMs: Long = 700) {
+class SteadyFraming(private val holdMs: Long = 500) {
     private var prev: GrayImage? = null
+    private var prevAt = 0L
     private var since = 0L
+    /** Cuadros seguidos con movimiento (uno suelto, un temblor, no reinicia la cuenta). */
+    private var movingRun = 0
+    /** Último cuadro quieto: tras un golpe de temblor la imagen vuelve a él. */
+    private var anchor: GrayImage? = null
 
-    fun reset() { prev = null; since = 0L }
+    fun reset() { prev = null; prevAt = 0L; since = 0L; movingRun = 0; anchor = null }
 
     /** [g]: luminancia 0..1 del cuadro (ver [ImageOps.luma]); [now] en ms. */
     fun update(g: GrayImage, now: Long): MatchEval {
-        val p = prev; prev = g
+        val p = prev; val pAt = prevAt; prev = g; prevAt = now
         val tex = texture(g)
         if (tex.first < MIN_STD || tex.second < MIN_GRAD) {
-            since = 0L
+            since = 0L; movingRun = 0; anchor = null
             return MatchEval(MatchStatus.SEARCHING, 0f, listOf(HINT_FRAME), threshold = 1f)
         }
         val shiftPx = if (p == null || p.width != g.width || p.height != g.height) Float.MAX_VALUE else meanAbsDiff(p, g) / tex.second
-        if (shiftPx > MAX_SHIFT_PX) {
-            since = 0L
-            return MatchEval(MatchStatus.CLOSE, 0.3f, listOf(HINT_STILL), threshold = 1f)
+        // velocidad (px cada 100 ms): con el análisis lento (zonas del cuerpo, varios cientos de ms entre
+        // cuadros) el desplazamiento entre cuadros acumula el temblor normal de la mano y no se llegaba nunca
+        val dt = (now - pAt).coerceIn(100L, 1000L)
+        val speed = if (shiftPx == Float.MAX_VALUE) shiftPx else shiftPx * 100f / dt
+        // de vuelta en el sitio del último cuadro quieto (el golpe de temblor fue ida y vuelta)
+        val back = anchor?.takeIf { it.width == g.width && it.height == g.height && since != 0L }?.let { meanAbsDiff(it, g) / tex.second <= MAX_SHIFT_PX } ?: false
+        if (speed > MAX_SHIFT_PX && !back) {
+            movingRun++
+            // un cuadro suelto con temblor no reinicia; dos seguidos sí (se está moviendo)
+            if (movingRun >= 2 || p == null || since == 0L) {
+                since = 0L
+                return MatchEval(MatchStatus.CLOSE, 0.3f, listOf(HINT_STILL), threshold = 1f)
+            }
+            return MatchEval(MatchStatus.CLOSE, 0.4f, listOf(HINT_STILL), threshold = 1f)
         }
+        movingRun = 0; anchor = g
         if (since == 0L) since = now
         val held = now - since
         // por debajo de 0,8 hasta cumplir el tiempo (el «casi alineada» no debe adelantarse)
@@ -47,7 +64,7 @@ class SteadyFraming(private val holdMs: Long = 700) {
         /** Desviación típica mínima de la luminancia y gradiente medio mínimo (imagen con detalle). */
         const val MIN_STD = 0.04f
         const val MIN_GRAD = 0.008f
-        /** Desplazamiento máximo entre cuadros para considerarlo quieto (px a 96 px de ancho ≈ 0,7 %). */
+        /** Velocidad máxima para considerarlo quieto: px cada 100 ms a 96 px de ancho (≈ 0,7 % del ancho). */
         const val MAX_SHIFT_PX = 0.7f
 
         /** Desviación típica de la luminancia y gradiente medio (diferencias entre vecinos). */

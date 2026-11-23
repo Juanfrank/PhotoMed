@@ -2,6 +2,17 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.48 — 24 de noviembre de 2026
+
+- **Captura más rápida**:
+  - La espera de quietud antes de la primera foto baja de 0,7 a 0,5 s y mide la velocidad del movimiento
+    (según el tiempo real entre cuadros), no el desplazamiento entre cuadros: en las zonas del cuerpo, con
+    el análisis más lento, el temblor normal de la mano reiniciaba la cuenta una y otra vez. Un golpe de
+    temblor suelto (que vuelve a su sitio) tampoco la reinicia. Moverse de verdad sigue impidiendo la foto.
+  - La ráfaga de 3 tomas (para evitar repetir por un parpadeo) solo en las zonas del rostro: en el cuerpo
+    se hace una toma, y hay que estar quieto mucho menos tiempo.
+  - En cuanto termina la exposición se detiene el análisis en vivo, así la foto se elige y se guarda antes.
+
 ## 2.47 — 23 de noviembre de 2026
 
 - **Corregido: palma y dorso de las manos estaban invertidos** con los puntos del detector de manos. Con

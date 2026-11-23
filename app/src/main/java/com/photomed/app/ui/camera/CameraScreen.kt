@@ -355,6 +355,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     matcher.useReference = referenceMode
     matcher.expression = expression
     val matchingFlag = remember { AtomicBoolean(false) }
+    /** Tras las exposiciones de una toma, hasta que se guarda: sin análisis en vivo. */
+    val analysisPaused = remember { AtomicBoolean(false) }
+    LaunchedEffect(capturing) { if (!capturing) analysisPaused.set(false) }
     matchingFlag.set(matchingEnabled && psPattern == null && reviewName == null)
 
     // Referencia para la coincidencia en vivo: la foto superpuesta (encuadre 3:4), con el motor elegido.
@@ -551,7 +554,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         val now = System.currentTimeMillis()
                         // secuencia de relieve: el fotograma pedido tiene prioridad
                         if (frameGrab.offer(now) { proxy.toUprightCrop(720) }) return@setAnalyzer
-                        if (matchingFlag.get() && now - lastAnalysis.get() >= 180) {
+                        if (matchingFlag.get() && !analysisPaused.get() && now - lastAnalysis.get() >= 180) {
                             lastAnalysis.set(now)
                             val frame = proxy.toUprightCrop(360)
                             pipeline.withEngine { it.analyze(frame) }?.let { live = it }
@@ -752,8 +755,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             val depthJob = if (zone.isFaceZone() && com.photomed.app.align.DepthSensor.available(context,
                     if (lensFacing == CameraSelector.LENS_FACING_FRONT) CameraCharacteristics.LENS_FACING_FRONT else CameraCharacteristics.LENS_FACING_BACK))
                 async { runCatching { ReliefCapture.depth(context, lensFacing == CameraSelector.LENS_FACING_FRONT) }.getOrNull() } else null
-            // Ráfaga: 3 tomas seguidas; se guarda la de mayor coincidencia (evita repetir por un parpadeo)
-            val shots = if (burst) 3 else 1
+            // Ráfaga: 3 tomas seguidas; se guarda la de mayor coincidencia (evita repetir por un parpadeo). Solo
+            // en el rostro: en el cuerpo no hay parpadeos ni gestos, y cada toma de calidad máxima alarga el
+            // tiempo que hay que estar quieto
+            val shots = if (burst && zone.isFaceZone()) 3 else 1
             // flash de pantalla en ráfaga: la pantalla sigue en blanco de la primera a la última toma
             val holdScreen = shots > 1 && effectiveFlash == ImageCapture.FLASH_MODE_SCREEN
             if (holdScreen) screenFlash.hold()
@@ -775,6 +780,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             try {
                 files += shootAll(requested) {
                     exposedAll = true
+                    // el análisis en vivo ya no hace falta: deja libre el procesador para elegir y guardar la foto
+                    analysisPaused.set(true)
                     if (holdScreen) screenFlash.release()
                     // aviso: ya puede moverse (la foto se procesa y se guarda)
                     haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)

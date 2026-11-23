@@ -350,7 +350,7 @@ object ZoneCriteria {
     /** ¿Lo que se ve son pies (piel que acaba en ≥ 4 dedos cortos, poco hondos)? Para los primeros planos sin puntos. */
     private fun footLike(s: Scene): Boolean {
         val c = s.classes ?: return false
-        fun toes(k: Classes, n: Int) = computeFeet(k).count { (it.toeCount ?: 0) >= 4 && it.digitDepth < HAND_DIGIT_DEPTH } >= n
+        fun toes(k: Classes, n: Int) = (if (k === c) feetOf(k) else computeFeet(k)).count { (it.toeCount ?: 0) >= 4 && it.digitDepth < HAND_DIGIT_DEPTH } >= n
         footMemo?.let { (k, v) -> if (k === c) return v }
         // los dedos abajo (como en la guía de los pies) o arriba (foto hecha desde el paciente; ahí se exigen
         // los dos pies: una espalda con los brazos levantados, girada, también acaba en salientes)
