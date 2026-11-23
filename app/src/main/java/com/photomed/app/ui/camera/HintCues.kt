@@ -59,6 +59,9 @@ object HintCues {
             t.startsWith("cabeza: enderezar") -> 6
             t.startsWith("mirada") -> 7
             t.startsWith("expresión") -> 7
+            // estado (no es una corrección): detrás de todas
+            t.startsWith("comprobando") || t.startsWith("buscando") || t.startsWith("checking") || t.startsWith("looking for") -> 10
+            t.startsWith("mantenga el teléfono quieto") || t.startsWith("hold the phone still") -> 9
             else -> 8
         }
     }
@@ -124,6 +127,8 @@ object HintCues {
             t.startsWith("no se detecta el rostro") -> HintCue(Icons.Default.FaceRetouchingOff, null, null, h)
             t.startsWith("no se detecta el cuerpo") -> HintCue(Icons.Default.PersonSearch, null, null, h)
             t.startsWith("detector") -> HintCue(Icons.Default.ErrorOutline, null, null, h)
+            // zona descentrada (las flechas del borde indican hacia dónde)
+            t.startsWith("centre la zona") || t.startsWith("center the area") -> HintCue(Icons.Default.CenterFocusStrong, null, null, h)
             else -> null
         }
     }

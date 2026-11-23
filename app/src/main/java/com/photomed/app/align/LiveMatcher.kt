@@ -447,16 +447,22 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         // segmentación o detección suelta no cambia el veredicto ni hace parpadear las indicaciones)
         synchronized(votes) {
             votes.addLast(now.isEmpty()); while (votes.size > 3) votes.removeFirst()
-            if (now.isNotEmpty()) lastCriteriaHints = now
             val ok = votes.size >= 2 && votes.count { it } >= 2
             if (ok) return e
         }
-        val hints = now.ifEmpty { lastCriteriaHints }.ifEmpty { listOf(ZoneCriteria.HINT_ANALYZING) }
-        return e.copy(status = if (e.status == MatchStatus.MATCH) MatchStatus.CLOSE else e.status,
+        // cumple ahora pero aún no en 2 de 3 análisis: «comprobando» (no el último aviso, ya resuelto)
+        val hints = now.ifEmpty { listOf(ZoneCriteria.HINT_ANALYZING) }
+        // zona descentrada: el desplazamiento (en el cuadro) enciende las flechas del borde hacia donde mover
+        // el teléfono, como en la coincidencia con la referencia
+        val move = runCatching { ZoneCriteria.centerOffset(zone, scene) }.getOrNull()?.let { (c, d) ->
+            val c0 = ZoneCriteria.unrotate(c, q, aspect); val t0 = ZoneCriteria.unrotate(Pt(c.x + d.x, c.y + d.y), q, aspect)
+            Pt(t0.x - c0.x, t0.y - c0.y)
+        }
+        val base = if (move != null && e.dx == 0f && e.dy == 0f) e.copy(dx = move.x, dy = move.y) else e
+        return base.copy(status = if (e.status == MatchStatus.MATCH) MatchStatus.CLOSE else e.status,
             quality = e.quality.coerceAtMost(0.75f), hints = e.hints + hints)
     }
     private val votes = ArrayDeque<Boolean>()
-    private var lastCriteriaHints: List<String> = emptyList()
 
     override fun close() { detector.close(); runCatching { if (handsLazy.isInitialized()) handsLazy.value?.close() }; runCatching { segmenterOrNull?.close() }; runCatching { if (hairSkinLazy.isInitialized()) hairSkinLazy.value?.close() } }
 

@@ -75,6 +75,7 @@
     <string name="t_0f6d848fd891" formatted="false">The video lasts one cycle; the gallery or chat loops it.</string>
     <string name="t_0f90bc66e211" formatted="false">Time per image</string>
     <string name="t_0fe9d2ab08a2" formatted="false">Settings</string>
+    <string name="t_1013f0d542fe" formatted="false">Foot on the %1$s of the image: the nails are visible; show the sole</string>
     <string name="t_10301d22d36a" formatted="false">Probable type</string>
     <string name="t_107dd702208f" formatted="false">Share the error log</string>
     <string name="t_10fb09e807dd" formatted="false">Logo for exports</string>
@@ -141,6 +142,7 @@
     <string name="t_1b077769f9df" formatted="false">Right</string>
     <string name="t_1b879174623e" formatted="false">Options for protocol %1$s</string>
     <string name="t_1ba4db38f99b" formatted="false">jaw</string>
+    <string name="t_1bd659974baf" formatted="false">Hand on the %1$s of the image: show the palm</string>
     <string name="t_1bed538322b1" formatted="false">Automatic (skin)</string>
     <string name="t_1bf47ad22d07" formatted="false">Choose</string>
     <string name="t_1c7402de2578" formatted="false">The file is not an image</string>
@@ -351,6 +353,7 @@
     <string name="t_4afe25027944" formatted="false">Photo information</string>
     <string name="t_4b813c257383" formatted="false">Shots from photos</string>
     <string name="t_4bc68be6b728" formatted="false">Forehead (eyebrows → hairline): %1$s ×IPD (%2$+.0f %%%3$s)</string>
+    <string name="t_4be2d4a6d850" formatted="false">Hand on the %1$s of the image: fully inside the frame</string>
     <string name="t_4c15aade2391" formatted="false">Could not change the date</string>
     <string name="t_4c5c21ea9391" formatted="false">Stomion → chin / subnasale → stomion (ideal 2)</string>
     <string name="t_4cd4d1e48f6f" formatted="false">Middle third (brows → subnasale), mm</string>
@@ -358,6 +361,7 @@
     <string name="t_4d9a7ee81a48" formatted="false">orbicularis oculi and zygomatic muscles</string>
     <string name="t_4dd050a6bb8e" formatted="false">Move shot %1$d up</string>
     <string name="t_4df95802113a" formatted="false">Shots in order (%1$d photos)</string>
+    <string name="t_4e15e36241e5" formatted="false">Hand on the %1$s of the image: show the back of the hand</string>
     <string name="t_4e22e4ff6b0e" formatted="false">Frame the whole buttocks: both hips</string>
     <string name="t_4e7b9da23085" formatted="false">Also capture when nearly aligned</string>
     <string name="t_4ef50f502afc" formatted="false">Expression: raise the eyebrows more</string>
@@ -372,6 +376,7 @@
     <string name="t_505cf0a43ae3" formatted="false">left</string>
     <string name="t_506008390f08" formatted="false">Glabellar, nasal root</string>
     <string name="t_508a6fa0e318" formatted="false">Skin color</string>
+    <string name="t_50cf3b9a4239" formatted="false">Hand on the %1$s of the image: fingers pointing down, as in the guide</string>
     <string name="t_50f0a746e538" formatted="false">tap the gray or white card in each photo</string>
     <string name="t_511456f09301" formatted="false">Crow\'s feet</string>
     <string name="t_5167ee5be411" formatted="false">Eyelid bag</string>
@@ -443,6 +448,7 @@
     <string name="t_622d40af41e8" formatted="false">shoulders, hips and chest contour</string>
     <string name="t_6288d35f5f1d" formatted="false">Expanded</string>
     <string name="t_629c8b4aeaef" formatted="false">Cross</string>
+    <string name="t_62ad6e69a855" formatted="false">Foot on the %1$s of the image: the toes must be visible</string>
     <string name="t_62e34bcf9046" formatted="false">Photo date</string>
     <string name="t_63097946d25d" formatted="false">Turn 45° showing the left side; nasal tip aligned with the cheek.</string>
     <string name="t_63252034e7cb" formatted="false">Import a protocol</string>
@@ -467,7 +473,6 @@
     <string name="t_65e05899cce4" formatted="false">ear and temple</string>
     <string name="t_65fa38524ad2" formatted="false">Maximum width</string>
     <string name="t_66025c5c7eaf" formatted="false">Finish</string>
-    <string name="t_66590e12beed" formatted="false">Foot on the %1$s: the nails are visible; show the sole</string>
     <string name="t_66c9af388952" formatted="false">A protocol is a list of shots (areas, expressions, count, match, light and reference) that is reused with any patient and shared with other professionals.</string>
     <string name="t_66f5cbc1e91b" formatted="false">Too much light: no flash</string>
     <string name="t_670e1266954a" formatted="false">thighs</string>
@@ -594,7 +599,6 @@
     <string name="t_81de432a2172" formatted="false">Show details</string>
     <string name="t_81ee0c76034a" formatted="false">Both hands on a plain background, fingers slightly apart, camera parallel to the surface.</string>
     <string name="t_81f060cbca57" formatted="false">estimated (30 cm)</string>
-    <string name="t_829958218146" formatted="false">Hand on the %1$s: fingers pointing down, as in the guide</string>
     <string name="t_82d7030f5dd9" formatted="false">Restore deleted lines (%1$d)</string>
     <string name="t_82eb11e9105d" formatted="false">Expression: smile as wide as possible</string>
     <string name="t_831f8c23aa69" formatted="false">Couldn\'t rename the photo</string>
@@ -649,7 +653,6 @@
     <string name="t_8a19b4a51fac" formatted="false">Dorsum width (middle), mm</string>
     <string name="t_8a695023a201" formatted="false">Analyzing wrinkles and features…</string>
     <string name="t_8a850948781b" formatted="false">Alignment</string>
-    <string name="t_8a947c1d5a0e" formatted="false">Foot on the %1$s: the toes must be visible</string>
     <string name="t_8b3e31080154" formatted="false">%1$d more hints: %2$s</string>
     <string name="t_8b466bbdf18d" formatted="false">Auto-capture on match</string>
     <string name="t_8b6f303fb29c" formatted="false">Above the right brow tail (lateral canthus), mm</string>
@@ -731,6 +734,7 @@
     <string name="t_9c7706beaba2" formatted="false">different landmark engine</string>
     <string name="t_9cf00ab7e291" formatted="false">Expert mode</string>
     <string name="t_9d216d7dbc1b" formatted="false">It will be deleted from the phone\'s gallery and from the patient record.</string>
+    <string name="t_9da61737286a" formatted="false">Hand on the %1$s of the image: all phalanges of every finger must be visible (%2$s)</string>
     <string name="t_9dcc5693fc83" formatted="false">Auto-capture on</string>
     <string name="t_9e33a91b0e7e" formatted="false">No skin found to match</string>
     <string name="t_9ee1b812c554" formatted="false">Some photos could not be shared</string>
@@ -744,11 +748,9 @@
     <string name="t_a1e56a034b63" formatted="false">nasal base</string>
     <string name="t_a1e9db9161f2" formatted="false">Width at 50 % (middle)</string>
     <string name="t_a217f294e4f4" formatted="false">Do not match: %1$s (expression, pose or a local change different from the rest)</string>
-    <string name="t_a220d67b2bd7" formatted="false">Hand on the %1$s: all phalanges of every finger must be visible (%2$s)</string>
     <string name="t_a23190537144" formatted="false">Width at 25 % (upper)</string>
     <string name="t_a276b1754a3a" formatted="false">Tips</string>
     <string name="t_a2eeab6cf8ab" formatted="false">Match · capturing</string>
-    <string name="t_a357187cb61a" formatted="false">Hand on the %1$s: show the palm</string>
     <string name="t_a3980dd32780" formatted="false">The name is required</string>
     <string name="t_a3b4b3ced269" formatted="false">Burst of 3 photos</string>
     <string name="t_a43db90c06c5" formatted="false">" · difference between cheeks %1$.0f %%"</string>
@@ -763,7 +765,6 @@
     <string name="t_a5eb5d15060e" formatted="false">Compare</string>
     <string name="t_a5f8d8f332d0" formatted="false">Latest face photo</string>
     <string name="t_a6b8e28b41d6" formatted="false">Relief not saved: too much ambient light (use dim light)</string>
-    <string name="t_a6c31da20601" formatted="false">Hand on the %1$s: fully inside the frame</string>
     <string name="t_a6e75d5e41e6" formatted="false">Importing %1$d photo…</string>
     <string name="t_a6ea4d4431ae" formatted="false">image right</string>
     <string name="t_a6fe655b0a42" formatted="false">Matches the reference</string>
@@ -924,7 +925,6 @@
     <string name="t_c7074cac2c94" formatted="false">Draw on the photo</string>
     <string name="t_c7158732f612" formatted="false">Gaze straight ahead</string>
     <string name="t_c766fa366bed" formatted="false">In all</string>
-    <string name="t_c7798e3867b4" formatted="false">Hand on the %1$s: show the back of the hand</string>
     <string name="t_c79155e38c96" formatted="false">Tense your neck, showing your lower teeth</string>
     <string name="t_c802c46db199" formatted="false">Retrace %1$s</string>
     <string name="t_c81f5771478f" formatted="false">" (%1$d could not be read)"</string>

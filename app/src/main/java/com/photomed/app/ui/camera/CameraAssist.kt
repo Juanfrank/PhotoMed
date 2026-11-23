@@ -9,6 +9,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
@@ -177,8 +178,12 @@ fun correctionItems(frame: LiveFrame?, zoomInfo: String?, distanceHint: String?)
 fun CueOverlay(items: List<String>, accent: Color, modifier: Modifier = Modifier) {
     // De una en una: la corrección más importante (ver HintCues.priority) y "+N" con las demás;
     // al tocar "+N" se ven todas, y al tocar de nuevo se recogen.
-    val cues = items.sortedBy(HintCues::priority).mapNotNull { HintCues.of(it) }
-    if (cues.isEmpty()) return
+    // las que no tienen icono (criterios de manos, pies y cuerpo: dedos, codo, ropa…) van como texto corto;
+    // antes no se mostraban en el modo simple y la cámara no disparaba sin decir por qué
+    val sorted = items.sortedBy(HintCues::priority)
+    if (sorted.isEmpty()) return
+    val cues = sorted.map { h -> HintCues.of(h) ?: HintCue(Icons.Default.Info, null, null, HintText.display(h)) }
+    val isText = sorted.map { HintCues.of(it) == null }
     var expanded by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.foundation.layout.FlowRow(
         modifier.padding(horizontal = 8.dp),
@@ -186,14 +191,21 @@ fun CueOverlay(items: List<String>, accent: Color, modifier: Modifier = Modifier
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (expanded) {
-            cues.forEach { CueChip(it, accent, compact = true) }
+            cues.forEachIndexed { i, c -> if (isText[i]) TextCue(c.description) else CueChip(c, accent, compact = true) }
             if (cues.size > 1) MoreChip(Icons.Default.ExpandMore, null, tr("Mostrar solo la indicación principal")) { expanded = false }
         } else {
-            CueChip(cues.first(), accent, compact = true)
+            if (isText[0]) TextCue(cues.first().description) else CueChip(cues.first(), accent, compact = true)
             if (cues.size > 1) MoreChip(Icons.Default.MoreHoriz, "+${cues.size - 1}",
                 tr("%1\$d indicaciones más: %2\$s", cues.size - 1, cues.drop(1).joinToString("; ") { it.description })) { expanded = true }
         }
     }
+}
+
+/** Indicación sin icono, como texto corto sobre la imagen. */
+@Composable
+private fun TextCue(text: String) {
+    Text(text, color = Color.White, style = MaterialTheme.typography.labelMedium, maxLines = 2,
+        modifier = Modifier.background(Color(0x99000000), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 3.dp))
 }
 
 @Composable

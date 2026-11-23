@@ -180,6 +180,19 @@ object ZoneCriteria {
         }
     }
 
+    /**
+     * Desplazamiento que centraría la parte del cuerpo (centro del cuadro − centro de la parte, en los ejes
+     * que cuentan), con el centro de la parte; null si ya está centrada o no se encuentra.
+     */
+    fun centerOffset(zone: Zone, s: Scene): Pair<Pt, Pt>? {
+        val (b, axes) = partBox(zone, s) ?: return null
+        val c = Pt((b[0] + b[2]) / 2, (b[1] + b[3]) / 2)
+        val offX = axes[0] && abs(c.x - 0.5f) > CENTER_TOL
+        val offY = axes[1] && abs(c.y - s.aspect / 2) > CENTER_TOL * s.aspect
+        if (!offX && !offY) return null
+        return c to Pt(if (offX) 0.5f - c.x else 0f, if (offY) s.aspect / 2 - c.y else 0f)
+    }
+
     /** «Centre la zona»: el centro de la parte del cuerpo lejos del centro del cuadro (en la orientación de la guía). */
     fun centerHint(zone: Zone, s: Scene): String? {
         val (b, axes) = partBox(zone, s) ?: return null
@@ -240,18 +253,18 @@ object ZoneCriteria {
         chosen.forEachIndexed { i, h ->
             val side = if (s.single) (if (h.points[0].x < 0.5f) tr("izquierda") else tr("derecha")) else if (i == 0) tr("izquierda") else tr("derecha")
             if (h.points.any { it.x < HAND_MARGIN || it.x > 1f - HAND_MARGIN || it.y < HAND_MARGIN * s.aspect || it.y > s.aspect * (1f - HAND_MARGIN) })
-                out += tr("Mano de la %1\$s: entera dentro del cuadro", side)
+                out += tr("Mano a la %1\$s de la imagen: entera dentro del cuadro", side)
             val bent = bentFingers(h)
-            if (bent.isNotEmpty()) out += tr("Mano de la %1\$s: que se vean las falanges de todos los dedos (%2\$s)", side, bent.joinToString(", ") { tr(it) })
+            if (bent.isNotEmpty()) out += tr("Mano a la %1\$s de la imagen: que se vean las falanges de todos los dedos (%2\$s)", side, bent.joinToString(", ") { tr(it) })
             // dedos hacia abajo (muñeca arriba), como la guía
             val d = h.points[9] - h.points[0]
             val fromDown = abs(Math.toDegrees(atan2(d.x.toDouble(), d.y.toDouble()))).toFloat()
-            if (d.y <= 0f || fromDown > FINGERS_DOWN_DEG) out += tr("Mano de la %1\$s: dedos hacia abajo, como en la guía", side)
+            if (d.y <= 0f || fromDown > FINGERS_DOWN_DEG) out += tr("Mano a la %1\$s de la imagen: dedos hacia abajo, como en la guía", side)
             val wantPalm = zone == Zone.HANDS_PALMAR
             // uñas claramente visibles (3 o más): es el dorso, aunque la orientación de los puntos diga otra cosa
             val nails = s.classes?.let { c -> c.rgb?.let { rgb -> Nails.ofHand(rgb, c.width, c.height, h.points, STRONG_NAIL_DE).count { it != null } } } ?: 0
             val palm = if (nails >= DORSAL_NAILS) false else palmFacing(h)
-            if (palm != wantPalm) out += if (wantPalm) tr("Mano de la %1\$s: muestre la palma", side) else tr("Mano de la %1\$s: muestre el dorso", side)
+            if (palm != wantPalm) out += if (wantPalm) tr("Mano a la %1\$s de la imagen: muestre la palma", side) else tr("Mano a la %1\$s de la imagen: muestre el dorso", side)
         }
         return out
     }
@@ -413,10 +426,10 @@ object ZoneCriteria {
             // cada dedo en la silueta no es fiable con fotos reales (se tocan): no se exige un número
             // y que se distingan los dedos: menos de MIN_TOES curvas en el borde distal es que no se ven
             if (f.coveredTip > COVERED_TIP || (f.toeCount != null && f.toeCount < MIN_TOES))
-                out += tr("Pie de la %1\$s: que se vean los dedos", if (left) tr("izquierda") else tr("derecha"))
+                out += tr("Pie a la %1\$s de la imagen: que se vean los dedos", if (left) tr("izquierda") else tr("derecha"))
             // planta pedida pero se ven las uñas: es el dorso (la uña solo se ve por arriba)
             if (zone == Zone.FEET_PLANTAR && f.nails.size >= DORSAL_NAILS)
-                out += tr("Pie de la %1\$s: se ven las uñas; muestre la planta", if (left) tr("izquierda") else tr("derecha"))
+                out += tr("Pie a la %1\$s de la imagen: se ven las uñas; muestre la planta", if (left) tr("izquierda") else tr("derecha"))
         }
         return out.distinct()
     }

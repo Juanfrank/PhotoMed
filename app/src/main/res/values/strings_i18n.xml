@@ -75,6 +75,7 @@
     <string name="t_0f6d848fd891" formatted="false">El vídeo dura un ciclo; la galería o el chat lo repiten.</string>
     <string name="t_0f90bc66e211" formatted="false">Tiempo por imagen</string>
     <string name="t_0fe9d2ab08a2" formatted="false">Ajustes</string>
+    <string name="t_1013f0d542fe" formatted="false">Pie a la %1$s de la imagen: se ven las uñas; muestre la planta</string>
     <string name="t_10301d22d36a" formatted="false">Tipo probable</string>
     <string name="t_107dd702208f" formatted="false">Compartir el registro de errores</string>
     <string name="t_10fb09e807dd" formatted="false">Logo para exportar</string>
@@ -141,6 +142,7 @@
     <string name="t_1b077769f9df" formatted="false">Derecha</string>
     <string name="t_1b879174623e" formatted="false">Opciones del protocolo %1$s</string>
     <string name="t_1ba4db38f99b" formatted="false">mandíbula</string>
+    <string name="t_1bd659974baf" formatted="false">Mano a la %1$s de la imagen: muestre la palma</string>
     <string name="t_1bed538322b1" formatted="false">Automático (piel)</string>
     <string name="t_1bf47ad22d07" formatted="false">Elegir</string>
     <string name="t_1c7402de2578" formatted="false">El archivo no es una imagen</string>
@@ -351,6 +353,7 @@
     <string name="t_4afe25027944" formatted="false">Información de la fotografía</string>
     <string name="t_4b813c257383" formatted="false">Tomas desde fotos</string>
     <string name="t_4bc68be6b728" formatted="false">Frente (cejas → implantación): %1$s ×IPD (%2$+.0f %%%3$s)</string>
+    <string name="t_4be2d4a6d850" formatted="false">Mano a la %1$s de la imagen: entera dentro del cuadro</string>
     <string name="t_4c15aade2391" formatted="false">No se pudo cambiar la fecha</string>
     <string name="t_4c5c21ea9391" formatted="false">Estomion → mentón / subnasal → estomion (ideal 2)</string>
     <string name="t_4cd4d1e48f6f" formatted="false">Tercio medio (cejas → subnasal), mm</string>
@@ -358,6 +361,7 @@
     <string name="t_4d9a7ee81a48" formatted="false">orbicular de los ojos y cigomáticos</string>
     <string name="t_4dd050a6bb8e" formatted="false">Subir la toma %1$d</string>
     <string name="t_4df95802113a" formatted="false">Tomas en orden (%1$d fotos)</string>
+    <string name="t_4e15e36241e5" formatted="false">Mano a la %1$s de la imagen: muestre el dorso</string>
     <string name="t_4e22e4ff6b0e" formatted="false">Encuadre los glúteos enteros: las dos caderas</string>
     <string name="t_4e7b9da23085" formatted="false">Disparar también casi alineado</string>
     <string name="t_4ef50f502afc" formatted="false">Expresión: subir más las cejas</string>
@@ -372,6 +376,7 @@
     <string name="t_505cf0a43ae3" formatted="false">izquierda</string>
     <string name="t_506008390f08" formatted="false">Ceño, raíz nasal</string>
     <string name="t_508a6fa0e318" formatted="false">Color de la piel</string>
+    <string name="t_50cf3b9a4239" formatted="false">Mano a la %1$s de la imagen: dedos hacia abajo, como en la guía</string>
     <string name="t_50f0a746e538" formatted="false">toque la carta gris o blanca en cada foto</string>
     <string name="t_511456f09301" formatted="false">Pata de gallo</string>
     <string name="t_5167ee5be411" formatted="false">Bolsa palpebral</string>
@@ -443,6 +448,7 @@
     <string name="t_622d40af41e8" formatted="false">hombros, caderas y contorno torácico</string>
     <string name="t_6288d35f5f1d" formatted="false">Desplegada</string>
     <string name="t_629c8b4aeaef" formatted="false">Cruz</string>
+    <string name="t_62ad6e69a855" formatted="false">Pie a la %1$s de la imagen: que se vean los dedos</string>
     <string name="t_62e34bcf9046" formatted="false">Fecha de la foto</string>
     <string name="t_63097946d25d" formatted="false">Girar 45° mostrando el lado izquierdo; punta nasal alineada con la mejilla.</string>
     <string name="t_63252034e7cb" formatted="false">Importar un protocolo</string>
@@ -467,7 +473,6 @@
     <string name="t_65e05899cce4" formatted="false">oreja y sien</string>
     <string name="t_65fa38524ad2" formatted="false">Ancho máximo</string>
     <string name="t_66025c5c7eaf" formatted="false">Terminar</string>
-    <string name="t_66590e12beed" formatted="false">Pie de la %1$s: se ven las uñas; muestre la planta</string>
     <string name="t_66c9af388952" formatted="false">Un protocolo es una lista de tomas (zonas, gestos, cantidad, coincidencia, luz y referencia) que se reutiliza con cualquier paciente y se comparte con otros profesionales.</string>
     <string name="t_66f5cbc1e91b" formatted="false">Demasiada luz: sin flash</string>
     <string name="t_670e1266954a" formatted="false">muslos</string>
@@ -594,7 +599,6 @@
     <string name="t_81de432a2172" formatted="false">Ver detalles</string>
     <string name="t_81ee0c76034a" formatted="false">Ambas manos sobre fondo liso, dedos ligeramente separados, cámara paralela a la superficie.</string>
     <string name="t_81f060cbca57" formatted="false">estimada (30 cm)</string>
-    <string name="t_829958218146" formatted="false">Mano de la %1$s: dedos hacia abajo, como en la guía</string>
     <string name="t_82d7030f5dd9" formatted="false">Restaurar líneas eliminadas (%1$d)</string>
     <string name="t_82eb11e9105d" formatted="false">Expresión: sonreír al máximo</string>
     <string name="t_831f8c23aa69" formatted="false">No se pudo renombrar la foto</string>
@@ -649,7 +653,6 @@
     <string name="t_8a19b4a51fac" formatted="false">Ancho del dorso (mitad), mm</string>
     <string name="t_8a695023a201" formatted="false">Analizando arrugas y rasgos…</string>
     <string name="t_8a850948781b" formatted="false">Alineación</string>
-    <string name="t_8a947c1d5a0e" formatted="false">Pie de la %1$s: que se vean los dedos</string>
     <string name="t_8b3e31080154" formatted="false">%1$d indicaciones más: %2$s</string>
     <string name="t_8b466bbdf18d" formatted="false">Disparo automático al coincidir</string>
     <string name="t_8b6f303fb29c" formatted="false">Sobre la cola de la ceja derecha (canto externo), mm</string>
@@ -731,6 +734,7 @@
     <string name="t_9c7706beaba2" formatted="false">motor de puntos distinto</string>
     <string name="t_9cf00ab7e291" formatted="false">Modo experto</string>
     <string name="t_9d216d7dbc1b" formatted="false">Se eliminará de la galería del teléfono y del expediente.</string>
+    <string name="t_9da61737286a" formatted="false">Mano a la %1$s de la imagen: que se vean las falanges de todos los dedos (%2$s)</string>
     <string name="t_9dcc5693fc83" formatted="false">Disparo automático activado</string>
     <string name="t_9e33a91b0e7e" formatted="false">No se encontró piel para igualar</string>
     <string name="t_9ee1b812c554" formatted="false">Algunas fotografías no se pudieron compartir</string>
@@ -744,11 +748,9 @@
     <string name="t_a1e56a034b63" formatted="false">base nasal</string>
     <string name="t_a1e9db9161f2" formatted="false">Ancho al 50 % (medio)</string>
     <string name="t_a217f294e4f4" formatted="false">No coinciden: %1$s (expresión, pose o cambio local distinto del resto)</string>
-    <string name="t_a220d67b2bd7" formatted="false">Mano de la %1$s: que se vean las falanges de todos los dedos (%2$s)</string>
     <string name="t_a23190537144" formatted="false">Ancho al 25 % (sup.)</string>
     <string name="t_a276b1754a3a" formatted="false">Ayudas</string>
     <string name="t_a2eeab6cf8ab" formatted="false">Coincide · capturando</string>
-    <string name="t_a357187cb61a" formatted="false">Mano de la %1$s: muestre la palma</string>
     <string name="t_a3980dd32780" formatted="false">El nombre es obligatorio</string>
     <string name="t_a3b4b3ced269" formatted="false">Ráfaga de 3 fotos</string>
     <string name="t_a43db90c06c5" formatted="false">" · diferencia entre mejillas %1$.0f %%"</string>
@@ -763,7 +765,6 @@
     <string name="t_a5eb5d15060e" formatted="false">Comparar</string>
     <string name="t_a5f8d8f332d0" formatted="false">Última foto de la cara</string>
     <string name="t_a6b8e28b41d6" formatted="false">Relieve no guardado: demasiada luz ambiente (use penumbra)</string>
-    <string name="t_a6c31da20601" formatted="false">Mano de la %1$s: entera dentro del cuadro</string>
     <string name="t_a6e75d5e41e6" formatted="false">Importando %1$d foto…</string>
     <string name="t_a6ea4d4431ae" formatted="false">derecha de la imagen</string>
     <string name="t_a6fe655b0a42" formatted="false">Coincide con la referencia</string>
@@ -924,7 +925,6 @@
     <string name="t_c7074cac2c94" formatted="false">Dibuje sobre la foto</string>
     <string name="t_c7158732f612" formatted="false">Mirada al frente</string>
     <string name="t_c766fa366bed" formatted="false">En todas</string>
-    <string name="t_c7798e3867b4" formatted="false">Mano de la %1$s: muestre el dorso</string>
     <string name="t_c79155e38c96" formatted="false">Tense el cuello mostrando los dientes inferiores</string>
     <string name="t_c802c46db199" formatted="false">Volver a trazar %1$s</string>
     <string name="t_c81f5771478f" formatted="false">" (%1$d no se pudieron leer)"</string>

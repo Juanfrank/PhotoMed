@@ -4,6 +4,15 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Mensajes de corrección revisados**:
+  - En el modo simple solo se veían las indicaciones con icono: las de manos, pies y cuerpo (falanges,
+    dedos, uñas, codo, rodillas, ropa, centrado…) no se mostraban y la cámara no disparaba sin decir por
+    qué. Ahora la principal se muestra como texto corto sobre la imagen (y «+N» con las demás).
+  - «Mano / Pie a la izquierda de la imagen» en lugar de «Mano de la izquierda» (se confundía con la mano
+    izquierda del paciente, que con la cámara trasera sale a la derecha).
+  - «Centre la zona» enciende las flechas del borde hacia donde mover el teléfono y tiene su icono.
+  - Mientras se confirma que la zona ya cumple se muestra «Comprobando la zona…» (antes seguía el último
+    aviso, ya resuelto); las correcciones van antes que los mensajes de estado.
 - **Captura más rápida**: la ráfaga de 3 tomas se pide de golpe (antes cada toma esperaba a que la anterior
   se guardara) y solo hay que estar quieto hasta que se hacen las exposiciones (una vibración corta avisa);
   la elección de la mejor y el guardado siguen después. El disparo automático espera menos (0,15 s) y no
