@@ -152,7 +152,7 @@ object Standardization {
                 hints += if (l.leftCheek < l.rightCheek) trn("Luz desigual: lado izquierdo más oscuro") else trn("Luz desigual: lado derecho más oscuro")
                 off += 0.5f
             }
-            lightHints(l).forEach { hints += it; off += 0.5f }
+            lightHints(l, det.yaw).forEach { hints += it; off += 0.5f }
         }
         // la expresión pedida es condición para el disparo automático
         val expressionOk = ZoneAlignment.of(zone).detector != Detector.FACE || Expression.meets(expression, det.points, det.yaw)
@@ -170,9 +170,20 @@ object Standardization {
     const val MIN_FACE_LIGHT = 0.35f
     const val MAX_FACE_LIGHT = 0.85f
 
-    /** Avisos de luz insuficiente o excesiva del rostro (también con referencia, fuera de los protocolos). */
-    fun lightHints(l: Lighting): List<String> = buildList {
-        if (l.face < MIN_FACE_LIGHT) add(trn("Poca luz en el rostro"))
+    /** Luz mínima del rostro en vistas giradas (oblicuo, perfil): se mide el lado que mira a la cámara. */
+    const val MIN_FACE_LIGHT_TURNED = 0.28f
+    /** Giro de la cabeza a partir del cual la luz se mide en el lado que mira a la cámara. */
+    const val TURNED_YAW = 30f
+
+    /**
+     * Avisos de luz insuficiente o excesiva del rostro (también con referencia, fuera de los protocolos).
+     * Con la cabeza girada ([yaw] ≥ 30°) el lado lejano queda en sombra por la propia vista: se mide el lado
+     * iluminado (el más claro), con un mínimo algo menor (no penaliza la sombra natural ni la piel oscura).
+     */
+    fun lightHints(l: Lighting, yaw: Float? = null): List<String> = buildList {
+        val turned = yaw != null && abs(yaw) >= TURNED_YAW
+        val v = if (turned) maxOf(l.face, l.leftCheek, l.rightCheek) else l.face
+        if (v < (if (turned) MIN_FACE_LIGHT_TURNED else MIN_FACE_LIGHT)) add(trn("Poca luz en el rostro"))
         if (l.face > MAX_FACE_LIGHT) add(trn("Demasiada luz: sin flash"))
     }
 

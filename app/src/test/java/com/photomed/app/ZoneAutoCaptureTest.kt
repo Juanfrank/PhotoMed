@@ -140,7 +140,8 @@ class ZoneAutoCaptureTest {
     /** Criterios clínicos de la zona sobre la foto (pose, manos y piel/ropa calculadas con MediaPipe). */
     private fun criteria(z: Zone, s: Sample): List<String> =
         com.photomed.app.align.ZoneCriteria.hints(z, com.photomed.app.align.ZoneCriteria.Scene(
-            if (ZoneAlignment.of(z).detector == Detector.POSE) s.pose.points else emptyMap(), s.hands, s.classes, s.h / s.w.toFloat()))
+            if (ZoneAlignment.of(z).detector == Detector.POSE) s.pose.points else emptyMap(), s.hands, s.classes, s.h / s.w.toFloat(),
+            face = s.face.points))
 
     /** Primera foto completa: por quietud si no hay puntos que comprobar, si no la estandarización. */
     private fun first(z: Zone, s: Sample): MatchEval =
@@ -192,6 +193,42 @@ class ZoneAutoCaptureTest {
     data class Row(val zone: Zone, val images: Int, val detected: Int, val firstN: Int, val firstReady: Int, val geomOk: Int, val unexplained: Int,
                    val criteriaN: Int, val criteriaOk: Int, val criteriaNotes: String, val wrongViewReady: Int?,
                    val steadyMovingReady: Int, val steadyN: Int, val refSame: Int, val refMoved: Int, val refN: Int, val notes: String)
+
+    /**
+     * Precisión entre zonas: la primera foto de cada zona (con sus criterios) sobre las fotos de las DEMÁS
+     * zonas no debe disparar (p. ej. «pies» con una foto de manos, «ojo» con una de labios). Informe:
+     * build/reports/zone_cross.md (falsos disparos por zona y de qué zonas vienen).
+     */
+    @Test
+    fun crossZonePrecision() {
+        assumeTrue(File(root, "rostro_frontal/landmarks.json").exists())
+        val dirs = Zone.entries.filter { it != Zone.FREE }.map { dirOf(it) }.distinct()
+        val cache = dirs.associateWith { d -> load(d).filter { !it.file.name.startsWith("m_") && !it.file.name.startsWith("pm_") }.take(8) }
+        val md = StringBuilder("# Precisión entre zonas (fotos de otras zonas que disparan)\n\n| Zona | Falsos disparos | De |\n|---|---|---|\n")
+        var total = 0; var fa = 0
+        val perZone = LinkedHashMap<Zone, Int>()
+        for (z in Zone.entries.filter { it != Zone.FREE && it != Zone.FACE_FRONTAL }) {
+            val from = HashMap<String, Int>(); var n = 0
+            for (d in dirs.filter { it != dirOf(z) }) for (s in cache[d].orEmpty()) {
+                n++
+                val det = detOf(s, z)
+                val firstOk = (SteadyFraming.applies(z, det) || det.points.size >= LiveDecision.MIN_POINTS)
+                if (!firstOk) continue
+                val e = first(z, s)
+                val crit = if (com.photomed.app.align.ZoneCriteria.applies(z)) criteria(z, s) else emptyList()
+                if (AutoCapture.ready(e) && crit.isEmpty()) from[d] = (from[d] ?: 0) + 1
+            }
+            val k = from.values.sum(); total += n; fa += k; perZone[z] = k
+            md.append("| ${z.id} | $k/$n | ${from.entries.sortedByDescending { it.value }.joinToString(", ") { "${it.key} ${it.value}" }} |\n")
+        }
+        md.append("\nTOTAL: $fa/$total falsos disparos\n")
+        File("build/reports").mkdirs(); File("build/reports/zone_cross.md").writeText(md.toString())
+        println(md)
+        // sin retroceso: antes de las comprobaciones de contenido eran 1174 de 3974 (ojo y cuero cabelludo
+        // disparaban con casi cualquier foto quieta); ahora 63
+        org.junit.Assert.assertTrue("falsos disparos entre zonas: $fa/$total\n$md", fa <= 0.025f * total)
+        perZone.forEach { (z, k) -> org.junit.Assert.assertTrue("${z.id}: $k falsos disparos\n$md", k <= 20) }
+    }
 
     @Test
     fun everyZoneAutoCaptures() {
@@ -262,9 +299,9 @@ class ZoneAutoCaptureTest {
                 .flatMap { it.hints }.groupingBy { it.take(40) }.eachCount()
                 .entries.sortedByDescending { it.value }.take(3).joinToString("; ") { "${it.key} (${it.value})" }
             if (refFails.isNotEmpty()) println("REF ${z.id}: " + refFails.joinToString(" | "))
-            if (System.getenv("PM_ZONE_DEBUG") != null && spec.detector == Detector.FACE) firstSet.forEach { s0 ->
+            if ((System.getenv("PM_ZONE_DEBUG") != null || File("build/zone_debug").exists()) && spec.detector == Detector.FACE) firstSet.forEach { s0 ->
                 val e = first(z, s0); val d = detOf(s0, z)
-                println("DBG ${z.id} ${s0.file.name} yaw=${d.yaw} pose=${d.pose?.yaw} side=${Standardization.facingSide(d.points)} pitch=${d.pitch} roll=${d.roll} gaze=${d.gaze} ${e.status} q=${"%.2f".format(e.quality)} ${e.hints}")
+                println("DBG ${z.id} ${s0.file.name} luz=${light(s0, d)} yaw=${d.yaw} pose=${d.pose?.yaw} side=${Standardization.facingSide(d.points)} pitch=${d.pitch} roll=${d.roll} gaze=${d.gaze} ${e.status} q=${"%.2f".format(e.quality)} ${e.hints}")
             }
             rows += Row(z, ss.size, detected, firstSet.size, firstReady, geomOk, unexplained,
                 if (hasCriteria) firstSet.size else 0, critOk, critNotes, wrong, steadyMoving, steadySet.size.coerceAtMost(8), same, mov, n, hints)

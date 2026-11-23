@@ -280,6 +280,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     }
 
     private val fusion = ClassesFusion()
+    private var lastFace: Map<String, Pt> = emptyMap(); private var lastFaceAt = 0L
     /** Última segmentación sin fusionar: para dibujar el contorno sin retraso. */
     @Volatile private var lastRawClasses: ZoneCriteria.Classes? = null
 
@@ -376,7 +377,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         // luz del rostro: siempre (antes solo en protocolos); fuera de ellos, con el mínimo y máximo generales
         val light = if (spec.detector == Detector.FACE && cur.points.isNotEmpty())
             runCatching { Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points, cur.yaw) }.getOrNull() else null
-        if (!measureLight) light?.let { Standardization.lightHints(it) }?.takeIf { it.isNotEmpty() }?.let { lh ->
+        if (!measureLight) light?.let { Standardization.lightHints(it, cur.yaw) }?.takeIf { it.isNotEmpty() }?.let { lh ->
             eval = eval.copy(status = if (eval.status == MatchStatus.MATCH) MatchStatus.CLOSE else eval.status,
                 quality = eval.quality.coerceAtMost(0.75f), hints = eval.hints + lh)
         }
@@ -442,13 +443,18 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val aspect = frame.height / frame.width.toFloat()
         val q = guideRot
         // con la guía girada, los criterios se miden en su orientación y el esquema vuelve al cuadro
-        val scene = with(ZoneCriteria) { ZoneCriteria.Scene(pose, lastHands, lastClasses, aspect, single = singleLimb).rotatedCcw(q) }
+        // zona del ojo (sin detector): si el detector de rostro ve la cara entera, no es un primer plano de un ojo
+        if (zone.guide == com.photomed.app.data.GuideType.EYE && System.currentTimeMillis() - lastFaceAt > 500) {
+            lastFaceAt = System.currentTimeMillis()
+            lastFace = runCatching { detector.detectFull(Detector.FACE, frame).points }.getOrDefault(emptyMap())
+        }
+        val scene = with(ZoneCriteria) { ZoneCriteria.Scene(pose, lastHands, lastClasses, aspect, single = singleLimb, face = lastFace).rotatedCcw(q) }
         // el contorno dibujado, con la segmentación más reciente (sin la fusión, que va por detrás si se mueve)
         val drawScene = if (lastRawClasses === lastClasses) scene
             else with(ZoneCriteria) { ZoneCriteria.Scene(pose, lastHands, lastRawClasses, aspect, single = singleLimb).rotatedCcw(q) }
         lastSchema = runCatching { BodySchema.of(zone, drawScene)?.let { sch -> if (q % 4 == 0) sch else with(BodySchema) { sch.map { ZoneCriteria.unrotate(it, q, aspect) } } } }.getOrNull()
         // luz de la zona del cuerpo (sobre su piel): poca o demasiada también impide el disparo
-        val lightNow = runCatching {
+        val lightNow = if (!ZoneCriteria.isBody(zone)) emptyList() else runCatching {
             val c = lastRawClasses
             val px = frame.rgb()
             val skin = c?.let { cl -> { x: Int, y: Int ->

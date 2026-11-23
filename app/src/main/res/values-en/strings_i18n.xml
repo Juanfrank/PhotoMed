@@ -102,6 +102,7 @@
     <string name="t_13ff4fdfba5d" formatted="false">Edit the capture date</string>
     <string name="t_1409f2deba17" formatted="false">Automatic detection</string>
     <string name="t_1434aafdff99" formatted="false">Profile: no face mesh; the neck and double chin are measured from the silhouette.</string>
+    <string name="t_1454513dc7a6" formatted="false">Move closer: frame only the area (the whole face is visible)</string>
     <string name="t_145687c7dfc5" formatted="false">Strokes saved in the app; could not be written to %1$d photo(s)</string>
     <string name="t_14627a06347f" formatted="false">Folds confirmed in all %1$d photos</string>
     <string name="t_1534ef8d044e" formatted="false">Could not get the full face mesh%1$s: only the folds are measured (nasolabial, marionette, tear trough); forehead, glabellar lines, crow\'s feet and dark circles need the mesh.</string>
@@ -423,6 +424,7 @@
     <string name="t_5c151ba1ec8f" formatted="false">Save the protocol</string>
     <string name="t_5c754c49873e" formatted="false">upper</string>
     <string name="t_5c9d78682ea2" formatted="false">Scale measured with the phone\'s depth sensor.</string>
+    <string name="t_5cd20838c9a3" formatted="false">Move closer: frame a single eye</string>
     <string name="t_5d20980008ec" formatted="false">Protocol «%1$s» imported</string>
     <string name="t_5d86bdfa1dd6" formatted="false">Could not read the photo (%1$s)</string>
     <string name="t_5da223f54229" formatted="false">Remove from the sequence</string>
@@ -434,6 +436,7 @@
     <string name="t_5e5898a10a27" formatted="false">Anatomical illustrations</string>
     <string name="t_5e5cf0a452ad" formatted="false">left</string>
     <string name="t_5e6aa89c725a" formatted="false">Eyes, eyebrows, nose, mouth, facial oval; joints on the body.</string>
+    <string name="t_5ebfa955fab0" formatted="false">Frame the facial area (the facial skin is not visible)</string>
     <string name="t_5ec025834fbe" formatted="false">back / palm</string>
     <string name="t_5ed8ae63732e" formatted="false">Before</string>
     <string name="t_5f408032f96c" formatted="false">All strokes and symbols will be removed from this photo. You can undo this afterwards.</string>
@@ -654,6 +657,7 @@
     <string name="t_8a19b4a51fac" formatted="false">Dorsum width (middle), mm</string>
     <string name="t_8a695023a201" formatted="false">Analyzing wrinkles and features…</string>
     <string name="t_8a850948781b" formatted="false">Alignment</string>
+    <string name="t_8ae701cbc8b4" formatted="false">Frame the scalp (the hair is not visible)</string>
     <string name="t_8b3e31080154" formatted="false">%1$d more hints: %2$s</string>
     <string name="t_8b466bbdf18d" formatted="false">Auto-capture on match</string>
     <string name="t_8b6f303fb29c" formatted="false">Above the right brow tail (lateral canthus), mm</string>
@@ -739,6 +743,7 @@
     <string name="t_9da61737286a" formatted="false">Hand on the %1$s of the image: all phalanges of every finger must be visible (%2$s)</string>
     <string name="t_9dcc5693fc83" formatted="false">Auto-capture on</string>
     <string name="t_9e33a91b0e7e" formatted="false">No skin found to match</string>
+    <string name="t_9e975e601be9" formatted="false">Frame the scalp, not the face</string>
     <string name="t_9ee1b812c554" formatted="false">Some photos could not be shared</string>
     <string name="t_9f0a54155487" formatted="false">Crown</string>
     <string name="t_9f494a0c7bc4" formatted="false">Expand</string>
@@ -1165,6 +1170,7 @@
     <string name="t_f75e8637c90b" formatted="false">Light: measuring…</string>
     <string name="t_f76d9918a893" formatted="false">Estimates the tilt between shots from the contour geometry (facial landmarks, contours chosen in “Contours” or silhouette widths at each height), without using sensors.</string>
     <string name="t_f79c2d3b4a68" formatted="false">cheek and nose</string>
+    <string name="t_f7dfe6b5b411" formatted="false">Frame the lips (the eyes or the forehead are visible)</string>
     <string name="t_f7e989a2266c" formatted="false">Eye bags</string>
     <string name="t_f7f892110571" formatted="false">lips</string>
     <string name="t_f80dc59c97dc" formatted="false">Protocol name</string>

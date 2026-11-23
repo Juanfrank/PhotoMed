@@ -52,5 +52,11 @@
   "Mano a la %1$s de la imagen: muestre la palma": "Hand on the %1$s of the image: show the palm",
   "Mano a la %1$s de la imagen: muestre el dorso": "Hand on the %1$s of the image: show the back of the hand",
   "Pie a la %1$s de la imagen: que se vean los dedos": "Foot on the %1$s of the image: the toes must be visible",
-  "Pie a la %1$s de la imagen: se ven las uñas; muestre la planta": "Foot on the %1$s of the image: the nails are visible; show the sole"
+  "Pie a la %1$s de la imagen: se ven las uñas; muestre la planta": "Foot on the %1$s of the image: the nails are visible; show the sole",
+  "Encuadre la zona del rostro (no se ve la piel de la cara)": "Frame the facial area (the facial skin is not visible)",
+  "Encuadre el cuero cabelludo, no la cara": "Frame the scalp, not the face",
+  "Encuadre el cuero cabelludo (no se ve el pelo)": "Frame the scalp (the hair is not visible)",
+  "Acérquese: encuadre solo la zona (se ve la cara entera)": "Move closer: frame only the area (the whole face is visible)",
+  "Acérquese: encuadre un solo ojo": "Move closer: frame a single eye",
+  "Encuadre los labios (se ven los ojos o la frente)": "Frame the lips (the eyes or the forehead are visible)"
 }

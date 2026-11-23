@@ -102,6 +102,7 @@
     <string name="t_13ff4fdfba5d" formatted="false">Editar la fecha de captura</string>
     <string name="t_1409f2deba17" formatted="false">Detección automática</string>
     <string name="t_1434aafdff99" formatted="false">Perfil: sin malla facial; el cuello y la papada se miden por la silueta.</string>
+    <string name="t_1454513dc7a6" formatted="false">Acérquese: encuadre solo la zona (se ve la cara entera)</string>
     <string name="t_145687c7dfc5" formatted="false">Trazos guardados en la app; no se pudieron escribir en %1$d foto(s)</string>
     <string name="t_14627a06347f" formatted="false">Surcos confirmados en las %1$d fotos</string>
     <string name="t_1534ef8d044e" formatted="false">No se pudo obtener la malla facial completa%1$s: solo se miden los surcos (nasogeniano, marioneta, valle lagrimal); frente, ceño, patas de gallo y ojeras necesitan la malla.</string>
@@ -423,6 +424,7 @@
     <string name="t_5c151ba1ec8f" formatted="false">Guardar el protocolo</string>
     <string name="t_5c754c49873e" formatted="false">superior</string>
     <string name="t_5c9d78682ea2" formatted="false">Escala medida con el sensor de profundidad del teléfono.</string>
+    <string name="t_5cd20838c9a3" formatted="false">Acérquese: encuadre un solo ojo</string>
     <string name="t_5d20980008ec" formatted="false">Protocolo «%1$s» importado</string>
     <string name="t_5d86bdfa1dd6" formatted="false">No se pudo leer la fotografía (%1$s)</string>
     <string name="t_5da223f54229" formatted="false">Quitar de la secuencia</string>
@@ -434,6 +436,7 @@
     <string name="t_5e5898a10a27" formatted="false">Ilustraciones anatómicas</string>
     <string name="t_5e5cf0a452ad" formatted="false">izquierdo</string>
     <string name="t_5e6aa89c725a" formatted="false">Ojos, cejas, nariz, boca, óvalo; articulaciones en el cuerpo.</string>
+    <string name="t_5ebfa955fab0" formatted="false">Encuadre la zona del rostro (no se ve la piel de la cara)</string>
     <string name="t_5ec025834fbe" formatted="false">dorso / palma</string>
     <string name="t_5ed8ae63732e" formatted="false">Antes</string>
     <string name="t_5f408032f96c" formatted="false">Se quitarán todos los trazos y símbolos de esta foto. Puede deshacerlo después.</string>
@@ -654,6 +657,7 @@
     <string name="t_8a19b4a51fac" formatted="false">Ancho del dorso (mitad), mm</string>
     <string name="t_8a695023a201" formatted="false">Analizando arrugas y rasgos…</string>
     <string name="t_8a850948781b" formatted="false">Alineación</string>
+    <string name="t_8ae701cbc8b4" formatted="false">Encuadre el cuero cabelludo (no se ve el pelo)</string>
     <string name="t_8b3e31080154" formatted="false">%1$d indicaciones más: %2$s</string>
     <string name="t_8b466bbdf18d" formatted="false">Disparo automático al coincidir</string>
     <string name="t_8b6f303fb29c" formatted="false">Sobre la cola de la ceja derecha (canto externo), mm</string>
@@ -739,6 +743,7 @@
     <string name="t_9da61737286a" formatted="false">Mano a la %1$s de la imagen: que se vean las falanges de todos los dedos (%2$s)</string>
     <string name="t_9dcc5693fc83" formatted="false">Disparo automático activado</string>
     <string name="t_9e33a91b0e7e" formatted="false">No se encontró piel para igualar</string>
+    <string name="t_9e975e601be9" formatted="false">Encuadre el cuero cabelludo, no la cara</string>
     <string name="t_9ee1b812c554" formatted="false">Algunas fotografías no se pudieron compartir</string>
     <string name="t_9f0a54155487" formatted="false">Corona (coronilla)</string>
     <string name="t_9f494a0c7bc4" formatted="false">Desplegar</string>
@@ -1165,6 +1170,7 @@
     <string name="t_f75e8637c90b" formatted="false">Luz: midiendo…</string>
     <string name="t_f76d9918a893" formatted="false">Estima la inclinación entre tomas con la geometría del contorno (puntos faciales, contornos elegidos en “Contornos” o anchos de la silueta a cada altura), sin usar sensores.</string>
     <string name="t_f79c2d3b4a68" formatted="false">mejilla y nariz</string>
+    <string name="t_f7dfe6b5b411" formatted="false">Encuadre los labios (se ven los ojos o la frente)</string>
     <string name="t_f7e989a2266c" formatted="false">Bolsas palpebrales</string>
     <string name="t_f7f892110571" formatted="false">labios</string>
     <string name="t_f80dc59c97dc" formatted="false">Nombre del protocolo</string>

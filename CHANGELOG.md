@@ -4,6 +4,15 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Más precisión en las zonas que no son el rostro frontal**: el ojo, el cuero cabelludo, los labios, la
+  zona periocular y la frente disparaban con casi cualquier escena quieta (también con fotos de manos o
+  pies). Ahora se comprueba el contenido (piel de la cara que llena el cuadro, pelo en el cuero cabelludo,
+  un solo ojo, labios sin los ojos debajo; cuello centrado del mentón a los hombros; espalda y glúteos sin
+  cara). Falsos disparos con fotos de otras zonas: de 1174 a 63 de 3974, con pocas pérdidas en las fotos
+  propias. Nuevos avisos: «Acérquese: encuadre solo la zona», «Acérquese: encuadre un solo ojo», «Encuadre
+  los labios», «Encuadre el cuero cabelludo…».
+- **Luz en oblicuos y perfiles**: se mide el lado de la cara que mira a la cámara (la sombra del lado lejano
+  es propia de la vista y no indica poca luz).
 - **Avisos de luz insuficiente o excesiva** que faltaban: en el rostro con foto anterior de referencia (antes
   la luz solo se medía en los protocolos) y en manos, pies y cuerpo (no se medía nunca; ahora sobre la piel
   de la zona: «Poca luz en la zona», «Demasiada luz en la zona: sin flash», también con mucha piel

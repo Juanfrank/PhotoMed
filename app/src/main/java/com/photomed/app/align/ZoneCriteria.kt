@@ -48,7 +48,9 @@ object ZoneCriteria {
      * extremidad (selector «Derecha / Izquierda» de manos, pies y piernas): se exige una, no las dos.
      */
     class Scene(val pose: Map<String, Pt>, val hands: List<Hand>?, val classes: Classes?, val aspect: Float = 4f / 3f,
-                val single: Boolean = false)
+                val single: Boolean = false,
+                /** Puntos del rostro (zona del ojo: para saber si se ve la cara entera en lugar de un ojo). */
+                val face: Map<String, Pt> = emptyMap())
 
     /**
      * Escena girada 90° × [q] en sentido antihorario: la del cuadro pasada a la orientación de la guía
@@ -67,7 +69,8 @@ object ZoneCriteria {
                 val lm = c.rgb?.let { l -> IntArray(w2 * h2).also { o -> for (y2 in 0 until h2) for (x2 in 0 until w2) o[y2 * w2 + x2] = l[x2 * c.width + (c.width - 1 - y2)] } }
                 Classes(w2, h2, d, lm)
             }
-            sc = Scene(sc.pose.mapValues { r(it.value) }, sc.hands?.map { h -> Hand(h.points.map(::r), h.label) }, cl, 1f / a, sc.single)
+            sc = Scene(sc.pose.mapValues { r(it.value) }, sc.hands?.map { h -> Hand(h.points.map(::r), h.label) }, cl, 1f / a, sc.single,
+                sc.face.mapValues { r(it.value) })
         }
         return sc
     }
@@ -87,8 +90,15 @@ object ZoneCriteria {
     /** Datos que necesita cada zona (para calcular solo lo necesario en cada cuadro). */
     fun needsHands(zone: Zone) = zone.guide == GuideType.HANDS
     /** En las manos, la piel sirve para que el contorno del esquema siga el borde real de cada mano. */
-    fun needsClasses(zone: Zone) = zone.guide in SKIN_ZONES || zone.guide == GuideType.FEET || zone.guide == GuideType.HANDS
+    fun needsClasses(zone: Zone) = zone.guide in SKIN_ZONES || zone.guide == GuideType.FEET || zone.guide == GuideType.HANDS ||
+        zone.guide in CLOSEUP_FACE || zone.guide in SCALP_ZONES
+    /** Primeros planos del rostro (sin cara entera detectable): se comprueba que lo encuadrado sea piel de la cara. */
+    private val CLOSEUP_FACE = setOf(GuideType.FOREHEAD, GuideType.PERIOCULAR, GuideType.LIPS, GuideType.EYE)
+    /** Vistas del cuero cabelludo: se comprueba que se vea pelo (o cuero cabelludo) y no la cara. */
+    private val SCALP_ZONES = setOf(GuideType.SCALP, GuideType.SCALP_CROWN, GuideType.SCALP_PARIETAL)
     fun applies(zone: Zone) = needsHands(zone) || needsClasses(zone) || zone.guide in POSE_RULES
+    /** Zonas del cuerpo (no el rostro ni el cuero cabelludo): luz de la zona, puntos y esquema del cuerpo. */
+    fun isBody(zone: Zone) = zone.guide in SKIN_ZONES || zone.guide == GuideType.FEET || zone.guide == GuideType.HANDS
 
     private val SKIN_ZONES = setOf(GuideType.TORSO_FRONT, GuideType.TORSO_SIDE, GuideType.BREASTS, GuideType.BACK,
         GuideType.GLUTES, GuideType.LEGS, GuideType.ARM, GuideType.NECK)
@@ -129,10 +139,80 @@ object ZoneCriteria {
             GuideType.HANDS -> hands(zone, s)
             GuideType.FEET -> feet(zone, s)
             in SKIN_ZONES -> body(zone, s)
+            in CLOSEUP_FACE -> closeupFace(zone, s)
+            in SCALP_ZONES -> scalp(s)
             else -> emptyList()
         }
         return h + listOfNotNull(centerHint(zone, s))
     }
+
+    /** Fracción de las clases [cls] en el centro del cuadro (60 % central de cada lado). */
+    fun centerFraction(c: Classes, vararg cls: Int): Float {
+        var n = 0; var k = 0
+        for (y in (c.height * 0.2f).toInt() until (c.height * 0.8f).toInt()) for (x in (c.width * 0.2f).toInt() until (c.width * 0.8f).toInt()) {
+            n++; if (c.at(x, y) in cls) k++
+        }
+        return if (n == 0) 0f else k / n.toFloat()
+    }
+
+    /** Piel de la cara mínima en el centro de un primer plano del rostro (con fotos reales: ojo, periocular, labios, frente). */
+    const val CLOSEUP_FACE_MIN = 0.35f
+    /** Pelo mínimo y piel de la cara máxima en el centro de una vista del cuero cabelludo. */
+    const val SCALP_HAIR_MIN = 0.25f
+    const val SCALP_FACE_MAX = 0.5f
+
+    /** Piel de la cara mínima en el borde del cuadro: en un primer plano llena el cuadro; con la cara entera, alrededor hay fondo. */
+    const val CLOSEUP_BORDER_MIN = 0.25f
+    /** Piel de la cara mínima en el borde inferior (ojo, periocular, frente: debajo sigue la cara). */
+    const val CLOSEUP_BOTTOM_MIN = 0.4f
+    /** Piel de la cara máxima en el borde inferior de un primer plano de los labios (con fotos reales ≤ 0,06 en el 90 %). */
+    const val LIPS_BOTTOM_MAX = 0.6f
+
+    /** Fracción de las clases [cls] en el borde del cuadro ([inner]: lo que queda dentro, sin contar). */
+    fun borderFraction(c: Classes, cls: Int, bottomOnly: Boolean = false): Float {
+        var n = 0; var k = 0
+        for (y in 0 until c.height) for (x in 0 until c.width) {
+            val inBorder = if (bottomOnly) y >= c.height * 0.9f else (x < c.width * 0.1f || x >= c.width * 0.9f || y < c.height * 0.1f || y >= c.height * 0.9f)
+            if (!inBorder) continue
+            n++; if (c.at(x, y) == cls) k++
+        }
+        return if (n == 0) 0f else k / n.toFloat()
+    }
+
+    /**
+     * Primer plano del rostro: lo encuadrado debe ser piel de la cara (no una mano, un pie, el cuerpo o el
+     * fondo) y llenar el cuadro (no la cara entera con fondo alrededor). Ojo, periocular y frente: debajo
+     * sigue la cara; ojo: no se ven los dos ojos.
+     */
+    private fun closeupFace(zone: Zone, s: Scene): List<String> {
+        val c = s.classes ?: return emptyList()
+        if (centerFraction(c, FaceLabels.FACE_SKIN) < CLOSEUP_FACE_MIN) return listOf(tr("Encuadre la zona del rostro (no se ve la piel de la cara)"))
+        val out = ArrayList<String>()
+        if (borderFraction(c, FaceLabels.FACE_SKIN) < CLOSEUP_BORDER_MIN ||
+            (zone.guide != GuideType.LIPS && borderFraction(c, FaceLabels.FACE_SKIN, bottomOnly = true) < CLOSEUP_BOTTOM_MIN))
+            out += tr("Acérquese: encuadre solo la zona (se ve la cara entera)")
+        // labios: debajo ya no sigue la piel de la cara (mentón y cuello); con la cara debajo son ojos o frente
+        if (zone.guide == GuideType.LIPS && borderFraction(c, FaceLabels.FACE_SKIN, bottomOnly = true) >= LIPS_BOTTOM_MAX)
+            out += tr("Encuadre los labios (se ven los ojos o la frente)")
+        if (zone.guide == GuideType.EYE) {
+            val l = s.face[Landmarks.EYE_L]; val r = s.face[Landmarks.EYE_R]
+            if (l != null && r != null && listOf(l, r).all { it.x in 0f..1f && it.y in 0f..s.aspect }) out += tr("Acérquese: encuadre un solo ojo")
+        }
+        return out
+    }
+
+    /** Cuero cabelludo: se debe ver pelo en el centro, no la cara. */
+    private fun scalp(s: Scene): List<String> {
+        val c = s.classes ?: return emptyList()
+        return when {
+            centerFraction(c, FaceLabels.FACE_SKIN) >= SCALP_FACE_MAX -> listOf(tr("Encuadre el cuero cabelludo, no la cara"))
+            centerFraction(c, FaceLabels.HAIR) < SCALP_HAIR_MIN -> listOf(tr("Encuadre el cuero cabelludo (no se ve el pelo)"))
+            else -> emptyList()
+        }
+    }
+
+    /** Fracción de piel de la cara en todo el cuadro (de espaldas no debería verse). */
+    private fun faceSkinAll(c: Classes): Float { var k = 0; for (b in c.data) if (b.toInt() == FaceLabels.FACE_SKIN) k++; return k / c.data.size.toFloat() }
 
     /** Tolerancia del centrado de la zona: desvío máximo de su centro respecto al del cuadro (fracción de cada lado). */
     const val CENTER_TOL = 0.13f
@@ -175,7 +255,12 @@ object ZoneCriteria {
             GuideType.TORSO_FRONT, GuideType.BREASTS, GuideType.BACK, GuideType.TORSO_SIDE ->
                 pts(L.SHOULDER_L, L.SHOULDER_R, L.HIP_L, L.HIP_R).takeIf { it.size >= 3 }?.let { box(it) }
             GuideType.GLUTES -> pts(L.HIP_L, L.HIP_R, L.KNEE_L, L.KNEE_R).takeIf { it.size == 4 }?.let { box(it) }
-            GuideType.NECK -> pts(L.SHOULDER_L, L.SHOULDER_R).takeIf { it.size == 2 }?.let { box(it, y = false) }
+            // cuello y escote: del mentón (boca) a los hombros, centrado también en vertical (un retrato de la
+            // cara no es la toma del cuello)
+            GuideType.NECK -> pts(L.SHOULDER_L, L.SHOULDER_R).takeIf { it.size == 2 }?.let { sh ->
+                val mouth = pts(L.MOUTH_L, L.MOUTH_R)
+                if (mouth.isEmpty()) box(sh, y = false) else box(sh + mouth)
+            }
             else -> null
         }
     }
@@ -494,7 +579,7 @@ object ZoneCriteria {
                 // de espaldas el detector de cuerpo no suele ver a la persona (la localiza por la cara):
                 // la espalda descubierta se comprueba en la región de la guía
                 if (zone.guide == GuideType.BACK && !has(p, L.SHOULDER_L, L.SHOULDER_R, L.HIP_L, L.HIP_R)) {
-                    if (L.NOSE in p) out += tr("De espaldas a la cámara")
+                    if (L.NOSE in p || (c != null && faceSkinAll(c) > 0.12f)) out += tr("De espaldas a la cámara")
                     if (c != null && !(sidesClear(c, 0.5f) && sidesClear(c, 0.7f))) out += tr("Encuadre la espalda entera: hombros, cintura y los dos costados")
                     uncovered(c, trn("la espalda"), c?.let { skinClothes(it, 0.30f, 0.25f * s.aspect, 0.70f, 0.62f * s.aspect) })?.let { out += it }
                     return out
@@ -538,7 +623,7 @@ object ZoneCriteria {
             GuideType.GLUTES -> {
                 if (!has(p, L.HIP_L, L.HIP_R, L.KNEE_L, L.KNEE_R)) {
                     // de espaldas: región de la guía (los glúteos en el centro del cuadro)
-                    if (L.NOSE in p) out += tr("De espaldas a la cámara")
+                    if (L.NOSE in p || (c != null && faceSkinAll(c) > 0.12f)) out += tr("De espaldas a la cámara")
                     if (c != null && !sidesClear(c, 0.5f)) out += tr("Encuadre los glúteos enteros: las dos caderas")
                     uncovered(c, trn("los glúteos"), c?.let { skinClothes(it, 0.22f, 0.38f * s.aspect, 0.78f, 0.68f * s.aspect) })?.let { out += it }
                     return out

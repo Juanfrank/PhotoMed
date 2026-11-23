@@ -172,6 +172,32 @@ claramente visibles (ΔE ≥ 15):
   otra cosa (y en la toma de palma, avisan de que se ve el dorso).
 - Se dibujan en el esquema como puntos de referencia.
 
+### Precisión entre zonas (`crossZonePrecision`)
+
+La primera foto de cada zona (con sus criterios) se evalúa sobre las fotos de prueba de **las demás zonas**:
+no debería disparar. Las zonas sin detector o con primeros planos sin cara (ojo, cuero cabelludo, labios,
+periocular, frente) disparaban con casi cualquier escena quieta. Con la segmentación (piel de la cara, pelo)
+y el detector de rostro se comprueba el contenido:
+
+| Comprobación | Datos (fotos reales, centro del cuadro) |
+|---|---|
+| Primer plano del rostro: piel de la cara en el centro ≥ 0,35 | ojo, periocular, labios, frente: mediana 0,80–0,99; cuerpo ≈ 0 |
+| … y llenando el cuadro: piel de la cara en el borde ≥ 0,25 | primeros planos 0,31–0,92; cara entera ≈ 0 |
+| Ojo, periocular, frente: piel de la cara en el borde inferior ≥ 0,4; labios: < 0,6 | ojo 0,99, frente 0,97, periocular 0,78; labios 0,00 |
+| Ojo: el detector de rostro no ve los dos ojos | primer plano de un ojo: cara detectada 2/26; periocular 25/27 |
+| Cuero cabelludo: pelo en el centro ≥ 0,25 y piel de la cara < 0,5 | cuero cabelludo: pelo 0,66 |
+| Cuello: del mentón a los hombros, centrado también en vertical | un retrato de la cara no es la toma del cuello |
+| Espalda y glúteos sin puntos del cuerpo: sin piel de la cara (> 12 %) | |
+
+Falsos disparos: **1174 → 63 de 3974** (ojo 143 → 7, cuero cabelludo 144 → 3, labios 95 → 1,
+periocular 92 → 13, frente 89 → 10, cuello 16 → 1). Lo que queda es la confusión entre primeros planos
+parecidos (frente y periocular). Exhaustividad con las fotos propias: ojo 26 → 22, labios 12 → 9 primeras
+fotos, cuero cabelludo 7 → 5; el resto sin cambios.
+
+Luz en vistas giradas (oblicuo, perfil): el lado lejano queda en sombra por la propia vista; se mide el
+lado que mira a la cámara (mínimo 0,28), así no se penaliza la sombra natural ni la piel oscura bien
+iluminada.
+
 **Zona centrada**: el centro de la parte del cuerpo (manos, pies en horizontal, brazo, piernas,
 tronco, glúteos, cuello en horizontal) a menos del 13 % del centro del cuadro; si no, «Centre la zona
 en el cuadro».
