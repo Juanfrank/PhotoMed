@@ -297,11 +297,18 @@ object ZoneCriteria {
 
     private val FINGER_NAMES = listOf(tr("pulgar"), "índice", "medio", "anular", "meñique")
 
-    /** ¿La palma mira a la cámara? (ver la documentación de la etiqueta de MediaPipe: vale con y sin espejo). */
+    /**
+     * ¿La palma mira a la cámara? Por la etiqueta de la mano (derecha o izquierda) y el sentido de giro de
+     * muñeca → nudillo del índice → nudillo del meñique: una mano derecha con la palma a la cámara gira en un
+     * sentido y con el dorso en el otro (y la izquierda al revés). Espejar la imagen cambia a la vez la
+     * etiqueta y el giro, así que vale con y sin espejo; lo que importa es qué significa la etiqueta. Con
+     * fotos reales (11k Hands: 14 pares de dorsos y 8 de palmas; fotos de Pexels con la palma a la cámara)
+     * la etiqueta del detector, en cuadros sin espejar, es la mano real (no la supuesta en espejo).
+     */
     fun palmFacing(h: Hand): Boolean {
         val w = h.points[0]; val a = h.points[5] - w; val b = h.points[17] - w
         val z = a.x * b.y - a.y * b.x
-        return (h.label == "Left" && z < 0) || (h.label == "Right" && z > 0)
+        return (h.label == "Right" && z < 0) || (h.label == "Left" && z > 0)
     }
 
     /** Ángulo (°) en [b] entre [a] y [c]: 180 = recto. */
@@ -616,6 +623,9 @@ object ZoneCriteria {
         val mx = (FEET_MARGIN * c.width).toInt().coerceAtLeast(1); val my = (FEET_MARGIN * c.height).toInt().coerceAtLeast(1)
         val out = ArrayList<String>()
         val feet = feetOf(c).sortedByDescending { it.box.area }
+        // dedos largos con surcos hondos: son manos, no pies
+        if (handLike(s) || feet.take(if (s.single) 1 else 2).any { it.digitDepth >= HAND_DIGIT_DEPTH && (it.toeCount ?: 0) >= 3 })
+            return listOf(if (s.single) tr("Encuadre el pie descalzo") else tr("Encuadre los dos pies descalzos"))
         val two = feet.size >= 2 && feet[1].box.area > feet[0].box.area * 0.35f &&
             abs((feet[0].box.x0 + feet[0].box.x1) - (feet[1].box.x0 + feet[1].box.x1)) / 2f >= 0.2f * c.width
         if (s.single) { if (feet.isEmpty()) out += tr("Encuadre el pie descalzo") }
@@ -827,7 +837,7 @@ object ZoneCriteria {
                 val whole = { right: Boolean -> if (right) has(p, L.SHOULDER_R, L.ELBOW_R, L.WRIST_R) else has(p, L.SHOULDER_L, L.ELBOW_L, L.WRIST_L) }
                 val r = if (whole(r0)) r0 else if (whole(!r0)) !r0
                     // sin los puntos del brazo (primer plano): por la piel
-                    else return c?.takeIf { !footLike(s) }?.let { armFromSkin(it, s) } ?: listOf(tr("Encuadre el brazo entero: hombro, codo y muñeca"))
+                    else return c?.takeIf { !footLike(s) && !handLike(s) }?.let { armFromSkin(it, s) } ?: listOf(tr("Encuadre el brazo entero: hombro, codo y muñeca"))
                 val sh = if (r) L.SHOULDER_R else L.SHOULDER_L; val el = if (r) L.ELBOW_R else L.ELBOW_L
                 val wr = if (r) L.WRIST_R else L.WRIST_L; val hp = if (r) L.HIP_R else L.HIP_L
                 val a = p[sh]!!; val e = p[el]!!; val w = p[wr]!!

@@ -280,3 +280,10 @@ Conclusiones de la primera ronda:
   Límite conocido: a la resolución de la segmentación (96 px) un bikini pequeño se ve como piel.
 - **Manicura**: manos sueltas recortadas (rechazadas) y escenas con personas como negativos; un primer plano
   de una mano ya no dispara glúteos ni espalda.
+- **Manos (11k Hands, Hugging Face)**: fotos reales de una mano con los dedos hacia abajo sobre fondo
+  blanco, de dorso y de palma; se componen pares (la mano y su espejo, como izquierda y derecha) para el
+  protocolo de dos manos, pares mixtos dorso + palma y manos sueltas, que deben rechazarse. Revelaron que
+  la app interpretaba al revés la etiqueta derecha/izquierda del detector de manos (palma y dorso
+  invertidos); confirmado con fotos de Pexels con la palma a la cámara. Tras corregirlo: dorso 12/14 y palma
+  6/8 aceptadas, y ninguna palma como dorso.
+- Otras fuentes probadas: Unsplash, Pexels y Pixabay exigen clave de API; Wikimedia limita las peticiones.

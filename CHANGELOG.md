@@ -4,6 +4,14 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Corregido: palma y dorso de las manos estaban invertidos** con los puntos del detector de manos. Con
+  fotos reales (11k Hands y Pexels) la etiqueta derecha/izquierda del detector, en los cuadros sin espejar
+  de la cámara, es la mano real; la app la interpretaba como si viniera espejada, así que pedía «muestre el
+  dorso» enseñando el dorso. Ahora, con 14 pares de dorsos y 8 de palmas, se aceptan 12 y 6 (las demás por
+  encuadre) y ninguna palma pasa por dorso ni al revés.
+- **Manos que no pasan por pies ni por brazo**: los surcos hondos entre dedos (o una mano que domina el
+  cuadro) descartan las zonas de pies y el brazo en primer plano.
+
 - **De frente o de espaldas, fiable**: se decide por el lado de cada hombro que da el detector del cuerpo
   (de frente el hombro izquierdo queda a la derecha de la imagen; de espaldas, a la izquierda) y, si están
   superpuestos, por la cabeza en la segmentación (cara o pelo). Antes se usaba la «nariz», que el detector

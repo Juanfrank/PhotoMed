@@ -200,11 +200,12 @@ class ZoneCriteriaDrawingsTest {
                            spread: Float = 5f, lenK: Float = 1f, rotDeg: Float = 0f): Pair<Bitmap, List<ZoneCriteria.Hand>> {
         val (b, c) = canvas()
         val wy = (if (up) 300f else 110f) + shiftY
-        // mano derecha del paciente a la izquierda de la imagen; MediaPipe la etiqueta «Left» (supone espejo)
+        // mano derecha del paciente a la izquierda de la imagen; MediaPipe la etiqueta «Right» (en cuadros sin
+        // espejar la etiqueta es la mano real: comprobado con fotos reales de dorsos y palmas)
         val leftImgThumb = if (palm) -1f else 1f
         val hs = ArrayList<ZoneCriteria.Hand>()
-        hs += ZoneCriteria.Hand(hand(c, if (oneHand) 150f else 80f, wy, leftImgThumb, bent, up, nails = !palm, spread = spread, lenK = lenK, rotDeg = -rotDeg), "Left")
-        if (!oneHand) hs += ZoneCriteria.Hand(hand(c, 220f, wy, -leftImgThumb, emptySet(), up, nails = !palm, spread = spread, lenK = lenK, rotDeg = rotDeg), "Right")
+        hs += ZoneCriteria.Hand(hand(c, if (oneHand) 150f else 80f, wy, leftImgThumb, bent, up, nails = !palm, spread = spread, lenK = lenK, rotDeg = -rotDeg), "Right")
+        if (!oneHand) hs += ZoneCriteria.Hand(hand(c, 220f, wy, -leftImgThumb, emptySet(), up, nails = !palm, spread = spread, lenK = lenK, rotDeg = rotDeg), "Left")
         return b to hs
     }
 
