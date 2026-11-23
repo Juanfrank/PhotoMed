@@ -373,8 +373,13 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         matched = eval.status == MatchStatus.MATCH
         eval = withDiagnostic(eval, cur)
         val shown = if (drawKeys.size > MAX_DRAWN) drawKeys.filterIndexed { i, _ -> i % (drawKeys.size / MAX_DRAWN + 1) == 0 } else drawKeys
-        val light = if (measureLight && spec.detector == Detector.FACE)
+        // luz del rostro: siempre (antes solo en protocolos); fuera de ellos, con el mínimo y máximo generales
+        val light = if (spec.detector == Detector.FACE && cur.points.isNotEmpty())
             runCatching { Standardization.lighting(frame.rgb(), frame.width, frame.height, cur.points, cur.yaw) }.getOrNull() else null
+        if (!measureLight) light?.let { Standardization.lightHints(it) }?.takeIf { it.isNotEmpty() }?.let { lh ->
+            eval = eval.copy(status = if (eval.status == MatchStatus.MATCH) MatchStatus.CLOSE else eval.status,
+                quality = eval.quality.coerceAtMost(0.75f), hints = eval.hints + lh)
+        }
         eval = withCriteria(eval, frame, cur)
         return LiveFrame(eval, shown.map { ref.points[it]!! }, shown.map { cur.points[it]!! }, method, total, cur.points, headYaw = cur.yaw, headPitch = cur.pose?.pitch ?: cur.pitch, gaze = cur.gaze,
             hairline = if (smooth) hairlineOf(frame, cur) else null, light = light, schema = lastSchema)
@@ -442,7 +447,15 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val drawScene = if (lastRawClasses === lastClasses) scene
             else with(ZoneCriteria) { ZoneCriteria.Scene(pose, lastHands, lastRawClasses, aspect, single = singleLimb).rotatedCcw(q) }
         lastSchema = runCatching { BodySchema.of(zone, drawScene)?.let { sch -> if (q % 4 == 0) sch else with(BodySchema) { sch.map { ZoneCriteria.unrotate(it, q, aspect) } } } }.getOrNull()
-        val now = ZoneCriteria.hints(zone, scene)
+        // luz de la zona del cuerpo (sobre su piel): poca o demasiada también impide el disparo
+        val lightNow = runCatching {
+            val c = lastRawClasses
+            val px = frame.rgb()
+            val skin = c?.let { cl -> { x: Int, y: Int ->
+                val k = cl.at(x * cl.width / frame.width, y * cl.height / frame.height); k == FaceLabels.BODY_SKIN || k == FaceLabels.FACE_SKIN } }
+            Standardization.bodyLightHints(px, frame.width, frame.height, skin)
+        }.getOrDefault(emptyList())
+        val now = ZoneCriteria.hints(zone, scene) + lightNow
         // decisión estable: la zona cumple si cumple en al menos 2 de los 3 últimos análisis (una
         // segmentación o detección suelta no cambia el veredicto ni hace parpadear las indicaciones)
         synchronized(votes) {

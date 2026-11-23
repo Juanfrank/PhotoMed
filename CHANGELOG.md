@@ -4,6 +4,10 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.46 — 21 de noviembre de 2026
 
+- **Avisos de luz insuficiente o excesiva** que faltaban: en el rostro con foto anterior de referencia (antes
+  la luz solo se medía en los protocolos) y en manos, pies y cuerpo (no se medía nunca; ahora sobre la piel
+  de la zona: «Poca luz en la zona», «Demasiada luz en la zona: sin flash», también con mucha piel
+  quemada). Con poca o demasiada luz no dispara la captura automática.
 - **Mensajes de corrección revisados**:
   - En el modo simple solo se veían las indicaciones con icono: las de manos, pies y cuerpo (falanges,
     dedos, uñas, codo, rodillas, ropa, centrado…) no se mostraban y la cámara no disparaba sin decir por

@@ -327,6 +327,7 @@
     <string name="t_43b90fed8680" formatted="false">Relieve: la foto no coincide con la secuencia</string>
     <string name="t_43dc7ff7a410" formatted="false">Alinea las fotos en cuanto se abre o cambia la selección.</string>
     <string name="t_43efaf6ac681" formatted="false">%1$s · paso %2$d/%3$d · foto %4$d/%5$d</string>
+    <string name="t_43f53a31d7b5" formatted="false">Demasiada luz en la zona: sin flash</string>
     <string name="t_4422310a6126" formatted="false">Instrucción: %1$s</string>
     <string name="t_44509d401a83" formatted="false">ojos y cejas</string>
     <string name="t_44aed0109780" formatted="false">Mano</string>
@@ -708,6 +709,7 @@
     <string name="t_96cef484773d" formatted="false">Expresión de la foto %1$d</string>
     <string name="t_97137660a9f0" formatted="false">Elegir ángulo</string>
     <string name="t_973bbc6e3c4e" formatted="false">Indicaciones (opcional)</string>
+    <string name="t_97534806d68d" formatted="false">Poca luz en la zona</string>
     <string name="t_9755b48d697b" formatted="false">estimada</string>
     <string name="t_9766d880a12c" formatted="false">Espejo de la guía</string>
     <string name="t_976b2c468367" formatted="false">Compartir sin datos del paciente</string>

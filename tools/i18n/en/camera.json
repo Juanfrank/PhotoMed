@@ -186,5 +186,7 @@
   "Relieve guardado (%1$s cm, %2$s)": "Relief saved (%1$s cm, %2$s)",
   "sensor de profundidad": "depth sensor",
   "Mantenga el teléfono quieto": "Hold the phone still",
-  "Encuadre la zona dentro de la guía": "Frame the area inside the guide"
+  "Encuadre la zona dentro de la guía": "Frame the area inside the guide",
+  "Poca luz en la zona": "Low light on the area",
+  "Demasiada luz en la zona: sin flash": "Too much light on the area: no flash"
 }

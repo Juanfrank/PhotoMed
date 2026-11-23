@@ -44,5 +44,7 @@
   "Luz desigual: lado izquierdo más oscuro": "Uneven lighting: left side darker",
   "Luz desigual: lado derecho más oscuro": "Uneven lighting: right side darker",
   "Poca luz en el rostro": "Too little light on the face",
-  "Demasiada luz: sin flash": "Too much light: no flash"
+  "Demasiada luz: sin flash": "Too much light: no flash",
+  "Poca luz en la zona": "Low light on the area",
+  "Demasiada luz en la zona: sin flash": "Too much light on the area: no flash"
 }

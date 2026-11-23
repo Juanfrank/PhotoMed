@@ -327,6 +327,7 @@
     <string name="t_43b90fed8680" formatted="false">Relief: the photo does not match the sequence</string>
     <string name="t_43dc7ff7a410" formatted="false">Aligns the photos as soon as the selection is opened or changed.</string>
     <string name="t_43efaf6ac681" formatted="false">%1$s · step %2$d/%3$d · photo %4$d/%5$d</string>
+    <string name="t_43f53a31d7b5" formatted="false">Too much light on the area: no flash</string>
     <string name="t_4422310a6126" formatted="false">Instruction: %1$s</string>
     <string name="t_44509d401a83" formatted="false">eyes and brows</string>
     <string name="t_44aed0109780" formatted="false">Hand</string>
@@ -708,6 +709,7 @@
     <string name="t_96cef484773d" formatted="false">Expression of photo %1$d</string>
     <string name="t_97137660a9f0" formatted="false">Choose view</string>
     <string name="t_973bbc6e3c4e" formatted="false">Instructions (optional)</string>
+    <string name="t_97534806d68d" formatted="false">Low light on the area</string>
     <string name="t_9755b48d697b" formatted="false">estimated</string>
     <string name="t_9766d880a12c" formatted="false">Mirror the guide</string>
     <string name="t_976b2c468367" formatted="false">Share without patient data</string>

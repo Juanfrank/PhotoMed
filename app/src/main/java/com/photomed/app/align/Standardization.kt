@@ -152,8 +152,7 @@ object Standardization {
                 hints += if (l.leftCheek < l.rightCheek) trn("Luz desigual: lado izquierdo más oscuro") else trn("Luz desigual: lado derecho más oscuro")
                 off += 0.5f
             }
-            if (l.face < 0.35f) { hints += trn("Poca luz en el rostro"); off += 0.5f }
-            if (l.face > 0.85f) { hints += trn("Demasiada luz: sin flash"); off += 0.5f }
+            lightHints(l).forEach { hints += it; off += 0.5f }
         }
         // la expresión pedida es condición para el disparo automático
         val expressionOk = ZoneAlignment.of(zone).detector != Detector.FACE || Expression.meets(expression, det.points, det.yaw)
@@ -167,6 +166,40 @@ object Standardization {
     }
 
     /** Luminancia media (0..1) en un cuadrado de radio [rad] (unidades del ancho) alrededor de [p]. */
+    /** Luz mínima y máxima del rostro (luminancia media 0..1) para avisar. */
+    const val MIN_FACE_LIGHT = 0.35f
+    const val MAX_FACE_LIGHT = 0.85f
+
+    /** Avisos de luz insuficiente o excesiva del rostro (también con referencia, fuera de los protocolos). */
+    fun lightHints(l: Lighting): List<String> = buildList {
+        if (l.face < MIN_FACE_LIGHT) add(trn("Poca luz en el rostro"))
+        if (l.face > MAX_FACE_LIGHT) add(trn("Demasiada luz: sin flash"))
+    }
+
+    /** Luz mínima y máxima de la zona del cuerpo (luminancia media 0..1 de su piel) y fracción quemada máxima. */
+    const val MIN_BODY_LIGHT = 0.30f
+    const val MAX_BODY_LIGHT = 0.88f
+    const val MAX_BURNT = 0.20f
+
+    /**
+     * Luz de una zona del cuerpo: luminancia media de la piel ([skin], misma rejilla que la imagen; si hay
+     * pocos píxeles de piel, el centro del cuadro) y fracción quemada (casi blanca). Avisos si falta o sobra.
+     */
+    fun bodyLightHints(rgb: IntArray, w: Int, h: Int, skin: ((Int, Int) -> Boolean)?): List<String> {
+        var s = 0f; var n = 0; var burnt = 0
+        val step = maxOf(1, w / 120)
+        fun add(c: Int) { val v = (0.299f * ((c shr 16) and 0xFF) + 0.587f * ((c shr 8) and 0xFF) + 0.114f * (c and 0xFF)) / 255f; s += v; n++; if (v > 0.97f) burnt++ }
+        if (skin != null) for (y in 0 until h step step) for (x in 0 until w step step) if (skin(x, y)) add(rgb[y * w + x])
+        if (n < 50) { s = 0f; n = 0; burnt = 0
+            for (y in h / 4 until h * 3 / 4 step step) for (x in w / 4 until w * 3 / 4 step step) add(rgb[y * w + x]) }
+        if (n == 0) return emptyList()
+        val m = s / n
+        return buildList {
+            if (m < MIN_BODY_LIGHT) add(trn("Poca luz en la zona"))
+            if (m > MAX_BODY_LIGHT || burnt > MAX_BURNT * n) add(trn("Demasiada luz en la zona: sin flash"))
+        }
+    }
+
     private fun lum(rgb: IntArray, w: Int, h: Int, p: Pt, rad: Float): Float {
         val cx = (p.x * w).toInt(); val cy = (p.y * w).toInt(); val rr = (rad * w).toInt().coerceAtLeast(1)
         var s = 0f; var n = 0

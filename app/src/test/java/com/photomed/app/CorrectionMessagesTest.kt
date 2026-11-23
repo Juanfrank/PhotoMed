@@ -37,6 +37,26 @@ class CorrectionMessagesTest {
         assertEquals("Codo extendido", items.sortedBy(HintCues::priority).first())
     }
 
+    /** Avisos de luz: rostro (también con referencia) y zonas del cuerpo, sobre su piel. */
+    @Test
+    fun lightMessages() {
+        val S = com.photomed.app.align.Standardization
+        assertEquals(listOf("Poca luz en el rostro"), S.lightHints(com.photomed.app.align.Standardization.Lighting(0.2f, 0.2f, 0.2f)))
+        assertTrue(S.lightHints(com.photomed.app.align.Standardization.Lighting(0.5f, 0.5f, 0.5f)).isEmpty())
+        assertEquals(listOf("Demasiada luz: sin flash"), S.lightHints(com.photomed.app.align.Standardization.Lighting(0.9f, 0.9f, 0.9f)))
+        fun img(v: Int) = IntArray(100 * 100) { android.graphics.Color.rgb(v, v, v) }
+        // la piel (mitad izquierda) manda: la medida es la de la zona, no la del fondo
+        val skin = { x: Int, _: Int -> x < 50 }
+        assertEquals(listOf("Poca luz en la zona"), S.bodyLightHints(img(40), 100, 100, skin))
+        assertTrue(S.bodyLightHints(img(150), 100, 100, skin).isEmpty())
+        assertEquals(listOf("Demasiada luz en la zona: sin flash"), S.bodyLightHints(img(252), 100, 100, skin))
+        // piel bien iluminada sobre un fondo negro: sin aviso (no cuenta el fondo)
+        val mixed = IntArray(100 * 100) { i -> if (i % 100 < 50) android.graphics.Color.rgb(160, 120, 100) else android.graphics.Color.BLACK }
+        assertTrue(S.bodyLightHints(mixed, 100, 100, skin).isEmpty())
+        // con icono de luz
+        assertNotNull(HintCues.of("Poca luz en la zona")); assertNotNull(HintCues.of("Demasiada luz en la zona: sin flash"))
+    }
+
     /** Zona descentrada: la flecha indica hacia dónde mover el teléfono (cámara trasera). */
     @Test
     fun centeringLightsTheRightArrow() {

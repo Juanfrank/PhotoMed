@@ -151,6 +151,8 @@ object HintText {
         trn("Luz desigual: lado izquierdo más oscuro"),
         trn("Luz desigual: lado derecho más oscuro"),
         trn("Poca luz en el rostro"),
+        trn("Poca luz en la zona"),
+        trn("Demasiada luz en la zona: sin flash"),
         trn("Demasiada luz: sin flash"),
         trn("Buscando referencias anatómicas…"),
         trn("← Mueva la cámara a la izquierda"),
