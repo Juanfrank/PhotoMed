@@ -126,6 +126,8 @@ class ZoneCriteriaDrawingsTest {
         arm(sl, 1f, L.ELBOW_L, L.WRIST_L, L.INDEX_L); arm(sr, -1f, L.ELBOW_R, L.WRIST_R, L.INDEX_R)
         pts[L.SHOULDER_L] = u(sl.x, sl.y); pts[L.SHOULDER_R] = u(sr.x, sr.y); pts[L.HIP_L] = u(hl.x, hl.y); pts[L.HIP_R] = u(hr.x, hr.y)
         if (!back) { pts[L.NOSE] = u(cx, top + 34 * k); pts[L.MOUTH_L] = u(cx + 8 * k, top + 46 * k); pts[L.MOUTH_R] = u(cx - 8 * k, top + 46 * k) }
+        // de espaldas el lado izquierdo de la persona queda a la izquierda de la imagen (como da el detector)
+        if (back) return pts.mapKeys { (key, _) -> when { key.endsWith("_l") -> key.dropLast(2) + "_r"; key.endsWith("_r") -> key.dropLast(2) + "_l"; else -> key } }
         return pts
     }
 
@@ -375,14 +377,16 @@ class ZoneCriteriaDrawingsTest {
         oneLeg("modo una pierna: con pantalón", false, "Descubra") { figure(it, top = 10f, scale = 0.92f, pants = true) }
         // brazos
         for (z in listOf(Zone.ARM_R, Zone.ARM_L)) {
-            out += case(z, "correcta (≈ 20°)", true, null) { figure(it, armAbd = 20f) }
-            out += case(z, "brazo a 35° (se ajusta)", true, null) { figure(it, armAbd = 35f) }
-            out += case(z, "codo con flexión natural (se ajusta)", true, null) { figure(it, armAbd = 20f, elbowBend = 18f) }
-            out += case(z, "codo doblado", false, "Codo extendido", draw = { figure(it, armAbd = 20f, elbowBend = 50f) })
-            out += case(z, "brazo pegado al cuerpo", false, "Separe un poco el brazo", draw = { figure(it, armAbd = 1f) })
-            out += case(z, "brazo a 60°", false, "Baje el brazo", draw = { figure(it, armAbd = 60f) })
-            out += case(z, "con manga", false, "Descubra", draw = { figure(it, armAbd = 20f, sleeve = true) })
-            out += case(z, "brazo descentrado", false, "Centre", center = false) { figure(it, armAbd = 20f) }
+            out += case(z, "correcta (≈ 20°)", true, null) { figure(it, back = true, armAbd = 20f) }
+            out += case(z, "brazo a 35° (se ajusta)", true, null) { figure(it, back = true, armAbd = 35f) }
+            out += case(z, "codo con flexión natural (se ajusta)", true, null) { figure(it, back = true, armAbd = 20f, elbowBend = 18f) }
+            out += case(z, "codo doblado", false, "Codo extendido", draw = { figure(it, back = true, armAbd = 20f, elbowBend = 50f) })
+            out += case(z, "brazo pegado al cuerpo", false, "Separe un poco el brazo", draw = { figure(it, back = true, armAbd = 1f) })
+            out += case(z, "brazo a 60°", false, "Baje el brazo", draw = { figure(it, back = true, armAbd = 60f) })
+            out += case(z, "con manga", false, "Descubra", draw = { figure(it, back = true, armAbd = 20f, sleeve = true) })
+            // vista posterior: de frente no vale
+            out += case(z, "de frente", false, "De espaldas", draw = { figure(it, armAbd = 20f) })
+            out += case(z, "brazo descentrado", false, "Centre", center = false) { figure(it, back = true, armAbd = 20f) }
             // primer plano del brazo sin ningún punto del cuerpo (el detector no lo ve): por la piel
             fun armClose(name: String, ok: Boolean, expect: String?, draw: (Canvas) -> Unit) {
                 val (bm, cv) = canvas(); draw(cv); out += Case(z, "sin puntos: $name", ok, expect, bm, ZoneCriteria.Scene(emptyMap(), null, classes(bm)))

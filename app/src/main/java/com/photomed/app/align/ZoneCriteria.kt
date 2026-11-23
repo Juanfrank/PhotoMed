@@ -466,9 +466,23 @@ object ZoneCriteria {
             else { groups[i] = groups[i].let { g -> Blob(g.area + b.area, minOf(g.x0, b.x0), minOf(g.y0, b.y0), maxOf(g.x1, b.x1), maxOf(g.y1, b.y1)) }; groupOf[bi] = i }
         }
         val w = c.width; val k = 1f / w
-        return groups.mapIndexedNotNull { gi, g ->
-            if (g.y1 - g.y0 < 0.25f * c.height) return@mapIndexedNotNull null
-            fun inG(x: Int, y: Int) = lab[y * w + x].let { it >= 0 && groupOf[it] == gi }
+        // dos pies unidos por las piernas (rodillas o tobillos juntos): si la parte distal tiene dos trozos
+        // separados por una franja vacía, se parte la mancha por ahí (cada pie con su pierna)
+        val parts = ArrayList<Triple<Int, Int, Int>>() // grupo, x desde, x hasta
+        groups.forEachIndexed { gi, g ->
+            val xs = splitColumn(c, g) { x, y -> lab[y * w + x].let { it >= 0 && groupOf[it] == gi } }
+            if (xs == null) parts += Triple(gi, g.x0, g.x1) else { parts += Triple(gi, g.x0, xs - 1); parts += Triple(gi, xs, g.x1) }
+        }
+        return parts.mapNotNull { (gi, xa, xb) ->
+            fun inG0(x: Int, y: Int) = x in xa..xb && lab[y * w + x].let { it >= 0 && groupOf[it] == gi }
+            val g = groups[gi].let { g0 ->
+                var x0 = w; var y0 = c.height; var x1 = -1; var y1 = -1; var n = 0
+                for (y in g0.y0..g0.y1) for (x in xa..xb) if (inG0(x, y)) { n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
+                if (n == 0) return@mapNotNull null
+                Blob(n, x0, y0, x1, y1)
+            }
+            if (g.y1 - g.y0 < 0.25f * c.height) return@mapNotNull null
+            fun inG(x: Int, y: Int) = inG0(x, y)
             // borde distal por columna y contorno por filas
             val bottom = IntArray(g.x1 - g.x0 + 1) { -1 }
             val left = ArrayList<Pt>(); val right = ArrayList<Pt>()
@@ -519,6 +533,39 @@ object ZoneCriteria {
     }
 
     /**
+     * Columna por la que partir una mancha de piel en dos pies ([g] con los dedos abajo): en la franja distal
+     * (el 35 % inferior de la mancha) hay un valle de columnas casi sin piel con un trozo alto a cada lado, y cada lado
+     * tiene al menos el 25 % de la piel de la franja. null si no hay dos pies.
+     */
+    private fun splitColumn(c: Classes, g: Blob, inG: (Int, Int) -> Boolean): Int? {
+        val hgt = g.y1 - g.y0; if (hgt < 0.25f * c.height) return null
+        val yb = (g.y1 - 0.35f * hgt).toInt()
+        val cnt = IntArray(g.x1 - g.x0 + 1) { i -> var n = 0; for (y in yb..g.y1) if (inG(g.x0 + i, y)) n++; n }
+        val total = cnt.sum(); if (total == 0) return null
+        val bh = g.y1 - yb + 1
+        // valle: columnas con poca piel en la franja (los pies se tocan como mucho en un punto) entre dos
+        // trozos altos (cada pie ocupa casi toda la franja) con al menos el 25 % de la piel cada uno
+        val low = maxOf(1, (0.3f * bh).toInt())
+        val minRun = maxOf(2, (0.1f * c.width).toInt())
+        var best: Int? = null; var bestScore = Int.MAX_VALUE; var i = 0
+        while (i < cnt.size) {
+            if (cnt[i] > low) { i++; continue }
+            val st = i; while (i < cnt.size && cnt[i] <= low) i++
+            if (st == 0 || i >= cnt.size) continue
+            val l = cnt.take(st).sum(); val r = cnt.drop(i).sum()
+            val lp = cnt.take(st).max(); val rp = cnt.drop(i).max()
+            val score = (st until i).sumOf { cnt[it] }
+            // cada lado es un pie ancho, no un dedo (entre dedos también hay valles)
+            fun run(from: Int, step: Int): Int { var j = from; var n = 0; while (j in cnt.indices && cnt[j] > low) { n++; j += step }; return n }
+            if (run(st - 1, -1) < minRun || run(i, 1) < minRun) continue
+            if (l >= 0.25f * total && r >= 0.25f * total && lp >= 0.7f * bh && rp >= 0.7f * bh && score < bestScore) {
+                bestScore = score; best = g.x0 + (st + i) / 2
+            }
+        }
+        return best
+    }
+
+    /**
      * Uñas de los dedos de un pie ([Nails]): detrás de la punta de cada dedo (hacia el tobillo, arriba en la
      * orientación de la guía), del ancho de un dedo (la separación entre puntas vecinas). Vacío sin color.
      */
@@ -533,6 +580,10 @@ object ZoneCriteria {
 
     /** Contraste (ΔE) de una uña claramente visible: con fotos reales, ninguna planta llega a 3 así. */
     const val STRONG_NAIL_DE = 15f
+    /** Separación horizontal mínima de los hombros (anchos de imagen) para fiarse de su lado ([facingCamera]). */
+    const val FACING_DX = 0.05f
+    /** Ropa a la altura de las areolas (fracción de la franja) que indica sujetador o bikini puesto. */
+    const val BREAST_CLOTHES = 0.06f
     /** Uñas claramente visibles en un pie que indican que se ve el dorso (no la planta). */
     const val DORSAL_NAILS = 3
 
@@ -548,7 +599,11 @@ object ZoneCriteria {
         else if (!two) out += tr("Muestre los dos pies, algo separados")
         feet.take(if (s.single) 1 else 2).sortedBy { it.box.x0 }.forEachIndexed { i, f ->
             val b = f.box
-            if (b.x0 < mx || b.x1 > c.width - 1 - mx || b.y1 > c.height - 1 - my) { out += tr("Pies completos: los dedos y los bordes dentro del cuadro"); return@forEachIndexed }
+            // margen lateral solo en la parte distal (el pie): la pierna puede salir por el borde
+            val yd = (b.y1 - 0.25f * c.height) * (1f / c.width)
+            val dist = f.outline.filter { it.y >= yd }
+            val dx0 = ((dist.minOfOrNull { it.x } ?: 0f) * c.width).toInt(); val dx1 = ((dist.maxOfOrNull { it.x } ?: 1f) * c.width).toInt()
+            if (dx0 < mx || dx1 > c.width - 1 - mx || b.y1 > c.height - 1 - my) { out += tr("Pies completos: los dedos y los bordes dentro del cuadro"); return@forEachIndexed }
             // las falanges: los dedos deben verse (su número y su forma son los del paciente)
             val left = if (s.single) (b.x0 + b.x1) < c.width else i == 0
             // los dedos: el extremo distal entero y al aire (no tapado por calcetín, ropa o calzado). Contar
@@ -615,6 +670,35 @@ object ZoneCriteria {
         else -> null
     }
 
+    /**
+     * ¿La persona mira a la cámara? El detector del cuerpo da «nariz» también de espaldas (la supone), así
+     * que no sirve. Sí distingue el lado de cada hombro: de frente el hombro izquierdo de la persona queda a
+     * la derecha de la imagen y de espaldas a la izquierda (con fotos reales de culturistas, sin un error; el
+     * cuadro de análisis no está espejado aunque la vista previa sí). Si los hombros están casi superpuestos
+     * (de lado), por la cabeza en la segmentación: por encima de las orejas, de frente se ve piel de la cara
+     * (frente, ojos) y de espaldas pelo (la nuca, bajo el pelo, sale como cara: no se mira).
+     * true de frente, false de espaldas, null si no se puede saber.
+     */
+    fun facingCamera(p: Map<String, Pt>, c: Classes?): Boolean? {
+        val L = Landmarks
+        if (!has(p, L.SHOULDER_L, L.SHOULDER_R)) return null
+        val sl = p[L.SHOULDER_L]!!; val sr = p[L.SHOULDER_R]!!
+        val sw = hypot(sl.x - sr.x, sl.y - sr.y).coerceAtLeast(0.02f)
+        if (abs(sl.x - sr.x) >= FACING_DX) return sl.x > sr.x
+        if (c == null) return null
+        val head = listOfNotNull(p[L.NOSE], p[L.EAR_L], p[L.EAR_R])
+        val cx = if (head.isNotEmpty()) head.map { it.x }.average().toFloat() else (sl.x + sr.x) / 2
+        val cy = if (head.isNotEmpty()) head.map { it.y }.average().toFloat() else (sl.y + sr.y) / 2 - 0.45f * sw
+        val r = 0.3f * sw
+        var face = 0; var hair = 0
+        val k = c.width.toFloat()
+        val x0 = ((cx - r) * k).toInt().coerceAtLeast(0); val x1 = ((cx + r) * k).toInt().coerceAtMost(c.width - 1)
+        val y0 = ((cy - r) * k).toInt().coerceAtLeast(0); val y1 = ((cy + 0.05f * r) * k).toInt().coerceAtMost(c.height - 1)
+        for (y in y0..y1) for (x in x0..x1) when (c.at(x, y)) { FaceLabels.FACE_SKIN -> face++; FaceLabels.HAIR -> hair++ }
+        if (face + hair < 6) return null
+        return face >= 0.3f * (face + hair)
+    }
+
     private fun body(zone: Zone, s: Scene): List<String> {
         val p = s.pose; val L = Landmarks; val c = s.classes
         val out = ArrayList<String>()
@@ -623,7 +707,7 @@ object ZoneCriteria {
                 // de espaldas el detector de cuerpo no suele ver a la persona (la localiza por la cara):
                 // la espalda descubierta se comprueba en la región de la guía
                 if (zone.guide == GuideType.BACK && !has(p, L.SHOULDER_L, L.SHOULDER_R, L.HIP_L, L.HIP_R)) {
-                    if (L.NOSE in p || (c != null && faceSkinAll(c) > 0.12f)) out += tr("De espaldas a la cámara")
+                    if (facingCamera(p, c) ?: (L.NOSE in p || (c != null && faceSkinAll(c) > 0.12f))) out += tr("De espaldas a la cámara")
                     if (c != null && !(sidesClear(c, 0.5f) && sidesClear(c, 0.7f))) out += tr("Encuadre la espalda entera: hombros, cintura y los dos costados")
                     uncovered(c, trn("la espalda"), c?.let { skinClothes(it, 0.30f, 0.25f * s.aspect, 0.70f, 0.62f * s.aspect) })?.let { out += it }
                     return out
@@ -638,17 +722,27 @@ object ZoneCriteria {
                 listOfNotNull(p[L.WRIST_L], p[L.WRIST_R]).forEach { w ->
                     if (w.x > left && w.x < right && w.y > sy && w.y < hy + 0.05f) out += tr("Separe los brazos del cuerpo")
                 }
+                val facing = facingCamera(p, c)
                 if (zone.guide == GuideType.BACK) {
-                    if (L.NOSE in p) out += tr("De espaldas a la cámara")
-                } else if (L.NOSE !in p && !has(p, L.MOUTH_L, L.MOUTH_R)) out += tr("De frente a la cámara")
+                    if (facing ?: (L.NOSE in p)) out += tr("De espaldas a la cámara")
+                } else if (facing == false || (facing == null && L.NOSE !in p && !has(p, L.MOUTH_L, L.MOUTH_R))) out += tr("De frente a la cámara")
                 val (y0, y1, name) = when (zone.guide) {
                     GuideType.BREASTS -> Triple(sy, sy + (hy - sy) * 0.55f, trn("el tórax"))
-                    GuideType.BACK -> Triple(sy, hy, trn("la espalda"))
+                    // espalda: hasta algo por encima de la cadera (la cintura del pantalón queda por encima de la articulación)
+                    GuideType.BACK -> Triple(sy, sy + (hy - sy) * 0.8f, trn("la espalda"))
                     // abdomen: hasta algo por encima de la cadera (la ropa interior en la cadera es correcta)
                     else -> Triple(sy + (hy - sy) * 0.4f, sy + (hy - sy) * 0.9f, trn("el abdomen"))
                 }
                 val m = (right - left) * 0.15f
-                uncovered(c, name, c?.let { skinClothes(it, left + m, y0, right - m, y1) })?.let { out += it }
+                val unc = uncovered(c, name, c?.let { skinClothes(it, left + m, y0, right - m, y1) })
+                unc?.let { out += it }
+                // tórax: a la altura de las areolas (de los hombros a un 45 % hacia la cadera) un sujetador o un
+                // bikini es poca área de la región pero tapa justo lo que se fotografía
+                if (zone.guide == GuideType.BREASTS && unc == null && c != null) {
+                    val sx0 = minOf(sl.x, sr.x); val sx1 = maxOf(sl.x, sr.x); val sm = (sx1 - sx0) * 0.12f
+                    val band = skinClothes(c, sx0 + sm, sy + (hy - sy) * 0.15f, sx1 - sm, sy + (hy - sy) * 0.45f)
+                    if (band.second > BREAST_CLOTHES) uncovered(c, name, 0f to 1f)?.let { out += it }
+                }
             }
             GuideType.TORSO_SIDE -> {
                 if (!has(p, L.HIP_L, L.HIP_R) || (L.SHOULDER_L !in p && L.SHOULDER_R !in p)) return listOf(tr("Encuadre el tronco de lado: hombro y cadera"))
@@ -667,12 +761,12 @@ object ZoneCriteria {
             GuideType.GLUTES -> {
                 if (!has(p, L.HIP_L, L.HIP_R, L.KNEE_L, L.KNEE_R)) {
                     // de espaldas: región de la guía (los glúteos en el centro del cuadro)
-                    if (L.NOSE in p || (c != null && faceSkinAll(c) > 0.12f)) out += tr("De espaldas a la cámara")
+                    if (facingCamera(p, c) ?: (L.NOSE in p || (c != null && faceSkinAll(c) > 0.12f))) out += tr("De espaldas a la cámara")
                     if (c != null && !sidesClear(c, 0.5f)) out += tr("Encuadre los glúteos enteros: las dos caderas")
                     uncovered(c, trn("los glúteos"), c?.let { skinClothes(it, 0.22f, 0.38f * s.aspect, 0.78f, 0.68f * s.aspect) })?.let { out += it }
                     return out
                 }
-                if (L.NOSE in p) out += tr("De espaldas a la cámara")
+                if (facingCamera(p, c) ?: (L.NOSE in p)) out += tr("De espaldas a la cámara")
                 val hl = p[L.HIP_L]!!; val hr = p[L.HIP_R]!!; val kl = p[L.KNEE_L]!!; val kr = p[L.KNEE_R]!!
                 if (tilt(hl, hr) > LEVEL_DEG) out += tr("Caderas niveladas")
                 val hy = (hl.y + hr.y) / 2; val ky = (kl.y + kr.y) / 2; val w = abs(hl.x - hr.x)
@@ -711,6 +805,8 @@ object ZoneCriteria {
                 val sh = if (r) L.SHOULDER_R else L.SHOULDER_L; val el = if (r) L.ELBOW_R else L.ELBOW_L
                 val wr = if (r) L.WRIST_R else L.WRIST_L; val hp = if (r) L.HIP_R else L.HIP_L
                 val a = p[sh]!!; val e = p[el]!!; val w = p[wr]!!
+                // vista posterior: de frente (los dos hombros a la vista y en su lado de frente) no vale
+                if (facingCamera(p, c) == true) out += tr("De espaldas a la cámara")
                 if (angle(a, e, w) < ELBOW_DEG) out += tr("Codo extendido")
                 // separación del cuerpo: ángulo entre el eje del tronco (centro de hombros → centro de caderas,
                 // o hombro → cadera si falta el otro lado) y el brazo (hombro → muñeca)

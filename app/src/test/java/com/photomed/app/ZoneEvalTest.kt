@@ -52,7 +52,10 @@ class ZoneEvalTest {
                 ZoneCriteria.Hand((0 until pts.length()).map { j -> pts.getJSONArray(j).let { Pt(it.getDouble(0).toFloat(), it.getDouble(1).toFloat() * h / w) } }, ho.getString("label"))
             } } }.orEmpty()
             val classes = e.optString("classes", "").takeIf { it.length == 96 * 128 }?.let { str ->
-                ZoneCriteria.Classes(96, 128, ByteArray(str.length) { (str[it] - '0').toByte() })
+                // la máscara se guardó a 96×128 sea cual sea la foto: se reescala a la proporción de la foto
+                // (en la cámara el cuadro y la máscara tienen la misma)
+                val hh = (96f * h / w).toInt().coerceAtLeast(1)
+                ZoneCriteria.Classes(96, hh, ByteArray(96 * hh) { i -> (str[((i / 96) * 128 / hh) * 96 + i % 96] - '0').toByte() })
             }
             S(w, h, face, pose, hands, classes)
         }
@@ -79,14 +82,19 @@ class ZoneEvalTest {
         val zones = Zone.entries.filter { it != Zone.FREE && it != Zone.FACE_FRONTAL }
         for (key in labels.keys().asSequence().sorted()) {
             val dir = key.substringBefore('/'); val name = key.substringAfter('/')
-            val s = cache.getOrPut(dir) { load(dir) }[name] ?: continue
+            // con copia girada 180° (r_…): fotos hechas al revés que la guía (la guía se puede girar); vale la mejor
+            val all = cache.getOrPut(dir) { load(dir) }
+            val s0 = all[name] ?: continue
+            val sr = all["r_$name"]
             val arr = labels.getJSONArray(key)
             val labeled = (0 until arr.length()).map { arr.getString(it) }
             val labeledZones = labeled.mapNotNull { l -> Zone.fromId(l.removePrefix("!"))?.let { it to !l.startsWith("!") } }
-            labeledZones.forEach { (z, ok) -> rows += R(z, key, ok, verdict(z, s)) }
+            fun best(z: Zone) = listOfNotNull(s0, sr).map { verdict(z, it) }.minBy { it.size }
+            val s = s0
+            labeledZones.forEach { (z, ok) -> rows += R(z, key, ok, best(z)) }
             // otras zonas que la aceptarían (falsos disparos)
             zones.filter { z -> labeledZones.none { it.first.guide == z.guide } }.forEach { z ->
-                if (verdict(z, s).isEmpty() && (ZoneAlignment.of(z).detector != Detector.FACE || s.face.points.size >= 4) && ZoneCriteria.applies(z))
+                if (best(z).isEmpty() && (ZoneAlignment.of(z).detector != Detector.FACE || s.face.points.size >= 4) && ZoneCriteria.applies(z))
                     falseAccepts += "${z.id} ← $key"
             }
         }
