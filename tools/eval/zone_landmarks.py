@@ -8,7 +8,8 @@ Para cada imagen de app/src/test/resources/stock/zones/<zona>/*.jpg escribe en l
 También genera los primeros planos (frente, periocular, labios, ojo) recortando las fotos frontales,
 como los vería la cámara, y les calcula los puntos.
 
-Uso: python3 tools/eval/zone_landmarks.py   (modelo de pose: app/build/models/pose_landmarker_full.task)
+Uso: python3 tools/eval/zone_landmarks.py [carpeta ...]   (modelo de pose: app/build/models/pose_landmarker_full.task;
+con carpetas, solo esas, sin generar primeros planos ni espejos)
 """
 import json, pathlib
 import numpy as np, cv2, mediapipe as mp
@@ -148,9 +149,12 @@ def mirror_face(face, pairs):
 
 
 def main():
-    closeups()
-    mirrors()
-    for d in sorted(p for p in ZONES.iterdir() if p.is_dir()):
+    import sys
+    only = sys.argv[1:]          # carpetas concretas (p. ej. las de evaluación nuevas): sin primeros planos ni espejos
+    if not only:
+        closeups()
+        mirrors()
+    for d in sorted(p for p in ZONES.iterdir() if p.is_dir() and (not only or p.name in only)):
         res = {}
         for f in sorted(d.glob("*.jpg")):
             img = cv2.imread(str(f))
