@@ -80,6 +80,8 @@ class ZoneEvalTest {
         data class R(val zone: Zone, val photo: String, val expectOk: Boolean, val why: List<String>)
         val rows = ArrayList<R>(); val falseAccepts = ArrayList<String>()
         val zones = Zone.entries.filter { it != Zone.FREE && it != Zone.FACE_FRONTAL }
+        // por toma: fotos de otras tomas (deben rechazarse) y si las aceptó
+        val crossNeg = HashMap<Zone, Pair<Int, Int>>()
         for (key in labels.keys().asSequence().sorted()) {
             val dir = key.substringBefore('/'); val name = key.substringAfter('/')
             // con copia girada 180° (r_…): fotos hechas al revés que la guía (la guía se puede girar); vale la mejor
@@ -94,8 +96,9 @@ class ZoneEvalTest {
             labeledZones.forEach { (z, ok) -> rows += R(z, key, ok, best(z)) }
             // otras zonas que la aceptarían (falsos disparos)
             zones.filter { z -> labeledZones.none { it.first.guide == z.guide } }.forEach { z ->
-                if (best(z).isEmpty() && (ZoneAlignment.of(z).detector != Detector.FACE || s.face.points.size >= 4) && ZoneCriteria.applies(z))
-                    falseAccepts += "${z.id} ← $key"
+                val acc = best(z).isEmpty() && (ZoneAlignment.of(z).detector != Detector.FACE || s.face.points.size >= 4) && ZoneCriteria.applies(z)
+                if (acc) falseAccepts += "${z.id} ← $key"
+                val (n, fa) = crossNeg[z] ?: (0 to 0); crossNeg[z] = (n + 1) to (fa + if (acc) 1 else 0)
             }
         }
         val md = StringBuilder("# Evaluación con fotos etiquetadas\n\n| Zona | Cumplen (esperado) | Aceptadas | Muestran la zona sin cumplir (esperado rechazo) | Rechazadas | Motivos de rechazo de las que cumplen |\n|---|---|---|---|---|---|\n")
@@ -105,6 +108,20 @@ class ZoneEvalTest {
                 .joinToString("; ") { "${it.key} (${it.value})" }
             md.append("| ${z.id} | ${pos.size} | ${pos.count { it.why.isEmpty() }} | ${neg.size} | ${neg.count { it.why.isNotEmpty() }} | $reasons |\n")
         }
+        // exactitud equilibrada por toma: (aceptadas de las que cumplen + rechazadas de las que no) / 2; las que no
+        // cumplen: las de la toma sin cumplir («!») y las de otras tomas
+        md.append("\n## Precisión por toma (verificación de la IA)\n\n| Toma | Cumplen | Aceptadas | No cumplen (misma toma + otras) | Rechazadas | Exactitud equilibrada |\n|---|---|---|---|---|---|\n")
+        val summary = JSONObject()
+        Zone.entries.filter { it != Zone.FREE }.forEach { z ->
+            val rs = rows.filter { it.zone == z }
+            val pos = rs.filter { it.expectOk }; val neg = rs.filter { !it.expectOk }
+            val (cn, cfa) = crossNeg[z] ?: (0 to 0)
+            val tp = pos.count { it.why.isEmpty() }; val nN = neg.size + cn; val tn = neg.count { it.why.isNotEmpty() } + (cn - cfa)
+            val bal = if (pos.isEmpty() || nN == 0) null else (tp.toFloat() / pos.size + tn.toFloat() / nN) / 2
+            md.append("| ${z.id} | ${pos.size} | $tp | $nN | $tn | ${bal?.let { "%.0f %%".format(it * 100) } ?: "—"} |\n")
+            summary.put(z.id, JSONObject().put("pos", pos.size).put("tp", tp).put("neg", nN).put("tn", tn).put("bal", bal ?: -1f))
+        }
+        File("build/reports").mkdirs(); File("build/reports/zone_eval_summary.json").writeText(summary.toString(1))
         md.append("\n## Rechazos de fotos que cumplen\n\n")
         rows.filter { it.expectOk && it.why.isNotEmpty() }.forEach { md.append("- ${it.zone.id} · ${it.photo}: ${it.why.joinToString(" | ")}\n") }
         md.append("\n## Aceptadas sin cumplir\n\n")

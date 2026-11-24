@@ -84,7 +84,8 @@ class ZoneAutoCaptureTest {
         val d = File(root, dir); val js = File(d, "landmarks.json")
         if (!js.exists()) return emptyList()
         val o = JSONObject(js.readText())
-        return o.keys().asSequence().sorted().map { name ->
+        // sin las copias giradas 180° (r_…), que son para la evaluación con fotos etiquetadas
+        return o.keys().asSequence().filter { !it.startsWith("r_") }.sorted().map { name ->
             val e = o.getJSONObject(name); val w = e.getInt("w"); val h = e.getInt("h")
             val face = e.optJSONObject("face")?.let { f ->
                 val mesh = f.getJSONArray("mesh")
