@@ -276,6 +276,7 @@
     <string name="t_377cafea39a1" formatted="false">Grid with dates</string>
     <string name="t_37b6b243a5d6" formatted="false">Language</string>
     <string name="t_381d8e7bd7a5" formatted="false">leptoprosopic (long)</string>
+    <string name="t_384e8454add5" formatted="false">Move closer: frame the neck and neckline</string>
     <string name="t_384fb0cacb99" formatted="false">facial oval, eyes, nose and lips</string>
     <string name="t_386435ce74e6" formatted="false">View of photo %1$d</string>
     <string name="t_3869222c591a" formatted="false">≈ %1$s cm: step back ≥ 1 m and use zoom</string>
@@ -406,6 +407,7 @@
     <string name="t_568489c3d3c8" formatted="false">No logo</string>
     <string name="t_569e67fe790e" formatted="false">Layers in the image</string>
     <string name="t_56cc67e3f310" formatted="false">Frame the whole arm: shoulder, elbow and wrist</string>
+    <string name="t_5749b90fc97f" formatted="false">Chin forward: look at the camera</string>
     <string name="t_575dab1075d7" formatted="false">Start photo session (protocols)</string>
     <string name="t_57d396bb6e2c" formatted="false">Abdomen left side</string>
     <string name="t_57d4c792a6bb" formatted="false">Height above pupil, mm</string>
@@ -1135,6 +1137,7 @@
     <string name="t_ec616f599f8c" formatted="false">Could not read the image</string>
     <string name="t_ecffc6c021fa" formatted="false">Waiting for wrinkle analysis…</string>
     <string name="t_ed1c5e218500" formatted="false">With photos</string>
+    <string name="t_ed206059d887" formatted="false">Move back: show the neckline, below the shoulders</string>
     <string name="t_edd238ac88c2" formatted="false">Level shoulders</string>
     <string name="t_ee18e51f8a8f" formatted="false">%1$s · exposure %2$+.2f EV · temperature %3$+.1f · tint %4$+.1f</string>
     <string name="t_ee51647e18ca" formatted="false">Capture date: %1$s</string>

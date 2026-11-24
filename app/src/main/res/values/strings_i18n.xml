@@ -276,6 +276,7 @@
     <string name="t_377cafea39a1" formatted="false">Cuadrícula con fechas</string>
     <string name="t_37b6b243a5d6" formatted="false">Idioma</string>
     <string name="t_381d8e7bd7a5" formatted="false">leptoprosopo (largo)</string>
+    <string name="t_384e8454add5" formatted="false">Acérquese: encuadre el cuello y el escote</string>
     <string name="t_384fb0cacb99" formatted="false">óvalo facial, ojos, nariz y labios</string>
     <string name="t_386435ce74e6" formatted="false">Ángulo de la foto %1$d</string>
     <string name="t_3869222c591a" formatted="false">≈ %1$s cm: aléjese ≥ 1 m y use zoom</string>
@@ -406,6 +407,7 @@
     <string name="t_568489c3d3c8" formatted="false">Sin logo</string>
     <string name="t_569e67fe790e" formatted="false">Capas en la imagen</string>
     <string name="t_56cc67e3f310" formatted="false">Encuadre el brazo entero: hombro, codo y muñeca</string>
+    <string name="t_5749b90fc97f" formatted="false">Mentón al frente: mire a la cámara</string>
     <string name="t_575dab1075d7" formatted="false">Iniciar sesión de fotos (protocolos)</string>
     <string name="t_57d396bb6e2c" formatted="false">Abdomen lateral izquierdo</string>
     <string name="t_57d4c792a6bb" formatted="false">Altura sobre la pupila, mm</string>
@@ -1135,6 +1137,7 @@
     <string name="t_ec616f599f8c" formatted="false">No se pudo leer la imagen</string>
     <string name="t_ecffc6c021fa" formatted="false">Esperando el análisis de arrugas…</string>
     <string name="t_ed1c5e218500" formatted="false">Con fotos</string>
+    <string name="t_ed206059d887" formatted="false">Aléjese: que se vea el escote, por debajo de los hombros</string>
     <string name="t_edd238ac88c2" formatted="false">Hombros nivelados</string>
     <string name="t_ee18e51f8a8f" formatted="false">%1$s · exposición %2$+.2f EV · temperatura %3$+.1f · tinte %4$+.1f</string>
     <string name="t_ee51647e18ca" formatted="false">Fecha de captura: %1$s</string>

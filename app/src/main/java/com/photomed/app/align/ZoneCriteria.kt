@@ -188,6 +188,10 @@ object ZoneCriteria {
      * sigue la cara; ojo: no se ven los dos ojos.
      */
     /** Accesorio (gafas) sobre los ojos, ropa (gorra, sombrero, pañuelo) sobre la frente y piel del cuerpo (mano) dentro del óvalo. */
+    /** Ancho mínimo de los hombros (fracción del ancho del cuadro) en la toma del cuello y escote. */
+    const val NECK_MIN_SHOULDERS = 0.4f
+    /** Desplazamiento máximo de la nariz respecto del centro de los hombros (en anchos de hombros). */
+    const val NECK_NOSE_OFF = 0.22f
     const val OCCL_GLASSES = 0.07f
     const val OCCL_FOREHEAD = 0.25f
     const val OCCL_HAND = 0.07f
@@ -955,9 +959,21 @@ object ZoneCriteria {
                 val sl = p[L.SHOULDER_L]!!; val sr = p[L.SHOULDER_R]!!
                 if (tilt(sl, sr) > LEVEL_DEG) out += tr("Hombros nivelados")
                 val chin = listOfNotNull(p[L.MOUTH_L], p[L.MOUTH_R]).takeIf { it.isNotEmpty() }?.let { m -> m.map { it.y }.average().toFloat() }
+                // tamaño de la toma: de cuerpo entero el cuello es diminuto; en un retrato de la cara el escote queda fuera
+                if (abs(sl.x - sr.x) < NECK_MIN_SHOULDERS) out += tr("Acérquese: encuadre el cuello y el escote")
+                if (chin != null) {
+                    val sy0 = (sl.y + sr.y) / 2
+                    if (sy0 + 0.5f * (sy0 - chin) > s.aspect) out += tr("Aléjese: que se vea el escote, por debajo de los hombros")
+                }
+                // mentón al frente: la nariz centrada entre los hombros (de lado o girada no es la toma)
+                p[L.NOSE]?.let { n -> if (abs(n.x - (sl.x + sr.x) / 2) > NECK_NOSE_OFF * abs(sl.x - sr.x)) out += tr("Mentón al frente: mire a la cámara") }
                 if (chin == null) out += tr("De frente: que se vea la cara") else {
                     val cx = (sl.x + sr.x) / 2; val half = abs(sl.x - sr.x) * 0.18f; val sy = (sl.y + sr.y) / 2
-                    uncovered(c, trn("el cuello y el escote"), c?.let { skinClothes(it, cx - half, chin + (sy - chin) * 0.35f, cx + half, sy + (sy - chin) * 0.3f) })?.let { out += it }
+                    // el cuello y, debajo de la línea de los hombros, el escote (una camiseta deja el cuello pero tapa el escote)
+                    val neck = c?.let { skinClothes(it, cx - half, chin + (sy - chin) * 0.35f, cx + half, sy + (sy - chin) * 0.3f) }
+                    val chest = c?.let { skinClothes(it, cx - half * 1.5f, sy + (sy - chin) * 0.1f, cx + half * 1.5f, sy + (sy - chin) * 0.45f) }
+                    val both = if (neck == null || chest == null) neck else minOf(neck.first, chest.first) to maxOf(neck.second, chest.second)
+                    uncovered(c, trn("el cuello y el escote"), both)?.let { out += it }
                 }
             }
             else -> {}
