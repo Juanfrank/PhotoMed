@@ -73,7 +73,7 @@ android {
         unitTests.isIncludeAndroidResources = true
         // las pruebas con fotos reales cargan miles de imágenes: un proceso nuevo cada 40 clases (si no, al final de
         // la suite el sistema lo cierra por memoria)
-        unitTests.all { it.setForkEvery(40) }
+        unitTests.all { it.setForkEvery(20); it.maxHeapSize = "3g" }
     }
 }
 
