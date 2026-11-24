@@ -2,6 +2,18 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.53 — 24 de noviembre de 2026
+
+- **Nueva toma capilar: «Frontal (cabeza inclinada)»**: de frente, con la cabeza inclinada hacia delante
+  (≈ 30°, barbilla al pecho) y la cámara a la altura de la cara, para ver la línea de implantación frontal,
+  las entradas, la raya y la mitad anterior del cuero cabelludo. La guía se proyecta desde el mismo modelo
+  3D de la cabeza que las demás vistas capilares (línea frontal en la marca, raya en la línea media, cara
+  escorzada abajo). La cámara comprueba con la malla facial que la cara esté de frente, sin girar ni
+  ladear, y que la inclinación hacia delante sea la pedida (pide «bajar» o «subir» la barbilla); no exige
+  mirada al frente ni expresión (los ojos miran abajo), y avisa si una gorra o un pañuelo tapan la frente.
+  Se mide la línea de implantación como en el rostro frontal. Es la primera toma del protocolo de
+  Tricología.
+
 ## 2.52 — 24 de noviembre de 2026
 
 - **Pies**: el suelo (arena, alfombra o baldosas que la segmentación toma por ropa u otros) ya no se

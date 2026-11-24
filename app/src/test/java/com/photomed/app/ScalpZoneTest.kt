@@ -48,6 +48,34 @@ class ScalpZoneTest {
         assertEquals("20°", c!!.value)
     }
 
+    /** Rostro sintético de frente (óvalo simétrico, ojos nivelados, nariz centrada) con el cabeceo dado. */
+    private fun face(pitch: Float): Detection {
+        val pts = HashMap<String, com.photomed.app.align.Pt>()
+        for (i in 0 until 36) { val a = 2 * Math.PI * i / 36; pts["oval_$i"] = com.photomed.app.align.Pt(0.5f + 0.25f * kotlin.math.sin(a).toFloat(), 0.6f - 0.32f * kotlin.math.cos(a).toFloat()) }
+        pts[com.photomed.app.align.Landmarks.EYE_R] = com.photomed.app.align.Pt(0.42f, 0.55f); pts[com.photomed.app.align.Landmarks.EYE_L] = com.photomed.app.align.Pt(0.58f, 0.55f)
+        pts["nose_bottom_1"] = com.photomed.app.align.Pt(0.5f, 0.68f)
+        return Detection(pts, yaw = 0f, pitch = pitch, roll = 0f)
+    }
+
+    @Test
+    fun frontalTiltedScalpViewAsksForTheForwardTilt() {
+        val z = Zone.fromId("cuero_cabelludo_frontal")
+        assertEquals(Zone.SCALP_FRONTAL, z)
+        assertEquals(ZoneCategory.CAPILAR, z!!.category)
+        assertEquals(Detector.FACE, ZoneAlignment.of(z).detector)
+        assertTrue(com.photomed.app.data.BuiltInProtocols.ALL.any { Zone.SCALP_FRONTAL in it.second })
+        // con la cabeza a nivel pide bajar la barbilla (inclinarla hacia delante)
+        val level = Standardization.evaluate(z, face(0f), null)
+        assertTrue(level.hints.toString(), level.hints.any { it.startsWith("Barbilla: bajar") })
+        // inclinada ≈ 30° hacia delante: sin indicaciones de cabeza ni de mirada (los ojos miran abajo)
+        val tilted = Standardization.evaluate(z, face(-30f), null)
+        assertTrue(tilted.hints.toString(), tilted.hints.none { it.startsWith("Barbilla") || it.startsWith("Mirada") || it.startsWith("Expresión") })
+        // demasiado inclinada: pide subirla
+        assertTrue(Standardization.evaluate(z, face(-55f), null).hints.any { it.startsWith("Barbilla: subir") })
+        // el rostro frontal sigue pidiendo la cabeza a nivel
+        assertTrue(Standardization.evaluate(Zone.FACE_FRONTAL, face(-30f), null).hints.any { it.startsWith("Barbilla: bajar").not() && it.startsWith("Barbilla") })
+    }
+
     @Test
     fun newZonesHaveIdsAndSides() {
         listOf(Zone.SCALP_CROWN, Zone.SCALP_PARIETAL_R, Zone.SCALP_PARIETAL_L).forEach { assertEquals(ZoneCategory.CAPILAR, it.category) }

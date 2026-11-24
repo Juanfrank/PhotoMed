@@ -409,6 +409,7 @@
     <string name="t_56cc67e3f310" formatted="false">Frame the whole arm: shoulder, elbow and wrist</string>
     <string name="t_5749b90fc97f" formatted="false">Chin forward: look at the camera</string>
     <string name="t_575dab1075d7" formatted="false">Start photo session (protocols)</string>
+    <string name="t_57a4cce1c970" formatted="false">frontal hairline, part, temples and hair pattern</string>
     <string name="t_57d396bb6e2c" formatted="false">Abdomen left side</string>
     <string name="t_57d4c792a6bb" formatted="false">Height above pupil, mm</string>
     <string name="t_57f3263afaf2" formatted="false">Comparison settings</string>
@@ -447,6 +448,7 @@
     <string name="t_5ebfa955fab0" formatted="false">Frame the facial area (the facial skin is not visible)</string>
     <string name="t_5ec025834fbe" formatted="false">back / palm</string>
     <string name="t_5ed8ae63732e" formatted="false">Before</string>
+    <string name="t_5f0e60f59f50" formatted="false">part and scalp</string>
     <string name="t_5f408032f96c" formatted="false">All strokes and symbols will be removed from this photo. You can undo this afterwards.</string>
     <string name="t_5fbb9e559d95" formatted="false">more to the left</string>
     <string name="t_604d94218886" formatted="false">Delete</string>
@@ -949,6 +951,7 @@
     <string name="t_c79155e38c96" formatted="false">Tense your neck, showing your lower teeth</string>
     <string name="t_c802c46db199" formatted="false">Retrace %1$s</string>
     <string name="t_c81f5771478f" formatted="false">" (%1$d could not be read)"</string>
+    <string name="t_c82b0cc21458" formatted="false">frontal hairline</string>
     <string name="t_c8b670ee5707" formatted="false">Upper/lower ratio</string>
     <string name="t_c90bc1798963" formatted="false">Eyes and brows</string>
     <string name="t_c957a98f6d23" formatted="false">Hold the phone still</string>
@@ -1133,12 +1136,14 @@
     <string name="t_ebb890c46560" formatted="false">Feet (dorsal)</string>
     <string name="t_ebc90f3d6188" formatted="false">Reference photos: %1$s</string>
     <string name="t_ebdc3787067c" formatted="false">Fingers and toes</string>
+    <string name="t_ebfa599808b3" formatted="false">Frontal (head tilted forward)</string>
     <string name="t_ec2a2156670c" formatted="false">No photos in 6 months</string>
     <string name="t_ec616f599f8c" formatted="false">Could not read the image</string>
     <string name="t_ecffc6c021fa" formatted="false">Waiting for wrinkle analysis…</string>
     <string name="t_ed1c5e218500" formatted="false">With photos</string>
     <string name="t_ed206059d887" formatted="false">Move back: show the neckline, below the shoulders</string>
     <string name="t_edd238ac88c2" formatted="false">Level shoulders</string>
+    <string name="t_eded9bee5f75" formatted="false">Facing the camera, head tilted forward (≈ 30°, chin toward the chest), camera at face height: frontal hairline on the mark, part on the midline; hair dry and combed back.</string>
     <string name="t_ee18e51f8a8f" formatted="false">%1$s · exposure %2$+.2f EV · temperature %3$+.1f · tint %4$+.1f</string>
     <string name="t_ee51647e18ca" formatted="false">Capture date: %1$s</string>
     <string name="t_eea99f7aadf4" formatted="false">Arrow</string>
@@ -1193,6 +1198,7 @@
     <string name="t_f7f892110571" formatted="false">lips</string>
     <string name="t_f80dc59c97dc" formatted="false">Protocol name</string>
     <string name="t_f80e874fb0b7" formatted="false">ΔE*ab vs. cheek</string>
+    <string name="t_f817823d9165" formatted="false">eyebrows and eyes</string>
     <string name="t_f823987a03ce" formatted="false">hyperleptoprosopic (very long)</string>
     <string name="t_f8732946e59b" formatted="false">Raise or cross the arms so they don\'t cover the abdomen</string>
     <string name="t_f892ea479f7e" formatted="false">gluteal folds</string>

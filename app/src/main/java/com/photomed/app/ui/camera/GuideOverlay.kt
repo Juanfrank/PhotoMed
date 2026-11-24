@@ -489,6 +489,14 @@ fun guideFor(type: GuideType): Guide = when (type) {
         marks = ScalpGuideArt.CROWN_MARKS,
     )
 
+    // Frontal con la cabeza inclinada hacia delante (≈ 30°): línea de implantación frontal en la marca y
+    // raya en la línea media; la cara, escorzada, abajo
+    GuideType.SCALP_FRONT -> Guide(
+        contours = ScalpGuideArt.FRONTAL_TILT_CONTOURS,
+        lines = ScalpGuideArt.FRONTAL_TILT_MARKS[0].let { listOf(hLine(it.y, 0.10f, 0.90f), vLine(it.x, 0.06f, 0.94f)) },
+        marks = ScalpGuideArt.FRONTAL_TILT_MARKS,
+    )
+
     // Parietal (derecho; el izquierdo en espejo): encima y al lado (≈ 45°), frente a la derecha del
     // encuadre; raya arriba, línea temporal y oreja abajo.
     GuideType.SCALP_PARIETAL -> Guide(

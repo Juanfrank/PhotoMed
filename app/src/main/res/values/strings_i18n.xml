@@ -409,6 +409,7 @@
     <string name="t_56cc67e3f310" formatted="false">Encuadre el brazo entero: hombro, codo y muñeca</string>
     <string name="t_5749b90fc97f" formatted="false">Mentón al frente: mire a la cámara</string>
     <string name="t_575dab1075d7" formatted="false">Iniciar sesión de fotos (protocolos)</string>
+    <string name="t_57a4cce1c970" formatted="false">línea de implantación frontal, raya, entradas y patrón del cabello</string>
     <string name="t_57d396bb6e2c" formatted="false">Abdomen lateral izquierdo</string>
     <string name="t_57d4c792a6bb" formatted="false">Altura sobre la pupila, mm</string>
     <string name="t_57f3263afaf2" formatted="false">Ajustes de comparación</string>
@@ -447,6 +448,7 @@
     <string name="t_5ebfa955fab0" formatted="false">Encuadre la zona del rostro (no se ve la piel de la cara)</string>
     <string name="t_5ec025834fbe" formatted="false">dorso / palma</string>
     <string name="t_5ed8ae63732e" formatted="false">Antes</string>
+    <string name="t_5f0e60f59f50" formatted="false">raya y cuero cabelludo</string>
     <string name="t_5f408032f96c" formatted="false">Se quitarán todos los trazos y símbolos de esta foto. Puede deshacerlo después.</string>
     <string name="t_5fbb9e559d95" formatted="false">más a la izquierda</string>
     <string name="t_604d94218886" formatted="false">Eliminar</string>
@@ -949,6 +951,7 @@
     <string name="t_c79155e38c96" formatted="false">Tense el cuello mostrando los dientes inferiores</string>
     <string name="t_c802c46db199" formatted="false">Volver a trazar %1$s</string>
     <string name="t_c81f5771478f" formatted="false">" (%1$d no se pudieron leer)"</string>
+    <string name="t_c82b0cc21458" formatted="false">línea de implantación frontal</string>
     <string name="t_c8b670ee5707" formatted="false">Proporción sup./inf.</string>
     <string name="t_c90bc1798963" formatted="false">Ojos y cejas</string>
     <string name="t_c957a98f6d23" formatted="false">Mantenga el teléfono quieto</string>
@@ -1133,12 +1136,14 @@
     <string name="t_ebb890c46560" formatted="false">Pies (dorso)</string>
     <string name="t_ebc90f3d6188" formatted="false">Fotos de referencia: %1$s</string>
     <string name="t_ebdc3787067c" formatted="false">Dedos</string>
+    <string name="t_ebfa599808b3" formatted="false">Frontal (cabeza inclinada)</string>
     <string name="t_ec2a2156670c" formatted="false">Sin fotos en 6 meses</string>
     <string name="t_ec616f599f8c" formatted="false">No se pudo leer la imagen</string>
     <string name="t_ecffc6c021fa" formatted="false">Esperando el análisis de arrugas…</string>
     <string name="t_ed1c5e218500" formatted="false">Con fotos</string>
     <string name="t_ed206059d887" formatted="false">Aléjese: que se vea el escote, por debajo de los hombros</string>
     <string name="t_edd238ac88c2" formatted="false">Hombros nivelados</string>
+    <string name="t_eded9bee5f75" formatted="false">De frente, cabeza inclinada hacia delante (≈ 30°, barbilla al pecho) y cámara a la altura de la cara: línea de implantación frontal en la marca, raya en la línea media; cabello seco y peinado hacia atrás.</string>
     <string name="t_ee18e51f8a8f" formatted="false">%1$s · exposición %2$+.2f EV · temperatura %3$+.1f · tinte %4$+.1f</string>
     <string name="t_ee51647e18ca" formatted="false">Fecha de captura: %1$s</string>
     <string name="t_eea99f7aadf4" formatted="false">Flecha</string>
@@ -1193,6 +1198,7 @@
     <string name="t_f7f892110571" formatted="false">labios</string>
     <string name="t_f80dc59c97dc" formatted="false">Nombre del protocolo</string>
     <string name="t_f80e874fb0b7" formatted="false">ΔE*ab frente a la mejilla</string>
+    <string name="t_f817823d9165" formatted="false">cejas y ojos</string>
     <string name="t_f823987a03ce" formatted="false">hiperleptoprosopo (muy largo)</string>
     <string name="t_f8732946e59b" formatted="false">Suba o cruce los brazos: que no tapen el abdomen</string>
     <string name="t_f892ea479f7e" formatted="false">pliegues glúteos</string>

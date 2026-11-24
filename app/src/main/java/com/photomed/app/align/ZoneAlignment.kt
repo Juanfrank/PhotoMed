@@ -101,6 +101,16 @@ data class ZoneAlignment(
                     listOf("Vértice", "Línea de implantación frontal (centro)"),
                     tr("contorno del cráneo, raya, vértice y patrón del cabello"),
                 )
+                // frontal con la cabeza inclinada: la cara (escorzada) da los puntos; los bordes de la línea de
+                // implantación y de la raya, el resto
+                GuideType.SCALP_FRONT -> ZoneAlignment(
+                    Detector.FACE, L.group("brow_") + L.group("eye_") + setOf(L.EYE_L, L.EYE_R, L.NOSE_BASE) + L.group("nose_") +
+                        L.ovalRange(0..8) + L.ovalRange(28..35) + L.mesh(L.MESH_BROWS) + L.mesh(L.MESH_EYES),
+                    listOf(r(trn("línea de implantación frontal"), 0.5f, 0.55f, 0.35f, 0.08f), r(trn("raya y cuero cabelludo"), 0.5f, 0.3f, 0.3f, 0.2f, 0.8f),
+                        r(trn("cejas y ojos"), 0.5f, 0.8f, 0.3f, 0.08f, 0.6f)),
+                    listOf("Línea de implantación frontal (centro)", "Raya (línea media)"),
+                    tr("línea de implantación frontal, raya, entradas y patrón del cabello"),
+                )
                 GuideType.SCALP_CROWN -> ZoneAlignment(
                     Detector.NONE, emptySet(),
                     listOf(r(trn("remolino de la coronilla"), 0.5f, 0.40f, 0.18f, 0.16f), r(trn("contorno craneal y orejas"), 0.5f, 0.55f, 0.45f, 0.4f, 0.8f),

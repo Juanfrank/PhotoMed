@@ -93,7 +93,7 @@ object ZoneCriteria {
     fun needsClasses(zone: Zone) = zone.guide in SKIN_ZONES || zone.guide == GuideType.FEET || zone.guide == GuideType.HANDS ||
         zone.guide in CLOSEUP_FACE || zone.guide in SCALP_ZONES || zone.guide in FACE_VIEWS
     /** Vistas del rostro entero en las que se comprueba que nada lo tape (gafas, gorra, mano). */
-    private val FACE_VIEWS = setOf(GuideType.FACE_FRONT, GuideType.FACE_OBLIQUE)
+    private val FACE_VIEWS = setOf(GuideType.FACE_FRONT, GuideType.FACE_OBLIQUE, GuideType.SCALP_FRONT)
     /** Primeros planos del rostro (sin cara entera detectable): se comprueba que lo encuadrado sea piel de la cara. */
     private val CLOSEUP_FACE = setOf(GuideType.FOREHEAD, GuideType.PERIOCULAR, GuideType.LIPS, GuideType.EYE)
     /** Vistas del cuero cabelludo: se comprueba que se vea pelo (o cuero cabelludo) y no la cara. */

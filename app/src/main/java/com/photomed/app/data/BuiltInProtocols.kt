@@ -20,7 +20,7 @@ object BuiltInProtocols {
         trn("Rostro 5 vistas") to listOf(Zone.FACE_FRONTAL, Zone.FACE_OBLIQUE_R, Zone.FACE_OBLIQUE_L, Zone.FACE_PROFILE_R, Zone.FACE_PROFILE_L),
         trn("Rostro 3 vistas") to listOf(Zone.FACE_FRONTAL, Zone.FACE_OBLIQUE_R, Zone.FACE_OBLIQUE_L),
         trn("Tercios faciales") to listOf(Zone.FOREHEAD, Zone.PERIOCULAR, Zone.LIPS),
-        trn("Tricología") to listOf(Zone.SCALP_VERTEX, Zone.SCALP_CROWN, Zone.SCALP_PARIETAL_R, Zone.SCALP_PARIETAL_L, Zone.FOREHEAD),
+        trn("Tricología") to listOf(Zone.SCALP_FRONTAL, Zone.SCALP_VERTEX, Zone.SCALP_CROWN, Zone.SCALP_PARIETAL_R, Zone.SCALP_PARIETAL_L, Zone.FOREHEAD),
         trn("Ojos") to listOf(Zone.EYE_R, Zone.EYE_L, Zone.PERIOCULAR),
         trn("Tronco") to listOf(Zone.TORSO_FRONT, Zone.TORSO_SIDE, Zone.TORSO_SIDE_L, Zone.BACK),
         trn("Manos y pies") to listOf(Zone.HANDS_DORSAL, Zone.HANDS_PALMAR, Zone.FEET_DORSAL, Zone.FEET_PLANTAR),

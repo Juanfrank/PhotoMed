@@ -63,6 +63,7 @@ class ZoneAutoCaptureTest {
         Zone.LIPS -> "labios"
         Zone.NECK -> "cuello"
         Zone.SCALP_VERTEX, Zone.SCALP_CROWN, Zone.SCALP_PARIETAL_R, Zone.SCALP_PARIETAL_L -> "cuero_cabelludo"
+        Zone.SCALP_FRONTAL -> "cuero_cabelludo_frontal"
         Zone.TORSO_FRONT -> "abdomen_frontal"
         Zone.TORSO_SIDE, Zone.TORSO_SIDE_L -> "abdomen_lateral"
         Zone.BREASTS -> "torax"

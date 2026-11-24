@@ -19,6 +19,8 @@ enum class GuideType {
     SCALP_CROWN,
     /** Cuero cabelludo: región parietal de un lado, vista lateral superior. */
     SCALP_PARIETAL,
+    /** Cuero cabelludo: de frente con la cabeza inclinada hacia delante (línea frontal y raya). */
+    SCALP_FRONT,
     /** Primer plano de un ojo (párpados, cola de la ceja y patas de gallo). */
     EYE,
     TORSO_FRONT, BREASTS, TORSO_SIDE, BACK, GLUTES, LEGS, ARM, HANDS, FEET,
@@ -61,6 +63,8 @@ enum class Zone(
         hintEs = trn("Labios relajados en contacto, comisuras sobre la línea horizontal.")),
     NECK("cuello", trn("Cuello y escote"), ZoneCategory.FACIAL, GuideType.NECK,
         hintEs = trn("Mentón al frente, hombros relajados.")),
+    SCALP_FRONTAL("cuero_cabelludo_frontal", trn("Frontal (cabeza inclinada)"), ZoneCategory.CAPILAR, GuideType.SCALP_FRONT,
+        hintEs = trn("De frente, cabeza inclinada hacia delante (≈ 30°, barbilla al pecho) y cámara a la altura de la cara: línea de implantación frontal en la marca, raya en la línea media; cabello seco y peinado hacia atrás.")),
     SCALP_VERTEX("cuero_cabelludo_vertice", trn("Vértice"), ZoneCategory.CAPILAR, GuideType.SCALP,
         hintEs = trn("Vista cenital: cámara paralela al suelo sobre la cabeza, frente hacia arriba del encuadre, raya en la línea media y el punto más alto del cráneo en la cruz; cabello seco y peinado igual en cada toma.")),
     SCALP_CROWN("cuero_cabelludo_corona", trn("Corona (coronilla)"), ZoneCategory.CAPILAR, GuideType.SCALP_CROWN,

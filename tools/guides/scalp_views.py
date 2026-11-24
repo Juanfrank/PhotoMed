@@ -7,7 +7,8 @@ remolino de la coronilla) y se proyecta desde la posición de cámara de cada vi
 
 - vértice: cenital, mirando el punto más alto del cráneo;
 - corona: perpendicular a la superficie en el remolino (detrás y encima de la cabeza);
-- parietal: perpendicular a la eminencia parietal (encima y al lado, ≈ 45°).
+- parietal: perpendicular a la eminencia parietal (encima y al lado, ≈ 45°);
+- frontal inclinada: de frente con la cabeza flexionada ≈ 30° (línea frontal y raya).
 
 La silueta sale de la máscara de la superficie proyectada (contorno exterior); las curvas
 anatómicas se dibujan solo donde la superficie mira a la cámara. Salida: Kotlin generado
@@ -341,6 +342,13 @@ def build():
     cam = Cam(p, npar, np.array([0, 1.0, 0]), 20.0, (0.48, 0.47))
     ear = ear_curve(-1)[0].mean(0)
     views.append(view("PARIETAL", cam, [p, ear], jaw=True) + (cam,))
+    # Frontal con la cabeza inclinada hacia delante (≈ 30° de flexión, barbilla abajo): equivale a la
+    # cámara delante y 30° por encima, mirando la línea de implantación frontal; se ven la frente, la
+    # raya y la mitad anterior del cuero cabelludo, y abajo los ojos y la nariz (escorzados)
+    fl = np.radians(30)
+    h = HAIRLINE[0][100]
+    cam = Cam(h, np.array([0, np.sin(fl), np.cos(fl)]), np.array([0, 1.0, 0]), 22.0, (0.5, 0.42))
+    views.append(view("FRONTAL_TILT", cam, [h, skull_dir(0, 62)[0]], face=True, jaw=True) + (cam,))
     return views
 
 

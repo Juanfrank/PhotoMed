@@ -20,13 +20,17 @@ import kotlin.math.abs
  * (punta nasal respecto del centro del óvalo), común a ML Kit y MediaPipe.
  */
 object Standardization {
-    data class Target(val yaw: Float?, val yawTol: Float, val side: Int, val minYaw: Float? = null)
+    data class Target(val yaw: Float?, val yawTol: Float, val side: Int, val minYaw: Float? = null,
+                      /** Cabeceo pedido (°, negativo = barbilla abajo) y su tolerancia. */
+                      val pitch: Float = 0f, val pitchTol: Float = PITCH_TOL)
 
     /** side: +1 la cara mira hacia la derecha de la imagen, −1 hacia la izquierda, 0 de frente. */
     fun target(zone: Zone): Target? = when (zone.guide) {
         // giro tolerado de frente: 8° (la estimación de la malla tiene unos ±3–5° de ruido)
         GuideType.FACE_FRONT, GuideType.FOREHEAD, GuideType.PERIOCULAR, GuideType.LIPS -> Target(0f, 8f, 0)
         GuideType.FACE_OBLIQUE -> Target(45f, 8f, if (zone.mirrored) -1 else 1)
+        // cuero cabelludo frontal: de frente con la cabeza inclinada hacia delante ≈ 30° (barbilla abajo)
+        GuideType.SCALP_FRONT -> Target(0f, 8f, 0, pitch = -30f, pitchTol = 10f)
         GuideType.FACE_PROFILE -> Target(null, 0f, if (zone.mirrored) -1 else 1, minYaw = PROFILE_MIN_YAW)
         else -> null
     }
@@ -133,7 +137,7 @@ object Standardization {
             }
             // cero del cabeceo calibrado con retratos frontales verificados: con el plano de Frankfort horizontal la
             // malla de MediaPipe da de media unos −5° (su modelo 3D canónico no está en el plano de Frankfort)
-            det.pitch?.let { it + PITCH_ZERO }?.let { if (abs(it) > PITCH_TOL) { hints += (if (it > 0) "Barbilla: bajar %.0f° (Frankfort)" else "Barbilla: subir %.0f° (Frankfort)").format(abs(it)); off += abs(it) / PITCH_TOL } }
+            det.pitch?.let { it + PITCH_ZERO - t.pitch }?.let { if (abs(it) > t.pitchTol) { hints += (if (it > 0) "Barbilla: bajar %.0f° (Frankfort)" else "Barbilla: subir %.0f° (Frankfort)").format(abs(it)); off += abs(it) / PITCH_TOL } }
             // Inclinación: línea entre los ojos en la imagen (de frente u oblicuo); Euler Z si no hay ojos.
             // De frente, la línea de los ojos; en el oblicuo la línea de los ojos se deforma con el giro y la
             // perspectiva (sesgo de 9–15° en fotos clínicas de oblicuos), así que se usa la del modelo 3D, que en el
@@ -151,7 +155,8 @@ object Standardization {
         // Expresión neutra en las vistas faciales completas; ojos abiertos siempre
         // sonrisa o boca abierta con la expresión neutra pedida: impide el disparo (aunque el resto esté «casi»)
         var neutralBroken = false
-        if (ZoneAlignment.of(zone).detector == Detector.FACE && Expression.usable(det.yaw)) {
+        // (con la cabeza inclinada hacia delante no: los ojos miran abajo y la expresión no se mide bien)
+        if (ZoneAlignment.of(zone).detector == Detector.FACE && Expression.usable(det.yaw) && (t?.pitch ?: 0f) == 0f) {
             Expression.measure(det.points)?.let { ex ->
                 val h = if (expression == com.photomed.app.data.FacialExpression.NEUTRAL) Expression.neutral(zone, ex) else Expression.target(expression, ex)
                 h.forEach { hints += it; off += 0.8f }
@@ -162,7 +167,7 @@ object Standardization {
         // que miran al frente de la cara proyectan el iris desplazado dentro del contorno del ojo; «iris
         // centrado» significaría mirar a la cámara. (Con referencia se compara la mirada entre fotos.)
         // (no en los labios: la mirada no cambia la zona; en la frente sí, mirar arriba la arruga)
-        det.gaze?.takeIf { t?.yaw == 0f && zone != Zone.LIPS }?.let { g ->
+        det.gaze?.takeIf { t?.yaw == 0f && t.pitch == 0f && zone != Zone.LIPS }?.let { g ->
             if (kotlin.math.abs(g.x) > Gaze.TOL_X * 1.2f || kotlin.math.abs(g.y) > Gaze.TOL_Y * 1.2f) {
                 hints += trn("Mirada: al frente")
                 off += 0.6f

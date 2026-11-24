@@ -89,7 +89,8 @@ object HairSkin {
 
     /** Zonas donde se sigue la línea de implantación frontal (vistas de frente que muestran la frente). */
     fun appliesTo(zone: com.photomed.app.data.Zone) =
-        zone.guide == com.photomed.app.data.GuideType.FACE_FRONT || zone.guide == com.photomed.app.data.GuideType.FOREHEAD
+        zone.guide == com.photomed.app.data.GuideType.FACE_FRONT || zone.guide == com.photomed.app.data.GuideType.FOREHEAD ||
+            zone.guide == com.photomed.app.data.GuideType.SCALP_FRONT
 
     fun hairline(labels: FaceLabels, points: Map<String, Pt>): Hairline? {
         val p = FaceKeys.canonical(points)
