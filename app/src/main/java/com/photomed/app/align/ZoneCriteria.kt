@@ -109,7 +109,8 @@ object ZoneCriteria {
     // ---- umbrales (documentados en docs/CAPTURA_AUTOMATICA.md) ----
     const val MIN_SKIN = 0.70f
     const val MAX_CLOTHES = 0.15f
-    const val LEVEL_DEG = 8f
+    // (los puntos del cuerpo tienen unos 2–3° de ruido; las posturas inclinadas reales medidas: 12–22°)
+    const val LEVEL_DEG = 10f
     /**
      * Dedos: basta con que se vean sus falanges (no recogidos ni en un puño). El ángulo entre dedos y su
      * longitud son los del paciente: el esquema se ajusta a ellos ([BodySchema]), no es incumplimiento.
@@ -802,6 +803,9 @@ object ZoneCriteria {
         if (!has(p, L.SHOULDER_L, L.SHOULDER_R)) return null
         val sl = p[L.SHOULDER_L]!!; val sr = p[L.SHOULDER_R]!!
         val sw = hypot(sl.x - sr.x, sl.y - sr.y).coerceAtLeast(0.02f)
+        // sin la cabeza en el cuadro (recortada o tapada) el detector no sabe de qué lado está cada hombro: supone
+        // que la persona mira a la cámara. Con la segmentación, si no se ve cabeza (ni cara ni pelo), no se sabe
+        if (c != null && !headVisible(p, c, sw)) return null
         if (abs(sl.x - sr.x) >= FACING_DX) return sl.x > sr.x
         if (c == null) return null
         val head = listOfNotNull(p[L.NOSE], p[L.EAR_L], p[L.EAR_R])
@@ -815,6 +819,23 @@ object ZoneCriteria {
         for (y in y0..y1) for (x in x0..x1) when (c.at(x, y)) { FaceLabels.FACE_SKIN -> face++; FaceLabels.HAIR -> hair++ }
         if (face + hair < 6) return null
         return face >= 0.3f * (face + hair)
+    }
+
+    /**
+     * ¿Se ve la cabeza? Pelo (≥ 6 píxeles) o bastante cara (≥ 15) alrededor de la cabeza (nariz y orejas del
+     * detector, o encima de los hombros); unos pocos píxeles de «cara» sin pelo son el cuello o la nuca.
+     */
+    private fun headVisible(p: Map<String, Pt>, c: Classes, sw: Float): Boolean {
+        val L = Landmarks
+        val sl = p[L.SHOULDER_L] ?: return false; val sr = p[L.SHOULDER_R] ?: return false
+        val head = listOfNotNull(p[L.NOSE], p[L.EAR_L], p[L.EAR_R])
+        val cx = if (head.isNotEmpty()) head.map { it.x }.average().toFloat() else (sl.x + sr.x) / 2
+        val cy = if (head.isNotEmpty()) head.map { it.y }.average().toFloat() else (sl.y + sr.y) / 2 - 0.45f * sw
+        val r = 0.35f * sw; val k = c.width.toFloat(); var face = 0; var hair = 0
+        val x0 = ((cx - r) * k).toInt().coerceAtLeast(0); val x1 = ((cx + r) * k).toInt().coerceAtMost(c.width - 1)
+        val y0 = ((cy - r) * k).toInt().coerceAtLeast(0); val y1 = ((cy + r) * k).toInt().coerceAtMost(c.height - 1)
+        for (y in y0..y1) for (x in x0..x1) { val q = c.at(x, y); if (q == FaceLabels.FACE_SKIN) face++ else if (q == FaceLabels.HAIR) hair++ }
+        return hair >= 6 || face >= 15
     }
 
     private fun body(zone: Zone, s: Scene): List<String> {
@@ -854,7 +875,8 @@ object ZoneCriteria {
                 }
                 val facing = facingCamera(p, c)
                 if (zone.guide == GuideType.BACK) {
-                    if (facing ?: (L.NOSE in p)) out += tr("De espaldas a la cámara")
+                    // (sin la cabeza a la vista no se sabe: no se pide nada; la «nariz» del detector es una suposición)
+                    if (facing == true) out += tr("De espaldas a la cámara")
                 } else if (facing == false || (facing == null && L.NOSE !in p && !has(p, L.MOUTH_L, L.MOUTH_R))) out += tr("De frente a la cámara")
                 val (y0, y1, name) = when (zone.guide) {
                     GuideType.BREASTS -> Triple(sy, sy + (hy - sy) * 0.55f, trn("el tórax"))
