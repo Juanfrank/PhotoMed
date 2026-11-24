@@ -71,6 +71,9 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
         unitTests.isIncludeAndroidResources = true
+        // las pruebas con fotos reales cargan miles de imágenes: un proceso nuevo cada 40 clases (si no, al final de
+        // la suite el sistema lo cierra por memoria)
+        unitTests.all { it.setForkEvery(40) }
     }
 }
 

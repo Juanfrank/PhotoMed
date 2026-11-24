@@ -61,7 +61,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.pointerInput
 
 private const val PREF_LAYERS = "annot_layers"
-private const val PREF_BODY_INIT = "annot_layers_body_init"
+private const val PREF_BODY_LAYERS = "annot_layers_body"
 private const val PREF_ALPHA = "annot_alpha"
 
 /** Opacidad de los trazos y números sobre las fotos (se recuerda; por defecto 50 %). */
@@ -100,17 +100,19 @@ fun rememberAnnotLayers(): MutableState<Set<AnnotLayer>> {
     val prefs = remember { context.getSharedPreferences("photomed", Context.MODE_PRIVATE) }
     return remember {
         object : MutableState<Set<AnnotLayer>> {
-            private val s = mutableStateOf(prefs.getString(PREF_LAYERS, "").orEmpty().split(',')
-                .mapNotNull { n -> AnnotLayer.entries.firstOrNull { it.name == n } }.toSet().let { v ->
-                    // capas del diagrama del cuerpo (2.49): encendidas la primera vez
-                    if (prefs.getBoolean(PREF_BODY_INIT, false)) v
-                    else (v + com.photomed.app.align.BodyDiagram.LAYERS).also {
-                        prefs.edit().putBoolean(PREF_BODY_INIT, true).putString(PREF_LAYERS, it.joinToString(",") { l -> l.name }).apply()
-                    }
-                })
+            // capas propias del diagrama del cuerpo (ejes, dedos, uñas, puntos): en su propia preferencia, encendidas
+            // por defecto; las de la cara (y el contorno, común), en la de siempre
+            private val bodyOnly = com.photomed.app.align.BodyDiagram.LAYERS.toSet() - AnnotLayer.CONTOUR
+            private fun parse(str: String) = str.split(',').mapNotNull { n -> AnnotLayer.entries.firstOrNull { it.name == n } }.toSet()
+            private val s = mutableStateOf(parse(prefs.getString(PREF_LAYERS, "").orEmpty()) - bodyOnly +
+                (prefs.getString(PREF_BODY_LAYERS, null)?.let(::parse) ?: bodyOnly))
             override var value: Set<AnnotLayer>
                 get() = s.value
-                set(v) { s.value = v; prefs.edit().putString(PREF_LAYERS, v.joinToString(",") { it.name }).apply() }
+                set(v) {
+                    s.value = v
+                    prefs.edit().putString(PREF_LAYERS, (v - bodyOnly).joinToString(",") { it.name })
+                        .putString(PREF_BODY_LAYERS, (v intersect bodyOnly).joinToString(",") { it.name }).apply()
+                }
             override fun component1() = value
             override fun component2(): (Set<AnnotLayer>) -> Unit = { value = it }
         }
