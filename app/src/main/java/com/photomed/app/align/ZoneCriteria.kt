@@ -835,9 +835,12 @@ object ZoneCriteria {
                 }
                 // tórax: basta con los hombros (una foto del pecho puede dejar las caderas fuera); la región se
                 // estima con el ancho de los hombros (caderas a 1,25 anchos por debajo)
+                // (con el pecho entero en el cuadro: hasta un ancho de hombros por debajo de ellos; si no, es una toma
+                // del cuello o de la cara)
                 @Suppress("NAME_SHADOWING") val p = if (zone.guide == GuideType.BREASTS && has(p, L.SHOULDER_L, L.SHOULDER_R) && !has(p, L.HIP_L, L.HIP_R)) {
                     val a = p[L.SHOULDER_L]!!; val b = p[L.SHOULDER_R]!!; val sw = hypot(a.x - b.x, a.y - b.y)
-                    p + mapOf(L.HIP_L to Pt(a.x + (b.x - a.x) * 0.12f, a.y + 1.25f * sw), L.HIP_R to Pt(b.x + (a.x - b.x) * 0.12f, b.y + 1.25f * sw))
+                    if (maxOf(a.y, b.y) + sw > s.aspect) p
+                    else p + mapOf(L.HIP_L to Pt(a.x + (b.x - a.x) * 0.12f, a.y + 1.25f * sw), L.HIP_R to Pt(b.x + (a.x - b.x) * 0.12f, b.y + 1.25f * sw))
                 } else p
                 if (!has(p, L.SHOULDER_L, L.SHOULDER_R, L.HIP_L, L.HIP_R)) return listOf(tr("Encuadre el tronco: hombros y caderas"))
                 val sl = p[L.SHOULDER_L]!!; val sr = p[L.SHOULDER_R]!!; val hl = p[L.HIP_L]!!; val hr = p[L.HIP_R]!!
