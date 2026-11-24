@@ -27,6 +27,7 @@ import java.io.File
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "es")
+@org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
 class ZoneEvalTest {
     private val root = File("src/test/resources/stock/zones")
 
@@ -55,7 +56,15 @@ class ZoneEvalTest {
                 // la máscara se guardó a 96×128 sea cual sea la foto: se reescala a la proporción de la foto
                 // (en la cámara el cuadro y la máscara tienen la misma)
                 val hh = (96f * h / w).toInt().coerceAtLeast(1)
-                ZoneCriteria.Classes(96, hh, ByteArray(96 * hh) { i -> (str[((i / 96) * 128 / hh) * 96 + i % 96] - '0').toByte() })
+                // el color de la foto en la misma rejilla (como en la cámara: uñas y dedos del pie lo usan)
+                val rgb = runCatching {
+                    val o = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
+                    android.graphics.BitmapFactory.decodeFile(File(root, "$dir/$n").path, o)?.let { b0 ->
+                        val sm = android.graphics.Bitmap.createScaledBitmap(b0, 96, hh, true)
+                        IntArray(96 * hh).also { sm.getPixels(it, 0, 96, 0, 0, 96, hh) }.also { b0.recycle(); sm.recycle() }
+                    }
+                }.getOrNull()
+                ZoneCriteria.Classes(96, hh, ByteArray(96 * hh) { i -> (str[((i / 96) * 128 / hh) * 96 + i % 96] - '0').toByte() }, rgb)
             }
             S(w, h, face, pose, hands, classes)
         }

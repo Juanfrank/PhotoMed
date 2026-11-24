@@ -427,15 +427,17 @@ object ZoneCriteria {
 
     /** Manos reconocidas por la piel (sin los puntos del detector): manchas con dedos largos (surcos hondos). */
     /** ¿Lo que se ve son pies (piel que acaba en ≥ 4 dedos cortos, poco hondos)? Para los primeros planos sin puntos. */
-    private fun footLike(s: Scene): Boolean {
+    private fun footLike(s: Scene, narrow: Boolean = false): Boolean {
         val c = s.classes ?: return false
-        fun toes(k: Classes, n: Int) = (if (k === c) feetOf(k) else computeFeet(k)).count { (it.toeCount ?: 0) >= 4 && it.digitDepth < HAND_DIGIT_DEPTH } >= n
-        footMemo?.let { (k, v) -> if (k === c) return v }
+        // ([narrow]: un pie no ocupa más de la mitad del ancho del cuadro; una espalda con los brazos también acaba en salientes)
+        fun toes(k: Classes, n: Int) = (if (k === c) feetOf(k) else computeFeet(k)).count {
+            (it.toeCount ?: 0) >= 4 && it.digitDepth < HAND_DIGIT_DEPTH && (!narrow || it.box.x1 - it.box.x0 <= 0.55f * k.width) } >= n
+        footMemo?.let { (k, nw, v) -> if (k === c && nw == narrow) return v }
         // los dedos abajo (como en la guía de los pies) o arriba (foto hecha desde el paciente; ahí se exigen
         // los dos pies: una espalda con los brazos levantados, girada, también acaba en salientes)
-        return (toes(c, 1) || toes(rotated180(c), 2)).also { footMemo = c to it }
+        return (toes(c, 1) || toes(rotated180(c), 2)).also { footMemo = Triple(c, narrow, it) }
     }
-    @Volatile private var footMemo: Pair<Classes, Boolean>? = null
+    @Volatile private var footMemo: Triple<Classes, Boolean, Boolean>? = null
 
     private fun rotated180(c: Classes) = Classes(c.width, c.height, c.data.reversedArray(), c.rgb?.reversedArray())
 
@@ -590,6 +592,14 @@ object ZoneCriteria {
             else { groups[i] = groups[i].let { g -> Blob(g.area + b.area, minOf(g.x0, b.x0), minOf(g.y0, b.y0), maxOf(g.x1, b.x1), maxOf(g.y1, b.y1)) }; groupOf[bi] = i }
         }
         val w = c.width; val k = 1f / w
+        // el suelo (arena, alfombra, baldosas con textura) puede salir como «ropa» u «otros»: si esa clase llena la
+        // franja inferior del cuadro (más allá de los dedos, en la orientación de la guía), es el fondo y no calzado
+        fun bottomShare(cls: Int): Float {
+            var n = 0; var m = 0
+            for (y in (c.height * 0.85f).toInt() until c.height) for (x in 0 until c.width) { n++; if (c.at(x, y) == cls) m++ }
+            return if (n == 0) 0f else m / n.toFloat()
+        }
+        val groundClasses = listOf(FaceLabels.CLOTHES, FaceLabels.OTHER).filter { bottomShare(it) >= OTHER_GROUND }.toSet()
         // dos pies unidos por las piernas (rodillas o tobillos juntos): si la parte distal tiene dos trozos
         // separados por una franja vacía, se parte la mancha por ahí (cada pie con su pierna)
         val parts = ArrayList<Triple<Int, Int, Int>>() // grupo, x desde, x hasta
@@ -627,7 +637,7 @@ object ZoneCriteria {
                 if (toes.isNotEmpty() && (g.x0 + i) * k - toes.last().x < 0.025f) continue
                 toes += Pt((g.x0 + i) * k, y * k)
             }
-            // lo que hay justo después del borde distal (fuera del pie): fondo (dedos al aire) o ropa / calzado
+            // lo que hay justo después del borde distal (fuera del pie): fondo (dedos al aire) o ropa / calzado.
             var cov = 0; var seen = 0
             val reach = maxOf(2, (0.012f * c.height).toInt())
             for (i in bottom.indices) {
@@ -637,7 +647,7 @@ object ZoneCriteria {
                     val yy = y + d; if (yy >= c.height) break
                     if (inG(x, yy)) continue
                     val q = c.at(x, yy)
-                    seen++; if (q == FaceLabels.CLOTHES || q == FaceLabels.OTHER) cov++
+                    seen++; if ((q == FaceLabels.CLOTHES || q == FaceLabels.OTHER) && q !in groundClasses) cov++
                     break
                 }
             }
@@ -706,6 +716,8 @@ object ZoneCriteria {
     const val STRONG_NAIL_DE = 15f
     /** Separación horizontal mínima de los hombros (anchos de imagen) para fiarse de su lado ([facingCamera]). */
     const val FACING_DX = 0.05f
+    /** Fracción de la franja inferior del cuadro de «ropa» u «otros» a partir de la cual es el suelo, no calzado. */
+    const val OTHER_GROUND = 0.5f
     const val GLUTES_MIN_SKIN = 0.5f
     const val GLUTES_MAX_CLOTHES = 0.45f
     /** Ropa a la altura de las areolas (fracción de la franja) que indica sujetador o bikini puesto. */
@@ -900,7 +912,7 @@ object ZoneCriteria {
                 // la espalda descubierta se comprueba en la región de la guía
                 if (zone.guide == GuideType.BACK && !has(p, L.SHOULDER_L, L.SHOULDER_R, L.HIP_L, L.HIP_R)) {
                     // un primer plano de una mano también es piel en el centro: si la piel tiene dedos, no es la espalda
-                    if (handLike(s) || footLike(s)) return listOf(tr("Encuadre la espalda entera: hombros, cintura y los dos costados"))
+                    if (handLike(s) || footLike(s, narrow = true)) return listOf(tr("Encuadre la espalda entera: hombros, cintura y los dos costados"))
                     if (facingCamera(p, c) ?: (L.NOSE in p || (c != null && faceSkinAll(c) > 0.12f))) out += tr("De espaldas a la cámara")
                     // los dos costados libres en dos alturas al menos (un brazo colgando puede tocar el borde en alguna)
                     if (c != null && listOf(0.4f, 0.5f, 0.6f, 0.7f).count { sidesClear(c, it) } < 2) out += tr("Encuadre la espalda entera: hombros, cintura y los dos costados")
