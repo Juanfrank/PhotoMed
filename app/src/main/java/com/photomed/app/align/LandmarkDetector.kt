@@ -42,19 +42,36 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
         if (engine == FaceEngine.MEDIAPIPE && context != null) runCatching { MediaPipeFace(context.applicationContext) }
             .onFailure { initError = tr("MediaPipe no se pudo iniciar (%1\$s); se usa ML Kit", it.javaClass.simpleName) }.getOrNull()
         else null
-    private val face: FaceDetector = FaceDetection.getClient(
-        FaceDetectorOptions.Builder()
-            .setPerformanceMode(if (stream) FaceDetectorOptions.PERFORMANCE_MODE_FAST else FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
-            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-            .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
-            .setMinFaceSize(0.15f)
-            .build()
-    )
-    private val pose: PoseDetector = PoseDetection.getClient(
-        PoseDetectorOptions.Builder()
-            .setDetectorMode(if (stream) PoseDetectorOptions.STREAM_MODE else PoseDetectorOptions.SINGLE_IMAGE_MODE)
-            .build()
-    )
+    // Los detectores de ML Kit se crean solo si se usan: antes cada LandmarkDetector creaba el de la cara y el
+    // del cuerpo aunque el rostro fuera con MediaPipe, y cada análisis de una foto, alineación o línea del pelo
+    // los creaba y cerraba seguidos (ML Kit libera su memoria nativa en sus propios hilos: un cierre en código
+    // nativo en uno de ellos)
+    private val faceLazy = lazy {
+        FaceDetection.getClient(
+            FaceDetectorOptions.Builder()
+                .setPerformanceMode(if (stream) FaceDetectorOptions.PERFORMANCE_MODE_FAST else FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+                .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
+                .setMinFaceSize(0.15f)
+                .build())
+    }
+    private val face: FaceDetector by faceLazy
+    private val poseLazy = lazy {
+        PoseDetection.getClient(
+            PoseDetectorOptions.Builder()
+                .setDetectorMode(if (stream) PoseDetectorOptions.STREAM_MODE else PoseDetectorOptions.SINGLE_IMAGE_MODE)
+                .build())
+    }
+    private val pose: PoseDetector by poseLazy
+    /** Última tarea de ML Kit: si se agotó el tiempo sigue en curso en sus hilos, y no se cierra el detector debajo. */
+    @Volatile private var pending: com.google.android.gms.tasks.Task<*>? = null
+    @Volatile private var closed = false
+
+    private fun <T> awaitMlKit(t: com.google.android.gms.tasks.Task<T>): T {
+        check(!closed) { "detector cerrado" }
+        pending = t
+        return Tasks.await(t, ML_KIT_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
+    }
 
     fun detect(detector: Detector, bmp: Bitmap): Map<String, Pt> = detectFull(detector, bmp).points
 
@@ -112,7 +129,7 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
     val diagnostic: String? get() = lastError ?: initError ?: if (mediaPipeUnavailable) tr("MediaPipe desactivado por errores; se usa ML Kit") else null
 
     private fun detectFace(bmp: Bitmap): Detection {
-        val faces = Tasks.await(face.process(InputImage.fromBitmap(bmp, 0)), ML_KIT_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
+        val faces = awaitMlKit(face.process(InputImage.fromBitmap(bmp, 0)))
         val f = faces.maxByOrNull { it.boundingBox.width() * it.boundingBox.height() } ?: return Detection.EMPTY
         val w = bmp.width.toFloat()
         val out = mutableMapOf<String, Pt>()
@@ -137,7 +154,7 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
     }
 
     private fun detectPose(bmp: Bitmap): Map<String, Pt> {
-        val p = Tasks.await(pose.process(InputImage.fromBitmap(bmp, 0)), ML_KIT_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
+        val p = awaitMlKit(pose.process(InputImage.fromBitmap(bmp, 0)))
         val w = bmp.width.toFloat()
         // los tipos de PoseLandmark de ML Kit son los índices de BlazePose (los mismos de MediaPipe Pose)
         return poseKeys(POSE_KEYS.keys.mapNotNull { t -> p.getPoseLandmark(t)?.let { t to Triple(it.position.x / w, it.position.y / w, it.inFrameLikelihood) } }.toMap())
@@ -154,6 +171,9 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
             27 to Landmarks.ANKLE_L, 28 to Landmarks.ANKLE_R, 29 to Landmarks.HEEL_L, 30 to Landmarks.HEEL_R,
             31 to Landmarks.FOOT_INDEX_L, 32 to Landmarks.FOOT_INDEX_R,
         )
+
+        /** Espera máxima, al cerrar, a una tarea de ML Kit que agotó el tiempo. */
+        const val CLOSE_WAIT_S = 10L
 
         /** Probabilidad mínima de que el punto esté dentro del cuadro para usarlo. */
         const val POSE_MIN_IN_FRAME = 0.8f
@@ -174,7 +194,13 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
     }
 
     override fun close() {
-        face.close(); pose.close(); mediaPipe?.close()
+        if (closed) return
+        closed = true
+        // una tarea que agotó el tiempo sigue usando el detector: se espera a que termine antes de liberarlo
+        pending?.let { t -> if (!t.isComplete) runCatching { Tasks.await(t, CLOSE_WAIT_S, java.util.concurrent.TimeUnit.SECONDS) } }
+        if (faceLazy.isInitialized()) runCatching { face.close() }
+        if (poseLazy.isInitialized()) runCatching { pose.close() }
+        mediaPipe?.close()
     }
 }
 

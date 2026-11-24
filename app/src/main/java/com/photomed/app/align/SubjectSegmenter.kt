@@ -18,8 +18,12 @@ class SubjectSegmenter : Closeable {
         SelfieSegmenterOptions.Builder().setDetectorMode(SelfieSegmenterOptions.SINGLE_IMAGE_MODE).build()
     )
 
+    /** Última tarea: si agotó el tiempo sigue en los hilos de ML Kit y no se libera el cliente debajo. */
+    @Volatile private var pending: com.google.android.gms.tasks.Task<*>? = null
+
     fun segment(bmp: Bitmap): Mask? = try {
-        val r = Tasks.await(client.process(InputImage.fromBitmap(bmp, 0)), ML_KIT_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
+        val t = client.process(InputImage.fromBitmap(bmp, 0)); pending = t
+        val r = Tasks.await(t, ML_KIT_TIMEOUT_S, java.util.concurrent.TimeUnit.SECONDS)
         val buf = r.buffer.order(ByteOrder.nativeOrder())
         val w = r.width; val h = r.height
         val m = Mask(w, h)
@@ -29,7 +33,10 @@ class SubjectSegmenter : Closeable {
         null
     }
 
-    override fun close() = client.close()
+    override fun close() {
+        pending?.let { t -> if (!t.isComplete) runCatching { Tasks.await(t, LandmarkDetector.CLOSE_WAIT_S, java.util.concurrent.TimeUnit.SECONDS) } }
+        runCatching { client.close() }
+    }
 }
 
 /** Pixeles RGB de un bitmap (para la varita mágica). */
