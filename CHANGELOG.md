@@ -2,6 +2,27 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.50 — 24 de noviembre de 2026
+
+- **Precisión por toma medida frente a la verificación de la IA**: cada foto de referencia (de internet y de
+  conjuntos clínicos públicos: dermatología, alopecia de Norwood, manos 11k) se revisa a mano según la toma
+  pedida, y se mide para cada toma la exactitud equilibrada (fotos correctas aceptadas y fotos incorrectas o
+  de otras tomas rechazadas). Superan el 80 %: rostro frontal, oblicuos, perfiles, tercio superior,
+  periocular, ojos, labios, cuello, vértice del cuero cabelludo, abdomen frontal, tórax, espalda, muslos y
+  manos.
+- **Oblicuo del rostro**: se acepta con la punta nasal alineada con la mejilla (la definición clínica del
+  oblicuo de 45°) aunque la malla estime menos giro; antes casi ningún oblicuo real se aceptaba.
+- **Cabeceo (plano de Frankfort)** calibrado con retratos frontales (el cero del modelo 3D no estaba en el
+  plano de Frankfort) y tolerancias de giro e inclinación ajustadas al ruido de la medida.
+- **Nada tapa la cara**: «Quítese las gafas», «Descubra la frente (sin gorra, sombrero ni pañuelo)» y
+  «Retire la mano de la cara».
+- **Expresión neutra**: una sonrisa o la boca abierta impiden el disparo (también con «casi alineada»); las
+  cejas de reposo ya no se toman por cejas levantadas.
+- **Cuello y escote**: distancia de la toma (acérquese / aléjese), mentón al frente y escote descubierto por
+  debajo de los hombros (una camiseta ya no pasa).
+- **Espalda y tórax**: la espalda con un brazo tocando el borde vale; el tórax se puede tomar sin las
+  caderas en el cuadro.
+
 ## 2.49 — 24 de noviembre de 2026
 
 - **Corregido: cierre en código nativo** (tras el relieve y el análisis de una foto). Cada análisis de una
