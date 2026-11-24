@@ -37,7 +37,7 @@ class SchemaPhotosTest {
         val lf = File(root, "eval_labels.json")
         assumeTrue("sin fotos etiquetadas locales", lf.exists())
         val labels = JSONObject(lf.readText())
-        val tiles = ArrayList<Bitmap>()
+        val tiles = ArrayList<Bitmap>(); val diagrams = ArrayList<Bitmap>()
         val cache = HashMap<String, JSONObject>()
         val only = System.getProperty("schemaOnly")?.split(",")
         for (key in labels.keys().asSequence().sorted()) {
@@ -82,6 +82,19 @@ class SchemaPhotosTest {
                 s.dots.forEach { cv.drawCircle(it.x * k, it.y * k, 3.5f, pd) }
             }
             pts.values.forEach { cv.drawCircle(it.x * k, it.y * k, 2.5f, pp) }
+            // diagrama del cuerpo (como en el visor), con el color de cada capa
+            val dg = Bitmap.createScaledBitmap(img, 300, (300f * h / w).toInt(), true).copy(Bitmap.Config.ARGB_8888, true)
+            val dc = Canvas(dg)
+            com.photomed.app.align.BodyDiagram.lines(z, scene).forEach { l ->
+                val col = when (l.layer) {
+                    com.photomed.app.align.AnnotLayer.CONTOUR -> Color.CYAN; com.photomed.app.align.AnnotLayer.BODY_AXES -> Color.WHITE
+                    com.photomed.app.align.AnnotLayer.FINGERS -> Color.rgb(128, 222, 234); com.photomed.app.align.AnnotLayer.NAILS -> Color.YELLOW
+                    else -> Color.MAGENTA }
+                val pa = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = col; strokeWidth = 2f; style = if (l.filled) Paint.Style.FILL else Paint.Style.STROKE }
+                if (l.filled) { val c0 = Pt(l.points.map { it.x }.average().toFloat(), l.points.map { it.y }.average().toFloat()); dc.drawCircle(c0.x * k, c0.y * k, 2.6f, pa) }
+                else (if (l.closed) l.points + l.points.take(1) else l.points).zipWithNext { a, b -> dc.drawLine(a.x * k, a.y * k, b.x * k, b.y * k, pa) }
+            }
+            diagrams += dg
             Canvas(out).drawText("${z.id} ${name.take(8)} pts ${pts.size}", 4f, 14f, Paint().apply { color = Color.RED; textSize = 13f; isFakeBoldText = true })
             tiles += out
         }
@@ -89,6 +102,9 @@ class SchemaPhotosTest {
         val sheet = Bitmap.createBitmap(300 * cols, th * ((tiles.size + cols - 1) / cols).coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         Canvas(sheet).apply { drawColor(Color.WHITE); tiles.forEachIndexed { i, t -> drawBitmap(t, (i % cols) * 300f, (i / cols) * th.toFloat(), null) } }
         File("build/reports/zone_criteria").apply { mkdirs() }.resolve("esquemas_fotos_reales.png").outputStream().use { sheet.compress(Bitmap.CompressFormat.PNG, 90, it) }
+        val dsheet = Bitmap.createBitmap(300 * cols, th * ((diagrams.size + cols - 1) / cols).coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        Canvas(dsheet).apply { drawColor(Color.WHITE); diagrams.forEachIndexed { i, t -> drawBitmap(t, (i % cols) * 300f, (i / cols) * th.toFloat(), null) } }
+        File("build/reports/zone_criteria").resolve("diagramas_cuerpo_fotos_reales.png").outputStream().use { dsheet.compress(Bitmap.CompressFormat.PNG, 90, it) }
         println("ESQUEMAS: ${tiles.size}")
     }
 }

@@ -61,6 +61,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.pointerInput
 
 private const val PREF_LAYERS = "annot_layers"
+private const val PREF_BODY_INIT = "annot_layers_body_init"
 private const val PREF_ALPHA = "annot_alpha"
 
 /** Opacidad de los trazos y números sobre las fotos (se recuerda; por defecto 50 %). */
@@ -100,7 +101,13 @@ fun rememberAnnotLayers(): MutableState<Set<AnnotLayer>> {
     return remember {
         object : MutableState<Set<AnnotLayer>> {
             private val s = mutableStateOf(prefs.getString(PREF_LAYERS, "").orEmpty().split(',')
-                .mapNotNull { n -> AnnotLayer.entries.firstOrNull { it.name == n } }.toSet())
+                .mapNotNull { n -> AnnotLayer.entries.firstOrNull { it.name == n } }.toSet().let { v ->
+                    // capas del diagrama del cuerpo (2.49): encendidas la primera vez
+                    if (prefs.getBoolean(PREF_BODY_INIT, false)) v
+                    else (v + com.photomed.app.align.BodyDiagram.LAYERS).also {
+                        prefs.edit().putBoolean(PREF_BODY_INIT, true).putString(PREF_LAYERS, it.joinToString(",") { l -> l.name }).apply()
+                    }
+                })
             override var value: Set<AnnotLayer>
                 get() = s.value
                 set(v) { s.value = v; prefs.edit().putString(PREF_LAYERS, v.joinToString(",") { it.name }).apply() }
@@ -113,7 +120,7 @@ fun rememberAnnotLayers(): MutableState<Set<AnnotLayer>> {
 /** Capas del contorno externo (silueta de la cara y línea del pelo). */
 val OUTER_LAYERS = listOf(AnnotLayer.CONTOUR, AnnotLayer.HAIRLINE, AnnotLayer.JAWLINE, AnnotLayer.PAPADA)
 /** Capas del contorno interno: rasgos (ojos y cejas, nariz, labios), arrugas, surcos y ojeras. */
-val INNER_LAYERS = AnnotLayer.entries - OUTER_LAYERS.toSet()
+val INNER_LAYERS = AnnotLayer.entries - OUTER_LAYERS.toSet() - com.photomed.app.align.BodyDiagram.LAYERS.toSet()
 
 /**
  * Selector de capas: «Medidas», «Trazar surco» y dos desplegables con casillas, **Contorno externo** y
@@ -128,15 +135,20 @@ fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, mod
                /** Si se da, chip «Vista» con las cuatro capas (imagen, diagrama, anotaciones, overlay). */
                viewLayers: MutableState<ViewLayers>? = null,
                /** Opacidad de trazos y números: un chip con el % que abre el control (antes era una fila fija). */
-               opacity: Float? = null, onOpacity: ((Float) -> Unit)? = null, light: Boolean = false) {
+               opacity: Float? = null, onOpacity: ((Float) -> Unit)? = null, light: Boolean = false,
+               /** Fotos de manos, pies, tronco o miembros: un solo desplegable, «Diagrama del cuerpo». */
+               body: Boolean = false) {
     Row(modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically) {
         if (onMetrics != null) androidx.compose.material3.AssistChip(onClick = onMetrics, label = { Text(tr("Medidas")) },
             leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.TableChart, null, Modifier.size(18.dp)) })
         if (onTrace != null) FilterChip(selected = tracing, onClick = onTrace, label = { Text(if (tracing) tr("Dibuje el surco…") else tr("Trazar surco")) },
             leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.Gesture, null, Modifier.size(18.dp)) })
-        LayerMenu(tr("Contorno externo"), OUTER_LAYERS, layers, onChange)
-        LayerMenu(tr("Contorno interno"), INNER_LAYERS, layers, onChange)
+        if (body) LayerMenu(tr("Diagrama del cuerpo"), com.photomed.app.align.BodyDiagram.LAYERS, layers, onChange)
+        else {
+            LayerMenu(tr("Contorno externo"), OUTER_LAYERS, layers, onChange)
+            LayerMenu(tr("Contorno interno"), INNER_LAYERS, layers, onChange)
+        }
         if (opacity != null && onOpacity != null) androidx.compose.foundation.layout.Box {
             var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
             val pct = (opacity * 100).toInt()

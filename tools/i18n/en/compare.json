@@ -269,5 +269,12 @@
   "Surcos confirmados en las %1$d fotos": "Folds confirmed in all %1$d photos",
   "Surcos detectados sin confirmar": "Detected folds not confirmed",
   "Surcos confirmados: se guardan en cada foto": "Folds confirmed: saved in each photo",
-  "Confirmar surcos": "Confirm folds"
+  "Confirmar surcos": "Confirm folds",
+  "Diagrama del cuerpo": "Body diagram",
+  "Analizando el contorno y los puntos…": "Analyzing the outline and points…",
+  "Ejes y articulaciones": "Axes and joints",
+  "Dedos": "Fingers and toes",
+  "Uñas": "Nails",
+  "Puntos de referencia": "Reference points",
+  "Diagrama del cuerpo: contorno, ejes, dedos, uñas y puntos de referencia. Las medidas de arrugas y surcos son solo para zonas del rostro.": "Body diagram: outline, axes, fingers, nails and reference points. Wrinkle and fold measurements are for facial zones only."
 }

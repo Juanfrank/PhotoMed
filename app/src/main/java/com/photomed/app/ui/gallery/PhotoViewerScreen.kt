@@ -123,6 +123,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     // capas (contorno, rasgos, surcos, arrugas) solo en las zonas del rostro: en manos, pies o cuerpo no
     // hay nada facial que analizar
     val showLayers = zone.isFaceZone()
+    // manos, pies, tronco y miembros: su diagrama (contorno, ejes, dedos, uñas, puntos de referencia), sin medidas
+    val bodyDiagram = !zone.isFaceZone() && zone != com.photomed.app.data.Zone.FREE
     var editing by remember { mutableStateOf(false) }
     var cropping by remember { mutableStateOf(false) }
     var editVersion by remember { mutableIntStateOf(0) }
@@ -460,12 +462,15 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 onTrace = { traceTarget = null; tracing = !tracing
                     if (tracing) scope.launch { snackbar.showSnackbar(tr("Dibuje sobre el surco: una línea por donde se ve, o rodee el área")) } },
                 tracing = tracing, viewLayers = viewLayers, opacity = annotAlpha.value, onOpacity = { annotAlpha.value = it })
+            else if (bodyDiagram && !fullscreen) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
+                Modifier.fillMaxWidth().padding(vertical = 4.dp), viewLayers = viewLayers, opacity = annotAlpha.value,
+                onOpacity = { annotAlpha.value = it }, body = true)
             // análisis en curso: barra de proceso visible
-            val analyzing = showLayers && annotsByUri[current.uri.toString()] == null || traceBusy
+            val analyzing = (showLayers || bodyDiagram) && annotsByUri[current.uri.toString()] == null || traceBusy
             if (analyzing) androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f).semantics { contentDescription = tr("Analizando arrugas y rasgos") })
-                Text(if (traceBusy) tr("Trazando y midiendo el surco…") else tr("Analizando arrugas y rasgos…"), color = Color.White, style = MaterialTheme.typography.labelMedium,
+                Text(if (traceBusy) tr("Trazando y midiendo el surco…") else if (bodyDiagram) tr("Analizando el contorno y los puntos…") else tr("Analizando arrugas y rasgos…"), color = Color.White, style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(start = 10.dp))
             }
             }
@@ -495,7 +500,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize().background(Color.Black), key = { list[it].key },
                 userScrollEnabled = !cropping && !tracing && !inking) { page ->
                 val ph = list[page]
-                PhotoPage(ph, zone, if (showLayers && viewLayers.value.diagram) layersState.value else emptySet(), editVersion, Modifier.fillMaxSize(),
+                PhotoPage(ph, zone, if ((showLayers || bodyDiagram) && viewLayers.value.diagram) layersState.value else emptySet(), editVersion, Modifier.fillMaxSize(),
                     showImage = viewLayers.value.image, showInk = viewLayers.value.notes, inkVersion = inkVersion,
                     ink = if (inking && page == pager.currentPage) inkStyle else null,
                     onInk = { path, aE -> inkPath(ph, path, aE) },
@@ -503,7 +508,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     poly = if (polyMode && page == pager.currentPage) polyDraft else null,
                     onPoly = { pts, aE -> polyDraft = pts; polyAspect = aE },
                     onInkVertex = { idx, vi, to -> inkVertex(ph, idx, vi, to) },
-                    selected = selected, selectedKey = selectedKey, analyze = showLayers, alpha = annotAlpha.value,
+                    selected = selected, selectedKey = selectedKey, analyze = showLayers || bodyDiagram, alpha = annotAlpha.value,
                     focusTick = if (page == pager.currentPage) focusTick else 0,
                     // referencia: fotos anteriores de la misma zona (la más reciente primero)
                     // (solo con la misma expresión: las arrugas dinámicas aparecen con el gesto)

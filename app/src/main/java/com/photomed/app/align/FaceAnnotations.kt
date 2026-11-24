@@ -13,7 +13,9 @@ enum class AnnotLayer(private val es: String) {
     CONTOUR(trn("Contorno")), HAIRLINE(trn("Línea del pelo")), EYES(trn("Ojos y cejas")), NOSE(trn("Nariz")), LIPS(trn("Labios")), FOLDS(trn("Surcos")),
     FOREHEAD(trn("Frente")), GLABELLA(trn("Ceño")), CROWS_FEET(trn("Patas de gallo")), DARK_CIRCLES(trn("Ojeras")), EYE_BAGS(trn("Bolsas palpebrales")),
     JAWLINE(trn("Línea mandibular")), PAPADA(trn("Papada")),
-    INFRAORBITAL(trn("Líneas infraorbitarias")), PERIORAL(trn("Líneas periorales"));
+    INFRAORBITAL(trn("Líneas infraorbitarias")), PERIORAL(trn("Líneas periorales")),
+    // diagrama del cuerpo (manos, pies, tronco y miembros: ver BodyDiagram)
+    BODY_AXES(trn("Ejes y articulaciones")), FINGERS(trn("Dedos")), NAILS(trn("Uñas")), BODY_POINTS(trn("Puntos de referencia"));
 
     val label: String get() = tr(es)
 }
@@ -990,8 +992,32 @@ class PhotoAnnotator(private val context: Context) {
 
     /** Zonas corporales: contorno con el segmentador nativo (dentro de la puerta). */
     private suspend fun analyzeGated(bmp: Bitmap, zone: Zone): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        // diagrama del cuerpo con los mismos detectores que la cámara: puntos del cuerpo, manos y segmentación
+        val diagram = runCatching { bodyDiagram(bmp, zone) }.getOrNull().orEmpty()
+        if (diagram.isNotEmpty()) return@withContext diagram to tr("Diagrama del cuerpo: contorno, ejes, dedos, uñas y puntos de referencia. " +
+            "Las medidas de arrugas y surcos son solo para zonas del rostro.")
         val mask = BodyRegion.of(zone, bmp) { b -> SubjectSegmenter().use { it.segment(b) } }
         (mask?.let { FaceAnnotations.body(it) } ?: emptyList()) to tr("Las medidas de arrugas y surcos son solo para zonas del rostro.")
+    }
+
+    /** Diagrama del cuerpo de la foto ([BodyDiagram]); vacío si no se ve la zona. */
+    private fun bodyDiagram(bmp: Bitmap, zone: Zone): List<AnnotLine> {
+        if (zone == Zone.FREE) return emptyList()
+        val spec = ZoneAlignment.of(zone)
+        // segmentación a baja resolución (como en la cámara: los criterios y el contorno están hechos para ella)
+        val w = 192; val h = (w * bmp.height / bmp.width.toFloat()).roundToInt().coerceAtLeast(1)
+        val small = Bitmap.createScaledBitmap(bmp, w, h, true)
+        val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(small) }
+        val classes = labels?.let { lb ->
+            val src = if (lb.width == w && lb.height == h) small else Bitmap.createScaledBitmap(bmp, lb.width, lb.height, true)
+            ZoneCriteria.Classes(lb.width, lb.height, lb.data, IntArray(lb.width * lb.height).also { src.getPixels(it, 0, lb.width, 0, 0, lb.width, lb.height) })
+        }
+        val pose = if (spec.detector == Detector.POSE && zone.guide != com.photomed.app.data.GuideType.HANDS && zone.guide != com.photomed.app.data.GuideType.FEET)
+            LandmarkDetector(stream = false, context, FaceEngine.ML_KIT).use { it.detect(Detector.POSE, bmp) } else emptyMap()
+        val hands = if (zone.guide == com.photomed.app.data.GuideType.HANDS) HandDetector.createOrNull(context)?.use { it.detect(bmp) } else null
+        // una sola mano en la foto (toma de una mano): se dibuja esa
+        val single = hands?.size == 1
+        return BodyDiagram.lines(zone, ZoneCriteria.Scene(pose, hands?.ifEmpty { null }, classes, bmp.height / bmp.width.toFloat(), single = single))
     }
 
     /**

@@ -490,6 +490,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         },
     ) { padding ->
         val (photos, zonesWithPhotos, visible, seq, seqKeys, n, timeline, reference, target, validAlign) = derive()
+        // diagrama del cuerpo (contorno, ejes, dedos, uñas, puntos de referencia): fotos de manos, pies, tronco o miembros
+        val bodyDiagram = showLayers && seq.orEmpty().isNotEmpty() && seq.orEmpty().none { it.zone.isFaceZone() || it.zone == com.photomed.app.data.Zone.FREE }
         // capas faciales (contorno, rasgos, surcos, arrugas): solo con fotos del rostro
         @Suppress("NAME_SHADOWING") val showLayers = showLayers && seq.orEmpty().any { it.zone.isFaceZone() }
         // referencia de arrugas: fotos anteriores del paciente en la misma zona (la más reciente primero)
@@ -501,10 +503,14 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             p.key to key(p.key) { rememberCorrected(p.uri, resultOf(p)?.keystoneDeg ?: 0f, Perspective.DEFAULT_FOCAL, shownColors[p.key]) }
         }.orEmpty()
         // anotaciones (contorno, línea del pelo, rasgos, surcos) de cada foto, en su foto corregida
-        val layers = if (showLayers) layersState.value else emptySet()
+        val layers = if (showLayers || bodyDiagram) layersState.value else emptySet()
         val annots: Map<String, List<com.photomed.app.align.AnnotLine>> = seq?.mapNotNull { p ->
-            // fuera del rostro no hay nada facial que analizar (sin anotaciones, sin esperar)
-            if (!p.zone.isFaceZone()) return@mapNotNull p.key to emptyList<com.photomed.app.align.AnnotLine>()
+            // fuera del rostro: el diagrama del cuerpo (si todas son del cuerpo); si no, nada que esperar
+            if (!p.zone.isFaceZone()) {
+                if (!bodyDiagram) return@mapNotNull p.key to emptyList<com.photomed.app.align.AnnotLine>()
+                return@mapNotNull key("b" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, true,
+                    previous = emptyList(), userVersion = userVersion).value }?.let { p.key to it }
+            }
             // con el panel de capas abierto se analizan las fotos aunque no haya capas encendidas (la tabla de medidas lo necesita)
             key("a" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, showLayers && p.zone.isFaceZone(),
                 previous = previousOf(p), userVersion = userVersion).value }?.let { p.key to it }
@@ -545,6 +551,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
 
             if (showLayers) LayerChips(layersState.value, { layersState.value = it }, Modifier.fillMaxWidth().padding(top = 4.dp),
                 onMetrics = { metricsSheet = !metricsSheet }, opacity = annotAlpha.value, onOpacity = { annotAlpha.value = it })
+            else if (bodyDiagram) LayerChips(layersState.value, { layersState.value = it }, Modifier.fillMaxWidth().padding(top = 4.dp),
+                opacity = annotAlpha.value, onOpacity = { annotAlpha.value = it }, body = true)
             // expresiones distintas en la comparación: las arrugas dinámicas no son comparables
             seq?.map { it.expression }?.distinct()?.takeIf { it.size > 1 }?.let { ex ->
                 Text(tr("Atención: compara expresiones distintas (%1\$s); las arrugas dinámicas solo se comparan con la misma expresión.", ex.joinToString(" / ") { it.label }),

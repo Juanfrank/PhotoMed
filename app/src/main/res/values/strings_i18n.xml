@@ -51,6 +51,7 @@
     <string name="t_0b4d1ab9ce63" formatted="false">Luz pareja entre mejillas: solo en la vista frontal (en oblicuas y perfiles cada mejilla recibe luz distinta)</string>
     <string name="t_0b5d027dbc0b" formatted="false">Tercio inferior (subnasal → mentón), mm</string>
     <string name="t_0b6f6f4c9a07" formatted="false">Encuadre la espalda entera: hombros, cintura y los dos costados</string>
+    <string name="t_0b78dd066da8" formatted="false">Uñas</string>
     <string name="t_0b8237d43c3b" formatted="false">Medición de relieve (pantalla)</string>
     <string name="t_0b82e54a9daa" formatted="false">Último: %1$s</string>
     <string name="t_0b90e21b7a10" formatted="false">Referencia: %1$s</string>
@@ -335,6 +336,7 @@
     <string name="t_4422310a6126" formatted="false">Instrucción: %1$s</string>
     <string name="t_44509d401a83" formatted="false">ojos y cejas</string>
     <string name="t_44aed0109780" formatted="false">Mano</string>
+    <string name="t_44dbc756c463" formatted="false">Puntos de referencia</string>
     <string name="t_45583668a731" formatted="false">Expresión: juntar los labios</string>
     <string name="t_45965b380fd4" formatted="false">luz ≥ %1$d %%</string>
     <string name="t_45cef7c7f58c" formatted="false">Automática por proporciones de contornos</string>
@@ -395,6 +397,7 @@
     <string name="t_5464ada4f9fd" formatted="false">Más opciones de la cámara</string>
     <string name="t_54fe8c6364b5" formatted="false">Sin fotografías de esta zona</string>
     <string name="t_5553abd9e73a" formatted="false">Foto %1$d a importar</string>
+    <string name="t_5579247382df" formatted="false">Analizando el contorno y los puntos…</string>
     <string name="t_55d86c63e7ce" formatted="false">Ancho</string>
     <string name="t_55f4f3c1ddc6" formatted="false">Elegir el color %1$s</string>
     <string name="t_55f7a4b0e3df" formatted="false">Cámara por encima del lado izquierdo (≈ 45° hacia abajo); oreja izquierda abajo en la marca, raya arriba siguiendo la curva, frente hacia la izquierda del encuadre.</string>
@@ -507,6 +510,7 @@
     <string name="t_6b04d1843add" formatted="false">Mirada: misma dirección</string>
     <string name="t_6b126b27526c" formatted="false">pulgar</string>
     <string name="t_6c107d8b7f81" formatted="false">Foto %1$d, %2$s</string>
+    <string name="t_6c3e1993c082" formatted="false">Diagrama del cuerpo</string>
     <string name="t_6cbb8ffb6931" formatted="false">Las fotografías se guardan en la galería del teléfono, en el álbum del paciente, e incluyen estos datos como metadatos. Use “Compartir sin datos del paciente” para enviarlas anonimizadas.</string>
     <string name="t_6cbca9120f3c" formatted="false">Indicaciones sobre gestos: pulsación larga, arrastrar, pellizcar…</string>
     <string name="t_6cfddcad5beb" formatted="false">Importar %1$d foto</string>
@@ -764,6 +768,7 @@
     <string name="t_a2eeab6cf8ab" formatted="false">Coincide · capturando</string>
     <string name="t_a3980dd32780" formatted="false">El nombre es obligatorio</string>
     <string name="t_a3b4b3ced269" formatted="false">Ráfaga de 3 fotos</string>
+    <string name="t_a3e3d3201a4d" formatted="false">Ejes y articulaciones</string>
     <string name="t_a43db90c06c5" formatted="false">" · diferencia entre mejillas %1$.0f %%"</string>
     <string name="t_a45937fa4d7e" formatted="false">Importando…</string>
     <string name="t_a466f216882d" formatted="false">" · guardado en la app (no se pudo escribir en la foto)"</string>
@@ -855,6 +860,7 @@
     <string name="t_b71baac9047e" formatted="false">Ojera</string>
     <string name="t_b71e90a74292" formatted="false">negro</string>
     <string name="t_b74c8e681eb3" formatted="false">Puntos anatómicos</string>
+    <string name="t_b7804851a759" formatted="false">Diagrama del cuerpo: contorno, ejes, dedos, uñas y puntos de referencia. Las medidas de arrugas y surcos son solo para zonas del rostro.</string>
     <string name="t_b7cbea7ff8fe" formatted="false">Restablecer la vista (giro, espejo y recorte manual)</string>
     <string name="t_b7d9598781c5" formatted="false">abdomen</string>
     <string name="t_b816ce5275eb" formatted="false">Los pies dentro del cuadro</string>
@@ -1121,6 +1127,7 @@
     <string name="t_ebaa417f7c98" formatted="false">Seleccione dos o más fotografías abajo para compararlas.</string>
     <string name="t_ebb890c46560" formatted="false">Pies (dorso)</string>
     <string name="t_ebc90f3d6188" formatted="false">Fotos de referencia: %1$s</string>
+    <string name="t_ebdc3787067c" formatted="false">Dedos</string>
     <string name="t_ec2a2156670c" formatted="false">Sin fotos en 6 meses</string>
     <string name="t_ec616f599f8c" formatted="false">No se pudo leer la imagen</string>
     <string name="t_ecffc6c021fa" formatted="false">Esperando el análisis de arrugas…</string>

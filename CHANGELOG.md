@@ -2,6 +2,25 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.49 — 24 de noviembre de 2026
+
+- **Corregido: cierre en código nativo** (tras el relieve y el análisis de una foto). Cada análisis de una
+  foto, alineación o medida de la línea del pelo creaba y cerraba a la vez los detectores de cara y de
+  cuerpo de ML Kit aunque no se usaran, y si una detección tardaba más de la cuenta el detector se cerraba
+  mientras ML Kit seguía trabajando en sus hilos. Ahora solo se crean si se usan y no se cierran con una
+  tarea en curso.
+- **Contorno real en las zonas del cuerpo**: la silueta de la persona (borde de la piel o de la ropa)
+  recortada a la zona, con el eje de cada miembro y sus articulaciones. Antes era un trapecio entre hombros
+  y caderas con bloques en los miembros, y de espaldas sin puntos no se dibujaba nada. El contorno del pie
+  se corta a la altura del pie (no sube por la pierna).
+- **Más puntos de referencia**: en las manos, el fondo de cada espacio entre dedos y los bordes de la
+  muñeca; en los pies, la punta de cada dedo (con los cinco distinguidos); el tronco (abdomen, tórax,
+  espalda) a seis alturas; en el ojo, cuatro regiones más (iris y pupila, párpado inferior y ojera, canto
+  interno y pliegue del párpado superior).
+- **Diagrama del cuerpo en el visor y en Comparar** (antes solo la cara tenía diagrama): capas de
+  contorno, ejes y articulaciones, dedos (esqueleto de cada dedo y la palma, o la separación entre los
+  dedos del pie), uñas y puntos de referencia, en el desplegable «Diagrama del cuerpo».
+
 ## 2.48 — 24 de noviembre de 2026
 
 - **Captura más rápida**:

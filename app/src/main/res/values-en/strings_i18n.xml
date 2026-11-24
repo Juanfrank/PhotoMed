@@ -51,6 +51,7 @@
     <string name="t_0b4d1ab9ce63" formatted="false">Even lighting across cheeks: frontal view only (in oblique and profile views each cheek gets different light)</string>
     <string name="t_0b5d027dbc0b" formatted="false">Lower third (subnasale → chin), mm</string>
     <string name="t_0b6f6f4c9a07" formatted="false">Frame the whole back: shoulders, waist and both sides</string>
+    <string name="t_0b78dd066da8" formatted="false">Nails</string>
     <string name="t_0b8237d43c3b" formatted="false">Relief measurement (screen)</string>
     <string name="t_0b82e54a9daa" formatted="false">Latest: %1$s</string>
     <string name="t_0b90e21b7a10" formatted="false">Reference: %1$s</string>
@@ -335,6 +336,7 @@
     <string name="t_4422310a6126" formatted="false">Instruction: %1$s</string>
     <string name="t_44509d401a83" formatted="false">eyes and brows</string>
     <string name="t_44aed0109780" formatted="false">Hand</string>
+    <string name="t_44dbc756c463" formatted="false">Reference points</string>
     <string name="t_45583668a731" formatted="false">Expression: close the lips</string>
     <string name="t_45965b380fd4" formatted="false">light ≥ %1$d %%</string>
     <string name="t_45cef7c7f58c" formatted="false">Automatic from contour proportions</string>
@@ -395,6 +397,7 @@
     <string name="t_5464ada4f9fd" formatted="false">More camera options</string>
     <string name="t_54fe8c6364b5" formatted="false">No photos of this area</string>
     <string name="t_5553abd9e73a" formatted="false">Photo %1$d to import</string>
+    <string name="t_5579247382df" formatted="false">Analyzing the outline and points…</string>
     <string name="t_55d86c63e7ce" formatted="false">Width</string>
     <string name="t_55f4f3c1ddc6" formatted="false">Choose the color %1$s</string>
     <string name="t_55f7a4b0e3df" formatted="false">Camera above the left side (≈ 45° downward); left ear at the bottom on the mark, parting at the top following the curve, forehead toward the left of the frame.</string>
@@ -507,6 +510,7 @@
     <string name="t_6b04d1843add" formatted="false">Gaze: same direction</string>
     <string name="t_6b126b27526c" formatted="false">thumb</string>
     <string name="t_6c107d8b7f81" formatted="false">Photo %1$d, %2$s</string>
+    <string name="t_6c3e1993c082" formatted="false">Body diagram</string>
     <string name="t_6cbb8ffb6931" formatted="false">Photos are saved in the phone\'s gallery, in the patient\'s album, and include this data as metadata. Use “Share without patient data” to send them anonymized.</string>
     <string name="t_6cbca9120f3c" formatted="false">Gesture tips: long press, drag, pinch…</string>
     <string name="t_6cfddcad5beb" formatted="false">Import %1$d photo</string>
@@ -764,6 +768,7 @@
     <string name="t_a2eeab6cf8ab" formatted="false">Match · capturing</string>
     <string name="t_a3980dd32780" formatted="false">The name is required</string>
     <string name="t_a3b4b3ced269" formatted="false">Burst of 3 photos</string>
+    <string name="t_a3e3d3201a4d" formatted="false">Axes and joints</string>
     <string name="t_a43db90c06c5" formatted="false">" · difference between cheeks %1$.0f %%"</string>
     <string name="t_a45937fa4d7e" formatted="false">Importing…</string>
     <string name="t_a466f216882d" formatted="false">" · saved in the app (could not write to the photo)"</string>
@@ -855,6 +860,7 @@
     <string name="t_b71baac9047e" formatted="false">Dark circle</string>
     <string name="t_b71e90a74292" formatted="false">black</string>
     <string name="t_b74c8e681eb3" formatted="false">Anatomical landmarks</string>
+    <string name="t_b7804851a759" formatted="false">Body diagram: outline, axes, fingers, nails and reference points. Wrinkle and fold measurements are for facial zones only.</string>
     <string name="t_b7cbea7ff8fe" formatted="false">Reset view (rotation, mirror and manual crop)</string>
     <string name="t_b7d9598781c5" formatted="false">abdomen</string>
     <string name="t_b816ce5275eb" formatted="false">Feet inside the frame</string>
@@ -1121,6 +1127,7 @@
     <string name="t_ebaa417f7c98" formatted="false">Select two or more photos below to compare them.</string>
     <string name="t_ebb890c46560" formatted="false">Feet (dorsal)</string>
     <string name="t_ebc90f3d6188" formatted="false">Reference photos: %1$s</string>
+    <string name="t_ebdc3787067c" formatted="false">Fingers and toes</string>
     <string name="t_ec2a2156670c" formatted="false">No photos in 6 months</string>
     <string name="t_ec616f599f8c" formatted="false">Could not read the image</string>
     <string name="t_ecffc6c021fa" formatted="false">Waiting for wrinkle analysis…</string>
