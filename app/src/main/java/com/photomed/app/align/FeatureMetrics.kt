@@ -67,7 +67,7 @@ object FeatureMetrics {
         fun dist(label: String, short: String, a: Pt, b: Pt) { val v = d(a, b) * mm; f += label to v; g += MeasureGuide(mmText(short, v), a, b, rowKey(label)) }
         fun value(label: String, v: Float) { f += label to v }
         fun guide(short: String, v: Float, a: Pt, b: Pt, label: String = "") { g += MeasureGuide(mmText(short, v), a, b, rowKey(label)) }
-        fun build(name: String, scale: String) = Measured(LineMetrics(name, scale = scale, features = f.toList()), g.toList())
+        fun build(name: String, scale: String, type: String? = null) = Measured(LineMetrics(name, scale = scale, features = f.toList(), type = type), g.toList())
     }
 
     fun upperLipM(mesh: List<Pt>, mm: Float, scale: String) = B(mm).run {
@@ -254,7 +254,10 @@ object FeatureMetrics {
         if (center != null && tr != null) b.value(trn("Entrada temporal derecha, mm"), tr - center)
         if (center != null && tl != null) b.value(trn("Entrada temporal izquierda, mm"), tl - center)
         center?.let { b.value(trn("Frente central / interpupilar"), it / (a.ipd * mm)) }
-        return if (b.f.isEmpty()) null else b.build(trn("Línea del pelo"), scale)
+        // tipo básico BASP (forma de la línea frontal) y Norwood aproximado, con las dos entradas medidas
+        val basp = if (center != null && tr != null && tl != null) HairDensity.baspBasic(center, (tr + tl) / 2) else null
+        return if (b.f.isEmpty()) null else b.build(trn("Línea del pelo"), scale,
+            basp?.let { "BASP $it · Norwood ≈ ${HairDensity.norwoodOfBasic(it)}" })
     }
 
     // compatibilidad: solo las medidas

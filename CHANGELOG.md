@@ -2,6 +2,24 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.55 — 24 de noviembre de 2026
+
+- **Densidad capilar aparente** en las tomas capilares (vértice, coronilla, parietales y frontal con la cabeza
+  inclinada), en el visor:
+  - **Cuero cabelludo visible** entre el pelo, en toda la zona, en el centro y en la periferia: cada píxel de
+    la cabeza combina la segmentación (pelo o piel) con su color entre el del pelo y el de la piel del propio
+    paciente, como HairComb (JAMA Dermatology 2023) y la automatización de la escala SALT. Validado con las
+    máscaras anotadas de 10 fotos cenitales de hombres y mujeres con alopecia: correlación 0,93 con la
+    cobertura anotada, error medio ≈ 10 puntos.
+  - **Raya**: cuero visible en la franja central frente a los lados (lo que valoran Sinclair y Olsen). El
+    ancho de la raya en mm no se da: con pelo claro o brillos salía varias veces el real.
+  - **Grados orientativos**: BASP específico V (vértice) y F (frontal), Hamilton‑Norwood de la coronilla,
+    Ludwig y Sinclair; y en la línea del pelo del rostro frontal y de la toma inclinada, el **tipo básico
+    BASP** (L, M1–3, C1–3, por el retroceso de las entradas frente al centro) con su Norwood aproximado.
+  - Capas «Cuero cabelludo visible» (contorno y zonas donde se ve más cuero que pelo) y «Raya», y la ficha
+    de medidas. No son pelos por cm² (eso es tricoscopia) ni un diagnóstico: sirven para seguir al mismo
+    paciente con tomas iguales (luz, peinado, cabello seco).
+
 ## 2.54 — 24 de noviembre de 2026
 
 - **Toma capilar «Frontal (cabeza inclinada)» con la malla facial completa**:

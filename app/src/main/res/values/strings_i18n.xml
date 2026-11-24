@@ -23,6 +23,7 @@
     <string name="t_04ba8712add8" formatted="false">Se reproduce de ida y vuelta: al repetirse en bucle no se nota el salto.</string>
     <string name="t_04e82e5facef" formatted="false">Más líneas: surcos accesorios, más frente y bajo los ojos (más hallazgos, algunos falsos).</string>
     <string name="t_0518bede37b6" formatted="false">Saltar</string>
+    <string name="t_0520f79d9c05" formatted="false">Periferia, %</string>
     <string name="t_0590fd75b2c4" formatted="false">ceja</string>
     <string name="t_068adb33e7f6" formatted="false">Contraste ΔL*</string>
     <string name="t_06ed6be6fc9c" formatted="false">Rostro frontal</string>
@@ -37,6 +38,7 @@
     <string name="t_093c3057cec8" formatted="false">contorno del cráneo, remolino, nuca y patrón del cabello</string>
     <string name="t_09429b8c043a" formatted="false">Toque la misma zona de piel en cada foto (p. ej. el centro de la mejilla).</string>
     <string name="t_095408637b0d" formatted="false">Girar 90°</string>
+    <string name="t_095aaf79edc2" formatted="false">No se encontró la cabeza en la foto (pelo y piel de la segmentación).</string>
     <string name="t_09b1747ecb81" formatted="false">No se encontraron arrugas ni surcos medibles.</string>
     <string name="t_09cbeb561d9f" formatted="false">El protocolo no tiene tomas.</string>
     <string name="t_09d0f2d1bcf2" formatted="false">blanco</string>
@@ -112,6 +114,7 @@
     <string name="t_15609a434b4a" formatted="false">Expresión: %1$s</string>
     <string name="t_156b6e765065" formatted="false">Ajuste la pose</string>
     <string name="t_158457f1b14f" formatted="false">Paciente en decúbito prono, plantas hacia la cámara, talones arriba.</string>
+    <string name="t_15866c0f8d7f" formatted="false">Centro de la zona, %</string>
     <string name="t_15a6d2360496" formatted="false">MediaPipe no se pudo iniciar (%1$s); se usa ML Kit</string>
     <string name="t_15cd998637d6" formatted="false">(Escala: distancia interpupilar de 63 mm; iris no fiable.)</string>
     <string name="t_1631c0359f81" formatted="false">Puntos anatómicos + contornos</string>
@@ -210,6 +213,7 @@
     <string name="t_2aeeb83de48c" formatted="false">Ningún expediente cumple los filtros elegidos.</string>
     <string name="t_2af6b92bb5b7" formatted="false">Mover antes</string>
     <string name="t_2b2a98b2b5d2" formatted="false">Flash automático</string>
+    <string name="t_2b2bd336823a" formatted="false">Raya</string>
     <string name="t_2b2e813f82b3" formatted="false">Estomion → mentón, mm</string>
     <string name="t_2b34007c066f" formatted="false">Plegada</string>
     <string name="t_2b34962aae4c" formatted="false">Como las cámaras del teléfono. Las fotos se guardan siempre sin espejar.</string>
@@ -300,6 +304,7 @@
     <string name="t_3cf5ba5ede2d" formatted="false">Área del bermellón, mm²</string>
     <string name="t_3d3aa4986b1a" formatted="false">Ancho alar, mm</string>
     <string name="t_3d9078e6c9eb" formatted="false">Mirada: %1$s y %2$s</string>
+    <string name="t_3e23a705dd33" formatted="false">Escalas clínicas (orientativo)</string>
     <string name="t_3e2889f08eb4" formatted="false">Ceño, vertical</string>
     <string name="t_3e7a4fda16aa" formatted="false">Sin consentimiento</string>
     <string name="t_3e8189f726a0" formatted="false">Con fotos · %1$d zonas</string>
@@ -342,6 +347,7 @@
     <string name="t_45965b380fd4" formatted="false">luz ≥ %1$d %%</string>
     <string name="t_45cef7c7f58c" formatted="false">Automática por proporciones de contornos</string>
     <string name="t_45e9fb45d94f" formatted="false">Recortar</string>
+    <string name="t_46d7bfff7a58" formatted="false">Densidad capilar aparente: cuero cabelludo visible entre el pelo (segmentación y color), no pelos por cm² (eso es tricoscopia). Grados BASP, Norwood, Ludwig y Sinclair orientativos, para seguir al mismo paciente con tomas iguales (luz, peinado, cabello seco); no son un diagnóstico.</string>
     <string name="t_46fcd20feebd" formatted="false">Labios / peribucal</string>
     <string name="t_47a93ee0cace" formatted="false">Infraorbitaria</string>
     <string name="t_47f434181700" formatted="false">Mover a la izquierda</string>
@@ -387,9 +393,11 @@
     <string name="t_50cf3b9a4239" formatted="false">Mano a la %1$s de la imagen: dedos hacia abajo, como en la guía</string>
     <string name="t_50f0a746e538" formatted="false">toque la carta gris o blanca en cada foto</string>
     <string name="t_511456f09301" formatted="false">Pata de gallo</string>
+    <string name="t_51346872d9e7" formatted="false">Raya (franja central), %</string>
     <string name="t_5167ee5be411" formatted="false">Bolsa palpebral</string>
     <string name="t_5216e5aace91" formatted="false">Sin permiso no es posible leer fotos de otra instalación</string>
     <string name="t_521a1ca39081" formatted="false">"Foto %1$d: "</string>
+    <string name="t_52aed10f0945" formatted="false">A los lados de la raya, %</string>
     <string name="t_52b53141bc8d" formatted="false">Libre</string>
     <string name="t_52cb0c4bf02a" formatted="false">Cara relajada, labios juntos, mirada al frente</string>
     <string name="t_52f09c57b072" formatted="false">Arrugue la nariz, como ante un mal olor</string>
@@ -516,6 +524,7 @@
     <string name="t_6b126b27526c" formatted="false">pulgar</string>
     <string name="t_6c107d8b7f81" formatted="false">Foto %1$d, %2$s</string>
     <string name="t_6c3e1993c082" formatted="false">Diagrama del cuerpo</string>
+    <string name="t_6cb19ffabb37" formatted="false">Densidad capilar aparente</string>
     <string name="t_6cbb8ffb6931" formatted="false">Las fotografías se guardan en la galería del teléfono, en el álbum del paciente, e incluyen estos datos como metadatos. Use “Compartir sin datos del paciente” para enviarlas anonimizadas.</string>
     <string name="t_6cbca9120f3c" formatted="false">Indicaciones sobre gestos: pulsación larga, arrastrar, pellizcar…</string>
     <string name="t_6cfddcad5beb" formatted="false">Importar %1$d foto</string>
@@ -567,6 +576,7 @@
     <string name="t_782d9db5352e" formatted="false">Seleccionar todas</string>
     <string name="t_784623e1f673" formatted="false">Tokens de color, tipografía, forma, elevación y movimiento de Juanfrank/MD (@material/web v0_192).</string>
     <string name="t_788b3c975f16" formatted="false">Auto</string>
+    <string name="t_78cc94402413" formatted="false">Cuero cabelludo visible, %</string>
     <string name="t_792e9d1e2d15" formatted="false">Girar, espejo y recorte</string>
     <string name="t_796fea690252" formatted="false">Buscar por nombre o número</string>
     <string name="t_79734eb60ee3" formatted="false">Aplicar</string>
@@ -702,6 +712,7 @@
     <string name="t_9012a3488a73" formatted="false">¿Eliminar expediente?</string>
     <string name="t_905037da1f25" formatted="false">Compartir con datos del paciente</string>
     <string name="t_908e44ae7a02" formatted="false">Añadir a la secuencia</string>
+    <string name="t_90e8de41b5cd" formatted="false">Contraste pelo–piel (ΔE)</string>
     <string name="t_9119f4190f35" formatted="false">Pie</string>
     <string name="t_911b9bb62b92" formatted="false">párpados</string>
     <string name="t_911e033bd93c" formatted="false">Cada foto elegida será una toma con su zona, su gesto y su referencia (sin la imagen).</string>
@@ -773,6 +784,7 @@
     <string name="t_a217f294e4f4" formatted="false">No coinciden: %1$s (expresión, pose o cambio local distinto del resto)</string>
     <string name="t_a23190537144" formatted="false">Ancho al 25 % (sup.)</string>
     <string name="t_a276b1754a3a" formatted="false">Ayudas</string>
+    <string name="t_a29ca9561b17" formatted="false">Pelo y piel de color parecido: solo cuenta la segmentación.</string>
     <string name="t_a2eeab6cf8ab" formatted="false">Coincide · capturando</string>
     <string name="t_a3980dd32780" formatted="false">El nombre es obligatorio</string>
     <string name="t_a3b4b3ced269" formatted="false">Ráfaga de 3 fotos</string>
@@ -995,6 +1007,7 @@
     <string name="t_cefd84dbdb1b" formatted="false">No se pudo guardar la línea</string>
     <string name="t_cf3a2d1b5fbe" formatted="false">Alineación automática</string>
     <string name="t_cf3dc15b515d" formatted="false">Secuencia %1$d/%2$d · %3$s</string>
+    <string name="t_cf49afcc61eb" formatted="false">proporciones de la foto (sin mm)</string>
     <string name="t_cf5d12c09cec" formatted="false">Alejarse</string>
     <string name="t_cf622aafba92" formatted="false">Vista</string>
     <string name="t_cf83d402dd37" formatted="false">Estos datos están incrustados en la imagen (EXIF y XMP).</string>
@@ -1079,6 +1092,7 @@
     <string name="t_dfc5d9d3e25c" formatted="false">Zoom asistido</string>
     <string name="t_dfe5a9d95670" formatted="false">Orientación original</string>
     <string name="t_e0b52191b7f9" formatted="false">Ancho (comisuras), mm</string>
+    <string name="t_e0c143aeb928" formatted="false">Cuero cabelludo visible</string>
     <string name="t_e0d877a84b4d" formatted="false">bermellón, comisuras y base nasal</string>
     <string name="t_e14e4c18206d" formatted="false">remolino de la coronilla</string>
     <string name="t_e1939b366d13" formatted="false">Mano a la %1$s de la imagen: que se vean todos los dedos extendidos, hacia abajo</string>
@@ -1231,5 +1245,6 @@
     <string name="t_fdf1055e24e6" formatted="false">vértice</string>
     <string name="t_fe18f806b021" formatted="false">Usted es responsable de obtener el consentimiento informado y de cumplir la normativa de datos de salud.</string>
     <string name="t_fec02633dfb2" formatted="false">← Mueva la cámara a la izquierda</string>
+    <string name="t_fed08c95a026" formatted="false">Analizando el cuero cabelludo…</string>
     <string name="t_ff2c03c8aeb8" formatted="false">Vista en espejo (cámara frontal)</string>
 </resources>

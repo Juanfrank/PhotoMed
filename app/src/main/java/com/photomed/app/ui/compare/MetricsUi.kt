@@ -71,7 +71,8 @@ private fun signed(v: Float?, digits: Int) = v?.let { String.format(Locale.getDe
  * que enlaza con [com.photomed.app.align.MeasureGuide.key]); se traduce al mostrarla con `tr(etiqueta)`.
  */
 fun metricRows(m: LineMetrics): List<Pair<String, String>> =
-    if (m.isFeature) m.features.map { (k, v) -> k.substringBeforeLast(",") to featureValue(k, v) } + (trn("Escala") to scaleLabel(m.scale))
+    if (m.isFeature) m.features.map { (k, v) -> k.substringBeforeLast(",") to featureValue(k, v) } +
+        listOfNotNull(m.type?.let { trn("Escalas clínicas (orientativo)") to it }) + (trn("Escala") to scaleLabel(m.scale))
     else if (m.areaMm2 != null || m.deltaE != null) listOfNotNull(
         trn("Área") to "${f1(m.areaMm2?.div(100f))} cm²",
         trn("ΔL* frente a la mejilla") to tr("%1\$s (más oscura)", f1(m.deltaL)),
@@ -103,6 +104,7 @@ fun featureValue(label: String, v: Float): String {
 fun scaleLabel(s: String) = when (s) {
     "sensor de profundidad" -> tr("sensor de profundidad")
     "interpupilar" -> tr("interpupilar (63 mm)")
+    "foto" -> tr("proporciones de la foto (sin mm)")
     else -> tr("iris (11,7 mm)")
 }
 
@@ -478,8 +480,8 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
     if (dismissedCount > 0 && onRestore != null) TextButton(onClick = onRestore) {
         Text(tr("Restaurar líneas eliminadas (%1\$d)", dismissedCount))
     }
-    if (ordered.any { it.value.second.any { m -> m?.type != null } }) {
-        Text(tr("Tipo probable de ojera: %1\$s", ordered.mapNotNull { e -> e.value.second.lastOrNull { it?.type != null }?.let { "${e.key}: ${it.type}" } }.joinToString("; ")),
+    if (ordered.any { it.value.second.any { m -> m?.type != null && !m.isFeature } }) {
+        Text(tr("Tipo probable de ojera: %1\$s", ordered.mapNotNull { e -> e.value.second.lastOrNull { it?.type != null && !it.isFeature }?.let { "${e.key}: ${it.type}" } }.joinToString("; ")),
             style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
     }
     if (ordered.any { it.value.second.any { m -> m?.note != null } }) Text(tr("✱ Parcialmente cubierto por barba o bigote: se mide solo la parte visible."),

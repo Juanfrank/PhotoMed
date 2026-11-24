@@ -125,6 +125,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     val showLayers = zone.isFaceZone()
     // manos, pies, tronco y miembros: su diagrama (contorno, ejes, dedos, uñas, puntos de referencia), sin medidas
     val bodyDiagram = !zone.isFaceZone() && zone != com.photomed.app.data.Zone.FREE
+    // cuero cabelludo (vértice, coronilla, parietales): densidad aparente con su ficha de medidas
+    val hairMetrics = bodyDiagram && zone.category == com.photomed.app.data.ZoneCategory.CAPILAR
     var editing by remember { mutableStateOf(false) }
     var cropping by remember { mutableStateOf(false) }
     var editVersion by remember { mutableIntStateOf(0) }
@@ -463,14 +465,14 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     if (tracing) scope.launch { snackbar.showSnackbar(tr("Dibuje sobre el surco: una línea por donde se ve, o rodee el área")) } },
                 tracing = tracing, viewLayers = viewLayers, opacity = annotAlpha.value, onOpacity = { annotAlpha.value = it })
             else if (bodyDiagram && !fullscreen) com.photomed.app.ui.compare.LayerChips(layersState.value, { layersState.value = it },
-                Modifier.fillMaxWidth().padding(vertical = 4.dp), viewLayers = viewLayers, opacity = annotAlpha.value,
-                onOpacity = { annotAlpha.value = it }, body = true)
+                Modifier.fillMaxWidth().padding(vertical = 4.dp), onMetrics = if (hairMetrics) ({ metricsSheet = !metricsSheet }) else null,
+                viewLayers = viewLayers, opacity = annotAlpha.value, onOpacity = { annotAlpha.value = it }, body = true)
             // análisis en curso: barra de proceso visible
             val analyzing = (showLayers || bodyDiagram) && annotsByUri[current.uri.toString()] == null || traceBusy
             if (analyzing) androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f).semantics { contentDescription = tr("Analizando arrugas y rasgos") })
-                Text(if (traceBusy) tr("Trazando y midiendo el surco…") else if (bodyDiagram) tr("Analizando el contorno y los puntos…") else tr("Analizando arrugas y rasgos…"), color = Color.White, style = MaterialTheme.typography.labelMedium,
+                Text(if (traceBusy) tr("Trazando y midiendo el surco…") else if (hairMetrics) tr("Analizando el cuero cabelludo…") else if (bodyDiagram) tr("Analizando el contorno y los puntos…") else tr("Analizando arrugas y rasgos…"), color = Color.White, style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(start = 10.dp))
             }
             }
@@ -570,7 +572,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 // horizontal / tableta apaisada: controles y tabla en la mitad izquierda, la foto en la derecha
                 Column(Modifier.weight(1f).fillMaxHeight().background(Color.Black)) {
                     topControls()
-                    if (metricsSheet && showLayers) metricsPanel(Modifier.fillMaxWidth().weight(1f))
+                    if (metricsSheet && (showLayers || hairMetrics)) metricsPanel(Modifier.fillMaxWidth().weight(1f))
                     else androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
                     bottomControls()
                 }
@@ -578,7 +580,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
             } else {
                 topControls()
                 photoArea(Modifier.weight(1f).fillMaxWidth())
-            if (!wide && metricsSheet && showLayers && !fullscreen)
+            if (!wide && metricsSheet && (showLayers || hairMetrics) && !fullscreen)
                 metricsPanel(Modifier.fillMaxWidth().heightIn(max = (conf.screenHeightDp * 0.20f).dp))
                 bottomControls()
             }

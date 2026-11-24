@@ -21,7 +21,8 @@ import kotlin.math.sin
  */
 object BodyDiagram {
     /** Capas propias del diagrama del cuerpo (el contorno es la capa [AnnotLayer.CONTOUR], común con la cara). */
-    val LAYERS = listOf(AnnotLayer.CONTOUR, AnnotLayer.BODY_AXES, AnnotLayer.FINGERS, AnnotLayer.NAILS, AnnotLayer.BODY_POINTS)
+    val LAYERS = listOf(AnnotLayer.CONTOUR, AnnotLayer.BODY_AXES, AnnotLayer.FINGERS, AnnotLayer.NAILS, AnnotLayer.BODY_POINTS,
+        AnnotLayer.SCALP_MAP, AnnotLayer.HAIR_PART)
 
     /** Círculo cerrado de radio [r] (punto del diagrama). */
     private fun dot(layer: AnnotLayer, c: Pt, r: Float) =

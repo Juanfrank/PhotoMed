@@ -15,7 +15,9 @@ enum class AnnotLayer(private val es: String) {
     JAWLINE(trn("Línea mandibular")), PAPADA(trn("Papada")),
     INFRAORBITAL(trn("Líneas infraorbitarias")), PERIORAL(trn("Líneas periorales")),
     // diagrama del cuerpo (manos, pies, tronco y miembros: ver BodyDiagram)
-    BODY_AXES(trn("Ejes y articulaciones")), FINGERS(trn("Dedos")), NAILS(trn("Uñas")), BODY_POINTS(trn("Puntos de referencia"));
+    BODY_AXES(trn("Ejes y articulaciones")), FINGERS(trn("Dedos")), NAILS(trn("Uñas")), BODY_POINTS(trn("Puntos de referencia")),
+    // cuero cabelludo (ver HairDensity)
+    SCALP_MAP(trn("Cuero cabelludo visible")), HAIR_PART(trn("Raya"));
 
     val label: String get() = tr(es)
 }
@@ -969,7 +971,10 @@ class PhotoAnnotator(private val context: Context) {
                     FaceCrop.finish(mesh, bmp, nat.crop, nat.cropBmp, nat.labels, extras, info, priors, user?.added.orEmpty(),
                         hairVScale = tilt?.let { FeatureMetrics.hairTiltScale(it) } ?: 1f)
                 } finally { if (nat.cropBmp !== bmp) nat.cropBmp.recycle() }
-                if (scalpFront) return@withContext scalpFrontLines(all.filter { l -> l.metrics?.name?.let { it in user?.dismissed.orEmpty() } != true }, measured = true) to scalpFrontNote(tilt)
+                if (scalpFront) {
+                    val kept = scalpFrontLines(all.filter { l -> l.metrics?.name?.let { it in user?.dismissed.orEmpty() } != true }, measured = true)
+                    return@withContext (kept + frontHair(bmp, kept)) to scalpFrontNote(tilt)
+                }
                 // falsos positivos eliminados por el usuario
                 val lines = all.filter { l -> l.metrics?.name?.let { it in user?.dismissed.orEmpty() } != true }
                 if (memoryUri != null) LineMemory.save(context, memoryUri, mesh, lines)
@@ -1004,18 +1009,65 @@ class PhotoAnnotator(private val context: Context) {
     else tr("Cabeza inclinada %1\$s°: contorno, ojos, cejas y línea del pelo; las alturas de la frente están corregidas a las de una toma frontal a nivel.",
         "%.0f".format(tiltDeg))
 
+    /** Capilar frontal inclinada: densidad del cuero por encima de la línea de implantación (nativo, con su puerta). */
+    private suspend fun frontHair(bmp: Bitmap, lines: List<AnnotLine>): List<AnnotLine> {
+        val hl = lines.firstOrNull { it.layer == AnnotLayer.HAIRLINE }?.points?.sortedBy { it.x }?.takeIf { it.size >= 3 } ?: return emptyList()
+        val margin = 0.01f
+        fun above(p: Pt): Boolean {
+            val y = when {
+                p.x <= hl.first().x -> hl.first().y
+                p.x >= hl.last().x -> hl.last().y
+                else -> {
+                    val k = hl.indexOfFirst { it.x >= p.x }
+                    val a = hl[k - 1]; val b = hl[k]
+                    a.y + (b.y - a.y) * (p.x - a.x) / (b.x - a.x).coerceAtLeast(1e-6f)
+                }
+            }
+            return p.y < y - margin
+        }
+        return runCatching {
+            NativeGate.run("densidad capilar (frontal inclinada)") { hairLines(bmp, HairDensity.View.FRONT_TILT, ::above) }
+        }.getOrNull().orEmpty()
+    }
+
     /** Flexión de la cabeza (barbilla abajo, grados positivos) por el ajuste de la malla al modelo 3D. */
     private fun tiltOf(mesh: List<Pt>): Float? =
         HeadPose.fit(FaceAnnotations.keysFromMesh(mesh))?.let { -(it.pitch + Standardization.PITCH_ZERO) }
 
     /** Zonas corporales: contorno con el segmentador nativo (dentro de la puerta). */
     private suspend fun analyzeGated(bmp: Bitmap, zone: Zone): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        // cuero cabelludo (vértice, coronilla, parietales): densidad capilar aparente y grados orientativos
+        if (zone.category == com.photomed.app.data.ZoneCategory.CAPILAR) {
+            val view = when (zone.guide) {
+                com.photomed.app.data.GuideType.SCALP -> HairDensity.View.VERTEX
+                com.photomed.app.data.GuideType.SCALP_CROWN -> HairDensity.View.CROWN
+                else -> HairDensity.View.PARIETAL
+            }
+            val lines = runCatching { hairLines(bmp, view, null) }.getOrNull().orEmpty()
+            return@withContext lines to (if (lines.isEmpty()) tr("No se encontró la cabeza en la foto (pelo y piel de la segmentación).")
+                else HAIR_NOTE)
+        }
         // diagrama del cuerpo con los mismos detectores que la cámara: puntos del cuerpo, manos y segmentación
         val diagram = runCatching { bodyDiagram(bmp, zone) }.getOrNull().orEmpty()
         if (diagram.isNotEmpty()) return@withContext diagram to tr("Diagrama del cuerpo: contorno, ejes, dedos, uñas y puntos de referencia. " +
             "Las medidas de arrugas y surcos son solo para zonas del rostro.")
         val mask = BodyRegion.of(zone, bmp) { b -> SubjectSegmenter().use { it.segment(b) } }
         (mask?.let { FaceAnnotations.body(it) } ?: emptyList()) to tr("Las medidas de arrugas y surcos son solo para zonas del rostro.")
+    }
+
+    /**
+     * Densidad capilar aparente ([HairDensity]) como líneas: contorno de la región con las medidas y los
+     * grados, celdas con el cuero cabelludo visible (relleno) y la franja de la raya. Usa el segmentador
+     * nativo: llamar dentro de [NativeGate].
+     */
+    private fun hairLines(bmp: Bitmap, view: HairDensity.View, keep: ((Pt) -> Boolean)?): List<AnnotLine> {
+        val w = HAIR_W; val h = (w * bmp.height / bmp.width.toFloat()).roundToInt().coerceAtLeast(1)
+        val small = Bitmap.createScaledBitmap(bmp, w, h, true).let { if (it.config == Bitmap.Config.ARGB_8888) it else it.copy(Bitmap.Config.ARGB_8888, false) }
+        val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(small) } ?: return emptyList()
+        val px = IntArray(w * h).also { small.getPixels(it, 0, w, 0, 0, w, h) }
+        if (small !== bmp) small.recycle()
+        val r = HairDensity.analyze(px, w, h, labels, view, keep) ?: return emptyList()
+        return hairLinesOf(r, view)
     }
 
     /** Diagrama del cuerpo de la foto ([BodyDiagram]); vacío si no se ve la zona. */
@@ -1155,7 +1207,39 @@ class PhotoAnnotator(private val context: Context) {
                     }
                 }
 
-        val SCALP_FRONT_LAYERS = setOf(AnnotLayer.CONTOUR, AnnotLayer.HAIRLINE, AnnotLayer.EYES)
+        val SCALP_FRONT_LAYERS = setOf(AnnotLayer.CONTOUR, AnnotLayer.HAIRLINE, AnnotLayer.EYES, AnnotLayer.SCALP_MAP, AnnotLayer.HAIR_PART)
+
+        /** Ancho del análisis capilar (px). */
+        const val HAIR_W = 384
+
+        val HAIR_NOTE: String get() = tr("Densidad capilar aparente: cuero cabelludo visible entre el pelo (segmentación y color), " +
+            "no pelos por cm² (eso es tricoscopia). Grados BASP, Norwood, Ludwig y Sinclair orientativos, para seguir al mismo " +
+            "paciente con tomas iguales (luz, peinado, cabello seco); no son un diagnóstico.")
+
+        /** Líneas de un resultado de [HairDensity] (contorno con las medidas, celdas y raya). */
+        fun hairLinesOf(r: HairDensity.Result, view: HairDensity.View): List<AnnotLine> {
+            val pct = { v: Float -> v * 100f }
+            val f = buildList {
+                add(trn("Cuero cabelludo visible, %") to pct(r.visible))
+                if (view != HairDensity.View.FRONT_TILT) {
+                    add(trn("Centro de la zona, %") to pct(r.center))
+                    add(trn("Periferia, %") to pct(r.periphery))
+                }
+                if (r.strip.isNotEmpty()) {
+                    add(trn("Raya (franja central), %") to pct(r.midline))
+                    add(trn("A los lados de la raya, %") to pct(r.lateral))
+                }
+                add(trn("Contraste pelo–piel (ΔE)") to r.contrast)
+            }
+            val m = LineMetrics(trn("Densidad capilar aparente"), scale = "foto", features = f,
+                type = HairDensity.grades(r, view),
+                note = if (r.contrast < HairDensity.MIN_CONTRAST) trn("Pelo y piel de color parecido: solo cuenta la segmentación.") else null)
+            return buildList {
+                if (r.outline.size >= 3) add(AnnotLine(AnnotLayer.SCALP_MAP, r.outline, closed = true, metrics = m))
+                r.cells.forEach { add(AnnotLine(AnnotLayer.SCALP_MAP, it, closed = true, filled = true)) }
+                r.strip.filter { it.size >= 2 }.forEach { add(AnnotLine(AnnotLayer.HAIR_PART, it, closed = false)) }
+            }
+        }
 
         /**
          * En las pruebas en la JVM (Robolectric) no hay modelos nativos: las llamadas a ML Kit no

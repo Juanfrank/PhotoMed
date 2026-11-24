@@ -171,5 +171,20 @@
   "De frente, cabeza inclinada hacia delante (≈ 30°, barbilla al pecho) y cámara a la altura de la cara: línea de implantación frontal en la marca, raya en la línea media; cabello seco y peinado hacia atrás.": "Facing the camera, head tilted forward (≈ 30°, chin toward the chest), camera at face height: frontal hairline on the mark, part on the midline; hair dry and combed back.",
   "Cabeza inclinada sin malla facial completa: solo el contorno, los ojos y la línea del pelo, sin medidas.": "Tilted head without a full face mesh: only the contour, eyes and hairline, without measurements.",
   "Cabeza inclinada: contorno, ojos, cejas y línea del pelo; no se pudo medir el cabeceo y las alturas de la frente van sin corregir.": "Tilted head: contour, eyes, brows and hairline; the head pitch could not be measured, so forehead heights are uncorrected.",
-  "Cabeza inclinada %1$s°: contorno, ojos, cejas y línea del pelo; las alturas de la frente están corregidas a las de una toma frontal a nivel.": "Head tilted %1$s°: contour, eyes, brows and hairline; forehead heights are corrected to those of a level frontal view."
+  "Cabeza inclinada %1$s°: contorno, ojos, cejas y línea del pelo; las alturas de la frente están corregidas a las de una toma frontal a nivel.": "Head tilted %1$s°: contour, eyes, brows and hairline; forehead heights are corrected to those of a level frontal view.",
+  "Cuero cabelludo visible": "Visible scalp",
+  "Raya": "Part",
+  "No se encontró la cabeza en la foto (pelo y piel de la segmentación).": "No head was found in the photo (hair and skin segmentation).",
+  "Densidad capilar aparente: cuero cabelludo visible entre el pelo (segmentación y color), no pelos por cm² (eso es tricoscopia). Grados BASP, Norwood, Ludwig y Sinclair orientativos, para seguir al mismo paciente con tomas iguales (luz, peinado, cabello seco); no son un diagnóstico.": "Apparent hair density: scalp visible through the hair (segmentation and color), not hairs per cm² (that requires trichoscopy). BASP, Norwood, Ludwig and Sinclair grades are indicative, for following the same patient with matching views (light, styling, dry hair); they are not a diagnosis.",
+  "Cuero cabelludo visible, %": "Visible scalp, %",
+  "Centro de la zona, %": "Center of the area, %",
+  "Periferia, %": "Periphery, %",
+  "Raya (franja central), %": "Part (central strip), %",
+  "A los lados de la raya, %": "Beside the part, %",
+  "Contraste pelo–piel (ΔE)": "Hair–skin contrast (ΔE)",
+  "Densidad capilar aparente": "Apparent hair density",
+  "Pelo y piel de color parecido: solo cuenta la segmentación.": "Hair and skin have similar colors: only the segmentation counts.",
+  "Escalas clínicas (orientativo)": "Clinical scales (indicative)",
+  "proporciones de la foto (sin mm)": "photo proportions (no mm)",
+  "Analizando el cuero cabelludo…": "Analyzing the scalp…"
 }

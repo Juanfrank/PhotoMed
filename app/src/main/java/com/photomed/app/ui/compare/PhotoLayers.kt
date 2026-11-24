@@ -120,7 +120,7 @@ fun rememberAnnotLayers(): MutableState<Set<AnnotLayer>> {
 }
 
 /** Capas del contorno externo (silueta de la cara y línea del pelo). */
-val OUTER_LAYERS = listOf(AnnotLayer.CONTOUR, AnnotLayer.HAIRLINE, AnnotLayer.JAWLINE, AnnotLayer.PAPADA)
+val OUTER_LAYERS = listOf(AnnotLayer.CONTOUR, AnnotLayer.HAIRLINE, AnnotLayer.JAWLINE, AnnotLayer.PAPADA, AnnotLayer.SCALP_MAP)
 /** Capas del contorno interno: rasgos (ojos y cejas, nariz, labios), arrugas, surcos y ojeras. */
 val INNER_LAYERS = AnnotLayer.entries - OUTER_LAYERS.toSet() - com.photomed.app.align.BodyDiagram.LAYERS.toSet()
 

@@ -23,6 +23,7 @@
     <string name="t_04ba8712add8" formatted="false">Plays back and forth: the jump is not noticeable when it loops.</string>
     <string name="t_04e82e5facef" formatted="false">More lines: accessory folds, more forehead and under-eye lines (more findings, some false).</string>
     <string name="t_0518bede37b6" formatted="false">Skip</string>
+    <string name="t_0520f79d9c05" formatted="false">Periphery, %</string>
     <string name="t_0590fd75b2c4" formatted="false">brow</string>
     <string name="t_068adb33e7f6" formatted="false">Contrast ΔL*</string>
     <string name="t_06ed6be6fc9c" formatted="false">Face front</string>
@@ -37,6 +38,7 @@
     <string name="t_093c3057cec8" formatted="false">skull contour, whorl, nape and hair pattern</string>
     <string name="t_09429b8c043a" formatted="false">Tap the same skin area in each photo (e.g. the center of the cheek).</string>
     <string name="t_095408637b0d" formatted="false">Rotate 90°</string>
+    <string name="t_095aaf79edc2" formatted="false">No head was found in the photo (hair and skin segmentation).</string>
     <string name="t_09b1747ecb81" formatted="false">No measurable wrinkles or folds found.</string>
     <string name="t_09cbeb561d9f" formatted="false">The protocol has no shots.</string>
     <string name="t_09d0f2d1bcf2" formatted="false">white</string>
@@ -112,6 +114,7 @@
     <string name="t_15609a434b4a" formatted="false">Expression: %1$s</string>
     <string name="t_156b6e765065" formatted="false">Adjust the pose</string>
     <string name="t_158457f1b14f" formatted="false">Patient lying prone, soles toward the camera, heels up.</string>
+    <string name="t_15866c0f8d7f" formatted="false">Center of the area, %</string>
     <string name="t_15a6d2360496" formatted="false">MediaPipe could not start (%1$s); using ML Kit</string>
     <string name="t_15cd998637d6" formatted="false">(Scale: interpupillary distance of 63 mm; iris not reliable.)</string>
     <string name="t_1631c0359f81" formatted="false">Anatomical landmarks + contours</string>
@@ -210,6 +213,7 @@
     <string name="t_2aeeb83de48c" formatted="false">No patient record meets the chosen filters.</string>
     <string name="t_2af6b92bb5b7" formatted="false">Move earlier</string>
     <string name="t_2b2a98b2b5d2" formatted="false">Auto flash</string>
+    <string name="t_2b2bd336823a" formatted="false">Part</string>
     <string name="t_2b2e813f82b3" formatted="false">Stomion → chin, mm</string>
     <string name="t_2b34007c066f" formatted="false">Collapsed</string>
     <string name="t_2b34962aae4c" formatted="false">Like the phone\'s cameras. Photos are always saved unmirrored.</string>
@@ -300,6 +304,7 @@
     <string name="t_3cf5ba5ede2d" formatted="false">Vermilion area, mm²</string>
     <string name="t_3d3aa4986b1a" formatted="false">Alar width, mm</string>
     <string name="t_3d9078e6c9eb" formatted="false">Gaze: %1$s and %2$s</string>
+    <string name="t_3e23a705dd33" formatted="false">Clinical scales (indicative)</string>
     <string name="t_3e2889f08eb4" formatted="false">Glabellar, vertical</string>
     <string name="t_3e7a4fda16aa" formatted="false">No consent</string>
     <string name="t_3e8189f726a0" formatted="false">With photos · %1$d areas</string>
@@ -342,6 +347,7 @@
     <string name="t_45965b380fd4" formatted="false">light ≥ %1$d %%</string>
     <string name="t_45cef7c7f58c" formatted="false">Automatic from contour proportions</string>
     <string name="t_45e9fb45d94f" formatted="false">Crop</string>
+    <string name="t_46d7bfff7a58" formatted="false">Apparent hair density: scalp visible through the hair (segmentation and color), not hairs per cm² (that requires trichoscopy). BASP, Norwood, Ludwig and Sinclair grades are indicative, for following the same patient with matching views (light, styling, dry hair); they are not a diagnosis.</string>
     <string name="t_46fcd20feebd" formatted="false">Lips / perioral</string>
     <string name="t_47a93ee0cace" formatted="false">Infraorbital</string>
     <string name="t_47f434181700" formatted="false">Move left</string>
@@ -387,9 +393,11 @@
     <string name="t_50cf3b9a4239" formatted="false">Hand on the %1$s of the image: fingers pointing down, as in the guide</string>
     <string name="t_50f0a746e538" formatted="false">tap the gray or white card in each photo</string>
     <string name="t_511456f09301" formatted="false">Crow\'s feet</string>
+    <string name="t_51346872d9e7" formatted="false">Part (central strip), %</string>
     <string name="t_5167ee5be411" formatted="false">Eyelid bag</string>
     <string name="t_5216e5aace91" formatted="false">Without permission, photos from another installation cannot be read</string>
     <string name="t_521a1ca39081" formatted="false">"Photo %1$d: "</string>
+    <string name="t_52aed10f0945" formatted="false">Beside the part, %</string>
     <string name="t_52b53141bc8d" formatted="false">Free</string>
     <string name="t_52cb0c4bf02a" formatted="false">Relaxed face, lips together, gaze straight ahead</string>
     <string name="t_52f09c57b072" formatted="false">Wrinkle your nose, as if at a bad smell</string>
@@ -516,6 +524,7 @@
     <string name="t_6b126b27526c" formatted="false">thumb</string>
     <string name="t_6c107d8b7f81" formatted="false">Photo %1$d, %2$s</string>
     <string name="t_6c3e1993c082" formatted="false">Body diagram</string>
+    <string name="t_6cb19ffabb37" formatted="false">Apparent hair density</string>
     <string name="t_6cbb8ffb6931" formatted="false">Photos are saved in the phone\'s gallery, in the patient\'s album, and include this data as metadata. Use “Share without patient data” to send them anonymized.</string>
     <string name="t_6cbca9120f3c" formatted="false">Gesture tips: long press, drag, pinch…</string>
     <string name="t_6cfddcad5beb" formatted="false">Import %1$d photo</string>
@@ -567,6 +576,7 @@
     <string name="t_782d9db5352e" formatted="false">Select all</string>
     <string name="t_784623e1f673" formatted="false">Color, typography, shape, elevation and motion tokens from Juanfrank/MD (@material/web v0_192).</string>
     <string name="t_788b3c975f16" formatted="false">Auto</string>
+    <string name="t_78cc94402413" formatted="false">Visible scalp, %</string>
     <string name="t_792e9d1e2d15" formatted="false">Rotate, mirror and crop</string>
     <string name="t_796fea690252" formatted="false">Search by name or number</string>
     <string name="t_79734eb60ee3" formatted="false">Apply</string>
@@ -702,6 +712,7 @@
     <string name="t_9012a3488a73" formatted="false">Delete patient record?</string>
     <string name="t_905037da1f25" formatted="false">Share with patient data</string>
     <string name="t_908e44ae7a02" formatted="false">Add to the sequence</string>
+    <string name="t_90e8de41b5cd" formatted="false">Hair–skin contrast (ΔE)</string>
     <string name="t_9119f4190f35" formatted="false">Foot</string>
     <string name="t_911b9bb62b92" formatted="false">eyelids</string>
     <string name="t_911e033bd93c" formatted="false">Each chosen photo will become a shot with its area, its expression and its reference (without the image).</string>
@@ -773,6 +784,7 @@
     <string name="t_a217f294e4f4" formatted="false">Do not match: %1$s (expression, pose or a local change different from the rest)</string>
     <string name="t_a23190537144" formatted="false">Width at 25 % (upper)</string>
     <string name="t_a276b1754a3a" formatted="false">Tips</string>
+    <string name="t_a29ca9561b17" formatted="false">Hair and skin have similar colors: only the segmentation counts.</string>
     <string name="t_a2eeab6cf8ab" formatted="false">Match · capturing</string>
     <string name="t_a3980dd32780" formatted="false">The name is required</string>
     <string name="t_a3b4b3ced269" formatted="false">Burst of 3 photos</string>
@@ -995,6 +1007,7 @@
     <string name="t_cefd84dbdb1b" formatted="false">Could not save the line</string>
     <string name="t_cf3a2d1b5fbe" formatted="false">Automatic alignment</string>
     <string name="t_cf3dc15b515d" formatted="false">Sequence %1$d/%2$d · %3$s</string>
+    <string name="t_cf49afcc61eb" formatted="false">photo proportions (no mm)</string>
     <string name="t_cf5d12c09cec" formatted="false">Move back</string>
     <string name="t_cf622aafba92" formatted="false">View</string>
     <string name="t_cf83d402dd37" formatted="false">This data is embedded in the image (EXIF and XMP).</string>
@@ -1079,6 +1092,7 @@
     <string name="t_dfc5d9d3e25c" formatted="false">Assisted zoom</string>
     <string name="t_dfe5a9d95670" formatted="false">Original orientation</string>
     <string name="t_e0b52191b7f9" formatted="false">Width (corners), mm</string>
+    <string name="t_e0c143aeb928" formatted="false">Visible scalp</string>
     <string name="t_e0d877a84b4d" formatted="false">vermilion, mouth corners and nasal base</string>
     <string name="t_e14e4c18206d" formatted="false">crown whorl</string>
     <string name="t_e1939b366d13" formatted="false">Hand on the %1$s of the image: all fingers must be visible, extended and pointing down</string>
@@ -1231,5 +1245,6 @@
     <string name="t_fdf1055e24e6" formatted="false">vertex</string>
     <string name="t_fe18f806b021" formatted="false">You are responsible for obtaining informed consent and for complying with health data regulations.</string>
     <string name="t_fec02633dfb2" formatted="false">← Move the camera left</string>
+    <string name="t_fed08c95a026" formatted="false">Analyzing the scalp…</string>
     <string name="t_ff2c03c8aeb8" formatted="false">Mirrored preview (front camera)</string>
 </resources>
