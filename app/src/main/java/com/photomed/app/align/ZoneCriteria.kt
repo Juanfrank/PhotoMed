@@ -91,7 +91,9 @@ object ZoneCriteria {
     fun needsHands(zone: Zone) = zone.guide == GuideType.HANDS
     /** En las manos, la piel sirve para que el contorno del esquema siga el borde real de cada mano. */
     fun needsClasses(zone: Zone) = zone.guide in SKIN_ZONES || zone.guide == GuideType.FEET || zone.guide == GuideType.HANDS ||
-        zone.guide in CLOSEUP_FACE || zone.guide in SCALP_ZONES
+        zone.guide in CLOSEUP_FACE || zone.guide in SCALP_ZONES || zone.guide in FACE_VIEWS
+    /** Vistas del rostro entero en las que se comprueba que nada lo tape (gafas, gorra, mano). */
+    private val FACE_VIEWS = setOf(GuideType.FACE_FRONT, GuideType.FACE_OBLIQUE)
     /** Primeros planos del rostro (sin cara entera detectable): se comprueba que lo encuadrado sea piel de la cara. */
     private val CLOSEUP_FACE = setOf(GuideType.FOREHEAD, GuideType.PERIOCULAR, GuideType.LIPS, GuideType.EYE)
     /** Vistas del cuero cabelludo: se comprueba que se vea pelo (o cuero cabelludo) y no la cara. */
@@ -139,7 +141,8 @@ object ZoneCriteria {
             GuideType.HANDS -> hands(zone, s)
             GuideType.FEET -> feet(zone, s)
             in SKIN_ZONES -> body(zone, s)
-            in CLOSEUP_FACE -> closeupFace(zone, s)
+            in CLOSEUP_FACE -> closeupFace(zone, s) + faceOcclusion(zone, s)
+            in FACE_VIEWS -> faceOcclusion(zone, s)
             in SCALP_ZONES -> scalp(s)
             else -> emptyList()
         }
@@ -184,6 +187,69 @@ object ZoneCriteria {
      * fondo) y llenar el cuadro (no la cara entera con fondo alrededor). Ojo, periocular y frente: debajo
      * sigue la cara; ojo: no se ven los dos ojos.
      */
+    /** Accesorio (gafas) sobre los ojos, ropa (gorra, sombrero, pañuelo) sobre la frente y piel del cuerpo (mano) dentro del óvalo. */
+    const val OCCL_GLASSES = 0.07f
+    const val OCCL_FOREHEAD = 0.25f
+    const val OCCL_HAND = 0.07f
+
+    /**
+     * Nada tapa la cara (con la segmentación y los puntos del rostro): gafas (clase «otros» sobre los ojos),
+     * gorra, sombrero o pañuelo (ropa u otros sobre la frente, encima de las cejas) y una mano (piel del
+     * cuerpo dentro del óvalo de la cara). Con fotos reales de retratos: separa sin error las fotos con gafas,
+     * gorra o mano de las que no (ninguna foto correcta pasa de 0,00 en ninguna de las tres medidas).
+     */
+    private fun faceOcclusion(zone: Zone, s: Scene): List<String> {
+        val c = s.classes ?: return emptyList()
+        val f = s.face; if (f.size < 20) return emptyList()
+        val k = c.width.toFloat()
+        val eyes = (0 until 16).flatMap { listOfNotNull(f["eye_l_$it"], f["eye_r_$it"]) }
+        val el = f[Landmarks.EYE_L]; val er = f[Landmarks.EYE_R]
+        val out = ArrayList<String>()
+        fun frac(x0: Float, y0: Float, x1: Float, y1: Float, pred: (Int) -> Boolean): Float {
+            var n = 0; var m = 0
+            val a = (x0 * k).toInt().coerceIn(0, c.width - 1); val b = (x1 * k).toInt().coerceIn(0, c.width - 1)
+            val t = (y0 * k).toInt().coerceIn(0, c.height - 1); val u = (y1 * k).toInt().coerceIn(0, c.height - 1)
+            for (y in t..u) for (x in a..b) { n++; if (pred(c.at(x, y))) m++ }
+            return if (n == 0) 0f else m / n.toFloat()
+        }
+        if (eyes.size >= 8 && el != null && er != null) {
+            val ipd = hypot(el.x - er.x, el.y - er.y).coerceAtLeast(1e-3f)
+            if (zone.guide != GuideType.LIPS && frac(eyes.minOf { it.x } - 0.2f * ipd, eyes.minOf { it.y } - 0.25f * ipd,
+                    eyes.maxOf { it.x } + 0.2f * ipd, eyes.maxOf { it.y } + 0.25f * ipd) { it == FaceLabels.OTHER } >= OCCL_GLASSES)
+                out += tr("Quítese las gafas")
+            val brows = (0 until 5).flatMap { listOfNotNull(f["brow_l_top_$it"], f["brow_r_top_$it"]) }
+            if (brows.isNotEmpty() && zone.guide != GuideType.LIPS) {
+                val by = brows.minOf { it.y }
+                if (frac(minOf(el.x, er.x), by - 0.55f * ipd, maxOf(el.x, er.x), by - 0.1f * ipd) { it == FaceLabels.CLOTHES || it == FaceLabels.OTHER } >= OCCL_FOREHEAD)
+                    out += tr("Descubra la frente (sin gorra, sombrero ni pañuelo)")
+            }
+        }
+        // mano: piel del cuerpo dentro del óvalo de la cara
+        val oval = (0 until 36).mapNotNull { f["oval_$it"] }
+        if (oval.size >= 20) {
+            var n = 0; var m = 0
+            val x0 = (oval.minOf { it.x } * k).toInt().coerceAtLeast(0); val x1 = (oval.maxOf { it.x } * k).toInt().coerceAtMost(c.width - 1)
+            val y0 = (oval.minOf { it.y } * k).toInt().coerceAtLeast(0); val y1 = (oval.maxOf { it.y } * k).toInt().coerceAtMost(c.height - 1)
+            for (y in y0..y1) for (x in x0..x1) {
+                val q = Pt((x + 0.5f) / k, (y + 0.5f) / k)
+                if (!inPolygon(q, oval)) continue
+                n++; if (c.at(x, y) == FaceLabels.BODY_SKIN) m++
+            }
+            if (n > 0 && m / n.toFloat() >= OCCL_HAND) out += tr("Retire la mano de la cara")
+        }
+        return out
+    }
+
+    private fun inPolygon(p: Pt, poly: List<Pt>): Boolean {
+        var inside = false; var j = poly.size - 1
+        for (i in poly.indices) {
+            val a = poly[i]; val b = poly[j]
+            if ((a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside
+            j = i
+        }
+        return inside
+    }
+
     private fun closeupFace(zone: Zone, s: Scene): List<String> {
         val c = s.classes ?: return emptyList()
         if (centerFraction(c, FaceLabels.FACE_SKIN) < CLOSEUP_FACE_MIN) return listOf(tr("Encuadre la zona del rostro (no se ve la piel de la cara)"))
@@ -364,10 +430,25 @@ object ZoneCriteria {
     private fun handLike(s: Scene): Boolean {
         // la mano domina el cuadro (los puños de una pose de espaldas no cuentan): ≥ 30 % del ancho de largo
         // según el detector, o la mancha con dedos es la mayor parte de la piel
-        if (s.hands.orEmpty().any { h -> h.points.isNotEmpty() && (h.points.maxOf { it.x } - h.points.minOf { it.x }).coerceAtLeast(h.points.maxOf { it.y } - h.points.minOf { it.y }) >= 0.3f }) return true
-        val c = s.classes ?: return false
+        val c = s.classes
+        val big = s.hands.orEmpty().filter { h -> h.points.isNotEmpty() && (h.points.maxOf { it.x } - h.points.minOf { it.x }).coerceAtLeast(h.points.maxOf { it.y } - h.points.minOf { it.y }) >= 0.3f }
+        if (big.isNotEmpty()) {
+            // y ocupa buena parte de la piel (una mano en la cabeza de una foto de espalda no es un primer plano de la mano)
+            if (c == null) return true
+            val k = c.width.toFloat(); var inHand = 0; var skin = 0
+            for (y in 0 until c.height) for (x in 0 until c.width) {
+                if (!isSkin(c.at(x, y))) continue
+                skin++
+                val px = (x + 0.5f) / k; val py = (y + 0.5f) / k
+                if (big.any { h -> val m = 0.15f * (h.points.maxOf { it.y } - h.points.minOf { it.y })
+                        px in h.points.minOf { it.x } - m..h.points.maxOf { it.x } + m && py in h.points.minOf { it.y } - m..h.points.maxOf { it.y } + m }) inHand++
+            }
+            if (skin > 0 && inHand >= 0.4f * skin) return true
+        }
+        if (c == null) return false
         val skin = feetOf(c).sumOf { it.box.area }.coerceAtLeast(1)
-        return skinHands(c).any { it.box.area >= 0.5f * skin }
+        // cuatro dedos o más (un tronco con los brazos en alto y la cabeza también tiene tres salientes hondos)
+        return skinHands(c).any { it.box.area >= 0.5f * skin && (it.toeCount ?: 0) >= 4 }
     }
 
     fun skinHands(c: Classes): List<Foot> = feetOf(c).filter { it.digitDepth >= HAND_DIGIT_DEPTH && (it.toeCount ?: 0) >= 3 }
@@ -743,10 +824,17 @@ object ZoneCriteria {
                     // un primer plano de una mano también es piel en el centro: si la piel tiene dedos, no es la espalda
                     if (handLike(s) || footLike(s)) return listOf(tr("Encuadre la espalda entera: hombros, cintura y los dos costados"))
                     if (facingCamera(p, c) ?: (L.NOSE in p || (c != null && faceSkinAll(c) > 0.12f))) out += tr("De espaldas a la cámara")
-                    if (c != null && !(sidesClear(c, 0.5f) && sidesClear(c, 0.7f))) out += tr("Encuadre la espalda entera: hombros, cintura y los dos costados")
+                    // los dos costados libres en dos alturas al menos (un brazo colgando puede tocar el borde en alguna)
+                    if (c != null && listOf(0.4f, 0.5f, 0.6f, 0.7f).count { sidesClear(c, it) } < 2) out += tr("Encuadre la espalda entera: hombros, cintura y los dos costados")
                     uncovered(c, trn("la espalda"), c?.let { skinClothes(it, 0.30f, 0.25f * s.aspect, 0.70f, 0.62f * s.aspect) })?.let { out += it }
                     return out
                 }
+                // tórax: basta con los hombros (una foto del pecho puede dejar las caderas fuera); la región se
+                // estima con el ancho de los hombros (caderas a 1,25 anchos por debajo)
+                @Suppress("NAME_SHADOWING") val p = if (zone.guide == GuideType.BREASTS && has(p, L.SHOULDER_L, L.SHOULDER_R) && !has(p, L.HIP_L, L.HIP_R)) {
+                    val a = p[L.SHOULDER_L]!!; val b = p[L.SHOULDER_R]!!; val sw = hypot(a.x - b.x, a.y - b.y)
+                    p + mapOf(L.HIP_L to Pt(a.x + (b.x - a.x) * 0.12f, a.y + 1.25f * sw), L.HIP_R to Pt(b.x + (a.x - b.x) * 0.12f, b.y + 1.25f * sw))
+                } else p
                 if (!has(p, L.SHOULDER_L, L.SHOULDER_R, L.HIP_L, L.HIP_R)) return listOf(tr("Encuadre el tronco: hombros y caderas"))
                 val sl = p[L.SHOULDER_L]!!; val sr = p[L.SHOULDER_R]!!; val hl = p[L.HIP_L]!!; val hr = p[L.HIP_R]!!
                 if (tilt(sl, sr) > LEVEL_DEG) out += tr("Hombros nivelados")
@@ -765,8 +853,8 @@ object ZoneCriteria {
                     GuideType.BREASTS -> Triple(sy, sy + (hy - sy) * 0.55f, trn("el tórax"))
                     // espalda: hasta algo por encima de la cadera (la cintura del pantalón queda por encima de la articulación)
                     GuideType.BACK -> Triple(sy, sy + (hy - sy) * 0.8f, trn("la espalda"))
-                    // abdomen: hasta algo por encima de la cadera (la ropa interior en la cadera es correcta)
-                    else -> Triple(sy + (hy - sy) * 0.4f, sy + (hy - sy) * 0.9f, trn("el abdomen"))
+                    // abdomen: hasta algo por encima de la cadera (la ropa interior o el bañador en la cadera es correcto)
+                    else -> Triple(sy + (hy - sy) * 0.4f, sy + (hy - sy) * 0.82f, trn("el abdomen"))
                 }
                 val m = (right - left) * 0.15f
                 val unc = uncovered(c, name, c?.let { skinClothes(it, left + m, y0, right - m, y1) })

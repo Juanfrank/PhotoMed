@@ -466,6 +466,7 @@
     <string name="t_6359eb3819a2" formatted="false">Protocol results: %1$s</string>
     <string name="t_63686d0bea65" formatted="false">shoulder, elbow, wrist and arm edges</string>
     <string name="t_638bb03bebcb" formatted="false">Added to exported photos, grids, GIFs and videos. The corner is chosen when exporting.</string>
+    <string name="t_639ee8720f79" formatted="false">Uncover the forehead (no cap, hat or headscarf)</string>
     <string name="t_63bf81c325ee" formatted="false">Wrinkle detection</string>
     <string name="t_640ec3c53deb" formatted="false">%1$s · %2$.0f%% scale · %3$.1f°</string>
     <string name="t_6438eefe9818" formatted="false">The protocol is from a newer version of PhotoMed: please update the app.</string>
@@ -650,6 +651,7 @@
     <string name="t_87287f6ce048" formatted="false">No geometric alignment</string>
     <string name="t_87363f0e213e" formatted="false">corrugator and procerus</string>
     <string name="t_874b300c9053" formatted="false">Bigonial / bizygomatic, %</string>
+    <string name="t_876588f8ffe5" formatted="false">Move the hand away from the face</string>
     <string name="t_8790c5b15043" formatted="false">manual</string>
     <string name="t_88450313f199" formatted="false">assisted zoom %1$s×</string>
     <string name="t_885995c5d7aa" formatted="false">Lower lip</string>
@@ -1013,6 +1015,7 @@
     <string name="t_d45c0c1bb8e4" formatted="false">different side (%1$s / %2$s)</string>
     <string name="t_d48fce64744d" formatted="false">Expression: squeeze the eyes shut</string>
     <string name="t_d4b272bdee37" formatted="false">Middle third (ideal 33 %), %</string>
+    <string name="t_d4bcaa768886" formatted="false">Take off the glasses</string>
     <string name="t_d500c64bc7c1" formatted="false">Rotate the guide 90°</string>
     <string name="t_d56d19670a72" formatted="false">Zoom</string>
     <string name="t_d57eb960ad9c" formatted="false">If the app closes due to an error, it is logged here (without photos or patient data).</string>

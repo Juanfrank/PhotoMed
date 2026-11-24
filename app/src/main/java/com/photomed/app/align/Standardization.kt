@@ -24,7 +24,8 @@ object Standardization {
 
     /** side: +1 la cara mira hacia la derecha de la imagen, −1 hacia la izquierda, 0 de frente. */
     fun target(zone: Zone): Target? = when (zone.guide) {
-        GuideType.FACE_FRONT, GuideType.FOREHEAD, GuideType.PERIOCULAR, GuideType.LIPS -> Target(0f, 5f, 0)
+        // giro tolerado de frente: 8° (la estimación de la malla tiene unos ±3–5° de ruido)
+        GuideType.FACE_FRONT, GuideType.FOREHEAD, GuideType.PERIOCULAR, GuideType.LIPS -> Target(0f, 8f, 0)
         GuideType.FACE_OBLIQUE -> Target(45f, 8f, if (zone.mirrored) -1 else 1)
         GuideType.FACE_PROFILE -> Target(null, 0f, if (zone.mirrored) -1 else 1, minYaw = PROFILE_MIN_YAW)
         else -> null
@@ -57,8 +58,16 @@ object Standardization {
     /** …o este giro con la punta nasal en el borde del óvalo ([facingSide] ≥ 0,95): perfil por geometría. */
     const val PROFILE_MIN_YAW_GEOM = 48f
 
-    const val PITCH_TOL = 7f
-    const val ROLL_TOL = 4f
+    /** Cabeceo (plano de Frankfort) tolerado: la estimación de la malla tiene unos ±5° de ruido. */
+    const val PITCH_TOL = 10f
+    /** Corrección del cero del cabeceo (ver [evaluate]). */
+    const val PITCH_ZERO = 4f
+    /** Oblicuo por geometría: punta nasal (desde el centro del óvalo, en medios anchos) y giro mínimo. */
+    const val OBLIQUE_SIDE_MIN = 0.45f
+    const val OBLIQUE_SIDE_MAX = 1.02f
+    const val OBLIQUE_MIN_YAW_GEOM = 15f
+    const val ROLL_TOL = 5f
+    const val ROLL_TOL_OBLIQUE = 12f
     const val LIGHT_ASYM = 0.15f
 
     /** Sentido del giro por geometría: punta nasal frente al centro del óvalo (normalizado por su ancho). */
@@ -113,26 +122,40 @@ object Standardization {
                 }
             } else {
                 val wrongSide = sideSign != 0 && sideSign != t.side
-                val err = if (wrongSide) yawAbs + t.yaw!! else yawAbs - t.yaw!!
+                // definición clínica del oblicuo de 45°: la punta nasal alineada con el contorno de la mejilla. El
+                // giro estimado por la malla se queda corto en oblicuos reales (24–33° con la nariz ya en la mejilla,
+                // fotos clínicas de dermatología): con la nariz entre ½ y el borde del óvalo y al menos 15° de giro, vale
+                val geomOblique = !wrongSide && yawAbs >= OBLIQUE_MIN_YAW_GEOM && abs(side) in OBLIQUE_SIDE_MIN..OBLIQUE_SIDE_MAX
+                val err = if (wrongSide) yawAbs + t.yaw!! else if (geomOblique) 0f else yawAbs - t.yaw!!
                 if (wrongSide) hints += if (t.side > 0) trn("Cara: mirar a la derecha de la imagen") else trn("Cara: mirar a la izquierda de la imagen")
                 else if (abs(err) > t.yawTol) hints += if (err < 0) "Cabeza: girar más (%.0f° de 45°)".format(yawAbs) else "Cabeza: girar menos (%.0f° de 45°)".format(yawAbs)
                 off += abs(err) / t.yawTol
             }
-            det.pitch?.let { if (abs(it) > PITCH_TOL) { hints += (if (it > 0) "Barbilla: bajar %.0f° (Frankfort)" else "Barbilla: subir %.0f° (Frankfort)").format(abs(it)); off += abs(it) / PITCH_TOL } }
+            // cero del cabeceo calibrado con retratos frontales verificados: con el plano de Frankfort horizontal la
+            // malla de MediaPipe da de media unos −5° (su modelo 3D canónico no está en el plano de Frankfort)
+            det.pitch?.let { it + PITCH_ZERO }?.let { if (abs(it) > PITCH_TOL) { hints += (if (it > 0) "Barbilla: bajar %.0f° (Frankfort)" else "Barbilla: subir %.0f° (Frankfort)").format(abs(it)); off += abs(it) / PITCH_TOL } }
             // Inclinación: línea entre los ojos en la imagen (de frente u oblicuo); Euler Z si no hay ojos.
-            val roll = (if (yawAbs < 30f) HeadRoll.of(det.points)?.first else null) ?: det.roll
+            // De frente, la línea de los ojos; en el oblicuo la línea de los ojos se deforma con el giro y la
+            // perspectiva (sesgo de 9–15° en fotos clínicas de oblicuos), así que se usa la del modelo 3D, que en el
+            // oblicuo también lleva un sesgo de unos 6–7° hacia el lado del giro: tolerancia mayor (12°: sesgo de unos 7° más la tolerancia de frente)
+            val oblique = abs(side) >= OBLIQUE_SIDE_MIN && t.yaw != 0f
+            val roll = (if (yawAbs < 30f && !oblique) HeadRoll.of(det.points)?.first else null) ?: det.roll
+            val rollTol = if (oblique) ROLL_TOL_OBLIQUE else ROLL_TOL
             roll?.let {
-                if (abs(it) > ROLL_TOL) {
+                if (abs(it) > rollTol) {
                     hints += (if (it > 0) "Cabeza: enderezar %.0f° (inclinada a la derecha)" else "Cabeza: enderezar %.0f° (inclinada a la izquierda)").format(abs(it))
-                    off += abs(it) / ROLL_TOL
+                    off += abs(it) / rollTol
                 }
             }
         }
         // Expresión neutra en las vistas faciales completas; ojos abiertos siempre
+        // sonrisa o boca abierta con la expresión neutra pedida: impide el disparo (aunque el resto esté «casi»)
+        var neutralBroken = false
         if (ZoneAlignment.of(zone).detector == Detector.FACE && Expression.usable(det.yaw)) {
             Expression.measure(det.points)?.let { ex ->
                 val h = if (expression == com.photomed.app.data.FacialExpression.NEUTRAL) Expression.neutral(zone, ex) else Expression.target(expression, ex)
                 h.forEach { hints += it; off += 0.8f }
+                if (expression == com.photomed.app.data.FacialExpression.NEUTRAL) neutralBroken = h.any { "sonrisa" in it || "juntar los labios" in it }
             }
         }
         // mirada al frente: solo en las vistas frontales. Con la cabeza girada (oblicuo, perfil), los ojos
@@ -157,7 +180,7 @@ object Standardization {
             lightHints(l, det.yaw).forEach { hints += it; off += 0.5f }
         }
         // la expresión pedida es condición para el disparo automático
-        val expressionOk = ZoneAlignment.of(zone).detector != Detector.FACE || Expression.meets(expression, det.points, det.yaw)
+        val expressionOk = (ZoneAlignment.of(zone).detector != Detector.FACE || Expression.meets(expression, det.points, det.yaw)) && !neutralBroken
         val status = when {
             hints.isEmpty() && expressionOk -> MatchStatus.MATCH
             off <= 2.5f -> MatchStatus.CLOSE

@@ -32,7 +32,8 @@ data class Expression(val eyes: Float, val mouthOpen: Float, val mouthWidth: Flo
         const val OPEN_MAX = 0.15f
         const val WIDTH_MAX = 0.97f
         const val LIFT_MAX = 0.10f
-        const val BROWS_MAX = 0.27f
+        // cejas: con retratos neutros verificados la altura llega a 0,33 (varía con la anatomía)
+        const val BROWS_MAX = 0.35f
 
         fun measure(points: Map<String, Pt>): Expression? {
             val p = FaceKeys.canonical(points)

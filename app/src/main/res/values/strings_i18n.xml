@@ -466,6 +466,7 @@
     <string name="t_6359eb3819a2" formatted="false">Resultados del protocolo: %1$s</string>
     <string name="t_63686d0bea65" formatted="false">hombro, codo, muñeca y bordes del brazo</string>
     <string name="t_638bb03bebcb" formatted="false">Se añade a las fotos, cuadrículas, GIF y vídeos exportados. La esquina se elige al exportar.</string>
+    <string name="t_639ee8720f79" formatted="false">Descubra la frente (sin gorra, sombrero ni pañuelo)</string>
     <string name="t_63bf81c325ee" formatted="false">Detección de arrugas</string>
     <string name="t_640ec3c53deb" formatted="false">%1$s · %2$.0f%% escala · %3$.1f°</string>
     <string name="t_6438eefe9818" formatted="false">El protocolo es de una versión más nueva de PhotoMed: actualice la app.</string>
@@ -650,6 +651,7 @@
     <string name="t_87287f6ce048" formatted="false">Sin alineación geométrica</string>
     <string name="t_87363f0e213e" formatted="false">corrugador y prócer</string>
     <string name="t_874b300c9053" formatted="false">Bigonial / bicigomático, %</string>
+    <string name="t_876588f8ffe5" formatted="false">Retire la mano de la cara</string>
     <string name="t_8790c5b15043" formatted="false">manual</string>
     <string name="t_88450313f199" formatted="false">zoom asistido %1$s×</string>
     <string name="t_885995c5d7aa" formatted="false">Labio inferior</string>
@@ -1013,6 +1015,7 @@
     <string name="t_d45c0c1bb8e4" formatted="false">lado distinto (%1$s / %2$s)</string>
     <string name="t_d48fce64744d" formatted="false">Expresión: apretar los ojos</string>
     <string name="t_d4b272bdee37" formatted="false">Tercio medio (ideal 33 %), %</string>
+    <string name="t_d4bcaa768886" formatted="false">Quítese las gafas</string>
     <string name="t_d500c64bc7c1" formatted="false">Girar la guía 90°</string>
     <string name="t_d56d19670a72" formatted="false">Zoom</string>
     <string name="t_d57eb960ad9c" formatted="false">Si la app se cierra por un error, queda registrado aquí (sin fotos ni datos del paciente).</string>

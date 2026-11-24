@@ -236,7 +236,10 @@ class ZoneAutoCaptureTest {
         assumeTrue("sin imágenes de prueba (tools/eval/fetch_zone_images.py + zone_landmarks.py)", File(root, "rostro_frontal/landmarks.json").exists())
         val cache = HashMap<String, List<Sample>>()
         val rows = ArrayList<Row>()
+        // fotos frontales de verdad (por geometría: la punta nasal cerca del centro del óvalo); alguna foto de la
+        // carpeta es un oblicuo (cabeza girada ~30°) y ahí disparar el oblicuo es correcto
         val frontal = cache.getOrPut("rostro_frontal") { load("rostro_frontal") }
+            .filter { s -> kotlin.math.abs(com.photomed.app.align.Standardization.facingSide(s.face.points) ?: 0f) < 0.3f }
         for (z in Zone.entries) {
             val spec = ZoneAlignment.of(z)
             val all = cache.getOrPut(dirOf(z)) { load(dirOf(z)) }

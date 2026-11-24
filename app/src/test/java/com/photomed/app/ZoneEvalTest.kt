@@ -65,10 +65,13 @@ class ZoneEvalTest {
     private fun verdict(z: Zone, s: S): List<String> {
         val spec = ZoneAlignment.of(z)
         val crit = if (ZoneCriteria.applies(z)) ZoneCriteria.hints(z, ZoneCriteria.Scene(
-            if (spec.detector == Detector.POSE) s.pose.points else emptyMap(), s.hands.ifEmpty { null }, s.classes, s.h / s.w.toFloat(), face = s.face.points)) else emptyList()
+            if (spec.detector == Detector.POSE) s.pose.points else emptyMap(),
+            // como en la cámara: el detector de manos solo en las zonas de manos
+            if (ZoneCriteria.needsHands(z)) s.hands.ifEmpty { null } else null, s.classes, s.h / s.w.toFloat(), face = s.face.points)) else emptyList()
         val std = if (spec.detector == Detector.FACE && s.face.points.size >= 4) Standardization.evaluate(z, s.face, null).let { e ->
             if (AutoCapture.ready(e.copy(status = if (e.hints.isEmpty()) MatchStatus.MATCH else e.status))) emptyList() else e.hints } else emptyList()
-        return crit + std
+        // «Centre la zona» es una indicación de encuadre que se corrige en vivo (no un incumplimiento de la vista)
+        return (crit + std).filter { "Centre la zona" !in it }
     }
 
     @Test
@@ -119,9 +122,18 @@ class ZoneEvalTest {
             val tp = pos.count { it.why.isEmpty() }; val nN = neg.size + cn; val tn = neg.count { it.why.isNotEmpty() } + (cn - cfa)
             val bal = if (pos.isEmpty() || nN == 0) null else (tp.toFloat() / pos.size + tn.toFloat() / nN) / 2
             md.append("| ${z.id} | ${pos.size} | $tp | $nN | $tn | ${bal?.let { "%.0f %%".format(it * 100) } ?: "—"} |\n")
-            summary.put(z.id, JSONObject().put("pos", pos.size).put("tp", tp).put("neg", nN).put("tn", tn).put("bal", bal ?: -1f))
+            summary.put(z.id, JSONObject().put("pos", pos.size).put("tp", tp).put("neg", nN).put("tn", tn).put("bal", (bal ?: -1f).toDouble()))
         }
         File("build/reports").mkdirs(); File("build/reports/zone_eval_summary.json").writeText(summary.toString(1))
+        // medidas de expresión de las fotos del rostro frontal (para calibrar la expresión neutra)
+        md.append("\n## Expresión medida (rostro frontal)\n\n| Foto | Cumple | Ojos | Boca abierta | Ancho boca | Comisuras | Cejas |\n|---|---|---|---|---|---|---|\n")
+        for (key in labels.keys().asSequence().sorted()) {
+            val arr = labels.getJSONArray(key); val l0 = arr.optString(0, "")
+            if (l0.removePrefix("!") != "rostro_frontal") continue
+            val s0 = cache[key.substringBefore('/')]?.get(key.substringAfter('/')) ?: continue
+            val ex = com.photomed.app.align.Expression.measure(s0.face.points) ?: continue
+            md.append("| $key | ${if (l0.startsWith("!")) "no" else "sí"} | %.2f | %.2f | %.2f | %.2f | %.2f |\n".format(ex.eyes, ex.mouthOpen, ex.mouthWidth, ex.smileLift, ex.brows))
+        }
         md.append("\n## Rechazos de fotos que cumplen\n\n")
         rows.filter { it.expectOk && it.why.isNotEmpty() }.forEach { md.append("- ${it.zone.id} · ${it.photo}: ${it.why.joinToString(" | ")}\n") }
         md.append("\n## Aceptadas sin cumplir\n\n")

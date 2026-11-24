@@ -48,7 +48,7 @@ class FacialExpressionTest {
     /** Con una expresión pedida, se pide el gesto (y no relajarlo, como en reposo). */
     @Test fun liveHintsFollowTheChosenExpression() {
         val rest = Expression(eyes = 0.28f, mouthOpen = 0.02f, mouthWidth = 0.85f, smileLift = 0.0f, brows = 0.20f)
-        val raised = rest.copy(brows = 0.31f)
+        val raised = rest.copy(brows = 0.40f)
         val smiling = rest.copy(mouthWidth = 1.05f, smileLift = 0.14f)
         val squeezed = rest.copy(eyes = 0.05f)
         assertTrue(Expression.target(FacialExpression.SURPRISE, rest).any { "cejas" in it })

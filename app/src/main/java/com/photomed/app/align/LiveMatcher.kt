@@ -448,7 +448,9 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             lastFaceAt = System.currentTimeMillis()
             lastFace = runCatching { detector.detectFull(Detector.FACE, frame).points }.getOrDefault(emptyMap())
         }
-        val scene = with(ZoneCriteria) { ZoneCriteria.Scene(pose, lastHands, lastClasses, aspect, single = singleLimb, face = lastFace).rotatedCcw(q) }
+        // rostro: sus puntos (para ver si algo lo tapa: gafas, gorra, mano)
+        val face = if (spec.detector == Detector.FACE && cur.points.isNotEmpty()) cur.points else lastFace
+        val scene = with(ZoneCriteria) { ZoneCriteria.Scene(pose, lastHands, lastClasses, aspect, single = singleLimb, face = face).rotatedCcw(q) }
         // el contorno dibujado, con la segmentación más reciente (sin la fusión, que va por detrás si se mueve)
         val drawScene = if (lastRawClasses === lastClasses) scene
             else with(ZoneCriteria) { ZoneCriteria.Scene(pose, lastHands, lastRawClasses, aspect, single = singleLimb).rotatedCcw(q) }
