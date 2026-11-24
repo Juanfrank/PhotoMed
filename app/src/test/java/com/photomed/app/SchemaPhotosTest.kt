@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import com.photomed.app.align.BodyPoints
 import com.photomed.app.align.BodySchema
+import com.photomed.app.align.isFaceZone
 import com.photomed.app.align.Detection
 import com.photomed.app.align.LandmarkDetector
 import com.photomed.app.align.Pt
@@ -43,6 +44,8 @@ class SchemaPhotosTest {
         for (key in labels.keys().asSequence().sorted()) {
             val arr = labels.getJSONArray(key)
             val z = (0 until arr.length()).map { arr.getString(it) }.firstOrNull { !it.startsWith("!") }?.let { Zone.fromId(it) } ?: continue
+            // solo las tomas con esquema del cuerpo y como mucho 120 fotos (cada una deja dos miniaturas en memoria)
+            if (z.isFaceZone() || z == Zone.FREE || tiles.size >= 120) continue
             if (only != null && only.none { key.contains(it) }) continue
             val dir = key.substringBefore('/'); val name = key.substringAfter('/')
             val js = cache.getOrPut(dir) { File(root, "$dir/landmarks.json").takeIf { it.exists() }?.let { JSONObject(it.readText()) } ?: JSONObject() }
