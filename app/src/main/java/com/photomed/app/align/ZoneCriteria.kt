@@ -698,6 +698,8 @@ object ZoneCriteria {
     const val STRONG_NAIL_DE = 15f
     /** Separación horizontal mínima de los hombros (anchos de imagen) para fiarse de su lado ([facingCamera]). */
     const val FACING_DX = 0.05f
+    const val GLUTES_MIN_SKIN = 0.5f
+    const val GLUTES_MAX_CLOTHES = 0.30f
     /** Ropa a la altura de las areolas (fracción de la franja) que indica sujetador o bikini puesto. */
     const val BREAST_CLOTHES = 0.06f
     /** Uñas claramente visibles en un pie que indican que se ve el dorso (no la planta). */
@@ -806,6 +808,9 @@ object ZoneCriteria {
         // sin la cabeza en el cuadro (recortada o tapada) el detector no sabe de qué lado está cada hombro: supone
         // que la persona mira a la cámara. Con la segmentación, si no se ve cabeza (ni cara ni pelo), no se sabe
         if (c != null && !headVisible(p, c, sw)) return null
+        // la cabeza vista casi solo como pelo es la nuca (de espaldas), aunque el detector ordene los hombros como
+        // de frente (le pasa con espaldas reales en las que la persona gira un poco la cabeza)
+        if (c != null && backOfHead(p, c, sw)) return false
         if (abs(sl.x - sr.x) >= FACING_DX) return sl.x > sr.x
         if (c == null) return null
         val head = listOfNotNull(p[L.NOSE], p[L.EAR_L], p[L.EAR_R])
@@ -825,9 +830,37 @@ object ZoneCriteria {
      * ¿Se ve la cabeza? Pelo (≥ 6 píxeles) o bastante cara (≥ 15) alrededor de la cabeza (nariz y orejas del
      * detector, o encima de los hombros); unos pocos píxeles de «cara» sin pelo son el cuello o la nuca.
      */
+    /**
+     * Sin poder decidir por los hombros: ¿hay una cara alrededor de la «nariz» del detector? (piel de la cara,
+     * más que pelo; el detector se inventa la nariz de espaldas, pero ahí no hay cara). Sin máscara, la nariz.
+     */
+    private fun faceAtNose(p: Map<String, Pt>, c: Classes?): Boolean {
+        val n = p[Landmarks.NOSE] ?: return false
+        if (c == null) return true
+        val k = c.width.toFloat(); val r = (0.05f * k).toInt().coerceAtLeast(2)
+        val cx = (n.x * k).toInt(); val cy = (n.y * k).toInt(); var face = 0; var hair = 0
+        for (y in cy - r..cy + r) for (x in cx - r..cx + r) {
+            if (x !in 0 until c.width || y !in 0 until c.height) continue
+            when (c.at(x, y)) { FaceLabels.FACE_SKIN -> face++; FaceLabels.HAIR -> hair++ }
+        }
+        return face >= 8 && face > hair
+    }
+
+    /** ¿Se ve la nuca? Alrededor de la cabeza, pelo (≥ 15 píxeles) y casi nada de cara (≤ 12 % de cara y pelo). */
+    private fun backOfHead(p: Map<String, Pt>, c: Classes, sw: Float): Boolean {
+        val (face, hair) = headCounts(p, c, sw) ?: return false
+        return hair >= 15 && face <= 0.12f * (face + hair)
+    }
+
     private fun headVisible(p: Map<String, Pt>, c: Classes, sw: Float): Boolean {
+        val (face, hair) = headCounts(p, c, sw) ?: return false
+        return hair >= 6 || face >= 15
+    }
+
+    /** Píxeles de cara y de pelo alrededor de la cabeza (nariz y orejas del detector, o encima de los hombros). */
+    private fun headCounts(p: Map<String, Pt>, c: Classes, sw: Float): Pair<Int, Int>? {
         val L = Landmarks
-        val sl = p[L.SHOULDER_L] ?: return false; val sr = p[L.SHOULDER_R] ?: return false
+        val sl = p[L.SHOULDER_L] ?: return null; val sr = p[L.SHOULDER_R] ?: return null
         val head = listOfNotNull(p[L.NOSE], p[L.EAR_L], p[L.EAR_R])
         val cx = if (head.isNotEmpty()) head.map { it.x }.average().toFloat() else (sl.x + sr.x) / 2
         val cy = if (head.isNotEmpty()) head.map { it.y }.average().toFloat() else (sl.y + sr.y) / 2 - 0.45f * sw
@@ -835,7 +868,19 @@ object ZoneCriteria {
         val x0 = ((cx - r) * k).toInt().coerceAtLeast(0); val x1 = ((cx + r) * k).toInt().coerceAtMost(c.width - 1)
         val y0 = ((cy - r) * k).toInt().coerceAtLeast(0); val y1 = ((cy + r) * k).toInt().coerceAtMost(c.height - 1)
         for (y in y0..y1) for (x in x0..x1) { val q = c.at(x, y); if (q == FaceLabels.FACE_SKIN) face++ else if (q == FaceLabels.HAIR) hair++ }
-        return hair >= 6 || face >= 15
+        return face to hair
+    }
+
+    /**
+     * Glúteos descubiertos: en la práctica clínica se fotografían con ropa interior mínima (tanga o desechable),
+     * que ocupa parte de la región; una braga o un bañador completo, no. Con fotos verificadas: tanga ≤ 30 % de
+     * ropa en la región y ≥ 50 % de piel; braga y bañador, más ropa o menos piel.
+     */
+    private fun glutesUncovered(c: Classes?, f: Pair<Float, Float>?): String? = when {
+        c == null -> HINT_ANALYZING
+        f == null -> null
+        f.first < GLUTES_MIN_SKIN || f.second > GLUTES_MAX_CLOTHES -> tr("Descubra %1\$s (se ve ropa o no se ve la piel)", tr(trn("los glúteos")))
+        else -> null
     }
 
     private fun body(zone: Zone, s: Scene): List<String> {
@@ -912,19 +957,29 @@ object ZoneCriteria {
                 uncovered(c, trn("el abdomen"), c?.let { skinClothes(it, cx - half, sy + (hy - sy) * 0.4f, cx + half, sy + (hy - sy) * 0.82f) })?.let { out += it }
             }
             GuideType.GLUTES -> {
+                // las rodillas suelen quedar fuera (la toma llega al tercio superior del muslo): con las caderas y los
+                // hombros, la altura del muslo se estima con la del tronco (de los hombros a las caderas)
+                @Suppress("NAME_SHADOWING") val p = if (has(p, L.HIP_L, L.HIP_R, L.SHOULDER_L, L.SHOULDER_R) && !has(p, L.KNEE_L, L.KNEE_R)) {
+                    val t = (p[L.HIP_L]!!.y + p[L.HIP_R]!!.y) / 2 - (p[L.SHOULDER_L]!!.y + p[L.SHOULDER_R]!!.y) / 2
+                    if (t <= 0.02f) p else p + mapOf(L.KNEE_L to Pt(p[L.HIP_L]!!.x, p[L.HIP_L]!!.y + 1.1f * t), L.KNEE_R to Pt(p[L.HIP_R]!!.x, p[L.HIP_R]!!.y + 1.1f * t))
+                } else p
                 if (!has(p, L.HIP_L, L.HIP_R, L.KNEE_L, L.KNEE_R)) {
                     if (handLike(s) || footLike(s)) return listOf(tr("Encuadre los glúteos enteros: las dos caderas"))
                     // de espaldas: región de la guía (los glúteos en el centro del cuadro)
-                    if (facingCamera(p, c) ?: (L.NOSE in p || (c != null && faceSkinAll(c) > 0.12f))) out += tr("De espaldas a la cámara")
+                    if (facingCamera(p, c) ?: (c != null && faceSkinAll(c) > 0.12f)) out += tr("De espaldas a la cámara")
                     if (c != null && !sidesClear(c, 0.5f)) out += tr("Encuadre los glúteos enteros: las dos caderas")
-                    uncovered(c, trn("los glúteos"), c?.let { skinClothes(it, 0.22f, 0.38f * s.aspect, 0.78f, 0.68f * s.aspect) })?.let { out += it }
+                    glutesUncovered(c, c?.let { skinClothes(it, 0.22f, 0.38f * s.aspect, 0.78f, 0.68f * s.aspect) })?.let { out += it }
                     return out
                 }
-                if (facingCamera(p, c) ?: (L.NOSE in p)) out += tr("De espaldas a la cámara")
+                // sin la cabeza (primer plano de los glúteos): el orden de los hombros, si se ven (en las fotos de espaldas
+                // verificadas sin cabeza el detector los ordena bien), o una cara junto a la «nariz»
+                val shoulderFacing = if (has(p, L.SHOULDER_L, L.SHOULDER_R) && abs(p[L.SHOULDER_L]!!.x - p[L.SHOULDER_R]!!.x) >= FACING_DX)
+                    p[L.SHOULDER_L]!!.x > p[L.SHOULDER_R]!!.x else null
+                if (facingCamera(p, c) ?: shoulderFacing ?: faceAtNose(p, c)) out += tr("De espaldas a la cámara")
                 val hl = p[L.HIP_L]!!; val hr = p[L.HIP_R]!!; val kl = p[L.KNEE_L]!!; val kr = p[L.KNEE_R]!!
                 if (tilt(hl, hr) > LEVEL_DEG) out += tr("Caderas niveladas")
                 val hy = (hl.y + hr.y) / 2; val ky = (kl.y + kr.y) / 2; val w = abs(hl.x - hr.x)
-                uncovered(c, trn("los glúteos"), c?.let { skinClothes(it, minOf(hl.x, hr.x) - w * 0.2f, hy - (ky - hy) * 0.1f, maxOf(hl.x, hr.x) + w * 0.2f, hy + (ky - hy) * 0.45f) })?.let { out += it }
+                glutesUncovered(c, c?.let { skinClothes(it, minOf(hl.x, hr.x) - w * 0.2f, hy - (ky - hy) * 0.1f, maxOf(hl.x, hr.x) + w * 0.2f, hy + (ky - hy) * 0.45f) })?.let { out += it }
             }
             GuideType.LEGS -> {
                 if (s.single) return singleLeg(s)
