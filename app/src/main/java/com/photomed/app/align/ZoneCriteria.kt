@@ -699,7 +699,7 @@ object ZoneCriteria {
     /** Separación horizontal mínima de los hombros (anchos de imagen) para fiarse de su lado ([facingCamera]). */
     const val FACING_DX = 0.05f
     const val GLUTES_MIN_SKIN = 0.5f
-    const val GLUTES_MAX_CLOTHES = 0.30f
+    const val GLUTES_MAX_CLOTHES = 0.45f
     /** Ropa a la altura de las areolas (fracción de la franja) que indica sujetador o bikini puesto. */
     const val BREAST_CLOTHES = 0.06f
     /** Uñas claramente visibles en un pie que indican que se ve el dorso (no la planta). */
@@ -873,7 +873,7 @@ object ZoneCriteria {
 
     /**
      * Glúteos descubiertos: en la práctica clínica se fotografían con ropa interior mínima (tanga o desechable),
-     * que ocupa parte de la región; una braga o un bañador completo, no. Con fotos verificadas: tanga ≤ 30 % de
+     * que ocupa parte de la región; una braga o un bañador completo, no. Con fotos verificadas: tanga ≤ 45 % de
      * ropa en la región y ≥ 50 % de piel; braga y bañador, más ropa o menos piel.
      */
     private fun glutesUncovered(c: Classes?, f: Pair<Float, Float>?): String? = when {
@@ -968,7 +968,8 @@ object ZoneCriteria {
                     // de espaldas: región de la guía (los glúteos en el centro del cuadro)
                     if (facingCamera(p, c) ?: (c != null && faceSkinAll(c) > 0.12f)) out += tr("De espaldas a la cámara")
                     if (c != null && !sidesClear(c, 0.5f)) out += tr("Encuadre los glúteos enteros: las dos caderas")
-                    glutesUncovered(c, c?.let { skinClothes(it, 0.22f, 0.38f * s.aspect, 0.78f, 0.68f * s.aspect) })?.let { out += it }
+                    // (sin puntos del cuerpo no se sabe dónde están los glúteos: la región de la guía, con el criterio general)
+                    uncovered(c, trn("los glúteos"), c?.let { skinClothes(it, 0.22f, 0.38f * s.aspect, 0.78f, 0.68f * s.aspect) })?.let { out += it }
                     return out
                 }
                 // sin la cabeza (primer plano de los glúteos): el orden de los hombros, si se ven (en las fotos de espaldas
