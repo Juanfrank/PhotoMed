@@ -27,6 +27,7 @@
     <string name="t_068adb33e7f6" formatted="false">Contrast ΔL*</string>
     <string name="t_06ed6be6fc9c" formatted="false">Face front</string>
     <string name="t_07592612817c" formatted="false">Abdomen right side</string>
+    <string name="t_075f8052acf3" formatted="false">lower eyelid and under-eye</string>
     <string name="t_076099a024c1" formatted="false">EEEE, MMMM d, yyyy</string>
     <string name="t_07b18ac218ae" formatted="false">Opacity</string>
     <string name="t_07fc11708c64" formatted="false">the buttocks</string>
@@ -56,6 +57,7 @@
     <string name="t_0b964b7af186" formatted="false">No reference: the shot is standardized (pose, light, expression)</string>
     <string name="t_0ba2e5910750" formatted="false">No errors logged</string>
     <string name="t_0c2e214fbd42" formatted="false">MMM d, yyyy, HH:mm</string>
+    <string name="t_0c2f4988eb15" formatted="false">inner canthus</string>
     <string name="t_0cbe904747d3" formatted="false">Facing forward: the face must be visible</string>
     <string name="t_0ce5df425650" formatted="false">Frame the whole leg: hip, knee and ankle</string>
     <string name="t_0d03edf094d3" formatted="false">Discard the line</string>
@@ -212,6 +214,7 @@
     <string name="t_2b34962aae4c" formatted="false">Like the phone\'s cameras. Photos are always saved unmirrored.</string>
     <string name="t_2b5e3f99646b" formatted="false">Search patient or patient record number</string>
     <string name="t_2b918057a110" formatted="false">Before · %1$s</string>
+    <string name="t_2b95c9bf1524" formatted="false">upper eyelid crease</string>
     <string name="t_2bb730a8e975" formatted="false">green</string>
     <string name="t_2bd2c7394ca0" formatted="false">Pulses that speed up as you approach a match and a tone on match, so you don\'t have to look at the screen.</string>
     <string name="t_2bd812186a0c" formatted="false">Perioral lines</string>
@@ -598,6 +601,7 @@
     <string name="t_8123a8bdfe6b" formatted="false">Privacy policy</string>
     <string name="t_814bb354fdfb" formatted="false">Indicative grade (0–5)</string>
     <string name="t_815ee15e8d98" formatted="false">System default</string>
+    <string name="t_8170bf4b2fd8" formatted="false">iris and pupil</string>
     <string name="t_818a6870adfc" formatted="false">Frame the trunk: shoulders and hips</string>
     <string name="t_81c08134212e" formatted="false">Eyes</string>
     <string name="t_81de432a2172" formatted="false">Show details</string>

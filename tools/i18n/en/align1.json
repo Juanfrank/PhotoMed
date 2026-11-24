@@ -158,5 +158,9 @@
   "orejas": "ears",
   "codos": "elbows",
   "manos": "hands",
-  "pies": "feet"
+  "pies": "feet",
+  "iris y pupila": "iris and pupil",
+  "párpado inferior y ojera": "lower eyelid and under-eye",
+  "canto interno": "inner canthus",
+  "pliegue del párpado superior": "upper eyelid crease"
 }

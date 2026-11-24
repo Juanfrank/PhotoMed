@@ -27,6 +27,7 @@
     <string name="t_068adb33e7f6" formatted="false">Contraste ΔL*</string>
     <string name="t_06ed6be6fc9c" formatted="false">Rostro frontal</string>
     <string name="t_07592612817c" formatted="false">Abdomen lateral derecho</string>
+    <string name="t_075f8052acf3" formatted="false">párpado inferior y ojera</string>
     <string name="t_076099a024c1" formatted="false">EEEE d \'de\' MMMM \'de\' yyyy</string>
     <string name="t_07b18ac218ae" formatted="false">Opacidad</string>
     <string name="t_07fc11708c64" formatted="false">los glúteos</string>
@@ -56,6 +57,7 @@
     <string name="t_0b964b7af186" formatted="false">Sin referencia: se estandariza la toma (pose, luz, gesto)</string>
     <string name="t_0ba2e5910750" formatted="false">Sin errores registrados</string>
     <string name="t_0c2e214fbd42" formatted="false">d MMM yyyy, HH:mm</string>
+    <string name="t_0c2f4988eb15" formatted="false">canto interno</string>
     <string name="t_0cbe904747d3" formatted="false">De frente: que se vea la cara</string>
     <string name="t_0ce5df425650" formatted="false">Encuadre la pierna entera: cadera, rodilla y tobillo</string>
     <string name="t_0d03edf094d3" formatted="false">Descartar la línea</string>
@@ -212,6 +214,7 @@
     <string name="t_2b34962aae4c" formatted="false">Como las cámaras del teléfono. Las fotos se guardan siempre sin espejar.</string>
     <string name="t_2b5e3f99646b" formatted="false">Buscar paciente o número de expediente</string>
     <string name="t_2b918057a110" formatted="false">Antes · %1$s</string>
+    <string name="t_2b95c9bf1524" formatted="false">pliegue del párpado superior</string>
     <string name="t_2bb730a8e975" formatted="false">verde</string>
     <string name="t_2bd2c7394ca0" formatted="false">Pulsos que se aceleran al acercarse a la coincidencia y un tono al coincidir, para no tener que mirar la pantalla.</string>
     <string name="t_2bd812186a0c" formatted="false">Líneas periorales</string>
@@ -598,6 +601,7 @@
     <string name="t_8123a8bdfe6b" formatted="false">Política de privacidad</string>
     <string name="t_814bb354fdfb" formatted="false">Grado orientativo (0–5)</string>
     <string name="t_815ee15e8d98" formatted="false">Según el sistema</string>
+    <string name="t_8170bf4b2fd8" formatted="false">iris y pupila</string>
     <string name="t_818a6870adfc" formatted="false">Encuadre el tronco: hombros y caderas</string>
     <string name="t_81c08134212e" formatted="false">Ojos</string>
     <string name="t_81de432a2172" formatted="false">Ver detalles</string>

@@ -491,7 +491,9 @@ class ZoneCriteriaDrawingsTest {
         val bp = com.photomed.app.align.BodyPoints
         val (hb, hs) = handsScene(true)
         val hp = bp.of(Zone.HANDS_PALMAR, ZoneCriteria.Scene(emptyMap(), hs, classes(hb)))
-        assertTrue("manos: ${hp.size} puntos", hp.size == 42)
+        // los 21 de cada mano y, del contorno, los 4 valles entre dedos y los 2 bordes de la muñeca de cada una
+        assertTrue("manos: ${hp.size} puntos", hp.keys.count { it.startsWith("mano_") } == 42)
+        assertTrue("manos, bordes: ${hp.keys.filter { it.startsWith("borde_mano_") }}", hp.keys.count { it.startsWith("borde_mano_") } >= 8)
         val fb = feetScene()
         val fp = bp.of(Zone.FEET_DORSAL, ZoneCriteria.Scene(emptyMap(), null, classes(fb)))
         assertTrue("pies: ${fp.keys}", fp.size >= 10)

@@ -117,8 +117,14 @@ data class ZoneAlignment(
                 )
                 GuideType.EYE -> ZoneAlignment(
                     Detector.NONE, emptySet(),
+                    // más regiones de borde (más puntos de referencia): iris y pupila, párpado inferior y ojera,
+                    // canto interno y pliegue del párpado superior
                     listOf(r(trn("párpados"), 0.5f, 0.73f, 0.3f, 0.08f), r(trn("ceja"), 0.5f, 0.45f, 0.35f, 0.08f, 0.8f),
-                        r(trn("patas de gallo"), 0.15f, 0.75f, 0.12f, 0.15f, 0.6f)).mirrored(zone.mirrored),
+                        r(trn("patas de gallo"), 0.15f, 0.75f, 0.12f, 0.15f, 0.6f),
+                        r(trn("iris y pupila"), 0.5f, 0.73f, 0.08f, 0.07f, 0.9f),
+                        r(trn("párpado inferior y ojera"), 0.5f, 0.86f, 0.28f, 0.07f, 0.6f),
+                        r(trn("canto interno"), 0.83f, 0.75f, 0.07f, 0.07f, 0.6f),
+                        r(trn("pliegue del párpado superior"), 0.5f, 0.62f, 0.28f, 0.05f, 0.6f)).mirrored(zone.mirrored),
                     listOf("Pupila", "Canto lateral"),
                     tr("párpados, ceja y pliegues laterales"),
                 )
