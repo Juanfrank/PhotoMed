@@ -717,7 +717,7 @@ object ZoneCriteria {
     /** Separación horizontal mínima de los hombros (anchos de imagen) para fiarse de su lado ([facingCamera]). */
     const val FACING_DX = 0.05f
     /** Fracción de la franja inferior del cuadro de «ropa» u «otros» a partir de la cual es el suelo, no calzado. */
-    const val OTHER_GROUND = 0.5f
+    const val OTHER_GROUND = 0.3f
     const val GLUTES_MIN_SKIN = 0.5f
     const val GLUTES_MAX_CLOTHES = 0.45f
     /** Ropa a la altura de las areolas (fracción de la franja) que indica sujetador o bikini puesto. */

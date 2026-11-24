@@ -2,6 +2,12 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.52 — 24 de noviembre de 2026
+
+- **Pies**: el suelo (arena, alfombra o baldosas que la segmentación toma por ropa u otros) ya no se
+  confunde con calzado que tapa los dedos. Dorso de los pies de 60 % a 78 % con fotos verificadas.
+- **Espalda**: una espalda musculosa con los brazos ya no se toma por un primer plano de pies (83 %).
+
 ## 2.51 — 24 de noviembre de 2026
 
 - **Glúteos**: con las rodillas fuera del cuadro (lo habitual en esta toma) la región se calcula con la
