@@ -281,6 +281,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
 
     private val fusion = ClassesFusion()
     private var lastFace: Map<String, Pt> = emptyMap(); private var lastFaceAt = 0L
+    private val SCALP_GUIDES = setOf(com.photomed.app.data.GuideType.SCALP, com.photomed.app.data.GuideType.SCALP_CROWN, com.photomed.app.data.GuideType.SCALP_PARIETAL)
     /** Última segmentación sin fusionar: para dibujar el contorno sin retraso. */
     @Volatile private var lastRawClasses: ZoneCriteria.Classes? = null
 
@@ -444,7 +445,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val q = guideRot
         // con la guía girada, los criterios se miden en su orientación y el esquema vuelve al cuadro
         // zona del ojo (sin detector): si el detector de rostro ve la cara entera, no es un primer plano de un ojo
-        if (zone.guide == com.photomed.app.data.GuideType.EYE && System.currentTimeMillis() - lastFaceAt > 500) {
+        // (y en el cuero cabelludo: con un rostro a la vista no es el cuero cabelludo; sin él, la piel es calvicie)
+        if ((zone.guide == com.photomed.app.data.GuideType.EYE || zone.guide in SCALP_GUIDES) && System.currentTimeMillis() - lastFaceAt > 500) {
             lastFaceAt = System.currentTimeMillis()
             lastFace = runCatching { detector.detectFull(Detector.FACE, frame).points }.getOrDefault(emptyMap())
         }

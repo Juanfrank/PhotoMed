@@ -273,12 +273,20 @@ object ZoneCriteria {
     }
 
     /** Cuero cabelludo: se debe ver pelo en el centro, no la cara. */
+    /**
+     * Vista del cuero cabelludo: no la cara (el detector de caras no ve los ojos; un retrato con mucho pelo
+     * en el centro no es la toma) y, en el centro, pelo.
+     */
     private fun scalp(s: Scene): List<String> {
         val c = s.classes ?: return emptyList()
+        val el = s.face[Landmarks.EYE_L]; val er = s.face[Landmarks.EYE_R]
+        val faceSeen = el != null && er != null && listOf(el, er).all { it.x in 0f..1f && it.y in 0f..s.aspect }
+        if (faceSeen) return listOf(tr("Encuadre el cuero cabelludo, no la cara"))
+        val hair = centerFraction(c, FaceLabels.HAIR)
         return when {
+            hair >= SCALP_HAIR_MIN && centerFraction(c, FaceLabels.FACE_SKIN) < SCALP_FACE_MAX -> emptyList()
             centerFraction(c, FaceLabels.FACE_SKIN) >= SCALP_FACE_MAX -> listOf(tr("Encuadre el cuero cabelludo, no la cara"))
-            centerFraction(c, FaceLabels.HAIR) < SCALP_HAIR_MIN -> listOf(tr("Encuadre el cuero cabelludo (no se ve el pelo)"))
-            else -> emptyList()
+            else -> listOf(tr("Encuadre el cuero cabelludo (no se ve el pelo)"))
         }
     }
 
