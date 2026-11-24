@@ -2,6 +2,16 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.51 — 24 de noviembre de 2026
+
+- **Glúteos**: con las rodillas fuera del cuadro (lo habitual en esta toma) la región se calcula con la
+  altura del tronco; la ropa interior mínima (tanga) se acepta, una braga o un bañador no; la nuca a la
+  vista indica que la persona está de espaldas. Con fotos verificadas, de 49 % a 80 %.
+- **Cuero cabelludo**: si el detector de caras ve los ojos, no es una vista del cuero cabelludo (antes un
+  retrato con mucho pelo en el centro podía dispararla). Coronilla 86 %, vértice 83 %.
+- **Espalda**: sin la cabeza en el cuadro no se pide «De espaldas a la cámara» (el detector supone la
+  orientación); hombros y caderas nivelados con 10° de tolerancia. Espalda 81 %.
+
 ## 2.50 — 24 de noviembre de 2026
 
 - **Precisión por toma medida frente a la verificación de la IA**: cada foto de referencia (de internet y de
