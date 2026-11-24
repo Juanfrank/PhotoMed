@@ -254,8 +254,11 @@ object FeatureMetrics {
         if (center != null && tr != null) b.value(trn("Entrada temporal derecha, mm"), tr - center)
         if (center != null && tl != null) b.value(trn("Entrada temporal izquierda, mm"), tl - center)
         center?.let { b.value(trn("Frente central / interpupilar"), it / (a.ipd * mm)) }
-        // tipo básico BASP (forma de la línea frontal) y Norwood aproximado, con las dos entradas medidas
-        val basp = if (center != null && tr != null && tl != null) HairDensity.baspBasic(center, (tr + tl) / 2) else null
+        // altura de la línea en el centro sobre las pupilas (en interpupilares): la que separa las líneas retrocedidas
+        val pupilHair = vAt(h, 0f)?.let { it * vScale / a.ipd }
+        pupilHair?.let { b.value(trn("Pupilas → pelo (centro) / interpupilar"), it) }
+        // tipo básico BASP (forma de la línea frontal) y Norwood aproximado
+        val basp = pupilHair?.let { HairDensity.baspBasic(it, if (center != null && tr != null && tl != null) (tr + tl) / 2 - center else null) }
         return if (b.f.isEmpty()) null else b.build(trn("Línea del pelo"), scale,
             basp?.let { "BASP $it · Norwood ≈ ${HairDensity.norwoodOfBasic(it)}" })
     }

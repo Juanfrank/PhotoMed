@@ -494,6 +494,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         val bodyDiagram = showLayers && seq.orEmpty().isNotEmpty() && seq.orEmpty().none { it.zone.isFaceZone() || it.zone == com.photomed.app.data.Zone.FREE }
         // capas faciales (contorno, rasgos, surcos, arrugas): solo con fotos del rostro
         @Suppress("NAME_SHADOWING") val showLayers = showLayers && seq.orEmpty().any { it.zone.isFaceZone() }
+        // cuero cabelludo (vértice, coronilla, parietales): densidad aparente con su tabla de medidas
+        val hairMetrics = bodyDiagram && seq.orEmpty().all { it.zone.category == com.photomed.app.data.ZoneCategory.CAPILAR }
+        val metricsOk = showLayers || hairMetrics
         // referencia de arrugas: fotos anteriores del paciente en la misma zona (la más reciente primero)
         fun previousOf(p: com.photomed.app.data.Photo) = photos.filter { it.zone == p.zone && it.expression == p.expression && it.takenAt < p.takenAt }
             .sortedByDescending { it.takenAt }.map { it.uri.toString() }
@@ -552,6 +555,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             if (showLayers) LayerChips(layersState.value, { layersState.value = it }, Modifier.fillMaxWidth().padding(top = 4.dp),
                 onMetrics = { metricsSheet = !metricsSheet }, opacity = annotAlpha.value, onOpacity = { annotAlpha.value = it })
             else if (bodyDiagram) LayerChips(layersState.value, { layersState.value = it }, Modifier.fillMaxWidth().padding(top = 4.dp),
+                onMetrics = if (hairMetrics) ({ metricsSheet = !metricsSheet }) else null,
                 opacity = annotAlpha.value, onOpacity = { annotAlpha.value = it }, body = true)
             // expresiones distintas en la comparación: las arrugas dinámicas no son comparables
             seq?.map { it.expression }?.distinct()?.takeIf { it.size > 1 }?.let { ex ->
@@ -778,7 +782,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             }
             androidx.compose.animation.AnimatedVisibility(panelOpen || seq == null) {
             Column {
-            if (!wide && metricsSheet && showLayers && seq != null)
+            if (!wide && metricsSheet && metricsOk && seq != null)
                 metricsPanel(seq, Modifier.fillMaxWidth().heightIn(max = (conf.screenHeightDp * 0.20f).dp))
 
             // Controles bajo las fotos: se ocultan a los 3 s sin tocar (fotos más grandes); un toque los recupera
@@ -840,7 +844,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             }
 
             // con la tabla de medidas abierta, el selector de fotos se oculta (más sitio para la tabla)
-            if (!(metricsSheet && showLayers && seq != null && !wide)) Column {
+            if (!(metricsSheet && metricsOk && seq != null && !wide)) Column {
             // Filtro por zona
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Md3Spacing.marginCompact),
@@ -930,7 +934,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             else if (wide) Row(Modifier.fillMaxSize()) {
                 // horizontal / tableta apaisada: controles y tabla en la mitad izquierda, las fotos en la derecha
                 Column(Modifier.weight(1f).fillMaxHeight()) {
-                    if (metricsSheet && showLayers && seq != null) {
+                    if (metricsSheet && metricsOk && seq != null) {
                         topControls()
                         metricsPanel(seq, Modifier.fillMaxWidth().weight(1f))
                     } else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {

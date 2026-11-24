@@ -90,6 +90,32 @@ class HairDensityTest {
         assertTrue("$men vs $women", men.isNotEmpty() && women.isNotEmpty() && men.min() > women.max())
     }
 
+    /** Vista frontal con la cabeza inclinada (fotos «front» de UniData, con máscara): cobertura frente a la anotada. */
+    @Test
+    fun frontTiltValidatedAgainstMasks() {
+        val lf = File(root, "hairval/labels.json")
+        assumeTrue("sin fotos de validación", lf.exists())
+        val js = JSONObject(lf.readText())
+        val est = ArrayList<Float>(); val gt = ArrayList<Float>()
+        val rep = StringBuilder("\n# Vista frontal inclinada\n\n| foto | visible | grados | anotado |\n|---|---|---|---|\n")
+        for (i in 1..5) {
+            val key = "src_menhair/${i}__front.png"
+            val o = js.optJSONObject(key) ?: continue
+            val w = o.getInt("w"); val h = o.getInt("h")
+            val labels = FaceLabels(w, h, java.util.Base64.getDecoder().decode(o.getString("labels")))
+            val r = HairDensity.analyze(scaled(File(root, key), w, h), w, h, labels, HairDensity.View.FRONT_TILT) ?: continue
+            val g = maskCoverage(File(root, "hairval/men_${i}_mask_front.png"), r.roi, w, h)
+            est += 1 - r.visible; gt += g
+            rep.append("| $key | %.0f %% | %s | cobertura %.0f %% |\n".format(r.visible * 100, HairDensity.grades(r, HairDensity.View.FRONT_TILT), g * 100))
+        }
+        assumeTrue(est.size >= 4)
+        val mae = est.indices.map { abs(est[it] - gt[it]) }.average()
+        rep.append("\nError medio de la cobertura: %.3f\n".format(mae))
+        File("build/reports").mkdirs(); File("build/reports/hair_density.md").appendText(rep.toString())
+        println(rep)
+        assertTrue("mae=$mae", mae <= 0.2)
+    }
+
     /** Sintético: cabeza con pelo oscuro uniforme (sin raya), con raya central y con la coronilla calva. */
     @Test
     fun syntheticPartAndCrown() {
@@ -137,10 +163,12 @@ class HairDensityTest {
 
     @Test
     fun baspBasicFromHairline() {
-        assertEquals("L", HairDensity.baspBasic(60f, 63f))
-        assertEquals("M1", HairDensity.baspBasic(60f, 75f))
-        assertEquals("M3", HairDensity.baspBasic(60f, 100f))
-        assertEquals("C2", HairDensity.baspBasic(95f, 98f))
+        assertEquals("L", HairDensity.baspBasic(1.05f, 3f))
+        assertEquals("M1", HairDensity.baspBasic(1.05f, 15f))
+        assertEquals("M3", HairDensity.baspBasic(1.3f, 40f))
+        assertEquals("C1", HairDensity.baspBasic(1.2f, null))
+        assertEquals("C2", HairDensity.baspBasic(1.4f, -5f))
+        assertEquals("L", HairDensity.baspBasic(1.1f, null))
         assertEquals("III", HairDensity.norwoodOfBasic("M2"))
     }
 }

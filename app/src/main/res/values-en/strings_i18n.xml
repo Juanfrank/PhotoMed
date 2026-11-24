@@ -206,6 +206,7 @@
     <string name="t_28086fbbf304" formatted="false">%1$s (darker)</string>
     <string name="t_28b06caf116d" formatted="false">Absolute measurements are comparable if both photos have the same framing (use the guide and the match); ratios do not depend on distance.</string>
     <string name="t_28e0f891a9f8" formatted="false">cropped to the alignment</string>
+    <string name="t_28eded005f83" formatted="false">Pupils → hairline (center) / interpupillary</string>
     <string name="t_29c0267d9bf2" formatted="false">Rotate the reference 90°</string>
     <string name="t_2a05733cc358" formatted="false">Flash on</string>
     <string name="t_2a61544ac64a" formatted="false">Use gaze</string>

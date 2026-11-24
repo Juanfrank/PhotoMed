@@ -2,6 +2,18 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.56 — 24 de noviembre de 2026
+
+- **Comparar**: las tomas capilares (vértice, coronilla, parietales) tienen la tabla de medidas de la densidad
+  capilar aparente, foto a foto, como el visor.
+- **Tipo básico BASP de la línea frontal recalibrado con retratos reales** (CelebA, línea retrocedida
+  etiquetada por personas): la altura de la línea en el centro sobre las pupilas, en distancias
+  interpupilares, separa las líneas retrocedidas con una exactitud equilibrada del 77 % (antes, con la
+  altura sobre las cejas, el 50 %). Nueva medida «Pupilas → pelo (centro) / interpupilar». La forma en M
+  (entradas) sigue con los umbrales de la escala: esas fotos no resuelven las sienes.
+- **Densidad de la vista frontal inclinada validada** con las máscaras anotadas de 5 fotos de hombres con
+  alopecia frontal: error medio de 6 puntos.
+
 ## 2.55 — 24 de noviembre de 2026
 
 - **Densidad capilar aparente** en las tomas capilares (vértice, coronilla, parietales y frontal con la cabeza

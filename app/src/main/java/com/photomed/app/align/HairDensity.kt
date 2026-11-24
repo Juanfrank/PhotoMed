@@ -192,18 +192,23 @@ object HairDensity {
 
     /**
      * Tipo básico BASP por la forma de la línea frontal: L (sin retroceso), M (las entradas retroceden
-     * más que el centro), C (retrocede el centro, en arco). [centerMm]: cejas → pelo en la línea media;
-     * [templeMm]: media de las dos verticales de los cantos externos (entradas). Grado 1–3 por la
-     * profundidad. Umbrales orientativos para una frente media de 55–65 mm.
+     * más que el centro, [templeRecessMm] ≥ 10 mm: altura de la línea en los cantos externos menos en el
+     * centro), C (retrocede la línea media). [pupilHairIpd]: altura de la línea en el centro sobre las
+     * pupilas, en distancias interpupilares (independiente de la escala de la foto).
+     *
+     * Calibrado con CelebA (atributo «Receding_Hairline» etiquetado por personas; 38 hombres con entradas
+     * y 39 sin ellas): la altura central ≥ [RECEDED_IPD] los separa con una exactitud equilibrada del 79 %
+     * (`BaspPhotosTest`). El umbral de las entradas (forma en M) no se pudo validar: esas fotos (≈ 180 px)
+     * no resuelven las sienes; es el de las definiciones de la escala.
      */
-    fun baspBasic(centerMm: Float, templeMm: Float): String {
-        val recess = templeMm - centerMm
-        return when {
-            recess >= 10f -> "M" + when { recess < 20f -> 1; recess < 35f -> 2; else -> 3 }
-            centerMm >= 75f -> "C" + when { centerMm < 90f -> 1; centerMm < 110f -> 2; else -> 3 }
-            else -> "L"
-        }
+    fun baspBasic(pupilHairIpd: Float, templeRecessMm: Float?): String = when {
+        templeRecessMm != null && templeRecessMm >= 10f -> "M" + when { templeRecessMm < 20f -> 1; templeRecessMm < 35f -> 2; else -> 3 }
+        pupilHairIpd >= RECEDED_IPD -> "C" + when { pupilHairIpd < 1.35f -> 1; pupilHairIpd < 1.55f -> 2; else -> 3 }
+        else -> "L"
     }
+
+    /** Línea frontal retrocedida: altura central sobre las pupilas, en distancias interpupilares (≈ 73 mm). */
+    const val RECEDED_IPD = 1.16f
 
     /** Norwood aproximado por el tipo básico BASP (patrón frontal). */
     fun norwoodOfBasic(t: String): String = when (t) {
