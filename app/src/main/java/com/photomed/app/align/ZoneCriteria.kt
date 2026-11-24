@@ -908,7 +908,8 @@ object ZoneCriteria {
                 listOfNotNull(p[L.WRIST_L], p[L.WRIST_R], p[L.ELBOW_L], p[L.ELBOW_R]).forEach { w ->
                     if (abs(w.x - cx) < half && w.y > sy + (hy - sy) * 0.3f && w.y < hy) { out += tr("Suba o cruce los brazos: que no tapen el abdomen"); return@forEach }
                 }
-                uncovered(c, trn("el abdomen"), c?.let { skinClothes(it, cx - half, sy + (hy - sy) * 0.4f, cx + half, hy) })?.let { out += it }
+                // hasta algo por encima de la cadera, como de frente (la cintura de la ropa queda por encima de la articulación)
+                uncovered(c, trn("el abdomen"), c?.let { skinClothes(it, cx - half, sy + (hy - sy) * 0.4f, cx + half, sy + (hy - sy) * 0.82f) })?.let { out += it }
             }
             GuideType.GLUTES -> {
                 if (!has(p, L.HIP_L, L.HIP_R, L.KNEE_L, L.KNEE_R)) {
