@@ -52,4 +52,5 @@ internal object ScalpGuideArt {
         pts(0.597f, 0.837f, 0.581f, 0.850f, 0.558f, 0.865f, 0.529f, 0.874f, 0.497f, 0.878f, 0.466f, 0.874f, 0.437f, 0.865f, 0.414f, 0.850f, 0.398f, 0.837f) to false,
     )
     val FRONTAL_TILT_MARKS: List<Offset> = pts(0.500f, 0.420f, 0.497f, 0.266f)
+    val FRONTAL_TILT_EYES: List<Offset> = pts(0.354f, 0.609f, 0.641f, 0.609f)
 }

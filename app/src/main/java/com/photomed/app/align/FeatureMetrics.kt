@@ -221,7 +221,11 @@ object FeatureMetrics {
      * externo (cola de la ceja); entradas temporales (cola − centro: positivo = el pelo retrocede más en
      * las sienes). Cada una con su segmento: pupila → ceja → pelo.
      */
-    fun hairlineM(mesh: List<Pt>, hair: List<Pt>, mm: Float, scale: String): Measured? {
+    /**
+     * [vScale]: corrección de las alturas frente → pelo (verticales) por el cabeceo de la toma (ver
+     * [hairTiltScale]); 1 en las tomas a nivel.
+     */
+    fun hairlineM(mesh: List<Pt>, hair: List<Pt>, mm: Float, scale: String, vScale: Float = 1f): Measured? {
         if (hair.size < 3) return null
         val a = Axes(mesh)
         val h = hair.map { a.u(it) to a.v(it) }.sortedBy { it.first }
@@ -231,7 +235,7 @@ object FeatureMetrics {
         fun column(from: Pt, short: String, label: String): Float? {
             val u = a.u(from)
             val vb = vAt(brow, u) ?: return null; val vh = vAt(h, u) ?: return null
-            val v = (vh - vb) * mm
+            val v = (vh - vb) * mm * vScale
             if (v <= 0f) return null
             b.g += MeasureGuide("", from, a.at(u, vb))           // pupila → ceja (sin texto)
             b.guide(short, v, a.at(u, vb), a.at(u, vh), label)    // ceja → pelo
@@ -261,4 +265,19 @@ object FeatureMetrics {
     fun nose(mesh: List<Pt>, mm: Float, scale: String) = noseM(mesh, mm, scale).metrics
     fun contour(mesh: List<Pt>, mm: Float, scale: String) = contourM(mesh, mm, scale).metrics
     fun hairline(mesh: List<Pt>, hair: List<Pt>, mm: Float, scale: String) = hairlineM(mesh, hair, mm, scale)?.metrics
+
+    /** Inclinación media de la frente hacia atrás respecto de la vertical (plano de Frankfort horizontal). */
+    const val FOREHEAD_SLOPE_DEG = 20f
+
+    /**
+     * Factor que lleva las alturas de la frente medidas con la cabeza flexionada [flexionDeg] (barbilla
+     * abajo, positivo) a las de una toma frontal a nivel: en la imagen la frente mide su longitud por
+     * cos(inclinación − flexión); a nivel, por cos(inclinación). Así la toma capilar con la cabeza
+     * inclinada da medidas comparables con las del rostro frontal.
+     */
+    fun hairTiltScale(flexionDeg: Float): Float {
+        val f = flexionDeg.coerceIn(-15f, 60f)
+        val r = Math.toRadians(FOREHEAD_SLOPE_DEG.toDouble())
+        return (kotlin.math.cos(r) / kotlin.math.cos(r - Math.toRadians(f.toDouble()))).toFloat()
+    }
 }

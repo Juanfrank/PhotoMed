@@ -2,6 +2,20 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.54 — 24 de noviembre de 2026
+
+- **Toma capilar «Frontal (cabeza inclinada)» con la malla facial completa**:
+  - **Guía adaptada a la cara**: el contorno del modelo 3D se encaja en la cara del paciente por los ojos
+    de la malla (escala, giro y posición), como las guías del rostro: en la primera toma, en cuanto la cara
+    está dentro del marco; en las siguientes, sobre la cara de la toma anterior. La frente, la línea de
+    implantación y la raya siguen la proyección a 30°: si la cabeza no está bastante inclinada, la marca
+    de la línea de implantación no coincide con la del paciente.
+  - **Distancia en cm** (por la distancia interpupilar), como en las tomas del rostro, y la de la toma
+    anterior como objetivo.
+  - **Visor y Comparar**: solo contorno, línea del pelo, ojos y cejas; ya no se miden arrugas, surcos ni
+    proporciones sobre la cara escorzada. Las alturas frente → pelo y las entradas se corrigen por el
+    cabeceo medido en la malla, para que sean comparables con las del rostro frontal.
+
 ## 2.53 — 24 de noviembre de 2026
 
 - **Nueva toma capilar: «Frontal (cabeza inclinada)»**: de frente, con la cabeza inclinada hacia delante

@@ -168,5 +168,8 @@
   "cejas y ojos": "eyebrows and eyes",
   "línea de implantación frontal, raya, entradas y patrón del cabello": "frontal hairline, part, temples and hair pattern",
   "Frontal (cabeza inclinada)": "Frontal (head tilted forward)",
-  "De frente, cabeza inclinada hacia delante (≈ 30°, barbilla al pecho) y cámara a la altura de la cara: línea de implantación frontal en la marca, raya en la línea media; cabello seco y peinado hacia atrás.": "Facing the camera, head tilted forward (≈ 30°, chin toward the chest), camera at face height: frontal hairline on the mark, part on the midline; hair dry and combed back."
+  "De frente, cabeza inclinada hacia delante (≈ 30°, barbilla al pecho) y cámara a la altura de la cara: línea de implantación frontal en la marca, raya en la línea media; cabello seco y peinado hacia atrás.": "Facing the camera, head tilted forward (≈ 30°, chin toward the chest), camera at face height: frontal hairline on the mark, part on the midline; hair dry and combed back.",
+  "Cabeza inclinada sin malla facial completa: solo el contorno, los ojos y la línea del pelo, sin medidas.": "Tilted head without a full face mesh: only the contour, eyes and hairline, without measurements.",
+  "Cabeza inclinada: contorno, ojos, cejas y línea del pelo; no se pudo medir el cabeceo y las alturas de la frente van sin corregir.": "Tilted head: contour, eyes, brows and hairline; the head pitch could not be measured, so forehead heights are uncorrected.",
+  "Cabeza inclinada %1$s°: contorno, ojos, cejas y línea del pelo; las alturas de la frente están corregidas a las de una toma frontal a nivel.": "Head tilted %1$s°: contour, eyes, brows and hairline; forehead heights are corrected to those of a level frontal view."
 }

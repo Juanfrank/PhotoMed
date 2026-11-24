@@ -178,7 +178,9 @@ object FaceAnnotations {
                  /** Arrugas y surcos de fotos anteriores del paciente (coordenadas de la cara), como referencia. */
                  priors: List<PriorLine> = emptyList(),
                  /** Trazos añadidos a mano (mismas coordenadas que [mesh]). */
-                 added: List<List<Pt>> = emptyList()): List<AnnotLine> {
+                 added: List<List<Pt>> = emptyList(),
+                 /** Corrección de las alturas de la frente por el cabeceo ([FeatureMetrics.hairTiltScale]). */
+                 hairVScale: Float = 1f): List<AnnotLine> {
         if (meshIn.size < 468) return face(keysFromMesh(meshIn), labels, lum)
         // cejas ajustadas a su borde en la imagen (la malla a veces las deja arriba o abajo del pelo)
         val mesh = if (lum != null) runCatching { BrowRefine.refineMesh(meshIn, lum, labels) }.getOrDefault(meshIn) else meshIn
@@ -204,7 +206,7 @@ object FaceAnnotations {
             out += feat(AnnotLayer.CONTOUR, it, true) { mm, s -> FeatureMetrics.contourM(mesh, mm, s, hairPts) }
         }
         hairPts?.let { h ->
-            out += feat(AnnotLayer.HAIRLINE, h, false) { mm, s -> FeatureMetrics.hairlineM(mesh, h, mm, s) }
+            out += feat(AnnotLayer.HAIRLINE, h, false) { mm, s -> FeatureMetrics.hairlineM(mesh, h, mm, s, hairVScale) }
         }
         fun chain(idx: IntArray) = idx.map { mesh[it] }
         out += feat(AnnotLayer.EYES, chain(EYE_R), true) { mm, s -> FeatureMetrics.eyeM(mesh, true, mm, s) }
@@ -888,12 +890,12 @@ object FaceCrop {
     /** Parte de cálculo de [annotate] (sin modelos nativos): recorte [b] ya hecho y su segmentación. */
     fun finish(mesh: List<Pt>, src: Bitmap, c: Crop, b: Bitmap, labels: FaceLabels?, extras: MeasureExtras? = null,
                info: MutableMap<String, Float>? = null, priors: List<PriorLine> = emptyList(),
-               added: List<List<Pt>> = emptyList()): List<AnnotLine> {
+               added: List<List<Pt>> = emptyList(), hairVScale: Float = 1f): List<AnnotLine> {
         val m = mesh.map { c.toCrop(it) }
         val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
         val ex = extras?.let { e -> MeasureExtras(e.relief?.let { relief(it, c, b.width, b.height) }, e.meta) }
         val lines = FaceAnnotations.fromMesh(m, labels, lum(b), LabImage.fromArgb(px, b.width, b.height), ex, info, priors,
-            added.map { l -> l.map { c.toCrop(it) } })
+            added.map { l -> l.map { c.toCrop(it) } }, hairVScale)
         if (b !== src) b.recycle()
         return lines.map { l -> l.mapped { c.toPhoto(it) } }
     }
@@ -954,15 +956,20 @@ class PhotoAnnotator(private val context: Context) {
                 }
             }
         }
+        val scalpFront = zone.guide == com.photomed.app.data.GuideType.SCALP_FRONT
         // perfil: cuello y papada por la silueta (fuera de la puerta)
         val prof = nat.profileMask?.let { m -> runCatching { Jawline.profile(m, bmp.width, bmp.height) }.getOrNull() }.orEmpty()
         val mesh = nat.mesh
         if (mesh != null && nat.crop != null && nat.cropBmp != null) {
             run {
                 val info = HashMap<String, Float>()
+                // capilar con la cabeza inclinada: alturas de la frente corregidas por el cabeceo medido en la malla
+                val tilt = if (scalpFront) tiltOf(mesh) else null
                 val all = try {
-                    FaceCrop.finish(mesh, bmp, nat.crop, nat.cropBmp, nat.labels, extras, info, priors, user?.added.orEmpty())
+                    FaceCrop.finish(mesh, bmp, nat.crop, nat.cropBmp, nat.labels, extras, info, priors, user?.added.orEmpty(),
+                        hairVScale = tilt?.let { FeatureMetrics.hairTiltScale(it) } ?: 1f)
                 } finally { if (nat.cropBmp !== bmp) nat.cropBmp.recycle() }
+                if (scalpFront) return@withContext scalpFrontLines(all.filter { l -> l.metrics?.name?.let { it in user?.dismissed.orEmpty() } != true }, measured = true) to scalpFrontNote(tilt)
                 // falsos positivos eliminados por el usuario
                 val lines = all.filter { l -> l.metrics?.name?.let { it in user?.dismissed.orEmpty() } != true }
                 if (memoryUri != null) LineMemory.save(context, memoryUri, mesh, lines)
@@ -981,6 +988,8 @@ class PhotoAnnotator(private val context: Context) {
                 val info = HashMap<String, Float>()
                 val lines = FaceAnnotations.face(pts, labels, lumOf(bmp), labOf(bmp), info)
                     .filter { l -> l.metrics?.name?.let { it in user?.dismissed.orEmpty() } != true }
+                if (scalpFront) return@withContext scalpFrontLines(lines, measured = false) to
+                    tr("Cabeza inclinada sin malla facial completa: solo el contorno, los ojos y la línea del pelo, sin medidas.")
                 return@withContext lines to (tr("No se pudo obtener la malla facial completa%1\$s: solo se miden los surcos " +
                     "(nasogeniano, marioneta, valle lagrimal); frente, ceño, patas de gallo y ojeras necesitan la malla.", err) +
                     (beardNote(info)?.let { " $it" } ?: ""))
@@ -989,6 +998,15 @@ class PhotoAnnotator(private val context: Context) {
             else emptyList<AnnotLine>() to tr("No se detectó ninguna cara en la foto%1\$s.", err)
         }
     }
+
+    private fun scalpFrontNote(tiltDeg: Float?): String = if (tiltDeg == null)
+        tr("Cabeza inclinada: contorno, ojos, cejas y línea del pelo; no se pudo medir el cabeceo y las alturas de la frente van sin corregir.")
+    else tr("Cabeza inclinada %1\$s°: contorno, ojos, cejas y línea del pelo; las alturas de la frente están corregidas a las de una toma frontal a nivel.",
+        "%.0f".format(tiltDeg))
+
+    /** Flexión de la cabeza (barbilla abajo, grados positivos) por el ajuste de la malla al modelo 3D. */
+    private fun tiltOf(mesh: List<Pt>): Float? =
+        HeadPose.fit(FaceAnnotations.keysFromMesh(mesh))?.let { -(it.pitch + Standardization.PITCH_ZERO) }
 
     /** Zonas corporales: contorno con el segmentador nativo (dentro de la puerta). */
     private suspend fun analyzeGated(bmp: Bitmap, zone: Zone): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
@@ -1121,6 +1139,24 @@ class PhotoAnnotator(private val context: Context) {
     }
 
     companion object {
+        /**
+         * Toma capilar frontal con la cabeza inclinada: solo el contorno, la línea del pelo, los ojos y las
+         * cejas. Las arrugas, surcos y proporciones medidos sobre una cara escorzada 30° no son comparables
+         * con los del rostro frontal; el contorno queda sin medidas (sus tercios dependen del escorzo).
+         * [measured] false (sin malla): ninguna línea lleva medidas.
+         */
+        internal fun scalpFrontLines(all: List<AnnotLine>, measured: Boolean): List<AnnotLine> =
+            all.filter { it.layer in SCALP_FRONT_LAYERS }
+                .map { l ->
+                    when {
+                        l.layer == AnnotLayer.CONTOUR -> l.copy(metrics = null, guides = emptyList())
+                        !measured -> l.copy(metrics = null, guides = emptyList())
+                        else -> l
+                    }
+                }
+
+        val SCALP_FRONT_LAYERS = setOf(AnnotLayer.CONTOUR, AnnotLayer.HAIRLINE, AnnotLayer.EYES)
+
         /**
          * En las pruebas en la JVM (Robolectric) no hay modelos nativos: las llamadas a ML Kit no
          * terminan y ocupan los hilos de fondo de las pruebas siguientes. Ahí el análisis no se hace

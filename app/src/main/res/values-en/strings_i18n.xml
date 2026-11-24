@@ -657,6 +657,7 @@
     <string name="t_874b300c9053" formatted="false">Bigonial / bizygomatic, %</string>
     <string name="t_876588f8ffe5" formatted="false">Move the hand away from the face</string>
     <string name="t_8790c5b15043" formatted="false">manual</string>
+    <string name="t_881ac0d171d9" formatted="false">Tilted head without a full face mesh: only the contour, eyes and hairline, without measurements.</string>
     <string name="t_88450313f199" formatted="false">assisted zoom %1$s×</string>
     <string name="t_885995c5d7aa" formatted="false">Lower lip</string>
     <string name="t_886fc7075481" formatted="false">Remove from selection</string>
@@ -666,6 +667,7 @@
     <string name="t_890100058cee" formatted="false">points</string>
     <string name="t_891dbe279c2c" formatted="false">Matching points (%)</string>
     <string name="t_891f467b3875" formatted="false">of its length</string>
+    <string name="t_89a8ce292406" formatted="false">Tilted head: contour, eyes, brows and hairline; the head pitch could not be measured, so forehead heights are uncorrected.</string>
     <string name="t_89d8bfc90c14" formatted="false">Right brow</string>
     <string name="t_89e7216c0a76" formatted="false">Protocol of %1$s</string>
     <string name="t_8a19b4a51fac" formatted="false">Dorsum width (middle), mm</string>
@@ -907,6 +909,7 @@
     <string name="t_be7dbbf70598" formatted="false">Whole feet: toes and edges inside the frame</string>
     <string name="t_be94adf8a363" formatted="false">Aligned %1$d photos to the reference (%2$s)</string>
     <string name="t_beaa8a4d3c28" formatted="false">Last shot</string>
+    <string name="t_bf3c8c0f321a" formatted="false">Head tilted %1$s°: contour, eyes, brows and hairline; forehead heights are corrected to those of a level frontal view.</string>
     <string name="t_bf50dba7b949" formatted="false">The patient record of %1$s and its %2$d photos will be deleted from the gallery. This action cannot be undone.</string>
     <string name="t_bf704749f12c" formatted="false">Choose the view for 1 photo.</string>
     <string name="t_bf98b1c3ecb6" formatted="false">Shutter</string>

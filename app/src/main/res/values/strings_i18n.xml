@@ -657,6 +657,7 @@
     <string name="t_874b300c9053" formatted="false">Bigonial / bicigomático, %</string>
     <string name="t_876588f8ffe5" formatted="false">Retire la mano de la cara</string>
     <string name="t_8790c5b15043" formatted="false">manual</string>
+    <string name="t_881ac0d171d9" formatted="false">Cabeza inclinada sin malla facial completa: solo el contorno, los ojos y la línea del pelo, sin medidas.</string>
     <string name="t_88450313f199" formatted="false">zoom asistido %1$s×</string>
     <string name="t_885995c5d7aa" formatted="false">Labio inferior</string>
     <string name="t_886fc7075481" formatted="false">Quitar de la selección</string>
@@ -666,6 +667,7 @@
     <string name="t_890100058cee" formatted="false">puntos</string>
     <string name="t_891dbe279c2c" formatted="false">Puntos coincidentes (%)</string>
     <string name="t_891f467b3875" formatted="false">del recorrido</string>
+    <string name="t_89a8ce292406" formatted="false">Cabeza inclinada: contorno, ojos, cejas y línea del pelo; no se pudo medir el cabeceo y las alturas de la frente van sin corregir.</string>
     <string name="t_89d8bfc90c14" formatted="false">Ceja derecha</string>
     <string name="t_89e7216c0a76" formatted="false">Protocolo del %1$s</string>
     <string name="t_8a19b4a51fac" formatted="false">Ancho del dorso (mitad), mm</string>
@@ -907,6 +909,7 @@
     <string name="t_be7dbbf70598" formatted="false">Pies completos: los dedos y los bordes dentro del cuadro</string>
     <string name="t_be94adf8a363" formatted="false">Alineadas %1$d fotos a la referencia (%2$s)</string>
     <string name="t_beaa8a4d3c28" formatted="false">Última toma</string>
+    <string name="t_bf3c8c0f321a" formatted="false">Cabeza inclinada %1$s°: contorno, ojos, cejas y línea del pelo; las alturas de la frente están corregidas a las de una toma frontal a nivel.</string>
     <string name="t_bf50dba7b949" formatted="false">Se eliminarán el expediente de %1$s y sus %2$d fotografías de la galería. Esta acción no se puede deshacer.</string>
     <string name="t_bf704749f12c" formatted="false">Elija el ángulo de 1 foto.</string>
     <string name="t_bf98b1c3ecb6" formatted="false">Disparador</string>

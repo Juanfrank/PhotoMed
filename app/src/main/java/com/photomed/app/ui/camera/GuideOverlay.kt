@@ -272,7 +272,13 @@ private fun GuideLayer(
         return
     }
     // Zonas sin ilustración (oblicuos 45°, abdomen lateral): contorno vectorial.
-    val guide = guideFor(zone.guide)
+    val guide = remember(zone.guide, adaptTo) {
+        val g = guideFor(zone.guide)
+        // capilar frontal (cabeza inclinada): la guía del modelo 3D se encaja en la cara por los ojos de la malla
+        val fit = if (zone.guide == com.photomed.app.data.GuideType.SCALP_FRONT && adaptTo.isNotEmpty()) ScalpFaceFit.of(adaptTo) else null
+        if (fit == null) g else Guide(g.contours.map { (pts, closed) -> pts.map(fit::map) to closed },
+            g.lines.map { (a, b) -> fit.map(a) to fit.map(b) }, g.marks.map(fit::map))
+    }
     Canvas(modifier) {
         if (showGrid) drawGrid()
         if (showContour) drawGuide(guide, zone.mirrored, tone.color, lines = showLines)

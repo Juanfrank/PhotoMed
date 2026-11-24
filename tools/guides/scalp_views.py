@@ -366,6 +366,10 @@ def kotlin(views):
             out.append(f"        pts({flat}) to {'true' if closed else 'false'},")
         out.append("    )")
         out.append(f"    val {name}_MARKS: List<Offset> = pts(" + ", ".join(f"{x:.3f}f, {y:.3f}f" for x, y in marks) + ")")
+        if name == "FRONTAL_TILT":
+            # centros de los ojos (derecho, izquierdo) del modelo: anclas para encajar la guía en la cara detectada
+            eyes = [tuple(cam.proj(FACE[k])) for k in ("eye_r", "eye_l")]
+            out.append(f"    val {name}_EYES: List<Offset> = pts(" + ", ".join(f"{x:.3f}f, {y:.3f}f" for x, y in eyes) + ")")
     out.append("}")
     OUT.write_text("\n".join(out) + "\n")
 

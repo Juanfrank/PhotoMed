@@ -12,6 +12,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.photomed.app.align.AnnotLayer as L
 
 /** Vista cenital del cuero cabelludo (tricología). */
 class ScalpZoneTest {
@@ -83,5 +84,59 @@ class ScalpZoneTest {
         assertTrue(Zone.EYE_L.mirrored && !Zone.EYE_R.mirrored)
         assertEquals(Zone.EYE_L, Zone.fromId("ojo_izq"))
         assertTrue(Zone.entries.map { it.id }.toSet().size == Zone.entries.size)
+    }
+
+    /** Toma capilar frontal: la guía del modelo 3D se encaja en la cara por los ojos de la malla. */
+    @Test
+    fun frontalTiltGuideFollowsDetectedEyes() {
+        val fit = com.photomed.app.ui.camera.ScalpFaceFit
+        val model = com.photomed.app.ui.camera.ScalpGuideArt.FRONTAL_TILT_EYES
+        val a = com.photomed.app.ui.camera.ScalpFaceFit.ASPECT
+        fun pts(r: androidx.compose.ui.geometry.Offset, l: androidx.compose.ui.geometry.Offset) = mapOf(
+            com.photomed.app.align.Landmarks.EYE_R to com.photomed.app.align.Pt(r.x, r.y / a),
+            com.photomed.app.align.Landmarks.EYE_L to com.photomed.app.align.Pt(l.x, l.y / a))
+        // ojos donde los del modelo: identidad y cara encuadrada
+        val same = fit.of(pts(model[0], model[1]))!!
+        val m = com.photomed.app.ui.camera.ScalpGuideArt.FRONTAL_TILT_MARKS[0]
+        assertEquals(m.x, same.map(m).x, 1e-4f); assertEquals(m.y, same.map(m).y, 1e-4f)
+        assertTrue(com.photomed.app.align.FaceFraming.matches(fit.framing(pts(model[0], model[1])), false))
+        // cara desplazada y más pequeña: la marca de la línea de implantación la sigue (mitad de la distancia a los ojos)
+        val off = androidx.compose.ui.geometry.Offset(0.05f, 0.04f)
+        val mid = androidx.compose.ui.geometry.Offset((model[0].x + model[1].x) / 2, (model[0].y + model[1].y) / 2)
+        fun shrink(o: androidx.compose.ui.geometry.Offset) = mid + (o - mid) * 0.5f + off
+        val small = fit.of(pts(shrink(model[0]), shrink(model[1])))!!
+        val got = small.map(m); val want = shrink(m)
+        assertEquals(want.x, got.x, 1e-3f); assertEquals(want.y, got.y, 1e-3f)
+        // ojos intercambiados (otra convención de lado): la misma guía, sin darla la vuelta
+        val swapped = fit.of(pts(model[1], model[0]))!!.map(m)
+        assertEquals(m.x, swapped.x, 1e-4f); assertEquals(m.y, swapped.y, 1e-4f)
+        assertTrue(!com.photomed.app.align.FaceFraming.matches(fit.framing(pts(shrink(model[0]), shrink(model[1]))), false))
+    }
+
+    /** Alturas de la frente con la cabeza inclinada: llevadas a las de una toma a nivel. */
+    @Test
+    fun hairlineHeightsCorrectedForHeadTilt() {
+        val f = com.photomed.app.align.FeatureMetrics
+        assertEquals(1f, f.hairTiltScale(0f), 1e-5f)
+        // a 30° la frente se ve casi de frente (más larga en la imagen): factor < 1
+        val k = f.hairTiltScale(30f)
+        assertTrue("k=$k", k in 0.93f..0.97f)
+        // fuera de rango: acotado
+        assertEquals(f.hairTiltScale(60f), f.hairTiltScale(90f), 1e-6f)
+    }
+
+    /** Visor: en la toma capilar inclinada solo contorno (sin medidas), línea del pelo, ojos y cejas. */
+    @Test
+    fun frontalTiltViewerKeepsHairLayersOnly() {
+
+        val met = com.photomed.app.align.LineMetrics("x", features = listOf("a" to 1f))
+        val p = listOf(com.photomed.app.align.Pt(0f, 0f), com.photomed.app.align.Pt(1f, 1f))
+        val all = listOf(L.CONTOUR, L.HAIRLINE, L.EYES, L.FOREHEAD, L.CROWS_FEET, L.FOLDS, L.GLABELLA, L.NOSE, L.LIPS)
+            .map { com.photomed.app.align.AnnotLine(it, p, false, metrics = met) }
+        val out = com.photomed.app.align.PhotoAnnotator.scalpFrontLines(all, measured = true)
+        assertEquals(listOf(L.CONTOUR, L.HAIRLINE, L.EYES), out.map { it.layer })
+        assertEquals(null, out[0].metrics)
+        assertNotNull(out[1].metrics)
+        assertTrue(com.photomed.app.align.PhotoAnnotator.scalpFrontLines(all, measured = false).all { it.metrics == null })
     }
 }

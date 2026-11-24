@@ -442,7 +442,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         val pts = live?.currentPointsAll.orEmpty()
         val noRef = refPoints.isEmpty() || !showGhost
         val fit = if (noRef && art != null && art.controls.isNotEmpty() && pts.isNotEmpty())
-            com.photomed.app.align.FaceFraming.of(art.controls, FaceControlKeys, pts) else null
+            com.photomed.app.align.FaceFraming.of(art.controls, FaceControlKeys, pts)
+            // capilar frontal (cabeza inclinada): por los ojos del modelo 3D de la guía
+            else if (noRef && zone.guide == com.photomed.app.data.GuideType.SCALP_FRONT && pts.isNotEmpty()) ScalpFaceFit.framing(pts)
+            else null
         framedFace = com.photomed.app.align.FaceFraming.matches(fit, framedFace)
     }
     // si la segmentación de pelo y piel no carga en este teléfono, decirlo una vez con el motivo
@@ -467,7 +470,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
      */
     fun distanceHint(): String? {
         overheadHint()?.let { return it }
-        if (zone.category != com.photomed.app.data.ZoneCategory.FACIAL) return null
+        // rostro y toma capilar frontal (cara inclinada: la interpupilar, horizontal, no cambia con el cabeceo)
+        if (zone.category != com.photomed.app.data.ZoneCategory.FACIAL && zone.guide != com.photomed.app.data.GuideType.SCALP_FRONT) return null
         val d = live?.let { CameraGuidance.faceDistanceCm(it.currentPointsAll, focalNorm, zoomRatio) } ?: return null
         val target = refCond["DistanceCm"]?.toFloatOrNull()?.takeIf { (showGhost && ghost != null) || protoRef != null }
         return when {
