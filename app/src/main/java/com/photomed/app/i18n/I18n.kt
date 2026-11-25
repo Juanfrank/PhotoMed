@@ -118,5 +118,6 @@ private object DataFragments {
         trn("Trazado de nuevo a mano"), trn("Trazado a mano"), trn("contornos"), trn("contorno"), trn("puntos"),
         trn("derecha"), trn("izquierda"), trn("derecho"), trn("izquierdo"), trn("superior"), trn("inferior"),
         trn("estimada"), trn("sensor de profundidad"), trn("interpupilar"), trn("manual"),
+        trn("Mancha"), trn("Arañita"), trn("Várice"),
     ).sortedByDescending { it.length }
 }

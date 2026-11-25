@@ -704,6 +704,10 @@ fun annotColor(layer: com.photomed.app.align.AnnotLayer): Color = when (layer) {
     com.photomed.app.align.AnnotLayer.BODY_POINTS -> Color(0xFFE040FB)
     com.photomed.app.align.AnnotLayer.SCALP_MAP -> Color(0xFFFF7043)
     com.photomed.app.align.AnnotLayer.HAIR_PART -> Color(0xFF80D8FF)
+    com.photomed.app.align.AnnotLayer.SPOTS -> Color(0xFFFFA000)
+    com.photomed.app.align.AnnotLayer.SPIDER_VEINS -> Color(0xFFFF1744)
+    com.photomed.app.align.AnnotLayer.VARICES -> Color(0xFF2979FF)
+    com.photomed.app.align.AnnotLayer.CELLULITE -> Color(0xFFB2FF59)
 }
 
 /**

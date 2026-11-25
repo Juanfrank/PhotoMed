@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import com.photomed.app.data.Zone
 import com.photomed.app.i18n.tr
+import com.photomed.app.i18n.trData
 import com.photomed.app.i18n.trn
 import kotlin.math.hypot
 import kotlin.math.roundToInt
@@ -17,7 +18,9 @@ enum class AnnotLayer(private val es: String) {
     // diagrama del cuerpo (manos, pies, tronco y miembros: ver BodyDiagram)
     BODY_AXES(trn("Ejes y articulaciones")), FINGERS(trn("Dedos")), NAILS(trn("Uñas")), BODY_POINTS(trn("Puntos de referencia")),
     // cuero cabelludo (ver HairDensity)
-    SCALP_MAP(trn("Cuero cabelludo visible")), HAIR_PART(trn("Franja de la raya"));
+    SCALP_MAP(trn("Cuero cabelludo visible")), HAIR_PART(trn("Franja de la raya")),
+    // hallazgos de la piel, orientativos (ver SkinLesions)
+    SPOTS(trn("Manchas")), SPIDER_VEINS(trn("Arañitas")), VARICES(trn("Várices")), CELLULITE(trn("Celulitis"));
 
     val label: String get() = tr(es)
 }
@@ -869,6 +872,11 @@ object FaceCrop {
         return Bitmap.createBitmap(src, x, y, w, h, m, true)
     }
 
+    /** Piel de [labels] (clases [classes]) en una rejilla [w]×[h] (vecino más cercano). */
+    fun skinOf(labels: FaceLabels, w: Int, h: Int, vararg classes: Int): BooleanArray = BooleanArray(w * h) { i ->
+        labels[(i % w) * labels.width / w, (i / w) * labels.height / h] in classes
+    }
+
     /** Luminancia (0..1) de un mapa de bits sin reescalar. */
     fun lum(b: Bitmap): GrayImage {
         val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
@@ -907,8 +915,14 @@ object FaceCrop {
         val ex = extras?.let { e -> MeasureExtras(e.relief?.let { relief(it, c, b.width, b.height) }, e.meta, e.onlyAdded) }
         val lines = FaceAnnotations.fromMesh(m, labels, lum(b), LabImage.fromArgb(px, b.width, b.height), ex, info, priors,
             added.map { l -> l.map { c.toCrop(it) } }, hairVScale)
+        // hallazgos de la piel (manchas, arañitas) en la piel de la cara, sin ojos, cejas ni labios; escala por el iris
+        val lesions = if (labels == null || extras?.onlyAdded == true) emptyList() else runCatching {
+            val skin = skinOf(labels, b.width, b.height, FaceLabels.FACE_SKIN)
+            SkinLesions.detect(px, b.width, b.height, skin, setOf(SkinLesions.Kind.SPOTS, SkinLesions.Kind.SPIDER),
+                LineMeasure.scale(m)?.first, lines.filter { it.closed && (it.layer == AnnotLayer.EYES || it.layer == AnnotLayer.LIPS) }.map { it.points })
+        }.getOrDefault(emptyList())
         if (b !== src) b.recycle()
-        return lines.map { l -> l.mapped { c.toPhoto(it) } }
+        return (lines + lesions).map { l -> l.mapped { c.toPhoto(it) } }
     }
 }
 
@@ -1078,8 +1092,8 @@ class PhotoAnnotator(private val context: Context) {
         }
         // diagrama del cuerpo con los mismos detectores que la cámara: puntos del cuerpo, manos y segmentación
         val diagram = runCatching { bodyDiagram(bmp, zone) }.getOrNull().orEmpty()
-        if (diagram.isNotEmpty()) return@withContext diagram to tr("Diagrama del cuerpo: contorno, ejes, dedos, uñas y puntos de referencia. " +
-            "Las medidas de arrugas y surcos son solo para zonas del rostro.")
+        if (diagram.isNotEmpty()) return@withContext diagram to (tr("Diagrama del cuerpo: contorno, ejes, dedos, uñas y puntos de referencia. " +
+            "Las medidas de arrugas y surcos son solo para zonas del rostro.") + " " + trData(SkinLesions.NOTE))
         val mask = BodyRegion.of(zone, bmp) { b -> SubjectSegmenter().use { it.segment(b) } }
         (mask?.let { FaceAnnotations.body(it) } ?: emptyList()) to tr("Las medidas de arrugas y surcos son solo para zonas del rostro.")
     }
@@ -1116,8 +1130,23 @@ class PhotoAnnotator(private val context: Context) {
         val hands = if (zone.guide == com.photomed.app.data.GuideType.HANDS) HandDetector.createOrNull(context)?.use { it.detect(bmp) } else null
         // una sola mano en la foto (toma de una mano): se dibuja esa
         val single = hands?.size == 1
-        return BodyDiagram.lines(zone, ZoneCriteria.Scene(pose, hands?.ifEmpty { null }, classes, bmp.height / bmp.width.toFloat(), single = single))
+        val diagram = BodyDiagram.lines(zone, ZoneCriteria.Scene(pose, hands?.ifEmpty { null }, classes, bmp.height / bmp.width.toFloat(), single = single))
+        return diagram + bodyLesions(bmp, zone, labels)
     }
+
+    /** Hallazgos de la piel ([SkinLesions]) de una zona del cuerpo, a resolución media, en la piel de la segmentación. */
+    private fun bodyLesions(bmp: Bitmap, zone: Zone, labels: FaceLabels?): List<AnnotLine> = runCatching {
+        val w = LESION_W; val h = (w * bmp.height / bmp.width.toFloat()).roundToInt().coerceAtLeast(1)
+        val b = Bitmap.createScaledBitmap(bmp, w, h, true)
+        val px = IntArray(w * h).also { b.getPixels(it, 0, w, 0, 0, w, h) }
+        b.recycleIfCopy(bmp)
+        // solo la piel del cuerpo: una cara pequeña en la foto daría ojos y cejas como «manchas»
+        val skin = labels?.let { FaceCrop.skinOf(it, w, h, FaceLabels.BODY_SKIN) }
+        SkinLesions.detect(px, w, h, skin, SkinLesions.kindsFor(zone))
+    }.getOrDefault(emptyList())
+
+    private fun Bitmap.recycleIfCopy(src: Bitmap) { if (this !== src && !isRecycled) recycle() }
+
 
     /**
      * Medidas de un trazo hecho a mano ([pts] en coordenadas de [bmp], unidades de su ancho), con la
@@ -1240,6 +1269,8 @@ class PhotoAnnotator(private val context: Context) {
 
         /** Ancho del análisis capilar (px). */
         const val HAIR_W = 384
+        /** Ancho de la imagen en la que se buscan manchas, arañitas, várices y celulitis en el cuerpo. */
+        const val LESION_W = 384
 
         val HAIR_NOTE: String get() = tr("Densidad capilar aparente: cuero cabelludo visible entre el pelo (segmentación y color), " +
             "no pelos por cm² (eso es tricoscopia). Grados BASP, Norwood, Ludwig y Sinclair orientativos, para seguir al mismo " +

@@ -68,5 +68,5 @@ object EyeComposite {
 
     /** Capas del ojo que se conservan (lo demás de la «cara» compuesta no es de la foto). */
     val LAYERS = setOf(AnnotLayer.EYES, AnnotLayer.CROWS_FEET, AnnotLayer.DARK_CIRCLES, AnnotLayer.EYE_BAGS,
-        AnnotLayer.INFRAORBITAL, AnnotLayer.FOLDS)
+        AnnotLayer.INFRAORBITAL, AnnotLayer.FOLDS, AnnotLayer.SPOTS, AnnotLayer.SPIDER_VEINS)
 }

@@ -2,6 +2,27 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.62 — 25 de noviembre de 2026
+
+- **Esqueleto del cuerpo al estilo de las manos** en pies, brazos, piernas, tronco (frente, lado, espalda, mamas,
+  glúteos) y cuello: articulaciones, ejes, falanges transversales (anchos de la piel a alturas fijas de cada
+  segmento) y medidas en grados y proporciones: ángulo del codo y de la rodilla, grosor / largo de cada segmento,
+  inclinación de hombros, caderas, tronco y cuello, cintura / tórax y cintura / caderas, antepié largo / ancho y
+  eje del pie. Brazo sin puntos del cuerpo: eje por la piel. En 335 fotos reales, 334 medidas en rangos anatómicos.
+  Todas las zonas del cuerpo tienen ahora la tabla de medidas.
+- **Alineador de color**: la referencia se toma solo de la piel (segmentación) y se descartan ropa, brillos,
+  sombras, rojeces y tonos no naturales (rechazo de atípicos por la mediana); si el punto elegido a mano no
+  parece piel natural, se avisa.
+- **Ojo individual**: se mide con la sección del ojo de la malla facial (la foto y su espejo forman una cara):
+  párpados, cejas, patas de gallo, ojeras, bolsas e infraorbitarias con escala por el iris.
+- **Hallazgos de la piel (orientativos, capas nuevas)**: **manchas** (más oscuras y con más color que la piel
+  vecina y con borde propio; frente a 80 lesiones con máscara de dermatólogo, IoU mediana 0,66), **arañitas**
+  (trazos finos rojos), **várices** (muslos, piernas y pies: trazos azulados alargados) y **celulitis** (glúteos y
+  muslos: superficie con hoyuelos y grado 0–3 por la textura). En la cara y el ojo, manchas y arañitas con medidas
+  en mm (sin ojos, cejas ni labios). Arañitas, várices y celulitis son heurísticas, sin datos etiquetados para
+  validarlas; la celulitis depende mucho de la luz. La **fibrosis no se detecta**: es un cambio de la dermis que
+  una foto no muestra de forma fiable (necesita palpación o ecografía).
+
 ## 2.61 — 25 de noviembre de 2026
 
 - **La pantalla de la cámara ya no se redibuja entera con cada cuadro analizado** (unas 5 veces por segundo). El
