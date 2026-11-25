@@ -719,6 +719,7 @@
     <string name="t_9119f4190f35" formatted="false">Foot</string>
     <string name="t_911b9bb62b92" formatted="false">eyelids</string>
     <string name="t_911e033bd93c" formatted="false">Each chosen photo will become a shot with its area, its expression and its reference (without the image).</string>
+    <string name="t_912fe120ff3e" formatted="false">The import was interrupted by an error (it is in the error log)</string>
     <string name="t_918e6c2cd00d" formatted="false">Vertical perspective</string>
     <string name="t_91aa28956e31" formatted="false">Mirror the reference</string>
     <string name="t_91ad59f14f99" formatted="false">Long-press an area to choose several: start a photo sequence or save it as a protocol.</string>

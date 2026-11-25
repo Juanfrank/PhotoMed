@@ -367,6 +367,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     val matchingFlag = remember { AtomicBoolean(false) }
     /** Tras las exposiciones de una toma, hasta que se guarda: sin análisis en vivo. */
     val analysisPaused = remember { AtomicBoolean(false) }
+    val liveErrorAt = remember { java.util.concurrent.atomic.AtomicLong(0L) }
     LaunchedEffect(capturing) { if (!capturing) analysisPaused.set(false) }
     matchingFlag.set(matchingEnabled && psPattern == null && reviewName == null)
 
@@ -597,7 +598,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                                 pipeline.withEngine { it.analyze(frame) }
                             }?.let { live = it }
                         }
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        // antes se tragaba sin rastro: queda en el registro de acciones (una vez por minuto como mucho)
+                        val now = System.currentTimeMillis()
+                        if (now - liveErrorAt.get() > 60_000) { liveErrorAt.set(now); com.photomed.app.CrashLog.crumb("análisis en vivo: ${e.javaClass.simpleName} ${e.message.orEmpty().take(80)}") }
                     } finally {
                         proxy.close()
                     }

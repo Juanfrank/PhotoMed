@@ -1277,7 +1277,10 @@ class PhotoAnnotator(private val context: Context) {
         private val cache = object : LinkedHashMap<String, List<AnnotLine>>(16, 0.75f, true) {
             override fun removeEldestEntry(e: MutableMap.MutableEntry<String, List<AnnotLine>>) = size > 40
         }
-        private val notes = HashMap<String, String?>()
+        // notas de cada análisis: acotadas como los análisis (antes sin límite)
+        private val notes = object : LinkedHashMap<String, String?>(16, 0.75f, true) {
+            override fun removeEldestEntry(e: MutableMap.MutableEntry<String, String?>) = size > 200
+        }
         // la sensibilidad de las arrugas forma parte de la clave: al cambiarla se vuelve a analizar
         fun note(key: String): String? = synchronized(cache) { notes[WrinkleTuning.key + key] }
         fun putNote(key: String, n: String?) = synchronized(cache) { notes[WrinkleTuning.key + key] = n }

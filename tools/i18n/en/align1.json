@@ -196,5 +196,6 @@
   "Cabeza: inclinar más hacia delante (nariz–mentón)": "Head: tilt further forward (nose–chin)",
   "Cabeza: inclinar menos, subir la barbilla (nariz–mentón)": "Head: tilt less, raise the chin (nose–chin)",
   "Se guardaron %1$d foto(s) pendientes": "%1$d pending photo(s) were saved",
-  " · se conservó en la app y se volverá a guardar al abrir de nuevo la cámara": " · kept in the app; it will be saved when the camera is opened again"
+  " · se conservó en la app y se volverá a guardar al abrir de nuevo la cámara": " · kept in the app; it will be saved when the camera is opened again",
+  "La importación se interrumpió por un error (queda en el registro de errores)": "The import was interrupted by an error (it is in the error log)"
 }

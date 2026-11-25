@@ -719,6 +719,7 @@
     <string name="t_9119f4190f35" formatted="false">Pie</string>
     <string name="t_911b9bb62b92" formatted="false">párpados</string>
     <string name="t_911e033bd93c" formatted="false">Cada foto elegida será una toma con su zona, su gesto y su referencia (sin la imagen).</string>
+    <string name="t_912fe120ff3e" formatted="false">La importación se interrumpió por un error (queda en el registro de errores)</string>
     <string name="t_918e6c2cd00d" formatted="false">Perspectiva vertical</string>
     <string name="t_91aa28956e31" formatted="false">Espejo de la referencia</string>
     <string name="t_91ad59f14f99" formatted="false">Mantenga pulsada una zona para elegir varias: inicie una secuencia de fotos o guárdela como protocolo.</string>

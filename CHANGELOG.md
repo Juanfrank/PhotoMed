@@ -2,6 +2,28 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.60 — 25 de noviembre de 2026
+
+Revisión integral, tanda 4: **escalabilidad, recursos y errores**.
+
+- **Lista de expedientes**: una sola consulta a la galería para todos (antes una por expediente) y los protocolos
+  leídos una vez; el recuento de tomas por protocolo se guarda por expediente, así un arranque en frío no abre
+  todas las fotos para leer sus metadatos.
+- **Espacio**: al borrar un expediente se borran también sus exportaciones y las imágenes de nombre no reconocido,
+  y los datos privados de sus fotos aunque el sistema pida confirmación; una vez al día se apartan los datos de
+  fotos que ya no existen y se borran a los 30 días; las cachés de análisis tienen límite y las cargas grandes no
+  desplazan las miniaturas de la memoria.
+- **Errores que ya no se pierden ni cierran la app**: importar sigue con las demás fotos si una falla (y avisa si
+  se interrumpe); la migración de la versión 1 sigue con las demás; el análisis en vivo deja rastro de sus
+  errores; las lecturas de metadatos de Comparar no cierran la app; un XMP demasiado grande no se intenta
+  escribir.
+- **Método**: la indicación de enderezar la cabeza en los oblicuos salía al revés (signo del alabeo del modelo 3D,
+  comprobado con 274 caras) y la semilla del ajuste de la pose también; el arco de Cupido se mide en el eje
+  vertical de la cara (antes incluía el desplazamiento lateral de los picos); dos pies en la misma mitad de la
+  imagen ya no mezclan sus puntos; la igualación de color se quita al cambiar la selección (podía aplicarse una
+  hecha contra otra referencia).
+- **Pruebas**: procesos de prueba más cortos y sin el compilador residente (agotaban la memoria).
+
 ## 2.59 — 25 de noviembre de 2026
 
 Revisión integral, tanda 3: **rendimiento de la cámara, el visor y Comparar** (mismos resultados, menos trabajo).

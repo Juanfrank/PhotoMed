@@ -177,12 +177,15 @@ fun ExpedienteScreen(
             val e = exp ?: return@ImportPhotosDialog
             scope.launch {
                 importBusy = if (chosen.size == 1) tr("Importando %1\$d foto…", chosen.size) else tr("Importando %1\$d fotos…", chosen.size)
-                val r = runCatching { com.photomed.app.data.PhotoImport.importAll(context, repo, e, chosen) }.getOrNull()
+                val rr = runCatching { com.photomed.app.data.PhotoImport.importAll(context, repo, e, chosen) }
+                rr.exceptionOrNull()?.let { com.photomed.app.CrashLog.write("Importar fotos", it) }
+                val r = rr.getOrNull()
                 importBusy = null
                 reload++
                 val saved = r?.saved?.size ?: 0; val dup = r?.duplicates ?: 0
                 val failed = chosen.size - saved - dup
-                snackbar.showSnackbar(tr("Importadas %1\$d de %2\$d", saved, chosen.size) + (if (dup > 0) tr(" (%1\$d ya estaban en el expediente)", dup) else "") +
+                snackbar.showSnackbar(if (r == null) tr("La importación se interrumpió por un error (queda en el registro de errores)")
+                    else tr("Importadas %1\$d de %2\$d", saved, chosen.size) + (if (dup > 0) tr(" (%1\$d ya estaban en el expediente)", dup) else "") +
                     if (failed > 0) tr(" (%1\$d no se pudieron leer)", failed) else "")
             }
         }

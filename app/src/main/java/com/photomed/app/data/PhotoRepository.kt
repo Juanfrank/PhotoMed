@@ -33,10 +33,16 @@ class PhotoRepository(
 
     // ---------- Expedientes ----------
 
-    fun listExpedientes(): List<Expediente> =
-        metaRoot.listFiles { f -> f.isDirectory }.orEmpty()
-            .mapNotNull { readExpediente(it) }
+    /** Expedientes con sus fotos de una sola consulta a la galería (antes una por expediente). */
+    fun listExpedientes(): List<Expediente> {
+        val all = runCatching { store.listAll() }.getOrNull()
+        return metaRoot.listFiles { f -> f.isDirectory }.orEmpty()
+            .mapNotNull { readExpediente(it, all?.let { m -> toPhotos(m[it.name].orEmpty()) }) }
             .sortedByDescending { it.lastPhotoAt ?: it.createdAt }
+    }
+
+    /** Fotos de todos los expedientes (carpeta → fotos), de una sola consulta. */
+    fun photosByExpediente(): Map<String, List<Photo>> = store.listAll().mapValues { (_, v) -> toPhotos(v) }
 
     fun getExpediente(id: String): Expediente? = readExpediente(File(metaRoot, id))
 
@@ -56,13 +62,18 @@ class PhotoRepository(
         writeMeta(exp.metaDir, patientName.trim(), recordNumber.trim(), notes.trim(), consent, exp.createdAt)
     }
 
+    private val pendingForget = HashMap<String, List<Uri>>()
+
     /** Borra el expediente y sus fotos de la galería. */
     fun deleteExpediente(exp: Expediente): DeleteResult {
-        val uris = photos(exp).map { it.uri }
+        // todas las imágenes del álbum (también las de nombre no reconocido) y sus exportaciones (antes quedaban)
+        val uris = (store.list(exp.id) + runCatching { store.list("${exp.id}/$EXPORT_DIR") }.getOrDefault(emptyList())).map { it.uri }.distinct()
         val result = store.delete(uris)
+        // con confirmación del sistema, al volver a llamar las fotos ya no aparecen: se recuerdan para limpiar sus datos
+        if (result !is DeleteResult.Done) synchronized(pendingForget) { pendingForget[exp.id] = uris }
         if (result is DeleteResult.Done) {
             // datos privados de cada foto (antes quedaban huérfanos)
-            uris.forEach { runCatching { forgetPhoto(it) } }
+            (uris + synchronized(pendingForget) { pendingForget.remove(exp.id).orEmpty() }).distinct().forEach { runCatching { forgetPhoto(it) } }
             exp.metaDir.deleteRecursively()
         }
         return result
@@ -101,12 +112,12 @@ class PhotoRepository(
         com.photomed.app.align.AtomicFile.write(File(dir, META), json.toString(2))
     }
 
-    private fun readExpediente(dir: File): Expediente? {
+    private fun readExpediente(dir: File, prefetched: List<Photo>? = null): Expediente? {
         val meta = File(dir, META)
         if (!dir.isDirectory || !meta.exists()) return null
         return try {
             val json = JSONObject(meta.readText())
-            val photos = photos(dir.name)
+            val photos = prefetched ?: photos(dir.name)
             Expediente(
                 id = dir.name,
                 patientName = json.optString("patientName"),
@@ -145,8 +156,10 @@ class PhotoRepository(
 
     fun photos(exp: Expediente, zone: Zone? = null): List<Photo> = photos(exp.id, zone)
 
-    private fun photos(folder: String, zone: Zone? = null): List<Photo> =
-        store.list(folder).mapNotNull { sp ->
+    private fun photos(folder: String, zone: Zone? = null): List<Photo> = toPhotos(store.list(folder), zone)
+
+    private fun toPhotos(stored: List<StoredPhoto>, zone: Zone? = null): List<Photo> =
+        stored.mapNotNull { sp ->
             val z = zoneOf(sp.displayName) ?: return@mapNotNull null
             if (zone != null && z != zone) return@mapNotNull null
             Photo(sp.uri, sp.displayName, z, timestampOf(sp.displayName) ?: sp.dateTaken)
@@ -218,11 +231,14 @@ class PhotoRepository(
             Zone.entries.forEach { zone ->
                 File(oldDir, zone.id).listFiles { f -> f.extension.equals("jpg", true) }.orEmpty().forEach { f ->
                     val t = timestampOf(f.name) ?: f.lastModified()
-                    savePhoto(exp, zone, f, t)
-                    f.delete()
+                    // una foto que falla no detiene la migración de las demás (se queda donde estaba)
+                    runCatching { savePhoto(exp, zone, f, t) }
+                        .onSuccess { f.delete() }
+                        .onFailure { com.photomed.app.CrashLog.write("Migrar una foto de la versión 1", it) }
                 }
             }
-            oldDir.deleteRecursively()
+            // solo si ya no queda ninguna foto sin migrar
+            if (oldDir.walkTopDown().none { it.isFile && it.extension.equals("jpg", true) }) oldDir.deleteRecursively()
         }
     }
 

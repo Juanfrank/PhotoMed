@@ -96,7 +96,7 @@ object PhotoImport {
         hashOf: (Uri) -> String? = { u -> runCatching { context.contentResolver.openInputStream(u)?.use { sha1(it) } }.getOrNull() },
     ): Result {
         val known = HashSet<String>()
-        withContext(Dispatchers.IO) { repo.photos(exp).forEach { p -> repo.readInfo(p)?.conditions?.get("SourceHash")?.let { known += it } } }
+        withContext(Dispatchers.IO) { repo.photos(exp).forEach { p -> runCatching { repo.readInfo(p)?.conditions?.get("SourceHash") }.getOrNull()?.let { known += it } } }
         val todo = ArrayList<ImportItem>(); val hashes = HashMap<Uri, String>(); var dup = 0
         for (it in items) {
             val h = withContext(Dispatchers.IO) { hashOf(it.uri) }
@@ -122,7 +122,8 @@ object PhotoImport {
             var t = it.takenAt
             while (!used.add(t)) t++
             val f = File(context.cacheDir, "import_${System.nanoTime()}.jpg")
-            try {
+            // una foto que falla al guardarse no interrumpe las demás (queda en el registro)
+            try { runCatching {
                 withContext(Dispatchers.IO) {
                     f.outputStream().use { o -> bmp.compress(Bitmap.CompressFormat.JPEG, 95, o) }
                     out += repo.savePhoto(exp, zone, f, takenAt = t,
@@ -131,7 +132,8 @@ object PhotoImport {
                             "Expression" to it.expression.labelEs) +
                             (hashes[it.uri]?.let { h -> mapOf("SourceHash" to h) } ?: emptyMap()))
                 }
-            } finally { f.delete() }
+            }.onFailure { e -> if (e is kotlinx.coroutines.CancellationException) throw e; com.photomed.app.CrashLog.write("Importar una foto", e) }
+            } finally { f.delete(); bmp.recycle() }
         }
         return out
     }

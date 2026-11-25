@@ -64,6 +64,8 @@ class MainActivity : ComponentActivity() {
         PhotoRepository.legacyRoot(applicationContext)?.let { legacy ->
             if (legacy.exists()) lifecycleScope.launch(Dispatchers.IO) { runCatching { repository.migrateLegacy(legacy) } }
         }
+        // datos privados de fotos que ya no existen: se apartan una vez al día (antes se acumulaban)
+        lifecycleScope.launch(Dispatchers.IO) { runCatching { com.photomed.app.data.OrphanSweep.runDaily(applicationContext, repository) } }
         handleShared(intent)
         setContent {
             PhotoMedTheme {

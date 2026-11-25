@@ -330,7 +330,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     // Condiciones de captura (XMP): avisar si alguna foto no es comparable con la referencia.
     LaunchedEffect(seqKeys) {
         val s = seq ?: run { conditionsWarning = null; return@LaunchedEffect }
-        val infos = withContext(Dispatchers.IO) { s.map { repo.readInfo(it)?.conditions.orEmpty() } }
+        val infos = withContext(Dispatchers.IO) { s.map { runCatching { repo.readInfo(it)?.conditions }.getOrNull().orEmpty() } }
         // tomadas "casi alineadas" (disparo permisivo): alinear automáticamente al abrir
         nearCaptured = infos.any { it["Status"] == "CLOSE" }
         // tricología: altura de la frente (cejas → línea de implantación) en cada foto
@@ -340,7 +340,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         }.joinToString("\n").ifEmpty { null }
     }
 
-    fun resetAlignment() { alignToken++; alignJob?.cancel(); alignJob = null; alignments = emptyMap(); alignedFor = emptyList(); alignProgress = null; zoom = ZoomState() }
+    // la igualación de color es relativa a la referencia de la selección: se quita con ella (antes podía aplicarse
+    // una igualación hecha contra otra referencia tras cambiar la selección o el orden)
+    fun resetAlignment() { alignToken++; alignJob?.cancel(); alignJob = null; alignments = emptyMap(); alignedFor = emptyList(); alignProgress = null; zoom = ZoomState(); colorAdjusts = emptyMap() }
 
     fun setOption(o: AlignOptions) {
         options = o
@@ -387,7 +389,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             val out = mutableMapOf<String, AlignmentResult>()
             var failed: Throwable? = null
             // orientación de cada foto por la cadena de referencias con que se tomó (giro de la referencia)
-            val orientInfos = withContext(Dispatchers.IO) { allPhotos.filter { it.zone == s[0].zone }.associate { it.displayName to (repo.readInfo(it)?.conditions.orEmpty()) } }
+            val orientInfos = withContext(Dispatchers.IO) { allPhotos.filter { it.zone == s[0].zone }.associate { it.displayName to (runCatching { repo.readInfo(it)?.conditions }.getOrNull().orEmpty()) } }
             for (i in 1 until s.size) {
                 alignProgress = if (s.size > 2) tr("Alineando %1\$d/%2\$d…", i, s.size - 1) else tr("Alineando…")
                 val r = runCatching {

@@ -88,7 +88,8 @@ object HeadPose {
         if (keys.size < MIN_POINTS) return null
         val X = Array(keys.size) { HeadModel.POINTS.getValue(keys[it]) }
         val U = Array(keys.size) { points.getValue(keys[it]) }
-        val rollInit = HeadRoll.of(points, 45f)?.first ?: 0f
+        // el alabeo del modelo es antihorario (y hacia arriba); HeadRoll, horario en la imagen: semilla con el signo cambiado
+        val rollInit = HeadRoll.of(points, 45f)?.first?.let { -it } ?: 0f
         var best: FloatArray? = null; var bestC = Float.MAX_VALUE
         for (y0 in floatArrayOf(-35f, 0f, 35f)) {
             val a = floatArrayOf(y0, 0f, rollInit)

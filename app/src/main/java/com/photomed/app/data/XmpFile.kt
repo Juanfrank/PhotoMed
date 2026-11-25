@@ -10,6 +10,17 @@ import java.io.File
  * tocan los metadatos; los píxeles no se vuelven a codificar.
  */
 object XmpFile {
+    /**
+     * El XMP va en un segmento APP1 de JPEG (≤ 64 kB, compartido con el EXIF): uno mayor no se escribe (antes se
+     * intentaba y fallaba sin rastro); queda en el registro y la copia privada de la app sigue valiendo.
+     */
+    const val MAX_XMP = 60_000
+    private fun checked(xmp: String): String {
+        val bytes = xmp.toByteArray().size
+        check(bytes <= MAX_XMP) { "XMP demasiado grande ($bytes bytes)" }
+        return xmp
+    }
+
     fun read(context: Context, uri: Uri): String? = runCatching {
         if (uri.scheme == "file") ExifInterface(uri.path!!).getAttribute(ExifInterface.TAG_XMP)
         else context.contentResolver.openInputStream(uri)?.use { ExifInterface(it).getAttribute(ExifInterface.TAG_XMP) }
@@ -23,12 +34,12 @@ object XmpFile {
     fun update(context: Context, uri: Uri, change: (String?) -> String): Boolean = PhotoLocks.on(uri.toString()) { runCatching {
         if (uri.scheme == "file") {
             val e = ExifInterface(File(uri.path!!))
-            e.setAttribute(ExifInterface.TAG_XMP, change(e.getAttribute(ExifInterface.TAG_XMP)))
+            e.setAttribute(ExifInterface.TAG_XMP, checked(change(e.getAttribute(ExifInterface.TAG_XMP))))
             e.saveAttributes()
         } else {
             context.contentResolver.openFileDescriptor(uri, "rw")!!.use { pfd ->
                 val e = ExifInterface(pfd.fileDescriptor)
-                e.setAttribute(ExifInterface.TAG_XMP, change(e.getAttribute(ExifInterface.TAG_XMP)))
+                e.setAttribute(ExifInterface.TAG_XMP, checked(change(e.getAttribute(ExifInterface.TAG_XMP))))
                 e.saveAttributes()
             }
         }

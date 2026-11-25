@@ -173,7 +173,10 @@ object TraceJson {
  * regeneran si el usuario lo pide.
  */
 object ConfirmedTraces {
-    private val mem = HashMap<String, Pair<Long, TraceSet?>>()
+    // las últimas fotos vistas (antes sin límite: un conjunto por cada foto abierta en la sesión)
+    private val mem = object : LinkedHashMap<String, Pair<Long, TraceSet?>>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<Long, TraceSet?>>?) = size > 64
+    }
     private fun dir(context: Context) = File(context.filesDir, "trazos").apply { mkdirs() }
     private fun key(uri: String) = MessageDigest.getInstance("SHA-1").digest(uri.toByteArray()).joinToString("") { "%02x".format(it) }
     private fun file(context: Context, uri: String) = File(dir(context), key(uri) + ".json")

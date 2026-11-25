@@ -27,7 +27,9 @@ object ImageOps {
             return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { centerCrop34(e.apply(full), width) } }
         val request = ImageRequest.Builder(context)
             .data(uri).size(width, width * 4 / 3).scale(Scale.FILL).precision(Precision.EXACT)
-            .allowHardware(false).build()
+            .allowHardware(false)
+            // cargas grandes de análisis: fuera de la caché de memoria (desplazaban las miniaturas de las rejillas)
+            .memoryCachePolicy(coil.request.CachePolicy.DISABLED).build()
         val bmp = (context.imageLoader.execute(request) as? SuccessResult)?.drawable
             ?.let { (it as BitmapDrawable).bitmap } ?: error(tr("No se pudo abrir la imagen"))
         // recorte, giro y escala fuera del hilo del llamador (a veces el principal: visor, exportación)
@@ -38,7 +40,9 @@ object ImageOps {
     suspend fun loadFull(context: Context, uri: Uri, maxSide: Int, edit: ImageEdit? = null): Bitmap {
         val request = ImageRequest.Builder(context)
             .data(uri).size(maxSide, maxSide).scale(Scale.FIT).precision(Precision.INEXACT)
-            .allowHardware(false).build()
+            .allowHardware(false)
+            // cargas grandes de análisis: fuera de la caché de memoria (desplazaban las miniaturas de las rejillas)
+            .memoryCachePolicy(coil.request.CachePolicy.DISABLED).build()
         val bmp = (context.imageLoader.execute(request) as? SuccessResult)?.drawable
             ?.let { (it as BitmapDrawable).bitmap } ?: error(tr("No se pudo abrir la imagen"))
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { (edit ?: PhotoEdits.of(context, uri.toString())).apply(bmp) }

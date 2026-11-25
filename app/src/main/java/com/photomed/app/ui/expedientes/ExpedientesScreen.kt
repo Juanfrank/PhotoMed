@@ -98,9 +98,15 @@ fun ExpedientesScreen(onOpen: (String) -> Unit, onAbout: () -> Unit, onSettings:
     val context = androidx.compose.ui.platform.LocalContext.current
     val summaries = remember { androidx.compose.runtime.mutableStateMapOf<String, com.photomed.app.data.ExpedienteSummary>() }
     LaunchedEffect(expedientes) {
+        // fotos de todos los expedientes de una consulta y los protocolos una vez (antes por cada expediente)
+        val (all, nProtocols) = withContext(Dispatchers.IO) {
+            runCatching { repo.photosByExpediente() }.getOrNull() to runCatching { com.photomed.app.data.Protocols.list(context).size }.getOrDefault(0)
+        }
         expedientes.orEmpty().forEach { e ->
-            withContext(Dispatchers.IO) { runCatching { com.photomed.app.data.ExpedienteSummaries.of(context, repo, e) }.getOrNull() }
-                ?.let { summaries[e.id] = it }
+            withContext(Dispatchers.IO) { runCatching {
+                if (all != null) com.photomed.app.data.ExpedienteSummaries.of(context, repo, e, all[e.id].orEmpty(), nProtocols)
+                else com.photomed.app.data.ExpedienteSummaries.of(context, repo, e)
+            }.getOrNull() }?.let { summaries[e.id] = it }
         }
     }
 

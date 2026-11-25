@@ -76,8 +76,10 @@ object FeatureMetrics {
         dist(trn("Alto en el centro, mm"), "alto", mesh[0], mesh[13])
         value(trn("Área del bermellón, mm²"), LineMeasure.area(upperLipPoly(mesh)) * mm * mm)
         dist(trn("Filtrum (subnasal → labio), mm"), "filtrum", mesh[2], mesh[0])
-        // arco de Cupido: picos (37, 267) frente al centro (0), hacia arriba
-        value(trn("Arco de Cupido (pico − centro), mm"), ((d(mesh[37], mesh[17]) + d(mesh[267], mesh[17])) / 2 - d(mesh[0], mesh[17])) * mm)
+        // arco de Cupido: altura de los picos (37, 267) sobre el centro (0) en el eje vertical de la cara (antes con
+        // distancias al punto 17, que sumaban el desplazamiento lateral de los picos)
+        val ax = Axes(mesh)
+        value(trn("Arco de Cupido (pico − centro), mm"), ((ax.v(mesh[37]) + ax.v(mesh[267])) / 2 - ax.v(mesh[0])) * mm)
         build(trn("Labio superior"), scale)
     }
 

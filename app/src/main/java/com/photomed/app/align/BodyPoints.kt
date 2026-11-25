@@ -81,11 +81,13 @@ object BodyPoints {
                 val fs = ZoneCriteria.feetOf(c).sortedByDescending { it.box.area }.take(if (s.single) 1 else 2)
                     .sortedBy { f -> f.outline.maxByOrNull { it.y }?.x ?: 0f }
                 // cada pie por su mitad de la imagen (si en un cuadro se pierde o se une uno, el otro no cambia
-                // de nombre); con uno solo, «a»
-                fs.forEach { f ->
-                    val tx = f.outline.maxByOrNull { it.y }?.x ?: 0.5f
-                    val side = if (tx < 0.5f) 'a' else 'b'
-                    out.putAll(footPoints(f, c, if (s.single) 'a' else side))
+                // de nombre); con uno solo, «a». Dos pies en la misma mitad: por el orden de su punta (antes se
+                // llamaban igual y sus puntos se mezclaban)
+                val sides = fs.map { f -> if ((f.outline.maxByOrNull { it.y }?.x ?: 0.5f) < 0.5f) 'a' else 'b' }
+                val clash = sides.size == 2 && sides[0] == sides[1]
+                fs.forEachIndexed { i, f ->
+                    val side = if (s.single) 'a' else if (clash) "ab"[i] else sides[i]
+                    out.putAll(footPoints(f, c, side))
                 }
             }
             else -> {}

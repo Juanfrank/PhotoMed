@@ -31,6 +31,8 @@ sealed interface DeleteResult {
 interface PhotoStore {
     fun list(folder: String): List<StoredPhoto>
     fun folders(): List<String>
+    /** Fotos de todas las carpetas (una sola consulta donde se puede; antes una por expediente). */
+    fun listAll(): Map<String, List<StoredPhoto>> = folders().associateWith { list(it) }
     fun save(folder: String, displayName: String, source: File, dateTaken: Long): Uri
     fun delete(uris: List<Uri>): DeleteResult
     /** Cambia el nombre y la fecha de toma de una foto; devuelve su URI (la misma en la galería). */
@@ -61,6 +63,11 @@ class MediaStorePhotoStore(private val resolver: ContentResolver) : PhotoStore {
     override fun folders(): List<String> = query(
         "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?", arrayOf("$base%")
     ).map { it.first.removePrefix(base).trimEnd('/') }.filter { it.isNotBlank() && '/' !in it }.distinct()
+
+    override fun listAll(): Map<String, List<StoredPhoto>> = query(
+        "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?", arrayOf("$base%")
+    ).mapNotNull { (path, sp) -> path.removePrefix(base).trimEnd('/').takeIf { it.isNotBlank() && '/' !in it }?.let { it to sp } }
+        .groupBy({ it.first }, { it.second })
 
     private fun query(selection: String, args: Array<String>): List<Pair<String, StoredPhoto>> {
         val projection = arrayOf(

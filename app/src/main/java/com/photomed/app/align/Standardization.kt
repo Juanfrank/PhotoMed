@@ -143,7 +143,10 @@ object Standardization {
             // perspectiva (sesgo de 9–15° en fotos clínicas de oblicuos), así que se usa la del modelo 3D, que en el
             // oblicuo también lleva un sesgo de unos 6–7° hacia el lado del giro: tolerancia mayor (12°: sesgo de unos 7° más la tolerancia de frente)
             val oblique = abs(side) >= OBLIQUE_SIDE_MIN && t.yaw != 0f
-            val roll = (if (yawAbs < 30f && !oblique) HeadRoll.of(det.points)?.first else null) ?: det.roll
+            // HeadRoll es horario en la imagen; el alabeo del detector (Euler de MediaPipe o ML Kit), antihorario: se
+            // cambia de signo (comprobado con 274 caras: signos opuestos en el 93 %). Antes, en los oblicuos, la
+            // indicación salía al revés
+            val roll = (if (yawAbs < 30f && !oblique) HeadRoll.of(det.points)?.first else null) ?: det.roll?.let { -it }
             val rollTol = if (oblique) ROLL_TOL_OBLIQUE else ROLL_TOL
             roll?.let {
                 if (abs(it) > rollTol) {
