@@ -64,8 +64,9 @@ object FeatureMetrics {
     private class B(val mm: Float) {
         val f = ArrayList<Pair<String, Float>>(); val g = ArrayList<MeasureGuide>()
         /** Distancia [a]–[b] como medida [label] y su segmento con el texto [short]. */
-        fun dist(label: String, short: String, a: Pt, b: Pt) { val v = d(a, b) * mm; f += label to v; g += MeasureGuide(mmText(short, v), a, b, rowKey(label)) }
-        fun value(label: String, v: Float) { f += label to v }
+        fun dist(label: String, short: String, a: Pt, b: Pt) { val v = d(a, b) * mm; if (!v.isFinite()) return; f += label to v; g += MeasureGuide(mmText(short, v), a, b, rowKey(label)) }
+        // medidas degeneradas (NaN, infinito): no se dan
+        fun value(label: String, v: Float) { if (v.isFinite()) f += label to v }
         fun guide(short: String, v: Float, a: Pt, b: Pt, label: String = "") { g += MeasureGuide(mmText(short, v), a, b, rowKey(label)) }
         fun build(name: String, scale: String, type: String? = null) = Measured(LineMetrics(name, scale = scale, features = f.toList(), type = type), g.toList())
     }

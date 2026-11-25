@@ -117,8 +117,9 @@ data class TraceSet(val baseAspect: Float, val traces: List<StoredTrace>, val re
 
 /** JSON compacto de los trazos (4 decimales) y de sus medidas. */
 object TraceJson {
-    private fun r(v: Float) = (v * 10000f).roundToInt() / 10000.0
-    private fun pts(p: List<Pt>) = JSONArray().apply { p.forEach { put(r(it.x)); put(r(it.y)) } }
+    // valores no finitos (NaN de una medida degenerada): no se guardan (antes cerraban la app al redondear)
+    private fun r(v: Float) = if (v.isFinite()) (v * 10000f).roundToInt() / 10000.0 else 0.0
+    private fun pts(p: List<Pt>) = JSONArray().apply { p.filter { it.x.isFinite() && it.y.isFinite() }.forEach { put(r(it.x)); put(r(it.y)) } }
     private fun ptsOf(a: JSONArray) = (0 until a.length() / 2).map { Pt(a.getDouble(2 * it).toFloat(), a.getDouble(2 * it + 1).toFloat()) }
 
     fun metrics(m: LineMetrics): JSONObject = JSONObject().apply {
@@ -127,7 +128,7 @@ object TraceJson {
         f("len", m.lengthMm); f("width", m.widthMm); f("contrast", m.contrastL); f("depth", m.depthMm)
         m.grade?.let { put("grade", it) }; f("area", m.areaMm2); f("dL", m.deltaL); f("dE", m.deltaE); f("ita", m.ita); f("itaRef", m.itaRef)
         m.type?.let { put("type", it) }; m.note?.let { put("note", it) }
-        if (m.features.isNotEmpty()) put("features", JSONArray().apply { m.features.forEach { (k, v) -> put(JSONArray().put(k).put((v * 1000f).roundToInt() / 1000.0)) } })
+        if (m.features.isNotEmpty()) put("features", JSONArray().apply { m.features.filter { it.second.isFinite() }.forEach { (k, v) -> put(JSONArray().put(k).put((v * 1000f).roundToInt() / 1000.0)) } })
     }
 
     fun metricsOf(o: JSONObject): LineMetrics {
@@ -143,7 +144,8 @@ object TraceJson {
         .put("closed", t.closed).put("filled", t.filled).put("est", t.estimated).put("origin", t.origin).apply {
             t.metrics?.let { put("m", metrics(it)) }
             t.previous?.let { put("prev", trace(it.copy(previous = null))) }
-            if (t.guides.isNotEmpty()) put("guides", JSONArray().apply { t.guides.forEach { g -> put(JSONObject().put("l", g.label).put("p", pts(listOf(g.a, g.b))).put("k", g.key)) } })
+            val fin = { q: Pt -> q.x.isFinite() && q.y.isFinite() }
+            if (t.guides.isNotEmpty()) put("guides", JSONArray().apply { t.guides.filter { fin(it.a) && fin(it.b) }.forEach { g -> put(JSONObject().put("l", g.label).put("p", pts(listOf(g.a, g.b))).put("k", g.key)) } })
         }
 
     private fun traceOf(o: JSONObject): StoredTrace = StoredTrace(AnnotLayer.valueOf(o.getString("layer")), ptsOf(o.getJSONArray("pts")),
@@ -192,7 +194,11 @@ object ConfirmedTraces {
     fun tag(context: Context, uri: String): String = file(context, uri).let { if (it.exists()) "${it.lastModified()}-${it.length()}" else "-" }
 
     /** Guarda el conjunto (copia privada y XMP de la foto). Devuelve si se pudo escribir en la foto. */
-    fun save(context: Context, uri: String, s: TraceSet): Boolean {
+    /** Guarda los trazos; false (sin cerrar la app) si no se pudieron guardar, con la causa en el registro. */
+    fun save(context: Context, uri: String, s: TraceSet): Boolean = runCatching { saveOrThrow(context, uri, s) }
+        .onFailure { com.photomed.app.CrashLog.write("No se pudieron guardar los trazos", it) }.getOrDefault(false)
+
+    private fun saveOrThrow(context: Context, uri: String, s: TraceSet): Boolean {
         val json = TraceJson.write(s)
         val f = file(context, uri)
         AtomicFile.write(f, json)

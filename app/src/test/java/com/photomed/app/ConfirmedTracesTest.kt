@@ -110,6 +110,20 @@ class ConfirmedTracesTest {
         assertEquals("{}", PhotoMetadata.tracesOf(PhotoMetadata.withTraces(null, "{}")))
     }
 
+    /** Cierre de la 2.56: una medida o un punto NaN cerraba la app al guardar los trazos. */
+    @Test fun nonFiniteValuesAreSkippedOnSave() {
+        val nan = Float.NaN
+        val m = LineMetrics("Línea del pelo", features = listOf("Frente central (cejas → pelo), mm" to 55f, "Pupilas → pelo (centro) / interpupilar" to nan))
+        val set = com.photomed.app.align.TraceSet(4f / 3f, listOf(
+            StoredTrace(AnnotLayer.HAIRLINE, listOf(Pt(0.1f, 0.2f), Pt(nan, 0.3f), Pt(0.3f, 0.25f)), false, false, false, m,
+                guides = listOf(com.photomed.app.align.MeasureGuide("x", Pt(0f, 0f), Pt(nan, nan)), com.photomed.app.align.MeasureGuide("y", Pt(0f, 0f), Pt(1f, 1f))))))
+        val back = com.photomed.app.align.TraceJson.read(com.photomed.app.align.TraceJson.write(set))!!
+        val t = back.traces.single()
+        assertEquals(2, t.points.size)
+        assertEquals(listOf("Frente central (cejas → pelo), mm"), t.metrics!!.features.map { it.first })
+        assertEquals(1, t.guides.size)
+    }
+
     @Test fun userOperations() {
         var s = sample()
         s = ConfirmedTraces.remove(s, "Frente, línea 1")

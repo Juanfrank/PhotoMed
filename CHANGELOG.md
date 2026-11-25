@@ -2,6 +2,12 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.57 — 25 de noviembre de 2026
+
+- **Cierre al analizar una foto del rostro** (p. ej. frente y glabela) corregido: una medida degenerada (NaN)
+  cerraba la app al guardar los trazos confirmados. Ahora esas medidas no se dan, los puntos no finitos se
+  descartan y, si el guardado falla por cualquier otra causa, se registra sin cerrar la app.
+
 ## 2.56 — 24 de noviembre de 2026
 
 - **Comparar**: las tomas capilares (vértice, coronilla, parietales) tienen la tabla de medidas de la densidad
