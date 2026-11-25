@@ -22,7 +22,7 @@ Versión 2.57, 25 de noviembre de 2026. Revisión de solo lectura del código; c
   anotadas el cuero calvo se etiqueta como piel de la cara o del cuerpo; excluirla rompería la medida.
 - **Pendiente (mejoras estructurales mayores)**: reescritura del XMP mediante copia y reemplazo, ediciones por foto
   fuera de SharedPreferences, importación sin recodificar el JPEG, alineación de N fotos preparando la referencia una
-  sola vez y recomposición de CameraScreen por estados derivados.
+  sola vez. (La recomposición de la cámara por cuadro se corrigió en 2.61.)
 
 ## Corregido ya
 

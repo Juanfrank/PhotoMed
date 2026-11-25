@@ -2,6 +2,16 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.61 — 25 de noviembre de 2026
+
+- **La pantalla de la cámara ya no se redibuja entera con cada cuadro analizado** (unas 5 veces por segundo). El
+  cuerpo de la pantalla lee solo valores que cambian poco (coincide o no, pulsos, aviso del detector, disparo
+  listo), y lo que cambia en cada cuadro (guía y su color, contorno del cuerpo, línea del pelo, puntos,
+  flechas, correcciones, anillo del disparador, aviso de luz) se dibuja en ámbitos propios. La vista previa, los
+  controles, la barra de zoom y el resto de la pantalla ya no se recomponen ni relanzan sus tareas por cuadro (el
+  zoom asistido y la guía adaptada leen el análisis fuera de la composición). Menos trabajo en el hilo principal
+  mientras se encuadra: menos tirones.
+
 ## 2.60 — 25 de noviembre de 2026
 
 Revisión integral, tanda 4: **escalabilidad, recursos y errores**.

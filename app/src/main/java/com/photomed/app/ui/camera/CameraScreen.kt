@@ -44,6 +44,8 @@ import com.photomed.app.align.LiveFrame
 import com.photomed.app.align.LiveMatcher
 import com.photomed.app.align.AnalysisPipeline
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import com.photomed.app.align.MatchStatus
 import com.photomed.app.align.Perspective
 import com.photomed.app.align.Pt
@@ -335,12 +337,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var lastFocusAt by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
     var lastFocusZoom by remember { mutableFloatStateOf(0f) }
     var live by remember { mutableStateOf<LiveFrame?>(null) }
-    run {
-        val cur = live?.currentPointsAll.orEmpty()
-        val prev = stableLive.value
-        fun moved(): Boolean = listOf(com.photomed.app.align.Landmarks.EYE_L, com.photomed.app.align.Landmarks.EYE_R, com.photomed.app.align.Landmarks.NOSE_BASE)
-            .any { k -> val a = cur[k]; val b = prev[k]; a == null || b == null || kotlin.math.hypot(a.x - b.x, a.y - b.y) > GUIDE_MOVE }
-        if (cur.isEmpty() != prev.isEmpty() || (cur.isNotEmpty() && moved())) SideEffect { stableLive.value = cur }
+    // fuera de la composición: leer `live` en el cuerpo recomponía toda la pantalla con cada cuadro
+    LaunchedEffect(Unit) {
+        androidx.compose.runtime.snapshotFlow { live?.currentPointsAll.orEmpty() }.collect { cur ->
+            val prev = stableLive.value
+            fun moved(): Boolean = listOf(com.photomed.app.align.Landmarks.EYE_L, com.photomed.app.align.Landmarks.EYE_R, com.photomed.app.align.Landmarks.NOSE_BASE)
+                .any { k -> val a = cur[k]; val b = prev[k]; a == null || b == null || kotlin.math.hypot(a.x - b.x, a.y - b.y) > GUIDE_MOVE }
+            if (cur.isEmpty() != prev.isEmpty() || (cur.isNotEmpty() && moved())) stableLive.value = cur
+        }
     }
     var focalNorm by remember { mutableStateOf<Float?>(null) }
     val tilt = rememberTilt(true)
@@ -436,7 +440,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             cam.cameraControl.setZoomRatio(zz); zoomRatio = zz
         }
     }
-    val status = live?.eval?.status
+    // Valores derivados de cada cuadro: el cuerpo de la pantalla solo se recompone cuando cambian (no en cada cuadro)
+    val status by remember { derivedStateOf { live?.eval?.status } }
     // tomas de ráfagas interrumpidas (cámara cerrada a mitad): se borran al abrir
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -455,8 +460,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     // Pulsos que se aceleran al acercarse a la coincidencia (sin mirar la pantalla)
     // sin pulsos durante la captura ni en la revisión de la foto: el análisis está en pausa y el último
     // cuadro quedaría congelado (vibraba sin parar en el visor)
-    val degree = if (matchingEnabled && !capturing && reviewName == null) GuideTone.degree(live?.eval) else null
-    val degreeStep = degree?.let { (it * 10).toInt() }
+    val pulsesOn by rememberUpdatedState(matchingEnabled && !capturing && reviewName == null)
+    val degreeStep by remember { derivedStateOf { if (pulsesOn) GuideTone.degree(live?.eval)?.let { (it * 10).toInt() } else null } }
     LaunchedEffect(degreeStep, feedback) {
         val d = degreeStep ?: return@LaunchedEffect
         if (!feedback || d < 3 || d >= 10) return@LaunchedEffect
@@ -478,12 +483,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     }
     // si la segmentación de pelo y piel no carga en este teléfono, decirlo una vez con el motivo
     var hairSkinWarned by remember { mutableStateOf(false) }
-    val hairSkinHint = live?.eval?.hints?.firstOrNull { it.startsWith("Detector (pelo y piel)") }
+    val hairSkinHint by remember { derivedStateOf { live?.eval?.hints?.firstOrNull { it.startsWith("Detector (pelo y piel)") } } }
     LaunchedEffect(hairSkinHint) {
         val h = hairSkinHint ?: return@LaunchedEffect
         if (!hairSkinWarned) { hairSkinWarned = true; snackbar.showSnackbar(tr("Línea del pelo no disponible. %1\$s", HintText.display(h))) }
     }
-    val tone = GuideTone.of(live?.eval, matchingEnabled)
+    // color de la guía: se lee solo dentro de las capas que lo dibujan (ámbitos propios)
+    val matchingNow by rememberUpdatedState(matchingEnabled)
+    val tone by remember { derivedStateOf { GuideTone.of(live?.eval, matchingNow) } }
     /**
      * Cuero cabelludo: cada vista pide un ángulo de la cámara trasera hacia abajo (vértice cenital
      * 90°, corona ≈ 75°, parietales ≈ 45°; cabeceo del sensor de gravedad); fuera de tolerancia se
@@ -932,17 +939,20 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         zoomRatio = z
         cam.cameraControl.setZoomRatio(z)
     }
-    LaunchedEffect(live, zoomAssist, manualZoom) {
-        val e = live?.eval ?: return@LaunchedEffect
-        val cam = camera ?: return@LaunchedEffect
-        if (!zoomAssist || manualZoom || !matchingEnabled || e.status == MatchStatus.SEARCHING) return@LaunchedEffect
-        val zs = cam.cameraInfo.zoomState.value ?: return@LaunchedEffect
-        val target = zoomCtl.update(e.scale, zs.zoomRatio, System.currentTimeMillis())
-            ?.coerceIn(zs.minZoomRatio, minOf(zs.maxZoomRatio, 4f)) ?: return@LaunchedEffect
-        zoomCtl.focusing = true
-        val zf = cam.cameraControl.setZoomRatio(target)
-        zoomRatio = target
-        zf.addListener({ focusOnPivot { zoomCtl.focusing = false } }, ContextCompat.getMainExecutor(context))
+    LaunchedEffect(zoomAssist, manualZoom, matchingEnabled, camera) {
+        androidx.compose.runtime.snapshotFlow { live }.collect { live ->
+            val e = live?.eval ?: return@collect
+            val cam = camera ?: return@collect
+            if (!zoomAssist || manualZoom || !matchingEnabled || e.status == MatchStatus.SEARCHING) return@collect
+            val zs = cam.cameraInfo.zoomState.value ?: return@collect
+            val target = zoomCtl.update(e.scale, zs.zoomRatio, System.currentTimeMillis())
+                ?.coerceIn(zs.minZoomRatio, minOf(zs.maxZoomRatio, 4f)) ?: return@collect
+            zoomCtl.focusing = true
+            val zf = cam.cameraControl.setZoomRatio(target)
+            zoomRatio = target
+            zf.addListener({ focusOnPivot { zoomCtl.focusing = false } }, ContextCompat.getMainExecutor(context))
+
+        }
     }
 
     // Disparo automático: coincidencia sostenida ~0,4 s, sin zoom/enfoque en curso; enfoca en el
@@ -969,7 +979,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         com.photomed.app.align.AutoCapture.ready(e, lightOk = lightIssue(live) == null, nearCapture = nearCapture, protocol = step != null,
             // cuero cabelludo: el ángulo de la cámara que pide cada vista
             framingOk = overheadHint() == null)
-    val ready = matchingEnabled && readyNow(live?.eval)
+    val readyFn by rememberUpdatedState { e: com.photomed.app.align.MatchEval? -> readyNow(e) }
+    val ready by remember { derivedStateOf { matchingNow && readyFn(live?.eval) } }
     LaunchedEffect(ready, autoCapture) {
         if (!ready) { autoArmed = true; return@LaunchedEffect }
         if (autoCapture && autoArmed && !capturing) {
@@ -1089,14 +1100,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         val front = lensFacing == CameraSelector.LENS_FACING_FRONT
         // PreviewView ya espeja la cámara frontal; si el espejo está apagado se des-espeja.
         val displayMirrored = front && mirrorOn
-        val guidance = if (matchingEnabled) CameraGuidance.of(live?.eval, front, displayMirrored) else null
+        fun guidanceNow() = if (matchingEnabled) CameraGuidance.of(live?.eval, front, displayMirrored) else null
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             Box(Modifier.aspectRatio(3f / 4f).clip(RoundedCornerShape(4.dp))) {
                 AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize()
                     .graphicsLayer { scaleX = if (front && !mirrorOn) -1f else 1f })
 
                 // Capas en coordenadas de la foto: se espejan igual que la vista previa.
-                Box(Modifier.fillMaxSize().graphicsLayer { scaleX = if (displayMirrored) -1f else 1f }) {
+                Box(Modifier.fillMaxSize().graphicsLayer { scaleX = if (displayMirrored) -1f else 1f }) { IsolatedBox {
                     val g = ghost
                     val edges = refEdges
                     if (showGhost && g != null && ghostEdges && edges != null) {
@@ -1174,7 +1185,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     val liveHl = live?.hairline
                     if (showContour && liveHl != null) HairlineGuide(liveHl, Color(0xFFFFD54F), Modifier.fillMaxSize(), dashed = false)
                     if (matchingEnabled && expert) live?.let { LivePoints(it, tone, mirror = false) }
-                }
+                } }
 
                 // Toque para enfocar
                 // Toque para enfocar; pellizco para zoom manual
@@ -1191,6 +1202,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     }
                 })
 
+                IsolatedBox {
+                val guidance = guidanceNow()
                 // nivel: en el modo simple solo cuando el teléfono está torcido (o hay que girarlo)
                 val tilted = kotlin.math.abs(tilt.value.roll) >= 1.5f && kotlin.math.abs(tilt.value.pitch) < 60f
                 if ((expert && showLevel) || tilted || (guidance?.rotateDeg ?: 0f) != 0f) {
@@ -1209,6 +1222,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                             .padding(bottom = if ((guidance?.moveY ?: 0) > 0) 54.dp else 28.dp),
                     )
                 }
+                }
                 val g = ghost
                 if (showGhost && g != null) {
                     Text(
@@ -1223,9 +1237,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 Box(Modifier.fillMaxSize().graphicsLayer { alpha = shutterFlash.value }.background(Color.White))
             }
         }
-        if (matchingEnabled && expert) {
+        if (matchingEnabled && expert) Isolated {
             RecommendationStrip(
-                live, guidance, autoCapture,
+                live, guidanceNow(), autoCapture,
                 zoomInfo = if (zoomAssist && !manualZoom && zoomRatio > 1.01f) "zoom asistido %.1f×".format(zoomRatio) else null,
                 distanceHint = distanceHint(),
                 showCues = false,
@@ -1259,7 +1273,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 step.minLight?.let { tr("luz ≥ %1\$d %%", (it * 100).toInt()) },
                 if (protoRef != null) (protoRef.sourceTakenAt?.let { tr("igual a la referencia del %1\$s", formatDate(it)) } ?: tr("igual a la referencia")) else null)
             Text(tr("Exige: %1\$s", req.joinToString(" · ")), color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
-            lightIssue(live)?.let { Text(it, color = GuideTone.FAR.color, style = MaterialTheme.typography.labelMedium) }
+            Isolated { lightIssue(live)?.let { Text(it, color = GuideTone.FAR.color, style = MaterialTheme.typography.labelMedium) } }
         }
         if (expressions.size > 1 && step == null) {
             Row(
@@ -1397,12 +1411,14 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 }
             }
             // anillo de progreso: se llena con la coincidencia (rojo → naranja → verde) y queda verde al coincidir
-            ShutterButton(
-                degree = if (matchingEnabled) GuideTone.degree(live?.eval) else null,
-                capturing = capturing,
-                enabled = !capturing && exp != null,
-                onClick = { capture() },
-            )
+            Isolated {
+                ShutterButton(
+                    degree = if (matchingEnabled) GuideTone.degree(live?.eval) else null,
+                    capturing = capturing,
+                    enabled = !capturing && exp != null,
+                    onClick = { capture() },
+                )
+            }
             IconButton(
                 onClick = {
                     lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT
@@ -1690,3 +1706,13 @@ fun ShutterButton(degree: Float?, capturing: Boolean, enabled: Boolean, onClick:
 
 /** Desplazamiento (unidades del ancho) de ojos o base nasal a partir del cual se vuelve a adaptar la guía al cuadro. */
 private const val GUIDE_MOVE = 0.004f
+
+/**
+ * Ámbito de recomposición propio: lo que lee el resultado del análisis en vivo (≈ 5 por segundo) se recompone
+ * aquí dentro, sin arrastrar la pantalla entera de la cámara.
+ */
+@Composable
+internal fun Isolated(content: @Composable () -> Unit) { content() }
+
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.IsolatedBox(content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) { content() }
