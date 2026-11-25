@@ -15,6 +15,7 @@ import kotlin.math.hypot
  *   distinguidos, la punta de cada uno.
  * - **Brazos, piernas y tronco**: los bordes del contorno a ¼, ½ y ¾ de cada segmento (brazo,
  *   antebrazo, muslo, pierna), a cada lado; el tronco (abdomen, tórax, espalda), a seis alturas.
+ * - **Tronco**: axilas (de frente, de espaldas y de lado) y, de frente, pezones y ombligo ([TorsoMarks]).
  *
  * Los lados se nombran por la imagen (a = izquierda, b = derecha; en el modo de una sola extremidad,
  * a), así la referencia y la toma se emparejan igual. Coordenadas en unidades del ancho.
@@ -61,7 +62,8 @@ object BodyPoints {
         GuideType.ARM -> ARMS
         GuideType.LEGS -> LEGS
         GuideType.GLUTES -> LEGS + TORSO
-        GuideType.TORSO_FRONT, GuideType.BREASTS, GuideType.BACK, GuideType.TORSO_SIDE -> TORSO + ARMS
+        GuideType.TORSO_FRONT, GuideType.BREASTS -> TORSO + ARMS + TorsoMarks.FRONT_KEYS
+        GuideType.BACK, GuideType.TORSO_SIDE -> TORSO + ARMS + TorsoMarks.AXILLA_KEYS
         GuideType.NECK -> NECK
         else -> emptySet()
     }
@@ -121,6 +123,8 @@ object BodyPoints {
                 out.putAll(segmentEdges(c, "tronco", a, b, maxReach = wide * 0.9f, ts = TORSO_TS))
             }
         }
+        // axilas, pezones y ombligo
+        if (zone.guide in TorsoMarks.GUIDES) runCatching { TorsoMarks.of(zone.guide, c, p, s.hi) }.getOrNull()?.let(out::putAll)
         return out
     }
 

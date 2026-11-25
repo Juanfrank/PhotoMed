@@ -2,6 +2,7 @@
 <!-- ARCHIVO GENERADO por tools/i18n/extract.py: no editar a mano. -->
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation,UnusedResources,Typos">
     <string name="t_003df45d60ec" formatted="false">Head: turn more (%1$s° of 45°)</string>
+    <string name="t_008d56f2bca1" formatted="false">Armpits</string>
     <string name="t_009f77491ae1" formatted="false">Finish editing</string>
     <string name="t_00bccb32acd1" formatted="false">no changes</string>
     <string name="t_00d72ed74f10" formatted="false">Anatomical edges (jaw, forehead, ears, silhouette) and perspective from proportions.</string>
@@ -95,6 +96,7 @@
     <string name="t_11b9c23183bc" formatted="false">moderate</string>
     <string name="t_11db942c0d82" formatted="false">Show controls</string>
     <string name="t_12021b9b2d63" formatted="false">Camera above the right side (≈ 45° downward); right ear at the bottom on the mark, parting at the top following the curve, forehead toward the right of the frame.</string>
+    <string name="t_123a5dbc0b0c" formatted="false">Navel offset from the midline, % of shoulder width</string>
     <string name="t_12767a7b6807" formatted="false">Photo protocol: %1$s</string>
     <string name="t_12ba5798e231" formatted="false">Any</string>
     <string name="t_12ffc9d18e93" formatted="false">Last 30 days</string>
@@ -299,6 +301,7 @@
     <string name="t_3968e915637e" formatted="false">"Color difference ΔE2000: %1$.1f → %2$.1f  (≤ 2: barely perceptible)"</string>
     <string name="t_3a1d4de09167" formatted="false">Indicative skin findings (spots, spider veins, varicose veins, cellulite), comparing each area with the neighbouring skin; they are not a diagnosis. Fibrosis cannot be detected in a photo (it needs palpation or ultrasound).</string>
     <string name="t_3a34ea0d24cd" formatted="false">Strokes confirmed: saved in the photo</string>
+    <string name="t_3a4cee22eb18" formatted="false">Armpit-line tilt, °</string>
     <string name="t_3a5a13f7cb43" formatted="false">Angles (multipoint)</string>
     <string name="t_3a6928bdb644" formatted="false">Head: straighten %1$s° (tilted to the left)</string>
     <string name="t_3a6cbf9c97c0" formatted="false">The original photo is not modified; the edit also applies in Compare and when exporting.</string>
@@ -310,6 +313,7 @@
     <string name="t_3c4222417c09" formatted="false">Share protocol</string>
     <string name="t_3c48d7318913" formatted="false">orbicularis oris</string>
     <string name="t_3c5d2f55ebf7" formatted="false">Analyzing wrinkles and features</string>
+    <string name="t_3c8ad4b4b224" formatted="false">Nipple-line tilt, °</string>
     <string name="t_3cb2fd0f447c" formatted="false">Image</string>
     <string name="t_3ce9cb82b824" formatted="false">Front view, feet slightly apart; kneecaps on the marks.</string>
     <string name="t_3cf5ba5ede2d" formatted="false">Vermilion area, mm²</string>
@@ -759,6 +763,7 @@
     <string name="t_937f90dc6ec2" formatted="false">Patient name *</string>
     <string name="t_9415e0096405" formatted="false">distance %1$.0f vs %2$.0f cm</string>
     <string name="t_945181473167" formatted="false">Warning: different areas (%1$s)</string>
+    <string name="t_94cb09f848e0" formatted="false">Armpit height (shoulders → hips), %</string>
     <string name="t_9527927b5fbc" formatted="false">Warning: comparing different expressions (%1$s); dynamic wrinkles can only be compared with the same expression.</string>
     <string name="t_953c8c5d5466" formatted="false">platysma</string>
     <string name="t_956a3f7c6611" formatted="false">Duplicate</string>
@@ -819,6 +824,7 @@
     <string name="t_a276b1754a3a" formatted="false">Tips</string>
     <string name="t_a29ca9561b17" formatted="false">Hair and skin have similar colors: only the segmentation counts.</string>
     <string name="t_a2eeab6cf8ab" formatted="false">Match · capturing</string>
+    <string name="t_a31c8c44fee8" formatted="false">Navel</string>
     <string name="t_a3980dd32780" formatted="false">The name is required</string>
     <string name="t_a3b22b3308b5" formatted="false">Waist / chest (armpits), %</string>
     <string name="t_a3b4b3ced269" formatted="false">Burst of 3 photos</string>
@@ -909,6 +915,7 @@
     <string name="t_b5c1e7d80d01" formatted="false">More options</string>
     <string name="t_b5d630e9192b" formatted="false">Arm thickness / visible length, %</string>
     <string name="t_b5e68a4cda70" formatted="false">Auto-capture</string>
+    <string name="t_b61097aa2dd9" formatted="false">Nipples</string>
     <string name="t_b620988533fd" formatted="false">Show the first-time tips again</string>
     <string name="t_b651b0a39d95" formatted="false">Reference %1$d of %2$d…</string>
     <string name="t_b6dcb7e4967f" formatted="false">Focus not confirmed: the photo was taken anyway</string>
@@ -928,6 +935,7 @@
     <string name="t_b836f188c7fb" formatted="false">waist</string>
     <string name="t_b85f56bf17a2" formatted="false">Undo</string>
     <string name="t_b86a1ff61e8d" formatted="false">Progression across %1$d photos</string>
+    <string name="t_b8930832daea" formatted="false">Nipple height (shoulders → hips), %</string>
     <string name="t_b8c89cbb87d4" formatted="false">Short text (optional)</string>
     <string name="t_b90b02a0f5e6" formatted="false">Shot %1$d: unknown area “%2$s”.</string>
     <string name="t_b914c1386093" formatted="false">Light difference between cheeks: max. %1$d %%</string>
@@ -994,6 +1002,7 @@
     <string name="t_c514f2ce264f" formatted="false">Protocol “%1$s” imported: open it from a patient record</string>
     <string name="t_c5bfa99fbdbf" formatted="false">Chin: lower %1$s° (Frankfort)</string>
     <string name="t_c5c5ad829102" formatted="false">Depth measured on the relief (photometric stereo using the screen).</string>
+    <string name="t_c5db52b4470d" formatted="false">Navel height (shoulders → hips), %</string>
     <string name="t_c5e5986106aa" formatted="false">Adjust the pose · follow the arrows</string>
     <string name="t_c665df74ee05" formatted="false">Nose</string>
     <string name="t_c6ee9646f46c" formatted="false">Top left</string>
@@ -1061,6 +1070,7 @@
     <string name="t_d07b2f59af76" formatted="false">Previous photo overlaid</string>
     <string name="t_d11aacc843c5" formatted="false">nasalis (bunny lines)</string>
     <string name="t_d15a45406be6" formatted="false">Turn sideways to the camera</string>
+    <string name="t_d15dda78e48b" formatted="false">Armpit distance / shoulder width, %</string>
     <string name="t_d18106e60221" formatted="false">%1$s (copy)</string>
     <string name="t_d194abdfdc4c" formatted="false">Wrinkle the nose</string>
     <string name="t_d1cb9a9304f9" formatted="false">Move back</string>
@@ -1084,6 +1094,7 @@
     <string name="t_d500c64bc7c1" formatted="false">Rotate the guide 90°</string>
     <string name="t_d56d19670a72" formatted="false">Zoom</string>
     <string name="t_d57eb960ad9c" formatted="false">If the app closes due to an error, it is logged here (without photos or patient data).</string>
+    <string name="t_d598fe776cd3" formatted="false">Nipple height difference, % of trunk</string>
     <string name="t_d6adbcd82421" formatted="false">Face height (nasion → chin), mm</string>
     <string name="t_d737047377da" formatted="false">MMM d, yyyy</string>
     <string name="t_d75f5f2e3837" formatted="false">Forearm thickness / its length, %</string>
@@ -1103,6 +1114,7 @@
     <string name="t_d9ba65202e9e" formatted="false">Match skin color</string>
     <string name="t_da10e62a882b" formatted="false">shoulder blades</string>
     <string name="t_da8ef37264d5" formatted="false">Relief: face not found in the photo</string>
+    <string name="t_dab8c4ed0963" formatted="false">Nipple distance / shoulder width, %</string>
     <string name="t_db0bc3c474cf" formatted="false">chin</string>
     <string name="t_db14f1031553" formatted="false">Could not save: %1$s</string>
     <string name="t_db3ca99cdae0" formatted="false">Matching-point threshold</string>

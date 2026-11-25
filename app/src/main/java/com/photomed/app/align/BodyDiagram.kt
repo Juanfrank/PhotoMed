@@ -31,6 +31,10 @@ object BodyDiagram {
     private val FINGER_CHAINS = listOf(listOf(0, 1, 2, 3, 4), listOf(5, 6, 7, 8), listOf(9, 10, 11, 12), listOf(13, 14, 15, 16), listOf(17, 18, 19, 20),
         listOf(0, 5, 9, 13, 17, 0))
 
+    /**
+     * Con [ZoneCriteria.Scene.hi] (la foto a más resolución), las uñas de las manos se buscan por el esqueleto y
+     * el color ([Nails.plates]); sin ella, en la rejilla de la segmentación (círculos).
+     */
     fun lines(zone: Zone, s: ZoneCriteria.Scene): List<AnnotLine> {
         val out = ArrayList<AnnotLine>()
         val schema = runCatching { BodySchema.of(zone, s) }.getOrNull()
@@ -51,7 +55,13 @@ object BodyDiagram {
         // manos: el esqueleto de cada dedo y la palma; uñas visibles
         if (zone.guide == GuideType.HANDS) s.hands.orEmpty().filter { it.points.size >= 21 }.forEach { h ->
             FINGER_CHAINS.forEach { ch -> out += AnnotLine(AnnotLayer.FINGERS, ch.map { h.points[it] }, closed = false) }
-            s.classes?.let { c -> c.rgb?.let { rgb ->
+            val hi = s.hi
+            if (hi != null) {
+                val w = hi.w
+                Nails.plates(hi.px, hi.w, hi.h, h.points).filterNotNull().forEach { n ->
+                    out += AnnotLine(AnnotLayer.NAILS, n.outline().map { Pt(it.x / w, it.y / w) }, closed = true, filled = true)
+                }
+            } else s.classes?.let { c -> c.rgb?.let { rgb ->
                 Nails.ofHand(rgb, c.width, c.height, h.points, ZoneCriteria.STRONG_NAIL_DE).filterNotNull().forEach { n ->
                     out += dot(AnnotLayer.NAILS, Pt(n.x / c.width, n.y / c.width), (n.r / c.width).coerceAtLeast(r))
                 }

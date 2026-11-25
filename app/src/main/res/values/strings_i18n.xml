@@ -2,6 +2,7 @@
 <!-- ARCHIVO GENERADO por tools/i18n/extract.py: no editar a mano. -->
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation,UnusedResources,Typos">
     <string name="t_003df45d60ec" formatted="false">Cabeza: girar más (%1$s° de 45°)</string>
+    <string name="t_008d56f2bca1" formatted="false">Axilas</string>
     <string name="t_009f77491ae1" formatted="false">Terminar edición</string>
     <string name="t_00bccb32acd1" formatted="false">sin cambios</string>
     <string name="t_00d72ed74f10" formatted="false">Bordes anatómicos (mandíbula, frente, orejas, silueta) y perspectiva por proporciones.</string>
@@ -95,6 +96,7 @@
     <string name="t_11b9c23183bc" formatted="false">moderada</string>
     <string name="t_11db942c0d82" formatted="false">Mostrar controles</string>
     <string name="t_12021b9b2d63" formatted="false">Cámara por encima del lado derecho (≈ 45° hacia abajo); oreja derecha abajo en la marca, raya arriba siguiendo la curva, frente hacia la derecha del encuadre.</string>
+    <string name="t_123a5dbc0b0c" formatted="false">Desvío del ombligo de la línea media, % del ancho de hombros</string>
     <string name="t_12767a7b6807" formatted="false">Protocolo fotográfico: %1$s</string>
     <string name="t_12ba5798e231" formatted="false">Cualquiera</string>
     <string name="t_12ffc9d18e93" formatted="false">Últimos 30 días</string>
@@ -299,6 +301,7 @@
     <string name="t_3968e915637e" formatted="false">"Diferencia de color ΔE2000: %1$.1f → %2$.1f  (≤ 2: apenas perceptible)"</string>
     <string name="t_3a1d4de09167" formatted="false">Hallazgos de la piel orientativos (manchas, arañitas, várices, celulitis), comparando cada zona con la piel vecina; no son un diagnóstico. La fibrosis no se puede detectar en una foto (necesita palpación o ecografía).</string>
     <string name="t_3a34ea0d24cd" formatted="false">Trazos confirmados: guardados en la foto</string>
+    <string name="t_3a4cee22eb18" formatted="false">Inclinación de las axilas, °</string>
     <string name="t_3a5a13f7cb43" formatted="false">Ángulos (multipunto)</string>
     <string name="t_3a6928bdb644" formatted="false">Cabeza: enderezar %1$s° (inclinada a la izquierda)</string>
     <string name="t_3a6cbf9c97c0" formatted="false">La foto original no se modifica; la edición se aplica también en Comparar y al exportar.</string>
@@ -310,6 +313,7 @@
     <string name="t_3c4222417c09" formatted="false">Compartir protocolo</string>
     <string name="t_3c48d7318913" formatted="false">orbicular de los labios</string>
     <string name="t_3c5d2f55ebf7" formatted="false">Analizando arrugas y rasgos</string>
+    <string name="t_3c8ad4b4b224" formatted="false">Inclinación de los pezones, °</string>
     <string name="t_3cb2fd0f447c" formatted="false">Imagen</string>
     <string name="t_3ce9cb82b824" formatted="false">Vista frontal, pies ligeramente separados; rótulas sobre las marcas.</string>
     <string name="t_3cf5ba5ede2d" formatted="false">Área del bermellón, mm²</string>
@@ -759,6 +763,7 @@
     <string name="t_937f90dc6ec2" formatted="false">Nombre del paciente *</string>
     <string name="t_9415e0096405" formatted="false">distancia %1$.0f vs %2$.0f cm</string>
     <string name="t_945181473167" formatted="false">Atención: zonas distintas (%1$s)</string>
+    <string name="t_94cb09f848e0" formatted="false">Altura de las axilas (hombros → caderas), %</string>
     <string name="t_9527927b5fbc" formatted="false">Atención: compara expresiones distintas (%1$s); las arrugas dinámicas solo se comparan con la misma expresión.</string>
     <string name="t_953c8c5d5466" formatted="false">platisma</string>
     <string name="t_956a3f7c6611" formatted="false">Duplicar</string>
@@ -819,6 +824,7 @@
     <string name="t_a276b1754a3a" formatted="false">Ayudas</string>
     <string name="t_a29ca9561b17" formatted="false">Pelo y piel de color parecido: solo cuenta la segmentación.</string>
     <string name="t_a2eeab6cf8ab" formatted="false">Coincide · capturando</string>
+    <string name="t_a31c8c44fee8" formatted="false">Ombligo</string>
     <string name="t_a3980dd32780" formatted="false">El nombre es obligatorio</string>
     <string name="t_a3b22b3308b5" formatted="false">Cintura / tórax (axilas), %</string>
     <string name="t_a3b4b3ced269" formatted="false">Ráfaga de 3 fotos</string>
@@ -909,6 +915,7 @@
     <string name="t_b5c1e7d80d01" formatted="false">Más opciones</string>
     <string name="t_b5d630e9192b" formatted="false">Grosor del brazo / largo visible, %</string>
     <string name="t_b5e68a4cda70" formatted="false">Disparo automático</string>
+    <string name="t_b61097aa2dd9" formatted="false">Pezones</string>
     <string name="t_b620988533fd" formatted="false">Mostrar las ayudas de primera vez otra vez</string>
     <string name="t_b651b0a39d95" formatted="false">Referencia %1$d de %2$d…</string>
     <string name="t_b6dcb7e4967f" formatted="false">Enfoque no confirmado: se tomó la foto igualmente</string>
@@ -928,6 +935,7 @@
     <string name="t_b836f188c7fb" formatted="false">cintura</string>
     <string name="t_b85f56bf17a2" formatted="false">Deshacer</string>
     <string name="t_b86a1ff61e8d" formatted="false">Progresión entre %1$d fotos</string>
+    <string name="t_b8930832daea" formatted="false">Altura de los pezones (hombros → caderas), %</string>
     <string name="t_b8c89cbb87d4" formatted="false">Texto corto (opcional)</string>
     <string name="t_b90b02a0f5e6" formatted="false">Toma %1$d: zona desconocida «%2$s».</string>
     <string name="t_b914c1386093" formatted="false">Diferencia de luz entre mejillas: máx. %1$d %%</string>
@@ -994,6 +1002,7 @@
     <string name="t_c514f2ce264f" formatted="false">Protocolo «%1$s» importado: ábralo desde un expediente</string>
     <string name="t_c5bfa99fbdbf" formatted="false">Barbilla: bajar %1$s° (Frankfort)</string>
     <string name="t_c5c5ad829102" formatted="false">Profundidad medida en el relieve (estéreo fotométrico con la pantalla).</string>
+    <string name="t_c5db52b4470d" formatted="false">Altura del ombligo (hombros → caderas), %</string>
     <string name="t_c5e5986106aa" formatted="false">Ajuste la pose · siga las flechas</string>
     <string name="t_c665df74ee05" formatted="false">Nariz</string>
     <string name="t_c6ee9646f46c" formatted="false">Arriba a la izquierda</string>
@@ -1061,6 +1070,7 @@
     <string name="t_d07b2f59af76" formatted="false">Foto anterior superpuesta</string>
     <string name="t_d11aacc843c5" formatted="false">nasal (líneas nasales)</string>
     <string name="t_d15a45406be6" formatted="false">Póngase de lado a la cámara</string>
+    <string name="t_d15dda78e48b" formatted="false">Distancia entre axilas / ancho de hombros, %</string>
     <string name="t_d18106e60221" formatted="false">%1$s (copia)</string>
     <string name="t_d194abdfdc4c" formatted="false">Arrugar la nariz</string>
     <string name="t_d1cb9a9304f9" formatted="false">Aléjese</string>
@@ -1084,6 +1094,7 @@
     <string name="t_d500c64bc7c1" formatted="false">Girar la guía 90°</string>
     <string name="t_d56d19670a72" formatted="false">Zoom</string>
     <string name="t_d57eb960ad9c" formatted="false">Si la app se cierra por un error, queda registrado aquí (sin fotos ni datos del paciente).</string>
+    <string name="t_d598fe776cd3" formatted="false">Diferencia de altura de los pezones, % del tronco</string>
     <string name="t_d6adbcd82421" formatted="false">Altura facial (nasion → mentón), mm</string>
     <string name="t_d737047377da" formatted="false">d MMM yyyy</string>
     <string name="t_d75f5f2e3837" formatted="false">Grosor del antebrazo / su largo, %</string>
@@ -1103,6 +1114,7 @@
     <string name="t_d9ba65202e9e" formatted="false">Igualar color de piel</string>
     <string name="t_da10e62a882b" formatted="false">escápulas</string>
     <string name="t_da8ef37264d5" formatted="false">Relieve: no se encontró la cara en la foto</string>
+    <string name="t_dab8c4ed0963" formatted="false">Distancia entre pezones / ancho de hombros, %</string>
     <string name="t_db0bc3c474cf" formatted="false">mentón</string>
     <string name="t_db14f1031553" formatted="false">No se pudo guardar: %1$s</string>
     <string name="t_db3ca99cdae0" formatted="false">Umbral de puntos coincidentes</string>

@@ -246,5 +246,17 @@
   "Grado orientativo por la textura; depende de la luz": "Indicative grade from texture; depends on lighting",
   "Superficie con hoyuelos, %": "Dimpled surface, %",
   "Hoyuelos, n.º": "Dimples, no.",
-  "Grado orientativo (0–3)": "Indicative grade (0–3)"
+  "Grado orientativo (0–3)": "Indicative grade (0–3)",
+  "Pezones": "Nipples",
+  "Inclinación de los pezones, °": "Nipple-line tilt, °",
+  "Distancia entre pezones / ancho de hombros, %": "Nipple distance / shoulder width, %",
+  "Altura de los pezones (hombros → caderas), %": "Nipple height (shoulders → hips), %",
+  "Diferencia de altura de los pezones, % del tronco": "Nipple height difference, % of trunk",
+  "Ombligo": "Navel",
+  "Altura del ombligo (hombros → caderas), %": "Navel height (shoulders → hips), %",
+  "Desvío del ombligo de la línea media, % del ancho de hombros": "Navel offset from the midline, % of shoulder width",
+  "Axilas": "Armpits",
+  "Inclinación de las axilas, °": "Armpit-line tilt, °",
+  "Altura de las axilas (hombros → caderas), %": "Armpit height (shoulders → hips), %",
+  "Distancia entre axilas / ancho de hombros, %": "Armpit distance / shoulder width, %"
 }

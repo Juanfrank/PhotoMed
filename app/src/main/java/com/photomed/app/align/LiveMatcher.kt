@@ -273,7 +273,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
                 val lb = sameAspect(lb0, frame)
                 lastLabels = lb; lastLabelsAt = now
                 // pies y manos: con el color del cuadro en la misma rejilla (piel, surcos, uñas)
-                if (zone.guide == com.photomed.app.data.GuideType.FEET || zone.guide == com.photomed.app.data.GuideType.HANDS) ZoneCriteria.Classes(lb.width, lb.height, lb.data, rgbOf(frame, lb.width, lb.height))
+                if (zone.guide == com.photomed.app.data.GuideType.FEET || zone.guide == com.photomed.app.data.GuideType.HANDS ||
+                zone.guide == com.photomed.app.data.GuideType.TORSO_FRONT || zone.guide == com.photomed.app.data.GuideType.BREASTS) ZoneCriteria.Classes(lb.width, lb.height, lb.data, rgbOf(frame, lb.width, lb.height))
                 else ZoneCriteria.Classes.of(lb)
             }
             lastRawClasses = raw
@@ -311,7 +312,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         for (k in floatArrayOf(0.92f, 1.08f, 1f)) {
             val b = if (k == 1f) bmp else runCatching { brightness(bmp, k) }.getOrNull() ?: continue
             val lb = runCatching { seg.labels(b) }.getOrNull() ?: continue
-            val c = if (zone.guide == com.photomed.app.data.GuideType.FEET || zone.guide == com.photomed.app.data.GuideType.HANDS) ZoneCriteria.Classes(lb.width, lb.height, lb.data, rgbOf(bmp, lb.width, lb.height))
+            val c = if (zone.guide == com.photomed.app.data.GuideType.FEET || zone.guide == com.photomed.app.data.GuideType.HANDS ||
+                zone.guide == com.photomed.app.data.GuideType.TORSO_FRONT || zone.guide == com.photomed.app.data.GuideType.BREASTS) ZoneCriteria.Classes(lb.width, lb.height, lb.data, rgbOf(bmp, lb.width, lb.height))
                 else ZoneCriteria.Classes.of(lb)
             last = f.add(c)
         }

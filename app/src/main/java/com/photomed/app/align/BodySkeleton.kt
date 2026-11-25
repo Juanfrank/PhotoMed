@@ -135,6 +135,31 @@ object BodySkeleton {
                 if (waist != null && hips != null) f += trn("Cintura / caderas (piel), %") to waist / hips * 100
                 out += AnnotLine(AnnotLayer.BODY_AXES, listOf(top, bottom), false, metrics = metrics(trn("Tronco"), f))
                 joint(top); joint(bottom)
+                // referencias anatómicas (TorsoMarks): pezones, ombligo y axilas, medidos respecto de hombros y caderas
+                val len = hypot(bottom.x - top.x, bottom.y - top.y)
+                val sw = if (sl != null && sr != null) hypot(sl.x - sr.x, sl.y - sr.y) else 0f
+                /** Posición a lo largo del tronco (0 = hombros, 100 = caderas) y desvío lateral (+ = derecha de la imagen). */
+                fun along(q: Pt) = ((q.x - top.x) * (bottom.x - top.x) + (q.y - top.y) * (bottom.y - top.y)) / (len * len) * 100f
+                fun lateral(q: Pt) = ((q.x - top.x) * (bottom.y - top.y) - (q.y - top.y) * (bottom.x - top.x)) / len
+                val na = pts[TorsoMarks.NIPPLE_A]; val nb = pts[TorsoMarks.NIPPLE_B]
+                if (na != null && nb != null && sw > 0f) {
+                    out += AnnotLine(AnnotLayer.BODY_AXES, listOf(na, nb), false, metrics = metrics(trn("Pezones"), listOf(
+                        trn("Inclinación de los pezones, °") to tilt(na, nb),
+                        trn("Distancia entre pezones / ancho de hombros, %") to hypot(na.x - nb.x, na.y - nb.y) / sw * 100,
+                        trn("Altura de los pezones (hombros → caderas), %") to (along(na) + along(nb)) / 2,
+                        trn("Diferencia de altura de los pezones, % del tronco") to abs(along(na) - along(nb)))))
+                }
+                pts[TorsoMarks.NAVEL]?.let { nv ->
+                    if (sw > 0f) out += AnnotLine(AnnotLayer.BODY_AXES, listOf(Pt(top.x + (bottom.x - top.x) * along(nv) / 100f, top.y + (bottom.y - top.y) * along(nv) / 100f), nv),
+                        false, metrics = metrics(trn("Ombligo"), listOf(
+                            trn("Altura del ombligo (hombros → caderas), %") to along(nv),
+                            trn("Desvío del ombligo de la línea media, % del ancho de hombros") to lateral(nv) / sw * 100)))
+                }
+                val xa = pts[TorsoMarks.AXILLA_A]; val xb = pts[TorsoMarks.AXILLA_B]
+                if (xa != null && xb != null && frontal) out += AnnotLine(AnnotLayer.BODY_AXES, listOf(xa, xb), false, metrics = metrics(trn("Axilas"), listOfNotNull(
+                    trn("Inclinación de las axilas, °") to tilt(xa, xb),
+                    trn("Altura de las axilas (hombros → caderas), %") to (along(xa) + along(xb)) / 2,
+                    (if (sw > 0f) trn("Distancia entre axilas / ancho de hombros, %") to hypot(xa.x - xb.x, xa.y - xb.y) / sw * 100 else null))))
             } else if (f.isNotEmpty()) out.lastOrNull { it.layer == AnnotLayer.BODY_AXES && !it.filled }?.let { l ->
                 out[out.indexOf(l)] = l.copy(metrics = metrics(trn("Tronco"), f))
             }

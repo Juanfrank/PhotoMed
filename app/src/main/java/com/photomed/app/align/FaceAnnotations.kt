@@ -1130,7 +1130,17 @@ class PhotoAnnotator(private val context: Context) {
         val hands = if (zone.guide == com.photomed.app.data.GuideType.HANDS) HandDetector.createOrNull(context)?.use { it.detect(bmp) } else null
         // una sola mano en la foto (toma de una mano): se dibuja esa
         val single = hands?.size == 1
-        val diagram = BodyDiagram.lines(zone, ZoneCriteria.Scene(pose, hands?.ifEmpty { null }, classes, bmp.height / bmp.width.toFloat(), single = single))
+        // la foto a más resolución: uñas de las manos (la placa mide pocos píxeles en la rejilla de la
+        // segmentación), pezones y ombligo
+        val hiRes = zone.guide == com.photomed.app.data.GuideType.HANDS || zone.guide in TorsoMarks.GUIDES
+        val hi = if (hiRes) runCatching {
+            val nw = minOf(bmp.width, NAIL_W); val nh = (nw * bmp.height / bmp.width.toFloat()).roundToInt().coerceAtLeast(1)
+            val b = if (nw == bmp.width) bmp else Bitmap.createScaledBitmap(bmp, nw, nh, true)
+            val px = IntArray(nw * nh).also { b.getPixels(it, 0, nw, 0, 0, nw, nh) }
+            b.recycleIfCopy(bmp)
+            ZoneCriteria.Hi(px, nw, nh)
+        }.getOrNull() else null
+        val diagram = BodyDiagram.lines(zone, ZoneCriteria.Scene(pose, hands?.ifEmpty { null }, classes, bmp.height / bmp.width.toFloat(), single = single, hi = hi))
         return diagram + bodyLesions(bmp, zone, labels)
     }
 
@@ -1271,6 +1281,8 @@ class PhotoAnnotator(private val context: Context) {
         const val HAIR_W = 384
         /** Ancho de la imagen en la que se buscan manchas, arañitas, várices y celulitis en el cuerpo. */
         const val LESION_W = 384
+        /** Ancho de la imagen en la que se buscan las uñas de las manos, los pezones y el ombligo. */
+        const val NAIL_W = 1400
 
         val HAIR_NOTE: String get() = tr("Densidad capilar aparente: cuero cabelludo visible entre el pelo (segmentación y color), " +
             "no pelos por cm² (eso es tricoscopia). Grados BASP, Norwood, Ludwig y Sinclair orientativos, para seguir al mismo " +

@@ -54,7 +54,12 @@ object ZoneCriteria {
     class Scene(val pose: Map<String, Pt>, val hands: List<Hand>?, val classes: Classes?, val aspect: Float = 4f / 3f,
                 val single: Boolean = false,
                 /** Puntos del rostro (zona del ojo: para saber si se ve la cara entera en lugar de un ojo). */
-                val face: Map<String, Pt> = emptyMap())
+                val face: Map<String, Pt> = emptyMap(),
+                /** La foto a más resolución (visor y Comparar): uñas de las manos, pezones y ombligo. */
+                val hi: Hi? = null)
+
+    /** Imagen ARGB [w]×[h] (más resolución que la de [Classes]). */
+    class Hi(val px: IntArray, val w: Int, val h: Int)
 
     /**
      * Escena girada 90° × [q] en sentido antihorario: la del cuadro pasada a la orientación de la guía
