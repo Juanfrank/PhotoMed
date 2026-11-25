@@ -11,7 +11,8 @@ import java.util.concurrent.locks.ReentrantLock
  * la alineación automática y el análisis de cada foto creaban a la vez varios detectores y
  * segmentadores nativos; eso agotaba la memoria o fallaba en código nativo y Android cerraba la app sin
  * pasar por el registro de errores de Java. No es reentrante: se usa solo en los puntos de entrada
- * (análisis de una foto, alineación, importación, relieve, línea del pelo al capturar).
+ * (análisis de una foto, alineación, importación, relieve, línea del pelo al capturar) y en cada cuadro
+ * del análisis en vivo de la cámara ([tryRunBlocking]).
  *
  * Con [priority] se pasa delante de los que esperan sin prioridad. La alineación de Comparar no la usa:
  * espera al análisis de arrugas de cada foto, porque usa sus surcos como puntos de correspondencia.
@@ -46,10 +47,15 @@ object NativeGate {
         try { return block() } finally { release(); CrashLog.crumb("fin: $what") }
     }
 
-    /** Versión bloqueante (hilo de la cámara): si no hay turno en [timeoutMs], devuelve null sin ejecutar. */
-    fun <T> tryRunBlocking(what: String, timeoutMs: Long, block: () -> T): T? {
+    /**
+     * Versión bloqueante (hilo de la cámara): si no hay turno en [timeoutMs], devuelve null sin ejecutar.
+     * El análisis en vivo de la cámara pasa por aquí con espera 0: mientras se analiza una foto (p. ej. la
+     * recién tomada, tras el relieve) se saltan cuadros en lugar de correr dos modelos nativos a la vez
+     * (cierres SIGBUS en los hilos de MediaPipe y ML Kit). [crumb] false: sin rastro por cuadro.
+     */
+    fun <T> tryRunBlocking(what: String, timeoutMs: Long, crumb: Boolean = true, block: () -> T): T? {
         if (!acquire(false, TimeUnit.MILLISECONDS.toNanos(timeoutMs))) return null
-        CrashLog.crumb(what)
+        if (crumb) CrashLog.crumb(what)
         try { return block() } finally { release() }
     }
 }

@@ -378,8 +378,11 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         val orient = refOrient
         refGuide = null
         pipeline.post {
-            runCatching { m.setReference(bmp) }
-            refGuide = if (orient.isIdentity) null else runCatching { m.guideOf(upright) }.getOrNull()
+            // modelos nativos: con la puerta (espera a que acabe el análisis de una foto en curso)
+            com.photomed.app.align.NativeGate.tryRunBlocking("referencia en la cámara", 30_000) {
+                runCatching { m.setReference(bmp) }
+                refGuide = if (orient.isIdentity) null else runCatching { m.guideOf(upright) }.getOrNull()
+            }
             refPoints = m.referencePoints
             refSilhouette = m.referenceSilhouette
             refFree = m.referenceFree
@@ -561,7 +564,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         if (matchingFlag.get() && !analysisPaused.get() && now - lastAnalysis.get() >= 180) {
                             lastAnalysis.set(now)
                             val frame = proxy.toUprightCrop(360)
-                            pipeline.withEngine { it.analyze(frame) }?.let { live = it }
+                            // de uno en uno con los demás modelos nativos: si se está analizando una foto, se salta el cuadro
+                            com.photomed.app.align.NativeGate.tryRunBlocking("análisis en vivo", 0, crumb = false) {
+                                pipeline.withEngine { it.analyze(frame) }
+                            }?.let { live = it }
                         }
                     } catch (_: Exception) {
                     } finally {
@@ -681,7 +687,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         // con tiempo límite: si el análisis se detiene (cámara cerrada) no queda esperando
         return kotlinx.coroutines.withTimeoutOrNull(4000) {
             kotlinx.coroutines.suspendCancellableCoroutine<Float> { c ->
-                pipeline.post { val sc = runCatching { pipeline.withEngine { it.scoreOf(bmp) } }.getOrNull() ?: 0f; if (c.isActive) c.resume(sc) }
+                pipeline.post { val sc = runCatching { com.photomed.app.align.NativeGate.tryRunBlocking("nitidez de la ráfaga", 3000, crumb = false) { pipeline.withEngine { it.scoreOf(bmp) } } }.getOrNull() ?: 0f; if (c.isActive) c.resume(sc) }
             }
         } ?: 0f
     }

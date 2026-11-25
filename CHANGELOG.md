@@ -7,6 +7,10 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 - **Cierre al analizar una foto del rostro** (p. ej. frente y glabela) corregido: una medida degenerada (NaN)
   cerraba la app al guardar los trazos confirmados. Ahora esas medidas no se dan, los puntos no finitos se
   descartan y, si el guardado falla por cualquier otra causa, se registra sin cerrar la app.
+- **Cierre en código nativo tras el relieve** (SIGBUS en los hilos de MediaPipe y ML Kit): el análisis en
+  vivo de la cámara seguía usando los modelos mientras se analizaba la foto recién tomada. Ahora también
+  pasa por la puerta de los modelos nativos: mientras se analiza una foto, la cámara se salta cuadros en
+  lugar de correr dos modelos a la vez (y la referencia de la cámara espera su turno).
 
 ## 2.56 — 24 de noviembre de 2026
 

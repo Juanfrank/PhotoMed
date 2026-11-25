@@ -37,6 +37,19 @@ class NativeGateTest {
         assertEquals(2, NativeGate.tryRunBlocking("cámara", 50) { 2 })
     }
 
+    /** Cámara: el cuadro en vivo se salta mientras se analiza una foto (no corren dos modelos a la vez). */
+    @Test fun liveFramesSkippedWhileAPhotoIsAnalyzed() = runBlocking {
+        val started = java.util.concurrent.CountDownLatch(1)
+        val done = java.util.concurrent.CountDownLatch(1)
+        val photo = async(Dispatchers.Default) {
+            NativeGate.run("análisis de una foto (prueba)") { started.countDown(); done.await(); 1 }
+        }
+        started.await()
+        assertNull(NativeGate.tryRunBlocking("análisis en vivo", 0, crumb = false) { 2 })
+        done.countDown(); photo.await()
+        assertEquals(3, NativeGate.tryRunBlocking("análisis en vivo", 0, crumb = false) { 3 })
+    }
+
     @Test fun crashLogIncludesLastActions() {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         CrashLog.install(ctx)
