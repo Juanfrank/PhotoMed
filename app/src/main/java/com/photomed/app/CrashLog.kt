@@ -84,7 +84,14 @@ object CrashLog {
      * Cierres que no pasaron por Java (fallo en código nativo, falta de memoria, bloqueo), según Android
      * (API 30+): se registran al volver a abrir la app, con el motivo y las últimas acciones.
      */
+    /** Se completa cuando [checkExitReasons] terminó (va en segundo plano al arrancar; el aviso lo espera). */
+    val exitChecked = kotlinx.coroutines.CompletableDeferred<Unit>()
+
     fun checkExitReasons(context: Context) {
+        try { checkExitReasonsNow(context) } finally { exitChecked.complete(Unit) }
+    }
+
+    private fun checkExitReasonsNow(context: Context) {
         if (Build.VERSION.SDK_INT < 30) return
         runCatching {
             val prefs = context.getSharedPreferences("photomed", Context.MODE_PRIVATE)

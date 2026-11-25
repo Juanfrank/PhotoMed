@@ -50,7 +50,8 @@ class MainActivity : ComponentActivity() {
         com.photomed.app.i18n.I18n.init(applicationContext.createConfigurationContext(resources.configuration))
         // ningún cierre silencioso: los errores se guardan y se avisan al volver a abrir
         CrashLog.install(applicationContext)
-        CrashLog.checkExitReasons(applicationContext)
+        // lectura de los volcados de cierres del sistema: fuera del hilo principal (arranque más rápido)
+        lifecycleScope.launch(Dispatchers.IO) { runCatching { CrashLog.checkExitReasons(applicationContext) } }
         // versión nueva: fuera las cachés de la anterior (formatos que pueden haber cambiado)
         AppUpgrade.onStart(applicationContext)
         // sensibilidad de la detección de arrugas elegida en los ajustes

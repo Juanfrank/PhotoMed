@@ -124,7 +124,30 @@ class ColorAdjust(
     val tint: Double, val temperature: Double,
     val method: String,
 ) {
+    /**
+     * Aplica el ajuste con tablas: sRGB → lineal (256), lineal → sRGB (8192) y, con curva de L*, una tabla 3D
+     * de 33³ nodos (el ajuste exacto en cada nodo, interpolación trilineal). Antes eran unas 12 potencias o
+     * raíces y una reserva de memoria por píxel. Diferencia con [applyExact]: como mucho 2–3 niveles de 255.
+     */
     fun apply(rgb: IntArray): IntArray {
+        val cube = lut?.let { cube() }
+        val m = matrix
+        return IntArray(rgb.size) { i ->
+            val c = rgb[i]
+            val a = c and 0xFF000000.toInt()
+            if (cube != null) a or cube.at((c shr 16) and 0xFF, (c shr 8) and 0xFF, c and 0xFF)
+            else {
+                val r0 = LIN[(c shr 16) and 0xFF]; val g0 = LIN[(c shr 8) and 0xFF]; val b0 = LIN[c and 0xFF]
+                val r = gamByte(m[0] * r0 + m[1] * g0 + m[2] * b0)
+                val g = gamByte(m[3] * r0 + m[4] * g0 + m[5] * b0)
+                val b = gamByte(m[6] * r0 + m[7] * g0 + m[8] * b0)
+                a or (r shl 16) or (g shl 8) or b
+            }
+        }
+    }
+
+    /** El ajuste exacto de un píxel (referencia de [apply] y nodos de la tabla 3D). */
+    fun applyExact(rgb: IntArray): IntArray {
         val lab = DoubleArray(3); val v = DoubleArray(3)
         return IntArray(rgb.size) { i ->
             val c = rgb[i]
@@ -142,9 +165,48 @@ class ColorAdjust(
         }
     }
 
+    @Volatile private var cubeCache: Cube? = null
+    private fun cube(): Cube = cubeCache ?: Cube.of { r, g, b -> applyExact(intArrayOf((0xFF shl 24) or (r shl 16) or (g shl 8) or b))[0] and 0xFFFFFF }.also { cubeCache = it }
+
+    /** Tabla 3D RGB → RGB de [N]³ nodos con interpolación trilineal. */
+    private class Cube(private val r: FloatArray, private val g: FloatArray, private val b: FloatArray) {
+        fun at(ri: Int, gi: Int, bi: Int): Int {
+            val fx = ri * (N - 1) / 255f; val fy = gi * (N - 1) / 255f; val fz = bi * (N - 1) / 255f
+            val x0 = fx.toInt().coerceAtMost(N - 2); val y0 = fy.toInt().coerceAtMost(N - 2); val z0 = fz.toInt().coerceAtMost(N - 2)
+            val dx = fx - x0; val dy = fy - y0; val dz = fz - z0
+            fun ch(t: FloatArray): Int {
+                fun v(x: Int, y: Int, z: Int) = t[(x * N + y) * N + z]
+                val c00 = v(x0, y0, z0) + (v(x0 + 1, y0, z0) - v(x0, y0, z0)) * dx
+                val c10 = v(x0, y0 + 1, z0) + (v(x0 + 1, y0 + 1, z0) - v(x0, y0 + 1, z0)) * dx
+                val c01 = v(x0, y0, z0 + 1) + (v(x0 + 1, y0, z0 + 1) - v(x0, y0, z0 + 1)) * dx
+                val c11 = v(x0, y0 + 1, z0 + 1) + (v(x0 + 1, y0 + 1, z0 + 1) - v(x0, y0 + 1, z0 + 1)) * dx
+                val c0 = c00 + (c10 - c00) * dy; val c1 = c01 + (c11 - c01) * dy
+                return (c0 + (c1 - c0) * dz + 0.5f).toInt().coerceIn(0, 255)
+            }
+            return (ch(r) shl 16) or (ch(g) shl 8) or ch(b)
+        }
+
+        companion object {
+            const val N = 33
+            fun of(f: (Int, Int, Int) -> Int): Cube {
+                val n3 = N * N * N; val r = FloatArray(n3); val g = FloatArray(n3); val b = FloatArray(n3)
+                for (x in 0 until N) for (y in 0 until N) for (z in 0 until N) {
+                    val o = f(x * 255 / (N - 1), y * 255 / (N - 1), z * 255 / (N - 1)); val i = (x * N + y) * N + z
+                    r[i] = ((o shr 16) and 0xFF).toFloat(); g[i] = ((o shr 8) and 0xFF).toFloat(); b[i] = (o and 0xFF).toFloat()
+                }
+                return Cube(r, g, b)
+            }
+        }
+    }
+
     fun describe(): String = tr("%1\$s · exposición %2\$+.2f EV · temperatura %3\$+.1f · tinte %4\$+.1f", tr(method), exposureEv, temperature, tint)
 
     companion object {
+        private val LIN = DoubleArray(256) { ColorSpace.lin(it) }
+        private const val GAM_N = 8192
+        private val GAM = IntArray(GAM_N + 1) { (ColorSpace.gam(it / GAM_N.toDouble()) * 255 + 0.5).toInt().coerceIn(0, 255) }
+        private fun gamByte(v: Double): Int = GAM[(v.coerceIn(0.0, 1.0) * GAM_N + 0.5).toInt()]
+
         val IDENTITY = ColorAdjust(doubleArrayOf(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0), null, 0.0, 0.0, 0.0, trn("sin cambios"))
     }
 }

@@ -32,10 +32,17 @@ object AppUpgrade {
         return true
     }
 
+    /**
+     * Las cachés se apartan al momento (renombrar es instantáneo: la versión nueva ya no las ve) y se borran en
+     * segundo plano. Antes el borrado recursivo de la caché de imágenes se hacía en el arranque, en el hilo principal.
+     */
     fun clearCaches(context: Context) {
-        runCatching { context.cacheDir.listFiles()?.forEach { it.deleteRecursively() } }
+        val trash = File(context.cacheDir.parentFile ?: context.filesDir, "cache_old").apply { mkdirs() }
+        fun away(f: File) { runCatching { if (!f.renameTo(File(trash, "${f.name}-${System.nanoTime()}"))) f.deleteRecursively() } }
+        runCatching { context.cacheDir.listFiles()?.forEach(::away) }
         runCatching { context.externalCacheDir?.listFiles()?.forEach { it.deleteRecursively() } }
-        DERIVED_DIRS.forEach { runCatching { File(context.filesDir, it).deleteRecursively() } }
+        DERIVED_DIRS.forEach { File(context.filesDir, it).takeIf { f -> f.exists() }?.let(::away) }
         runCatching { com.photomed.app.align.PhotoAnnotator.clearCache() }
+        Thread({ runCatching { trash.deleteRecursively() } }, "limpieza-cache").apply { isDaemon = true; priority = Thread.MIN_PRIORITY }.start()
     }
 }

@@ -2,6 +2,23 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.59 — 25 de noviembre de 2026
+
+Revisión integral, tanda 3: **rendimiento de la cámara, el visor y Comparar** (mismos resultados, menos trabajo).
+
+- **Cámara**: la guía de la cara (deformación de ~140 puntos) solo se recalcula si la cara se mueve, no con cada
+  cuadro; los pies de la máscara se analizan una vez (antes hasta tres por cuadro) y la máscara girada con la guía
+  se gira una vez; la comprobación de la mano recorre cajas precalculadas.
+- **Comparar**: el color igualado se aplica con tablas (y una tabla 3D con la curva de tono) en lugar de ~12
+  potencias por píxel; las fotos corregidas se decodifican más pequeñas cuantas más se ven (1080 → 540 px) y de dos
+  en dos (con 12 fotos había riesgo de quedarse sin memoria); tocar la pantalla ya no la recompone entera.
+- **Números de las medidas**: se colocan una vez por conjunto de líneas y zoom (antes en cada cuadro de dibujo,
+  también al hacer zoom), sin esquivar las celdas del mapa del cuero cabelludo.
+- **Trazo a mano**: se mide solo esa línea (antes se repetía el análisis completo de arrugas de la cara).
+- **Visor y arranque**: giro, recorte y lecturas de archivos fuera del hilo principal; las cachés de la versión
+  anterior se apartan al instante y se borran en segundo plano, y los cierres registrados por el sistema se leen
+  en segundo plano (el aviso sigue apareciendo).
+
 ## 2.58 — 25 de noviembre de 2026
 
 Revisión integral (10 revisores), tanda 1: **integridad de los datos clínicos**.

@@ -125,6 +125,7 @@ import com.photomed.app.ui.formatDate
 import com.photomed.app.ui.theme.Md3Spacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.width
@@ -191,7 +192,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     var hairlineInfo by remember { mutableStateOf<String?>(null) }
     var nearCaptured by remember { mutableStateOf(false) }
     var exportSheet by remember { mutableStateOf(false) }
-    var lastTouch by remember { mutableStateOf(0L) }
+    // toques: sin estado de Compose (antes cada toque, también al arrastrar, recomponía toda la pantalla)
+    val touches = remember { kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST) }
     var controlsVisible by remember { mutableStateOf(true) }
     /** Recortar todas las fotos al área común que dejan tras alinearse (sin bordes negros). */
     var cropToAlign by remember { mutableStateOf(prefs.getBoolean("compare_crop", false)) }
@@ -427,10 +429,16 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     }
 
     // Ocultar los controles inferiores tras unos segundos sin tocar (solo con fotos en comparación)
-    LaunchedEffect(lastTouch, seqKeys, alignJob, settings, exportSheet) {
-        controlsVisible = true
-        if (CompareIdle.enabled && seqKeys.size >= 2 && !settings && !exportSheet) {
-            kotlinx.coroutines.delay(CompareIdle.HIDE_MS); controlsVisible = alignJob?.isActive == true
+    LaunchedEffect(seqKeys, alignJob, settings, exportSheet) {
+        suspend fun cycle() {
+            controlsVisible = true
+            if (CompareIdle.enabled && seqKeys.size >= 2 && !settings && !exportSheet) {
+                kotlinx.coroutines.delay(CompareIdle.HIDE_MS); controlsVisible = alignJob?.isActive == true
+            }
+        }
+        kotlinx.coroutines.coroutineScope {
+            var job = launch { cycle() }
+            touches.collect { job.cancel(); job = launch { cycle() } }
         }
     }
 
@@ -506,7 +514,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         val aligning = alignJob?.isActive == true
         // Modelos (con perspectiva y color corregidos) de cada foto de la secuencia.
         val models: Map<String, Any> = seq?.associate { p ->
-            p.key to key(p.key) { rememberCorrected(p.uri, resultOf(p)?.keystoneDeg ?: 0f, Perspective.DEFAULT_FOCAL, shownColors[p.key]) }
+            p.key to key(p.key) { rememberCorrected(p.uri, resultOf(p)?.keystoneDeg ?: 0f, Perspective.DEFAULT_FOCAL, shownColors[p.key], correctedWidth(seq.size)) }
         }.orEmpty()
         // anotaciones (contorno, línea del pelo, rasgos, surcos) de cada foto, en su foto corregida
         val layers = if (showLayers || bodyDiagram) layersState.value else emptySet()
@@ -538,7 +546,7 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         }
         Column(Modifier.padding(padding).fillMaxSize().pointerInput(Unit) {
             awaitPointerEventScope {
-                while (true) { awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial); lastTouch = System.currentTimeMillis() }
+                while (true) { awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial); touches.tryEmit(Unit) }
             }
         }) {
             // controles de arriba: modo, capas, opacidad, avisos y análisis en curso
@@ -1287,26 +1295,33 @@ private data class CompareDerived(
 /** Descripción de la estrategia de la zona (para ayudas contextuales). */
 fun alignmentHint(zone: Zone) = ZoneAlignment.of(zone).description
 
+/** Ancho de las fotos corregidas según cuántas se ven a la vez (12 a 1080 px eran ~75 MB de mapas de bits). */
+fun correctedWidth(n: Int): Int = when { n <= 2 -> 1080; n <= 4 -> 720; else -> 540 }
+
+/** Correcciones (perspectiva, color) de dos en dos: el pico de memoria no crece con el número de fotos. */
+private val correctGate = kotlinx.coroutines.sync.Semaphore(2)
+
 /** Imagen con la perspectiva vertical corregida y el color igualado (o la URI tal cual si no hay cambios). */
 @Composable
-private fun rememberCorrected(uri: android.net.Uri, pitchDeg: Float, focalNorm: Float, color: ColorAdjust? = null): Any {
+private fun rememberCorrected(uri: android.net.Uri, pitchDeg: Float, focalNorm: Float, color: ColorAdjust? = null, width: Int = 1080): Any {
     val context = LocalContext.current
     // φ exacto: la semejanza se calculó sobre la foto corregida con este mismo ángulo
     val key = pitchDeg
-    val state = androidx.compose.runtime.produceState<Any>(uri, uri, key, focalNorm, color) {
+    val state = androidx.compose.runtime.produceState<Any>(uri, uri, key, focalNorm, color, width) {
         if (key == 0f && color == null) { value = com.photomed.app.ui.photoModel(context, uri); return@produceState }
-        value = withContext(Dispatchers.Default) {
+        value = correctGate.withPermit { withContext(Dispatchers.Default) {
             runCatching {
-                var bmp = ImageOps.correctPerspective(ImageOps.load34(context, uri, 1080), key, focalNorm)
+                var bmp = ImageOps.correctPerspective(ImageOps.load34(context, uri, width), key, focalNorm)
                 if (color != null) {
                     val px = IntArray(bmp.width * bmp.height).also { bmp.getPixels(it, 0, bmp.width, 0, 0, bmp.width, bmp.height) }
                     val out = color.apply(px)
-                    bmp = android.graphics.Bitmap.createBitmap(bmp.width, bmp.height, android.graphics.Bitmap.Config.ARGB_8888)
-                        .apply { setPixels(out, 0, width, 0, 0, width, height) }
+                    // sobre el mismo mapa de bits si se puede (antes siempre uno nuevo además del corregido)
+                    bmp = (if (bmp.isMutable) bmp else android.graphics.Bitmap.createBitmap(bmp.width, bmp.height, android.graphics.Bitmap.Config.ARGB_8888))
+                        .apply { setPixels(out, 0, this.width, 0, 0, this.width, this.height) }
                 }
                 bmp
             }.getOrNull()
-        } ?: uri
+        } } ?: uri
     }
     return state.value
 }

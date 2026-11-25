@@ -184,6 +184,15 @@ object FaceAnnotations {
                  /** Corrección de las alturas de la frente por el cabeceo ([FeatureMetrics.hairTiltScale]). */
                  hairVScale: Float = 1f): List<AnnotLine> {
         if (meshIn.size < 468) return face(keysFromMesh(meshIn), labels, lum)
+        // un trazo a mano: solo su medida (antes se repetía el análisis completo de arrugas para medir una línea)
+        if (extras?.onlyAdded == true) {
+            val sc = scaleOf(meshIn, extras) ?: return emptyList()
+            val l = lum ?: return emptyList()
+            return added.mapIndexedNotNull { i, pts ->
+                if (pts.size < 2) null else AnnotLine(AnnotLayer.FOLDS, pts, false, metrics = LineMeasure.line("Surco añadido ${i + 1}", pts, l, sc, halfMm = 4f, relief = extras.relief)
+                    .copy(note = trn("Trazado a mano en una zona elegida"))).let { withWidthGuide(it, sc.first) }
+            }
+        }
         // cejas ajustadas a su borde en la imagen (la malla a veces las deja arriba o abajo del pelo)
         val mesh = if (lum != null) runCatching { BrowRefine.refineMesh(meshIn, lum, labels) }.getOrDefault(meshIn) else meshIn
         val keys = FaceKeys.canonical(keysFromMesh(mesh))
@@ -895,7 +904,7 @@ object FaceCrop {
                added: List<List<Pt>> = emptyList(), hairVScale: Float = 1f): List<AnnotLine> {
         val m = mesh.map { c.toCrop(it) }
         val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
-        val ex = extras?.let { e -> MeasureExtras(e.relief?.let { relief(it, c, b.width, b.height) }, e.meta) }
+        val ex = extras?.let { e -> MeasureExtras(e.relief?.let { relief(it, c, b.width, b.height) }, e.meta, e.onlyAdded) }
         val lines = FaceAnnotations.fromMesh(m, labels, lum(b), LabImage.fromArgb(px, b.width, b.height), ex, info, priors,
             added.map { l -> l.map { c.toCrop(it) } }, hairVScale)
         if (b !== src) b.recycle()
@@ -1095,7 +1104,7 @@ class PhotoAnnotator(private val context: Context) {
      * misma escala y método que las líneas detectadas. null si no se pueden medir (sin cara).
      */
     suspend fun measureTrace(bmp: Bitmap, zone: Zone, extras: MeasureExtras?, pts: List<Pt>): LineMetrics? =
-        analyze(bmp, zone, extras, user = AnnotUserEdit(added = listOf(pts))).first
+        analyze(bmp, zone, MeasureExtras(extras?.relief, extras?.meta, onlyAdded = true), user = AnnotUserEdit(added = listOf(pts))).first
             .firstOrNull { it.metrics?.name == "Surco añadido 1" }?.metrics
 
     /** Aviso si hay barba o bigote: los surcos de la zona solo se trazan sobre la piel visible. */

@@ -754,8 +754,10 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
             return@produceState
         }
         val user = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.AnnotUserEdits.of(context, u) }.let { e -> if (e.editHash != edit.hashCode()) e.copy(added = emptyList()) else e }
-        val key = "full|$u|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, u)}|" +
-            "${com.photomed.app.align.AnnotUserEdits.tag(context, u)}|${com.photomed.app.align.LineMemory.tag(context, previous)}"
+        // clave con lecturas de archivos y preferencias: fuera del hilo principal
+        val key = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            "full|$u|${edit.hashCode()}|${com.photomed.app.align.ReliefStore.tag(context, u)}|" +
+                "${com.photomed.app.align.AnnotUserEdits.tag(context, u)}|${com.photomed.app.align.LineMemory.tag(context, previous)}" }
         val hit = com.photomed.app.align.PhotoAnnotator.cached(key)
         // sin análisis disponible (pruebas en la JVM): no se carga la imagen para nada
         if (hit == null && !com.photomed.app.align.PhotoAnnotator.enabled) {
@@ -765,8 +767,8 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
         value = hit ?: runCatching {
             com.photomed.app.align.PhotoAnnotator(context.applicationContext)
                 .analyze(com.photomed.app.align.ImageOps.loadFull(context, photo.uri, 1600, edit), zone,
-                    com.photomed.app.align.PhotoAnnotator.extrasFor(context, photo.uri, 1600, crop34 = false),
-                    user = user, priors = com.photomed.app.align.LineMemory.priors(context, previous), memoryUri = u)
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.PhotoAnnotator.extrasFor(context, photo.uri, 1600, crop34 = false) },
+                    user = user, priors = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.LineMemory.priors(context, previous) }, memoryUri = u)
         }.getOrNull()?.let { (lines, note) ->
             com.photomed.app.align.PhotoAnnotator.put(key, lines); com.photomed.app.align.PhotoAnnotator.putNote(key, note); lines
         } ?: emptyList<com.photomed.app.align.AnnotLine>().also {

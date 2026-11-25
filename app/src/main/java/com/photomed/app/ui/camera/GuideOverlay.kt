@@ -743,8 +743,7 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLineNumbers(
     // radio en unidades del ancho de la foto (para colocar los números fuera de los trazos)
     val o0 = map(com.photomed.app.align.Pt(0f, 0f)); val o1 = map(com.photomed.app.align.Pt(1f, 0f))
     val rUnits = r / kotlin.math.hypot(o1.x - o0.x, o1.y - o0.y).coerceAtLeast(1f)
-    val visible = lines.filter { it.layer in layers }
-    for (pl in com.photomed.app.align.MeasureNumbering.place(visible, numbers, rUnits, visible)) {
+    for (pl in com.photomed.app.align.MeasureNumbering.placeCached(lines, layers, numbers, rUnits)) {
         val n = numbers[pl.line.metrics!!.name] ?: continue
         val c = map(pl.at); val t = map(pl.target)
         val col = lineColor(pl.line)

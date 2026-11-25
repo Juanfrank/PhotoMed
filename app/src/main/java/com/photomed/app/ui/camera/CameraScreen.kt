@@ -328,10 +328,20 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     var ghostBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     /** Primera toma (sin referencia): el rostro coincide con el marco de la guía → la guía se ajusta a la cara. */
     var framedFace by remember { mutableStateOf(false) }
+    // puntos del cuadro para adaptar la guía (primera toma): solo cambian si la cara se mueve de verdad
+    // (antes la deformación de ~140 puntos se recalculaba en el hilo principal con cada cuadro analizado)
+    val stableLive = remember { mutableStateOf<Map<String, com.photomed.app.align.Pt>>(emptyMap()) }
     var autoArmed by remember { mutableStateOf(true) }
     var lastFocusAt by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
     var lastFocusZoom by remember { mutableFloatStateOf(0f) }
     var live by remember { mutableStateOf<LiveFrame?>(null) }
+    run {
+        val cur = live?.currentPointsAll.orEmpty()
+        val prev = stableLive.value
+        fun moved(): Boolean = listOf(com.photomed.app.align.Landmarks.EYE_L, com.photomed.app.align.Landmarks.EYE_R, com.photomed.app.align.Landmarks.NOSE_BASE)
+            .any { k -> val a = cur[k]; val b = prev[k]; a == null || b == null || kotlin.math.hypot(a.x - b.x, a.y - b.y) > GUIDE_MOVE }
+        if (cur.isEmpty() != prev.isEmpty() || (cur.isNotEmpty() && moved())) SideEffect { stableLive.value = cur }
+    }
     var focalNorm by remember { mutableStateOf<Float?>(null) }
     val tilt = rememberTilt(true)
     // Hilo de análisis con motor intercambiable: el analizador usa siempre el LiveMatcher actual;
@@ -453,9 +463,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         while (true) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); kotlinx.coroutines.delay(interval) }
     }
     // ¿La cara del cuadro coincide con el marco de la guía? (solo sin foto de referencia superpuesta)
-    LaunchedEffect(live, refPoints, showGhost) {
+    // con los puntos estables (solo cambian si la cara se mueve), no con cada cuadro analizado
+    LaunchedEffect(stableLive.value, refPoints, showGhost) {
         val art = GuideArtByZone[zone.id]
-        val pts = live?.currentPointsAll.orEmpty()
+        val pts = stableLive.value
         val noRef = refPoints.isEmpty() || !showGhost
         val fit = if (noRef && art != null && art.controls.isNotEmpty() && pts.isNotEmpty())
             com.photomed.app.align.FaceFraming.of(art.controls, FaceControlKeys, pts)
@@ -466,8 +477,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     }
     // si la segmentación de pelo y piel no carga en este teléfono, decirlo una vez con el motivo
     var hairSkinWarned by remember { mutableStateOf(false) }
-    LaunchedEffect(live) {
-        val h = live?.eval?.hints?.firstOrNull { it.startsWith("Detector (pelo y piel)") } ?: return@LaunchedEffect
+    val hairSkinHint = live?.eval?.hints?.firstOrNull { it.startsWith("Detector (pelo y piel)") }
+    LaunchedEffect(hairSkinHint) {
+        val h = hairSkinHint ?: return@LaunchedEffect
         if (!hairSkinWarned) { hairSkinWarned = true; snackbar.showSnackbar(tr("Línea del pelo no disponible. %1\$s", HintText.display(h))) }
     }
     val tone = GuideTone.of(live?.eval, matchingEnabled)
@@ -1110,7 +1122,7 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         rg != null -> rg.points
                         adaptGuide && ghost != null && refUpright && refPoints.isNotEmpty() -> refPoints
                         // primera toma: con la cara dentro del marco, el contorno se ajusta a ella
-                        adaptGuide && framedFace -> live?.currentPointsAll.orEmpty()
+                        adaptGuide && framedFace -> stableLive.value
                         else -> emptyMap()
                     }
                     val adaptSil = if (rg != null) rg.silhouette else if (adaptGuide && ghost != null && refUpright) refSilhouette else null
@@ -1671,3 +1683,6 @@ fun ShutterButton(degree: Float?, capturing: Boolean, enabled: Boolean, onClick:
         ) { if (capturing) CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp) }
     }
 }
+
+/** Desplazamiento (unidades del ancho) de ojos o base nasal a partir del cual se vuelve a adaptar la guía al cuadro. */
+private const val GUIDE_MOVE = 0.004f

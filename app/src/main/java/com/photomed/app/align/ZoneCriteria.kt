@@ -39,6 +39,10 @@ object ZoneCriteria {
                   /** Color (ARGB) en la misma rejilla, para los dedos del pie (piel refinada y surcos); opcional. */
                   val rgb: IntArray? = null) {
         fun at(x: Int, y: Int): Int = if (x in 0 until width && y in 0 until height) data[y * width + x].toInt() else FaceLabels.BG
+        /** Pies de esta máscara (se calculan una vez, la usen los criterios, el esquema o los puntos). */
+        @Volatile internal var feet: List<Foot>? = null
+        /** Esta máscara girada 90° antihorario (guía girada): se gira una vez por máscara, no en cada cuadro. */
+        @Volatile internal var rotatedCcw: Classes? = null
         companion object { fun of(l: FaceLabels) = Classes(l.width, l.height, l.data) }
     }
 
@@ -63,12 +67,12 @@ object ZoneCriteria {
         repeat(((q % 4) + 4) % 4) {
             val a = sc.aspect
             fun r(p: Pt) = Pt(p.y / a, (1f - p.x) / a)
-            val cl = sc.classes?.let { c ->
+            val cl = sc.classes?.let { c -> c.rotatedCcw ?: run {
                 val w2 = c.height; val h2 = c.width; val d = ByteArray(w2 * h2)
                 for (y2 in 0 until h2) for (x2 in 0 until w2) d[y2 * w2 + x2] = c.data[x2 * c.width + (c.width - 1 - y2)]
                 val lm = c.rgb?.let { l -> IntArray(w2 * h2).also { o -> for (y2 in 0 until h2) for (x2 in 0 until w2) o[y2 * w2 + x2] = l[x2 * c.width + (c.width - 1 - y2)] } }
-                Classes(w2, h2, d, lm)
-            }
+                Classes(w2, h2, d, lm).also { c.rotatedCcw = it }
+            } }
             sc = Scene(sc.pose.mapValues { r(it.value) }, sc.hands?.map { h -> Hand(h.points.map(::r), h.label) }, cl, 1f / a, sc.single,
                 sc.face.mapValues { r(it.value) })
         }
@@ -451,12 +455,17 @@ object ZoneCriteria {
             // y ocupa buena parte de la piel (una mano en la cabeza de una foto de espalda no es un primer plano de la mano)
             if (c == null) return true
             val k = c.width.toFloat(); var inHand = 0; var skin = 0
+            // caja (con margen) de cada mano, una vez (antes se recalculaba con sus 21 puntos para cada píxel de piel)
+            val boxes = big.map { h ->
+                val x0 = h.points.minOf { it.x }; val x1 = h.points.maxOf { it.x }
+                val y0 = h.points.minOf { it.y }; val y1 = h.points.maxOf { it.y }; val m = 0.15f * (y1 - y0)
+                floatArrayOf(x0 - m, x1 + m, y0 - m, y1 + m)
+            }
             for (y in 0 until c.height) for (x in 0 until c.width) {
                 if (!isSkin(c.at(x, y))) continue
                 skin++
                 val px = (x + 0.5f) / k; val py = (y + 0.5f) / k
-                if (big.any { h -> val m = 0.15f * (h.points.maxOf { it.y } - h.points.minOf { it.y })
-                        px in h.points.minOf { it.x } - m..h.points.maxOf { it.x } + m && py in h.points.minOf { it.y } - m..h.points.maxOf { it.y } + m }) inHand++
+                if (boxes.any { b -> px >= b[0] && px <= b[1] && py >= b[2] && py <= b[3] }) inHand++
             }
             if (skin > 0 && inHand >= 0.4f * skin) return true
         }
@@ -573,13 +582,11 @@ object ZoneCriteria {
                /** Profundidad de los surcos entre dedos (anchos): mano ≥ 0,3, pie ≈ 0,1 ([ToeDetector.Toes.depth]). */
                val digitDepth: Float = 0f)
 
-    @Volatile private var feetMemo: Pair<Classes, List<Foot>>? = null
-
-    /** Pies de [c] (se calcula una vez por máscara: los criterios y el esquema la comparten). */
-    fun feetOf(c: Classes): List<Foot> {
-        feetMemo?.let { (k, v) -> if (k === c) return v }
-        return computeFeet(c).also { feetMemo = c to it }
-    }
+    /**
+     * Pies de [c] (se calcula una vez por máscara: los criterios y el esquema la comparten). Antes la memoria
+     * guardaba solo la última máscara y, alternando la fusionada y la del cuadro, se recalculaba hasta 3 veces.
+     */
+    fun feetOf(c: Classes): List<Foot> = c.feet ?: computeFeet(c).also { c.feet = it }
 
     private fun computeFeet(c: Classes): List<Foot> {
         val (blobs, lab) = labeled(c)

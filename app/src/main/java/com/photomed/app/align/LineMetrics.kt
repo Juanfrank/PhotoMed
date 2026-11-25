@@ -293,7 +293,22 @@ object LineMeasure {
 object MeasureNumbering {
     fun group(m: LineMetrics) = when { m.isFeature -> 2; m.areaMm2 != null || m.deltaE != null -> 1; else -> 0 }
 
+    private class SetsKey(val sets: List<List<AnnotLine>>) {
+        override fun equals(other: Any?) = other is SetsKey && other.sets.size == sets.size && sets.indices.all { other.sets[it] === sets[it] }
+        override fun hashCode() = sets.fold(1) { h, l -> h * 31 + System.identityHashCode(l) }
+    }
+    private val ofCache = object : LinkedHashMap<SetsKey, Map<String, Int>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<SetsKey, Map<String, Int>>?) = size > 24
+    }
+
+    /** Números de las líneas medidas; el mismo mapa (misma instancia) para las mismas listas de líneas. */
     fun of(sets: List<List<AnnotLine>>): Map<String, Int> {
+        val key = SetsKey(sets)
+        synchronized(ofCache) { ofCache[key]?.let { return it } }
+        return compute(sets).also { synchronized(ofCache) { ofCache[key] = it } }
+    }
+
+    private fun compute(sets: List<List<AnnotLine>>): Map<String, Int> {
         val byName = LinkedHashMap<String, AnnotLine>()
         for (s in sets) for (l in s) { val m = l.metrics ?: continue; byName.putIfAbsent(m.name, l) }
         return byName.values.sortedWith(compareBy({ group(it.metrics!!) }, { it.layer.ordinal }, { it.metrics!!.name }))
@@ -312,6 +327,27 @@ object MeasureNumbering {
         return listOf(0.5f, 0.3f, 0.7f, 0.15f, 0.85f, 0f, 1f).map { p[(it * (p.size - 1)).toInt()] }
     }
 
+    private class PlaceKey(val lines: List<AnnotLine>, val layers: Set<AnnotLayer>, val numbers: Map<String, Int>, val rq: Int) {
+        override fun equals(other: Any?) = other is PlaceKey && other.lines === lines && other.numbers === numbers && other.rq == rq && other.layers == layers
+        override fun hashCode() = (System.identityHashCode(lines) * 31 + System.identityHashCode(numbers)) * 31 + rq * 17 + layers.hashCode()
+    }
+    private val placeCache = object : LinkedHashMap<PlaceKey, List<Placement>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<PlaceKey, List<Placement>>?) = size > 24
+    }
+
+    /**
+     * [place] de las líneas de [lines] en [layers], memorizado por (líneas, capas, números, radio en escalones del
+     * 5 %): se dibuja en cada cuadro (zoom, gesto) y antes se recolocaba todo cada vez en el hilo principal.
+     */
+    fun placeCached(lines: List<AnnotLine>, layers: Set<AnnotLayer>, numbers: Map<String, Int>, r: Float): List<Placement> {
+        val rq = kotlin.math.round(kotlin.math.ln(r.coerceAtLeast(1e-6f)) / kotlin.math.ln(1.05f)).toInt()
+        val key = PlaceKey(lines, layers.toSet(), numbers, rq)
+        synchronized(placeCache) { placeCache[key]?.let { return it } }
+        val visible = lines.filter { it.layer in layers }
+        val rr = Math.pow(1.05, rq.toDouble()).toFloat()
+        return place(visible, numbers, rr, visible).also { synchronized(placeCache) { placeCache[key] = it } }
+    }
+
     /** Número colocado: centro de la pastilla y punto de su línea al que apunta (guía). */
     class Placement(val line: AnnotLine, val at: Pt, val target: Pt)
 
@@ -321,7 +357,8 @@ object MeasureNumbering {
      * pastilla en unidades del ancho). Si no hay sitio libre, el de mayor holgura.
      */
     fun place(lines: List<AnnotLine>, numbers: Map<String, Int>, r: Float, all: List<AnnotLine> = lines): List<Placement> {
-        val segs = all.filter { it.points.size >= 2 }.flatMap { l ->
+        // las celdas rellenas sin medidas (mapa del cuero cabelludo) no son trazos que haya que esquivar
+        val segs = all.filter { it.points.size >= 2 && !(it.filled && it.metrics == null) }.flatMap { l ->
             val p = l.points
             (1 until p.size).map { p[it - 1] to p[it] } + if (l.closed) listOf(p.last() to p.first()) else emptyList()
         }

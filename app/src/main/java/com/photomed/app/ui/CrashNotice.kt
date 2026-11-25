@@ -17,6 +17,11 @@ import com.photomed.app.CrashLog
 fun CrashNotice() {
     val context = LocalContext.current
     var files by remember { mutableStateOf(runCatching { CrashLog.unseen(context) }.getOrDefault(emptyList())) }
+    // los cierres nativos registrados por el sistema se leen en segundo plano al arrancar: al terminar, se vuelve a mirar
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.withTimeoutOrNull(10_000) { CrashLog.exitChecked.await() }
+        files = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { CrashLog.unseen(context) }.getOrDefault(emptyList()) }
+    }
     if (files.isEmpty()) return
     AlertDialog(
         onDismissRequest = { CrashLog.markSeen(context); files = emptyList() },

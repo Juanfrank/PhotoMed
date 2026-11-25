@@ -165,7 +165,9 @@ data class MeasureMeta(
 )
 
 /** Medidas extra de una foto para [LineMeasure]: relieve en sus coordenadas y factor de escala. */
-class MeasureExtras(val relief: GrayImage?, val meta: MeasureMeta?)
+class MeasureExtras(val relief: GrayImage?, val meta: MeasureMeta?,
+                    /** Medir solo los trazos añadidos a mano (sin detectar rasgos, surcos ni arrugas). */
+                    val onlyAdded: Boolean = false)
 
 object ReliefStore {
     private fun dir(context: Context) = File(context.filesDir, "relieve").apply { mkdirs() }

@@ -23,13 +23,15 @@ object ImageOps {
      */
     suspend fun load34(context: Context, uri: Uri, width: Int, edit: ImageEdit? = null): Bitmap {
         val e = edit ?: PhotoEdits.of(context, uri.toString())
-        if (!e.isIdentity) return centerCrop34(e.apply(loadFull(context, uri, width * 2, ImageEdit.NONE)), width)
+        if (!e.isIdentity) { val full = loadFull(context, uri, width * 2, ImageEdit.NONE)
+            return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { centerCrop34(e.apply(full), width) } }
         val request = ImageRequest.Builder(context)
             .data(uri).size(width, width * 4 / 3).scale(Scale.FILL).precision(Precision.EXACT)
             .allowHardware(false).build()
         val bmp = (context.imageLoader.execute(request) as? SuccessResult)?.drawable
             ?.let { (it as BitmapDrawable).bitmap } ?: error(tr("No se pudo abrir la imagen"))
-        return centerCrop34(bmp, width)
+        // recorte, giro y escala fuera del hilo del llamador (a veces el principal: visor, exportación)
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { centerCrop34(bmp, width) }
     }
 
     /** Foto completa (sin recorte 3:4), lado mayor ≤ [maxSide], con su edición aplicada. */
@@ -39,7 +41,7 @@ object ImageOps {
             .allowHardware(false).build()
         val bmp = (context.imageLoader.execute(request) as? SuccessResult)?.drawable
             ?.let { (it as BitmapDrawable).bitmap } ?: error(tr("No se pudo abrir la imagen"))
-        return (edit ?: PhotoEdits.of(context, uri.toString())).apply(bmp)
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { (edit ?: PhotoEdits.of(context, uri.toString())).apply(bmp) }
     }
 
     /**

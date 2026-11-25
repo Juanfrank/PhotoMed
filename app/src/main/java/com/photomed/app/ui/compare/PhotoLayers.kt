@@ -248,11 +248,13 @@ fun rememberPhotoAnnotations(uri: Uri, zone: Zone, phiDeg: Float, enabled: Boole
         val user = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.AnnotUserEdits.of(context, u) }.let { e ->
             // los trazos añadidos están en la foto completa: se llevan al encuadre 3:4 de Comparar
             if (e.editHash != edit.hashCode()) e.copy(added = emptyList()) else e.copy(added = e.addedIn34()) }
-        val key = key34(context, uri, previous)
+        // clave, extras y líneas previas leen archivos y preferencias: fuera del hilo principal
+        val key = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { key34(context, uri, previous) }
         val base = PhotoAnnotator.cached(key) ?: if (!PhotoAnnotator.enabled) emptyList() else runCatching {
-            PhotoAnnotator(context.applicationContext).analyze(ImageOps.load34(context, uri, 1080), zone,
-                PhotoAnnotator.extrasFor(context, uri, 1080, crop34 = true),
-                user = user, priors = com.photomed.app.align.LineMemory.priors(context, previous), memoryUri = u)
+            val extras = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { PhotoAnnotator.extrasFor(context, uri, 1080, crop34 = true) }
+            val priors = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.photomed.app.align.LineMemory.priors(context, previous) }
+            PhotoAnnotator(context.applicationContext).analyze(ImageOps.load34(context, uri, 1080), zone, extras,
+                user = user, priors = priors, memoryUri = u)
         }.getOrNull()?.let { (lines, note) -> PhotoAnnotator.put(key, lines); PhotoAnnotator.putNote(key, note); lines }
             ?: emptyList<AnnotLine>().also { PhotoAnnotator.putNote(key, tr("No se pudo analizar la foto.")) }
         value = base?.map { l -> if (phiDeg == 0f) l else l.mapped { Perspective.mapPt(it, phiDeg) } }
