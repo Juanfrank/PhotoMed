@@ -133,7 +133,7 @@ object PhotoImport {
                             (hashes[it.uri]?.let { h -> mapOf("SourceHash" to h) } ?: emptyMap()))
                 }
             }.onFailure { e -> if (e is kotlinx.coroutines.CancellationException) throw e; com.photomed.app.CrashLog.write("Importar una foto", e) }
-            } finally { f.delete(); bmp.recycle() }
+            } finally { f.delete() }
         }
         return out
     }
