@@ -197,5 +197,8 @@
   "Cabeza: inclinar menos, subir la barbilla (nariz–mentón)": "Head: tilt less, raise the chin (nose–chin)",
   "Se guardaron %1$d foto(s) pendientes": "%1$d pending photo(s) were saved",
   " · se conservó en la app y se volverá a guardar al abrir de nuevo la cámara": " · kept in the app; it will be saved when the camera is opened again",
-  "La importación se interrumpió por un error (queda en el registro de errores)": "The import was interrupted by an error (it is in the error log)"
+  "La importación se interrumpió por un error (queda en el registro de errores)": "The import was interrupted by an error (it is in the error log)",
+  "No se encontró el ojo en la foto (encuadre el ojo con la ceja y el canto interno, como en la guía).": "The eye was not found in the photo (frame the eye with the eyebrow and the inner corner, as in the guide).",
+  "Ojo: medidas con la sección del ojo de la malla facial (escala por el iris, 11,7 mm).": "Eye: measurements with the eye section of the face mesh (scale from the iris, 11.7 mm).",
+  "el punto elegido no parece piel natural: elija piel sin sombra ni brillo": "the chosen point does not look like natural skin: pick skin without shadow or shine"
 }

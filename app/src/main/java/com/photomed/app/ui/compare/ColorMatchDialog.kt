@@ -125,7 +125,12 @@ private fun ColorMatchContent(before: Photo, after: Photo, onDismiss: () -> Unit
             }
             ensureActive()
             adjust = res?.first; preview = res?.second; deltaE = res?.third
+            // punto de piel elegido a mano que no parece piel (ropa, sombra, fondo): se avisa
+            val unnatural = m == ColorMode.SKIN_POINT && withContext(Dispatchers.Default) {
+                listOf(b to masks[0], a to masks[1]).any { (bm, mk) -> mk != null && ColorMatch.stats(bm.rgb(), mk)?.let { st -> !ColorMatch.isNaturalSkin(st.meanL, st.meanA, st.meanB) } == true }
+            }
             source = when {
+                res != null && unnatural -> m.done + " · " + tr("el punto elegido no parece piel natural: elija piel sin sombra ni brillo")
                 res != null -> m.done
                 m == ColorMode.AUTO -> tr("no se encontró piel: use un punto de piel o un punto neutro")
                 else -> m.ask

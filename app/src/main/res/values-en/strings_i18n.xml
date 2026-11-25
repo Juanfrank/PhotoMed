@@ -701,6 +701,7 @@
     <string name="t_8d28a741b5c3" formatted="false">Any region: the guide is drawn from the contour of what is visible (plain background or person); in the following shots, from that of the reference photo.</string>
     <string name="t_8d2aaadc2bd5" formatted="false">frontalis</string>
     <string name="t_8d871db0a35d" formatted="false">Grid</string>
+    <string name="t_8d87885e4576" formatted="false">The eye was not found in the photo (frame the eye with the eyebrow and the inner corner, as in the guide).</string>
     <string name="t_8dbafb8d4997" formatted="false">(no name)</string>
     <string name="t_8df5c9892441" formatted="false">Informed consent</string>
     <string name="t_8e01d018e058" formatted="false">MP4 video</string>
@@ -1150,6 +1151,7 @@
     <string name="t_ea0e80b70740" formatted="false">Features</string>
     <string name="t_ea10026ef986" formatted="false">Different capture conditions: %1$s</string>
     <string name="t_ea3dfbf35fb3" formatted="false">Open</string>
+    <string name="t_ead43ca3f825" formatted="false">the chosen point does not look like natural skin: pick skin without shadow or shine</string>
     <string name="t_eb06430dfef3" formatted="false">Contours (settings)</string>
     <string name="t_eb29391f8be7" formatted="false">Patient\'s body not detected</string>
     <string name="t_eb823a506f9f" formatted="false">Transition time</string>
@@ -1160,6 +1162,7 @@
     <string name="t_ebfa599808b3" formatted="false">Frontal (head tilted forward)</string>
     <string name="t_ec2a2156670c" formatted="false">No photos in 6 months</string>
     <string name="t_ec616f599f8c" formatted="false">Could not read the image</string>
+    <string name="t_ec841cc50d56" formatted="false">Eye: measurements with the eye section of the face mesh (scale from the iris, 11.7 mm).</string>
     <string name="t_ecffc6c021fa" formatted="false">Waiting for wrinkle analysis…</string>
     <string name="t_ed1c5e218500" formatted="false">With photos</string>
     <string name="t_ed206059d887" formatted="false">Move back: show the neckline, below the shoulders</string>

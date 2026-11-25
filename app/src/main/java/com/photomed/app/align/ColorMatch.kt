@@ -218,12 +218,34 @@ object ColorMatch {
      */
     fun stats(rgb: IntArray, mask: BooleanArray): SkinStats? {
         val lab = DoubleArray(3)
-        val idx = ArrayList<Int>(); val ls = ArrayList<Double>()
+        // solo píxeles con color de piel natural (antes cualquiera de la máscara: ropa, fondo, brillos o sombras
+        // podían dar una referencia de piel «innatural»)
+        val cand = ArrayList<DoubleArray>(); val candIdx = ArrayList<Int>(); val nat = ArrayList<Int>()
         for (i in rgb.indices) if (mask[i]) {
             Lab.fromRgb(rgb[i], lab)
-            if (lab[0] < 5 || lab[0] > 98) continue
-            idx += i; ls += lab[0]
+            if (lab[0] < 15 || lab[0] > 96) continue               // sombra profunda o brillo especular
+            if (isNaturalSkin(lab[0], lab[1], lab[2])) nat += cand.size
+            cand += lab.copyOf(); candIdx += i
         }
+        // con buena parte de piel de color natural, solo esa (fuera ropa o fondo); si no, la foto tiene una
+        // dominante de color (luz fría, verdosa…) y se usan todos: el ajuste existe para corregir eso
+        // el filtro absoluto solo si el color típico de la máscara no es de piel (dominan ropa o fondo); si lo es,
+        // basta el rechazo relativo, igual en las dos fotos (con una dominante de color se compara la misma zona)
+        val candMedianNatural = cand.size >= 30 && run {
+            fun m(k: Int) = cand.map { it[k] }.sorted()[cand.size / 2]
+            isNaturalSkin(m(0), m(1), m(2))
+        }
+        val useNat = !candMedianNatural && nat.size >= 30 && nat.size >= NATURAL_MIN_FRACTION * cand.size
+        val all = if (useNat) nat.map { cand[it] } else cand
+        val allIdx = if (useNat) nat.map { candIdx[it] } else candIdx
+        if (all.size < 30) return null
+        // y cerca del color típico de esa piel: fuera rojeces, lesiones, labios o restos de otra cosa (ΔE a la mediana)
+        fun med(k: Int) = all.map { it[k] }.sorted()[all.size / 2]
+        val mL = med(0); val mA = med(1); val mB = med(2)
+        val d = all.map { sqrt((it[0] - mL) * (it[0] - mL) * 0.25 + (it[1] - mA) * (it[1] - mA) + (it[2] - mB) * (it[2] - mB)) }
+        val mad = d.sorted()[d.size / 2].coerceAtLeast(1.0)
+        val idx = ArrayList<Int>(); val ls = ArrayList<Double>()
+        for (j in all.indices) if (d[j] <= OUTLIER_MAD * mad) { idx += allIdx[j]; ls += all[j][0] }
         if (ls.size < 30) return null
         val sorted = ls.sorted()
         val lo = sorted[(sorted.size * 0.05).toInt()]; val hi = sorted[((sorted.size - 1) * 0.95).toInt()]
@@ -240,6 +262,24 @@ object ColorMatch {
         val q = DoubleArray(21) { k -> sorted[((sorted.size - 1) * k / 20.0).toInt()] }
         return SkinStats(m, sd.coerceAtLeast(0.5), sa / n, sbb / n, n, doubleArrayOf(sr / n, sg / n, sb / n), q)
     }
+
+    /**
+     * Color de piel humana plausible en CIELAB (todos los fototipos, con luz de exposición normal): ni sombra
+     * profunda ni brillo especular (L* 20–94), algo de color pero no saturado (croma 4–48) y tono entre rojizo y
+     * amarillento (ángulo h 10°–80°). Excluye ropa, fondos, el gris de una carta y venas o tatuajes azulados.
+     */
+    fun isNaturalSkin(l: Double, a: Double, b: Double): Boolean {
+        if (l < 20 || l > 94) return false
+        val c = kotlin.math.hypot(a, b); if (c < 4 || c > 48) return false
+        val h = Math.toDegrees(kotlin.math.atan2(b, a))
+        return h in 10.0..80.0
+    }
+
+    /** Fracción mínima de píxeles de color de piel natural para usar solo esos. */
+    const val NATURAL_MIN_FRACTION = 0.25
+
+    /** Píxeles más lejos que esto (en desviaciones medianas) del color típico de la piel no cuentan. */
+    const val OUTLIER_MAD = 2.5
 
     /** Región circular (punto de referencia) en coordenadas normalizadas por el ancho. */
     fun patch(w: Int, h: Int, center: Pt, radius: Float = 0.04f): BooleanArray {

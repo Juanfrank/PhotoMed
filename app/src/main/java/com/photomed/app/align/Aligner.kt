@@ -159,7 +159,16 @@ class Aligner(private val context: Context) {
             com.photomed.app.data.GuideType.HANDS, com.photomed.app.data.GuideType.FEET -> ForegroundOnPlain.mask(bmp.rgb(), bmp.width, bmp.height)
             else -> null
         } ?: autoMask(spec, bmp) ?: return@withContext null
-        MaskOps.erode(m, (bmp.width * 0.06f).toInt().coerceAtLeast(2)).data.takeIf { d -> d.count { it } > 50 }
+        val body = MaskOps.erode(m, (bmp.width * 0.06f).toInt().coerceAtLeast(2)).data
+        // solo la piel según la segmentación (antes toda la silueta: ropa, pelo o fondo entraban en la referencia)
+        val skin = HairSkinSegmenter.sharedOrNull(context)?.labels(bmp)?.let { lb ->
+            BooleanArray(body.size) { i ->
+                val x = i % bmp.width; val y = i / bmp.width
+                val c = lb[x * lb.width / bmp.width, y * lb.height / bmp.height]
+                body[i] && (c == FaceLabels.BODY_SKIN || c == FaceLabels.FACE_SKIN)
+            }
+        }
+        (skin?.takeIf { d -> d.count { it } > 200 } ?: body).takeIf { d -> d.count { it } > 50 }
     }
 
     /**
