@@ -50,6 +50,18 @@ class NativeGateTest {
         assertEquals(3, NativeGate.tryRunBlocking("análisis en vivo", 0, crumb = false) { 3 })
     }
 
+    /** Cancelar mientras se espera el turno (o justo al conseguirlo) nunca deja la puerta tomada. */
+    @Test fun cancellationNeverLeavesTheGateTaken() = runBlocking {
+        repeat(200) { i ->
+            val holder = async(Dispatchers.Default) { NativeGate.run("ocupa") { delay(1); 0 } }
+            val waiter = async(Dispatchers.Default) { NativeGate.run("espera") { 1 } }
+            if (i % 2 == 0) waiter.cancel()
+            runCatching { holder.await() }; runCatching { waiter.await() }
+        }
+        // la puerta está libre
+        assertEquals(7, NativeGate.tryRunBlocking("comprobación", 2000, crumb = false) { 7 })
+    }
+
     @Test fun crashLogIncludesLastActions() {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
         CrashLog.install(ctx)

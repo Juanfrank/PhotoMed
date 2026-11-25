@@ -42,9 +42,14 @@ object NativeGate {
 
     /** Ejecuta [block] con la puerta tomada (espera su turno sin ocupar los hilos de cálculo). */
     suspend fun <T> run(what: String, priority: Boolean = false, block: suspend () -> T): T {
-        runInterruptible(Dispatchers.IO) { acquire(priority) }
-        CrashLog.crumb(what)
-        try { return block() } finally { release(); CrashLog.crumb("fin: $what") }
+        // el turno se marca dentro del bloque: si la corrutina se cancela justo al conseguirlo, withContext lanza
+        // la cancelación al volver y antes la puerta quedaba tomada para siempre (ningún análisis más hasta reiniciar)
+        var got = false
+        try {
+            runInterruptible(Dispatchers.IO) { acquire(priority); got = true }
+            CrashLog.crumb(what)
+            return block()
+        } finally { if (got) { release(); CrashLog.crumb("fin: $what") } }
     }
 
     /**
