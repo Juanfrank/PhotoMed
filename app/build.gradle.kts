@@ -73,7 +73,7 @@ android {
         unitTests.isIncludeAndroidResources = true
         // las pruebas con fotos reales cargan miles de imágenes: un proceso nuevo cada 40 clases (si no, al final de
         // la suite el sistema lo cierra por memoria)
-        unitTests.all { it.setForkEvery(8); it.maxHeapSize = "3g"; it.jvmArgs("-XX:MaxMetaspaceSize=1g", "-XX:MaxDirectMemorySize=512m") }
+        unitTests.all { it.setForkEvery(8); it.maxHeapSize = "3g"; it.jvmArgs("-XX:MaxMetaspaceSize=1g", "-XX:MaxDirectMemorySize=512m"); it.testLogging { events("started") } }
     }
 }
 
