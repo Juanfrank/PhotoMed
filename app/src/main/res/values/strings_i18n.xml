@@ -214,7 +214,6 @@
     <string name="t_2aeeb83de48c" formatted="false">Ningún expediente cumple los filtros elegidos.</string>
     <string name="t_2af6b92bb5b7" formatted="false">Mover antes</string>
     <string name="t_2b2a98b2b5d2" formatted="false">Flash automático</string>
-    <string name="t_2b2bd336823a" formatted="false">Raya</string>
     <string name="t_2b2e813f82b3" formatted="false">Estomion → mentón, mm</string>
     <string name="t_2b34007c066f" formatted="false">Plegada</string>
     <string name="t_2b34962aae4c" formatted="false">Como las cámaras del teléfono. Las fotos se guardan siempre sin espejar.</string>
@@ -253,6 +252,7 @@
     <string name="t_31033391e217" formatted="false">Ojeras</string>
     <string name="t_310aad2bdd11" formatted="false">Brazo derecho</string>
     <string name="t_3150836d4aa1" formatted="false">Tiempo por imagen: %1$.1f s</string>
+    <string name="t_316de7f5c700" formatted="false">Diferencia centro − lados, puntos</string>
     <string name="t_31c8bc9b6abd" formatted="false">Sin resultados</string>
     <string name="t_31f32c027fd7" formatted="false">Estado</string>
     <string name="t_323466e141c0" formatted="false">Mirada: %1$s</string>
@@ -394,11 +394,9 @@
     <string name="t_50cf3b9a4239" formatted="false">Mano a la %1$s de la imagen: dedos hacia abajo, como en la guía</string>
     <string name="t_50f0a746e538" formatted="false">toque la carta gris o blanca en cada foto</string>
     <string name="t_511456f09301" formatted="false">Pata de gallo</string>
-    <string name="t_51346872d9e7" formatted="false">Raya (franja central), %</string>
     <string name="t_5167ee5be411" formatted="false">Bolsa palpebral</string>
     <string name="t_5216e5aace91" formatted="false">Sin permiso no es posible leer fotos de otra instalación</string>
     <string name="t_521a1ca39081" formatted="false">"Foto %1$d: "</string>
-    <string name="t_52aed10f0945" formatted="false">A los lados de la raya, %</string>
     <string name="t_52b53141bc8d" formatted="false">Libre</string>
     <string name="t_52cb0c4bf02a" formatted="false">Cara relajada, labios juntos, mirada al frente</string>
     <string name="t_52f09c57b072" formatted="false">Arrugue la nariz, como ante un mal olor</string>
@@ -419,6 +417,7 @@
     <string name="t_5749b90fc97f" formatted="false">Mentón al frente: mire a la cámara</string>
     <string name="t_575dab1075d7" formatted="false">Iniciar sesión de fotos (protocolos)</string>
     <string name="t_57a4cce1c970" formatted="false">línea de implantación frontal, raya, entradas y patrón del cabello</string>
+    <string name="t_57b07cd55112" formatted="false">Cabeza: inclinar menos, subir la barbilla (nariz–mentón)</string>
     <string name="t_57d396bb6e2c" formatted="false">Abdomen lateral izquierdo</string>
     <string name="t_57d4c792a6bb" formatted="false">Altura sobre la pupila, mm</string>
     <string name="t_57f3263afaf2" formatted="false">Ajustes de comparación</string>
@@ -524,6 +523,7 @@
     <string name="t_6b04d1843add" formatted="false">Mirada: misma dirección</string>
     <string name="t_6b126b27526c" formatted="false">pulgar</string>
     <string name="t_6c107d8b7f81" formatted="false">Foto %1$d, %2$s</string>
+    <string name="t_6c2e3fb5685d" formatted="false">Cuero visible en la franja central, %</string>
     <string name="t_6c3e1993c082" formatted="false">Diagrama del cuerpo</string>
     <string name="t_6cb19ffabb37" formatted="false">Densidad capilar aparente</string>
     <string name="t_6cbb8ffb6931" formatted="false">Las fotografías se guardan en la galería del teléfono, en el álbum del paciente, e incluyen estos datos como metadatos. Use “Compartir sin datos del paciente” para enviarlas anonimizadas.</string>
@@ -549,6 +549,7 @@
     <string name="t_7192150aa159" formatted="false">✱ Parcialmente cubierto por barba o bigote: se mide solo la parte visible.</string>
     <string name="t_71aa46677249" formatted="false">Trazo %1$d</string>
     <string name="t_71e73d8c199c" formatted="false">Ordenar por %1$s</string>
+    <string name="t_71e7919a9c6c" formatted="false">Cabeza: inclinar más hacia delante (nariz–mentón)</string>
     <string name="t_7243410808b9" formatted="false">Frente</string>
     <string name="t_735083a35c5c" formatted="false">patas de gallo</string>
     <string name="t_73676362f60a" formatted="false">Levante las cejas al máximo, como sorprendido</string>
@@ -1160,6 +1161,7 @@
     <string name="t_ecffc6c021fa" formatted="false">Esperando el análisis de arrugas…</string>
     <string name="t_ed1c5e218500" formatted="false">Con fotos</string>
     <string name="t_ed206059d887" formatted="false">Aléjese: que se vea el escote, por debajo de los hombros</string>
+    <string name="t_edbd71bf3af9" formatted="false">Banda central de la cabeza (línea media) donde se mide la raya: si su cuero visible supera al de los lados, la raya se ensancha (Sinclair, Olsen).</string>
     <string name="t_edd238ac88c2" formatted="false">Hombros nivelados</string>
     <string name="t_eded9bee5f75" formatted="false">De frente, cabeza inclinada hacia delante (≈ 30°, barbilla al pecho) y cámara a la altura de la cara: línea de implantación frontal en la marca, raya en la línea media; cabello seco y peinado hacia atrás.</string>
     <string name="t_ee18e51f8a8f" formatted="false">%1$s · exposición %2$+.2f EV · temperatura %3$+.1f · tinte %4$+.1f</string>
@@ -1230,6 +1232,7 @@
     <string name="t_fa50c3889d86" formatted="false">, elegida %1$d</string>
     <string name="t_fa53653fbe43" formatted="false">Izquierda</string>
     <string name="t_faed4b10b94a" formatted="false">Luz de la foto: %1$.0f %%</string>
+    <string name="t_fb46fa9f93b4" formatted="false">Franja de la raya</string>
     <string name="t_fb8417b16b3b" formatted="false">azul</string>
     <string name="t_fba67fbec4de" formatted="false">Alinear al abrir la comparación</string>
     <string name="t_fbb4a7f35c17" formatted="false">Cabeza: girar a la izquierda %1$s°</string>
@@ -1243,6 +1246,7 @@
     <string name="t_fd22026d48ff" formatted="false">Reposo</string>
     <string name="t_fd34c795be45" formatted="false">Caderas niveladas</string>
     <string name="t_fd5316cbb849" formatted="false">hombros</string>
+    <string name="t_fda144e2796e" formatted="false">Cuero visible a los lados, %</string>
     <string name="t_fdf1055e24e6" formatted="false">vértice</string>
     <string name="t_fe18f806b021" formatted="false">Usted es responsable de obtener el consentimiento informado y de cumplir la normativa de datos de salud.</string>
     <string name="t_fec02633dfb2" formatted="false">← Mueva la cámara a la izquierda</string>

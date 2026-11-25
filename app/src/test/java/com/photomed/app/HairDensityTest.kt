@@ -158,7 +158,8 @@ class HairDensityTest {
         assertTrue(head.metrics!!.type!!.startsWith("BASP V3"))
         assertTrue(head.metrics!!.features.any { it.first.startsWith("Cuero cabelludo visible") && it.second > 15f })
         assertTrue(lines.any { it.filled })
-        assertEquals(2, lines.count { it.layer == com.photomed.app.align.AnnotLayer.HAIR_PART })
+        val band = lines.single { it.layer == com.photomed.app.align.AnnotLayer.HAIR_PART }
+        assertTrue(band.closed && band.metrics?.note != null)
     }
 
     @Test

@@ -4,6 +4,15 @@ Registro de cambios de cada versión, de la más reciente a la más antigua.
 
 ## 2.57 — 25 de noviembre de 2026
 
+- **Capilar frontal (cabeza inclinada): la distancia punta nasal–mentón es criterio de alineación con
+  peso.** Relativa a la distancia interpupilar, con la cabeza flexionada se acorta mucho más que la anchura
+  de los ojos (modelo 3D: 1,42 a nivel, 0,97 a 30°, ≈ 0,023 por grado). Sin referencia se pide ≈ 30°
+  (±0,12); con la toma anterior del paciente, su mismo valor ±6 % (≈ ±2,5°). Si no se cumple la foto no se
+  dispara, la calidad baja según el desvío y se indica «inclinar más hacia delante» o «inclinar menos».
+- **Cuero cabelludo: las líneas amarillas** eran los bordes de la franja central donde se mide la raya. Ahora
+  es una banda azul clara («Franja de la raya») que al tocarla explica qué es y muestra el cuero visible en el
+  centro, a los lados y la diferencia; solo en el vértice y en la frontal inclinada (en la coronilla y los
+  parietales no hay raya central).
 - **Cierre al analizar una foto del rostro** (p. ej. frente y glabela) corregido: una medida degenerada (NaN)
   cerraba la app al guardar los trazos confirmados. Ahora esas medidas no se dan, los puntos no finitos se
   descartan y, si el guardado falla por cualquier otra causa, se registra sin cerrar la app.

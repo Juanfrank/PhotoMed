@@ -187,5 +187,12 @@
   "Escalas clínicas (orientativo)": "Clinical scales (indicative)",
   "proporciones de la foto (sin mm)": "photo proportions (no mm)",
   "Analizando el cuero cabelludo…": "Analyzing the scalp…",
-  "Pupilas → pelo (centro) / interpupilar": "Pupils → hairline (center) / interpupillary"
+  "Pupilas → pelo (centro) / interpupilar": "Pupils → hairline (center) / interpupillary",
+  "Franja de la raya": "Part strip",
+  "Cuero visible en la franja central, %": "Visible scalp in the central strip, %",
+  "Cuero visible a los lados, %": "Visible scalp beside it, %",
+  "Diferencia centro − lados, puntos": "Center − sides difference, points",
+  "Banda central de la cabeza (línea media) donde se mide la raya: si su cuero visible supera al de los lados, la raya se ensancha (Sinclair, Olsen).": "Central band of the head (midline) where the part is measured: if its visible scalp exceeds that of the sides, the part is widening (Sinclair, Olsen).",
+  "Cabeza: inclinar más hacia delante (nariz–mentón)": "Head: tilt further forward (nose–chin)",
+  "Cabeza: inclinar menos, subir la barbilla (nariz–mentón)": "Head: tilt less, raise the chin (nose–chin)"
 }

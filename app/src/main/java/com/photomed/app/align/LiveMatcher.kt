@@ -327,6 +327,14 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     private val steady = SteadyFraming()
 
     fun analyze(frame: Bitmap, smooth: Boolean = true): LiveFrame {
+        val f = analyzeRaw(frame, smooth)
+        // capilar frontal (cabeza inclinada): la distancia punta nasal–mentón es criterio de peso
+        if (zone.guide != com.photomed.app.data.GuideType.SCALP_FRONT || f.currentPointsAll.isEmpty()) return f
+        val refPts = if (useReference) ref.points.takeIf { it.isNotEmpty() } else null
+        return f.copy(eval = Standardization.withNoseChin(f.eval, f.currentPointsAll, refPts))
+    }
+
+    private fun analyzeRaw(frame: Bitmap, smooth: Boolean): LiveFrame {
         if (!useReference) return standardize(frame, smooth)
         val byFeatures = featureOnly && (usesPoints(spec, ref) || refProfile != null)
         val refG = refGray ?: if (byFeatures) GrayImage(1, 1) else return standardize(frame, smooth)

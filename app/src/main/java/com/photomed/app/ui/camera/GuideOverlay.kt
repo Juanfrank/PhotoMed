@@ -703,7 +703,7 @@ fun annotColor(layer: com.photomed.app.align.AnnotLayer): Color = when (layer) {
     com.photomed.app.align.AnnotLayer.NAILS -> Color(0xFFFFEB3B)
     com.photomed.app.align.AnnotLayer.BODY_POINTS -> Color(0xFFE040FB)
     com.photomed.app.align.AnnotLayer.SCALP_MAP -> Color(0xFFFF7043)
-    com.photomed.app.align.AnnotLayer.HAIR_PART -> Color(0xFFFFF176)
+    com.photomed.app.align.AnnotLayer.HAIR_PART -> Color(0xFF80D8FF)
 }
 
 /**

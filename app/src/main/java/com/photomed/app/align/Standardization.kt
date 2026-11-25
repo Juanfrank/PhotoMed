@@ -195,6 +195,51 @@ object Standardization {
             headYawDelta = det.yaw ?: 0f, headPitchDelta = det.pitch ?: 0f, gazeDelta = det.gaze)
     }
 
+    // --- cabeza inclinada (capilar frontal): distancia punta nasal–mentón ---
+
+    /**
+     * Punta nasal → mentón / interpupilar, en el cuadro. Con la cabeza flexionada el tramo nariz–mentón se
+     * escorza mucho más que la interpupilar (horizontal): en el modelo canónico de MediaPipe vale 1,42 a
+     * nivel, 1,15 a 20°, [NOSE_CHIN_TILT] a 30° y 0,75 a 40° (≈ 0,023 por grado). Independiente de la
+     * distancia y del zoom, y más estable que el cabeceo estimado de la malla.
+     */
+    fun noseChinRatio(p: Map<String, Pt>): Float? {
+        val tip = p["nose_bridge_1"] ?: return null; val chin = p["oval_18"] ?: return null
+        val l = p[Landmarks.EYE_L] ?: return null; val r = p[Landmarks.EYE_R] ?: return null
+        val ipd = kotlin.math.hypot(l.x - r.x, l.y - r.y).takeIf { it > 1e-4f } ?: return null
+        return kotlin.math.hypot(tip.x - chin.x, tip.y - chin.y) / ipd
+    }
+
+    /** Punta nasal–mentón / interpupilar con la cabeza inclinada ≈ 30° (modelo canónico). */
+    const val NOSE_CHIN_TILT = 0.97f
+    /** Tolerancia sin referencia (≈ ±5°, más la variación de las proporciones de cada cara). */
+    const val NOSE_CHIN_TOL = 0.12f
+    /** Con la toma anterior del paciente como referencia: ±6 % de su valor (≈ ±2,5°). */
+    const val NOSE_CHIN_TOL_REF = 0.06f
+
+    /**
+     * Criterio de peso de la toma capilar frontal inclinada: la distancia punta nasal–mentón (relativa a la
+     * interpupilar) debe ser la de la referencia del paciente o, sin ella, la de 30° de flexión. Si no
+     * cumple, la toma no se dispara («casi» como mucho), la calidad baja según el desvío y se indica hacia
+     * dónde mover la cabeza; sustituye a la indicación del cabeceo (Frankfort), que es la misma corrección.
+     */
+    fun withNoseChin(e: MatchEval, cur: Map<String, Pt>, ref: Map<String, Pt>?): MatchEval {
+        val q = noseChinRatio(cur) ?: return e
+        val target = ref?.let(::noseChinRatio)
+        val (t, tol) = if (target != null) target to NOSE_CHIN_TOL_REF * target else NOSE_CHIN_TILT to NOSE_CHIN_TOL
+        val dev = q - t
+        if (abs(dev) <= tol) return e
+        val hint = if (dev > 0) trn("Cabeza: inclinar más hacia delante (nariz–mentón)") else trn("Cabeza: inclinar menos, subir la barbilla (nariz–mentón)")
+        val k = abs(dev) / tol
+        val status = when {
+            k > 3f -> MatchStatus.FAR
+            e.status == MatchStatus.MATCH || e.status == MatchStatus.SEARCHING -> MatchStatus.CLOSE
+            else -> e.status
+        }
+        val hints = listOf(hint) + e.hints.filterNot { it.startsWith("Barbilla: ") }
+        return e.copy(status = status, quality = (e.quality * (1f - 0.25f * k)).coerceIn(0f, 0.85f), hints = hints)
+    }
+
     /** Luminancia media (0..1) en un cuadrado de radio [rad] (unidades del ancho) alrededor de [p]. */
     /** Luz mínima y máxima del rostro (luminancia media 0..1) para avisar. */
     const val MIN_FACE_LIGHT = 0.35f

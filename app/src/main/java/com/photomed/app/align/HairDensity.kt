@@ -136,7 +136,12 @@ object HairDensity {
             fun back(p: Pt) = Pt(p.y * h / w, p.x * h / w)
             q.copy(edges = q.edges.map { l -> l.map(::back) })
         }
-        val st = if (sv.central - sv.lateral >= sh.central - sh.lateral) sv else sh
+        // la raya solo se ve en el vértice y en la frontal inclinada (en la coronilla y los parietales no hay raya central)
+        val st = when {
+            view == View.CROWN || view == View.PARIETAL -> Strip(0f, 0f, emptyList())
+            sv.central - sv.lateral >= sh.central - sh.lateral -> sv
+            else -> sh
+        }
         return Result(
             visible = (vt / area).toFloat(), center = if (nc > 0) (vc / nc).toFloat() else (vt / area).toFloat(),
             periphery = if (np > 0) (vp / np).toFloat() else (vt / area).toFloat(), midline = st.central, lateral = st.lateral,

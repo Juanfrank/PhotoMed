@@ -139,4 +139,29 @@ class ScalpZoneTest {
         assertNotNull(out[1].metrics)
         assertTrue(com.photomed.app.align.PhotoAnnotator.scalpFrontLines(all, measured = false).all { it.metrics == null })
     }
+
+    /** Cabeza inclinada: la distancia punta nasal–mentón (relativa a la interpupilar) es criterio de peso. */
+    @Test
+    fun noseChinDistanceGatesTheTiltedScalpView() {
+        fun face(noseChin: Float): Map<String, com.photomed.app.align.Pt> {
+            val ipd = 0.2f
+            return mapOf(com.photomed.app.align.Landmarks.EYE_R to com.photomed.app.align.Pt(0.4f, 0.5f),
+                com.photomed.app.align.Landmarks.EYE_L to com.photomed.app.align.Pt(0.6f, 0.5f),
+                "nose_bridge_1" to com.photomed.app.align.Pt(0.5f, 0.6f), "oval_18" to com.photomed.app.align.Pt(0.5f, 0.6f + noseChin * ipd))
+        }
+        val ok = com.photomed.app.align.MatchEval(MatchStatus.MATCH, 1f, emptyList(), threshold = 1f)
+        // a nivel (1,42): no se dispara, pide inclinar más; la indicación del cabeceo se sustituye
+        val level = Standardization.withNoseChin(ok.copy(hints = listOf("Barbilla: bajar 30° (Frankfort)")), face(1.42f), null)
+        assertTrue(level.status != MatchStatus.MATCH)
+        assertEquals(listOf("Cabeza: inclinar más hacia delante (nariz–mentón)"), level.hints)
+        // a 30° (0,97): sin cambios
+        assertEquals(ok, Standardization.withNoseChin(ok, face(0.97f), null))
+        // demasiado inclinada
+        assertTrue(Standardization.withNoseChin(ok, face(0.7f), null).hints.single().startsWith("Cabeza: inclinar menos"))
+        // con la referencia del paciente (1,10): 0,97 ya no vale (−12 %), 1,12 sí
+        val ref = face(1.10f)
+        assertTrue(Standardization.withNoseChin(ok, face(0.97f), ref).hints.single().startsWith("Cabeza: inclinar menos"))
+        assertEquals(ok, Standardization.withNoseChin(ok, face(1.12f), ref))
+        assertEquals(1.10f, Standardization.noseChinRatio(ref)!!, 1e-4f)
+    }
 }

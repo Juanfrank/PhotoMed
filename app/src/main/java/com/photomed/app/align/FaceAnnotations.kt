@@ -17,7 +17,7 @@ enum class AnnotLayer(private val es: String) {
     // diagrama del cuerpo (manos, pies, tronco y miembros: ver BodyDiagram)
     BODY_AXES(trn("Ejes y articulaciones")), FINGERS(trn("Dedos")), NAILS(trn("Uñas")), BODY_POINTS(trn("Puntos de referencia")),
     // cuero cabelludo (ver HairDensity)
-    SCALP_MAP(trn("Cuero cabelludo visible")), HAIR_PART(trn("Raya"));
+    SCALP_MAP(trn("Cuero cabelludo visible")), HAIR_PART(trn("Franja de la raya"));
 
     val label: String get() = tr(es)
 }
@@ -1225,10 +1225,6 @@ class PhotoAnnotator(private val context: Context) {
                     add(trn("Centro de la zona, %") to pct(r.center))
                     add(trn("Periferia, %") to pct(r.periphery))
                 }
-                if (r.strip.isNotEmpty()) {
-                    add(trn("Raya (franja central), %") to pct(r.midline))
-                    add(trn("A los lados de la raya, %") to pct(r.lateral))
-                }
                 add(trn("Contraste pelo–piel (ΔE)") to r.contrast)
             }
             val m = LineMetrics(trn("Densidad capilar aparente"), scale = "foto", features = f,
@@ -1237,7 +1233,15 @@ class PhotoAnnotator(private val context: Context) {
             return buildList {
                 if (r.outline.size >= 3) add(AnnotLine(AnnotLayer.SCALP_MAP, r.outline, closed = true, metrics = m))
                 r.cells.forEach { add(AnnotLine(AnnotLayer.SCALP_MAP, it, closed = true, filled = true)) }
-                r.strip.filter { it.size >= 2 }.forEach { add(AnnotLine(AnnotLayer.HAIR_PART, it, closed = false)) }
+                // franja de la raya: banda central (cerrada) con sus medidas; al tocarla se explica qué es
+                if (r.strip.size == 2 && r.strip.all { it.size >= 2 }) {
+                    val pm = LineMetrics(trn("Franja de la raya"), scale = "foto",
+                        features = listOf(trn("Cuero visible en la franja central, %") to pct(r.midline),
+                            trn("Cuero visible a los lados, %") to pct(r.lateral),
+                            trn("Diferencia centro − lados, puntos") to pct(r.midline - r.lateral)),
+                        note = trn("Banda central de la cabeza (línea media) donde se mide la raya: si su cuero visible supera al de los lados, la raya se ensancha (Sinclair, Olsen)."))
+                    add(AnnotLine(AnnotLayer.HAIR_PART, r.strip[0] + r.strip[1].reversed(), closed = true, metrics = pm))
+                }
             }
         }
 

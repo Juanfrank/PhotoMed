@@ -214,7 +214,6 @@
     <string name="t_2aeeb83de48c" formatted="false">No patient record meets the chosen filters.</string>
     <string name="t_2af6b92bb5b7" formatted="false">Move earlier</string>
     <string name="t_2b2a98b2b5d2" formatted="false">Auto flash</string>
-    <string name="t_2b2bd336823a" formatted="false">Part</string>
     <string name="t_2b2e813f82b3" formatted="false">Stomion → chin, mm</string>
     <string name="t_2b34007c066f" formatted="false">Collapsed</string>
     <string name="t_2b34962aae4c" formatted="false">Like the phone\'s cameras. Photos are always saved unmirrored.</string>
@@ -253,6 +252,7 @@
     <string name="t_31033391e217" formatted="false">Dark circles</string>
     <string name="t_310aad2bdd11" formatted="false">Right arm</string>
     <string name="t_3150836d4aa1" formatted="false">Time per image: %1$.1f s</string>
+    <string name="t_316de7f5c700" formatted="false">Center − sides difference, points</string>
     <string name="t_31c8bc9b6abd" formatted="false">No results</string>
     <string name="t_31f32c027fd7" formatted="false">Status</string>
     <string name="t_323466e141c0" formatted="false">Gaze: %1$s</string>
@@ -394,11 +394,9 @@
     <string name="t_50cf3b9a4239" formatted="false">Hand on the %1$s of the image: fingers pointing down, as in the guide</string>
     <string name="t_50f0a746e538" formatted="false">tap the gray or white card in each photo</string>
     <string name="t_511456f09301" formatted="false">Crow\'s feet</string>
-    <string name="t_51346872d9e7" formatted="false">Part (central strip), %</string>
     <string name="t_5167ee5be411" formatted="false">Eyelid bag</string>
     <string name="t_5216e5aace91" formatted="false">Without permission, photos from another installation cannot be read</string>
     <string name="t_521a1ca39081" formatted="false">"Photo %1$d: "</string>
-    <string name="t_52aed10f0945" formatted="false">Beside the part, %</string>
     <string name="t_52b53141bc8d" formatted="false">Free</string>
     <string name="t_52cb0c4bf02a" formatted="false">Relaxed face, lips together, gaze straight ahead</string>
     <string name="t_52f09c57b072" formatted="false">Wrinkle your nose, as if at a bad smell</string>
@@ -419,6 +417,7 @@
     <string name="t_5749b90fc97f" formatted="false">Chin forward: look at the camera</string>
     <string name="t_575dab1075d7" formatted="false">Start photo session (protocols)</string>
     <string name="t_57a4cce1c970" formatted="false">frontal hairline, part, temples and hair pattern</string>
+    <string name="t_57b07cd55112" formatted="false">Head: tilt less, raise the chin (nose–chin)</string>
     <string name="t_57d396bb6e2c" formatted="false">Abdomen left side</string>
     <string name="t_57d4c792a6bb" formatted="false">Height above pupil, mm</string>
     <string name="t_57f3263afaf2" formatted="false">Comparison settings</string>
@@ -524,6 +523,7 @@
     <string name="t_6b04d1843add" formatted="false">Gaze: same direction</string>
     <string name="t_6b126b27526c" formatted="false">thumb</string>
     <string name="t_6c107d8b7f81" formatted="false">Photo %1$d, %2$s</string>
+    <string name="t_6c2e3fb5685d" formatted="false">Visible scalp in the central strip, %</string>
     <string name="t_6c3e1993c082" formatted="false">Body diagram</string>
     <string name="t_6cb19ffabb37" formatted="false">Apparent hair density</string>
     <string name="t_6cbb8ffb6931" formatted="false">Photos are saved in the phone\'s gallery, in the patient\'s album, and include this data as metadata. Use “Share without patient data” to send them anonymized.</string>
@@ -549,6 +549,7 @@
     <string name="t_7192150aa159" formatted="false">✱ Partially covered by beard or mustache: only the visible part is measured.</string>
     <string name="t_71aa46677249" formatted="false">Stroke %1$d</string>
     <string name="t_71e73d8c199c" formatted="false">Sort by %1$s</string>
+    <string name="t_71e7919a9c6c" formatted="false">Head: tilt further forward (nose–chin)</string>
     <string name="t_7243410808b9" formatted="false">Forehead</string>
     <string name="t_735083a35c5c" formatted="false">crow\'s feet</string>
     <string name="t_73676362f60a" formatted="false">Raise your eyebrows as high as you can, as if surprised</string>
@@ -1160,6 +1161,7 @@
     <string name="t_ecffc6c021fa" formatted="false">Waiting for wrinkle analysis…</string>
     <string name="t_ed1c5e218500" formatted="false">With photos</string>
     <string name="t_ed206059d887" formatted="false">Move back: show the neckline, below the shoulders</string>
+    <string name="t_edbd71bf3af9" formatted="false">Central band of the head (midline) where the part is measured: if its visible scalp exceeds that of the sides, the part is widening (Sinclair, Olsen).</string>
     <string name="t_edd238ac88c2" formatted="false">Level shoulders</string>
     <string name="t_eded9bee5f75" formatted="false">Facing the camera, head tilted forward (≈ 30°, chin toward the chest), camera at face height: frontal hairline on the mark, part on the midline; hair dry and combed back.</string>
     <string name="t_ee18e51f8a8f" formatted="false">%1$s · exposure %2$+.2f EV · temperature %3$+.1f · tint %4$+.1f</string>
@@ -1230,6 +1232,7 @@
     <string name="t_fa50c3889d86" formatted="false">, chosen %1$d</string>
     <string name="t_fa53653fbe43" formatted="false">Left</string>
     <string name="t_faed4b10b94a" formatted="false">Photo light: %1$.0f %%</string>
+    <string name="t_fb46fa9f93b4" formatted="false">Part strip</string>
     <string name="t_fb8417b16b3b" formatted="false">blue</string>
     <string name="t_fba67fbec4de" formatted="false">Align when opening the comparison</string>
     <string name="t_fbb4a7f35c17" formatted="false">Head: turn left %1$s°</string>
@@ -1243,6 +1246,7 @@
     <string name="t_fd22026d48ff" formatted="false">At rest</string>
     <string name="t_fd34c795be45" formatted="false">Level hips</string>
     <string name="t_fd5316cbb849" formatted="false">shoulders</string>
+    <string name="t_fda144e2796e" formatted="false">Visible scalp beside it, %</string>
     <string name="t_fdf1055e24e6" formatted="false">vertex</string>
     <string name="t_fe18f806b021" formatted="false">You are responsible for obtaining informed consent and for complying with health data regulations.</string>
     <string name="t_fec02633dfb2" formatted="false">← Move the camera left</string>
