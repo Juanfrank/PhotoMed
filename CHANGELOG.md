@@ -2,6 +2,21 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.63 — 25 de noviembre de 2026
+
+- **Tronco: axilas, pezones y ombligo como puntos de referencia** (abdomen frontal y tórax / mamas; las axilas,
+  también de espaldas y de lado): se usan para alinear la toma con la referencia, se ven en el diagrama y miden:
+  inclinación y separación de los pezones (respecto del ancho de hombros) y su altura, altura del ombligo y su
+  desvío de la línea media, inclinación, altura y separación de las axilas. La axila es el vértice del hueco
+  brazo–tronco en la silueta; ombligo y pezones, manchas redondas más oscuras (los pezones, también más rojas)
+  que la piel en todas las direcciones, donde la anatomía los espera. Los pezones, solo si se ven los dos a una
+  altura parecida y sobre piel (no ropa): mejor sin punto que con uno falso.
+- **Uñas de las manos por el esqueleto y el color**: cada uña se busca en la falange distal (de la articulación a
+  la punta) como la placa más clara y menos roja que la piel del propio dedo (o de otro color, con esmalte), con
+  umbral adaptativo, y se dibuja con su forma (elipse orientada con el dedo) en la foto a más resolución. Frente
+  al detector anterior, el mismo número de uñas por el dorso y la mitad de falsas en la palma (manos de palma con
+  2 uñas o más: de 3 a 0).
+
 ## 2.62 — 25 de noviembre de 2026
 
 - **Esqueleto del cuerpo al estilo de las manos** en pies, brazos, piernas, tronco (frente, lado, espalda, mamas,
