@@ -4,6 +4,26 @@ Versión 2.57, 25 de noviembre de 2026. Revisión de solo lectura del código; c
 
 Ámbitos: Cámara y análisis en vivo, Modelos nativos, Análisis de una foto, Comparar y alineación, Persistencia, Manejo de errores, Concurrencia, Método de los criterios, Interfaz Compose, Recursos y escalabilidad.
 
+## Estado tras las correcciones (versiones 2.58–2.60)
+
+- **Tanda 1 – integridad de datos (2.58)**: corregidos A10, A11, A12, A13, A14, A18, A21 y los medios de
+  persistencia (escrituras atómicas con fsync, caché de trazos, recuperación del expediente, memoria de líneas y
+  relieve atómicos).
+- **Tanda 2 – modelos nativos y cámara (2.58)**: corregidos A1, A2, A3, A4, la ráfaga juzgada con el estado en vivo,
+  la segmentación duplicada, ML Kit en cada cuadro sin cara, la malla y el segmentador compartidos, y el flash que
+  cancelaba la foto.
+- **Tanda 3 – rendimiento (2.59)**: corregidos A5, A6, A7, A8, A9, A15, A16, A17, handLike, cargas en el hilo
+  principal del visor y de Comparar, y el arranque.
+- **Tanda 4 – escalabilidad, recursos y errores (2.60)**: corregidos A19, A20, los fallos silenciosos de importación,
+  migración y análisis en vivo, el signo del alabeo (comprobado con 274 caras), el arco de Cupido, los pies en la
+  misma mitad, la igualación de color al cambiar la selección, el tope del XMP, las cachés sin límite y el barrido de
+  datos huérfanos.
+- **Descartado con datos**: «la densidad capilar cuenta la piel de la cara como cuero visible»: en las 10 fotos
+  anotadas el cuero calvo se etiqueta como piel de la cara o del cuerpo; excluirla rompería la medida.
+- **Pendiente (mejoras estructurales mayores)**: reescritura del XMP mediante copia y reemplazo, ediciones por foto
+  fuera de SharedPreferences, importación sin recodificar el JPEG, alineación de N fotos preparando la referencia una
+  sola vez y recomposición de CameraScreen por estados derivados.
+
 ## Corregido ya
 
 - **NativeGate.run quedaba tomada para siempre** si la corrutina se cancelaba justo al conseguir el turno (lo encontraron cuatro revisores; crítico): desde ese momento ningún análisis, alineación ni medida se ejecutaba hasta reiniciar la app. Corregido en `NativeGate.kt`, con prueba (`NativeGateTest.cancellationNeverLeavesTheGateTaken`).
