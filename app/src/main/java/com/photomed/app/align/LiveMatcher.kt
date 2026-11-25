@@ -329,7 +329,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
 
     private fun rgbOf(frame: Bitmap, w: Int, h: Int): IntArray? = runCatching {
         val b = if (frame.width == w && frame.height == h) frame else Bitmap.createScaledBitmap(frame, w, h, true)
-        IntArray(w * h).also { b.getPixels(it, 0, w, 0, 0, w, h) }
+        // la copia reducida se libera en el acto (una por cuadro: sin esto se acumulaba memoria nativa)
+        try { IntArray(w * h).also { b.getPixels(it, 0, w, 0, 0, w, h) } } finally { if (b !== frame && !b.isRecycled) b.recycle() }
     }.getOrNull()
     private val smoother = LandmarkSmoother()
     private val steady = SteadyFraming()
