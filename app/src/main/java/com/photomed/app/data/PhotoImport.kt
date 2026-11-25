@@ -56,7 +56,7 @@ object PhotoImport {
 
     private suspend fun prepareGated(context: Context, uris: List<Uri>, default: Zone?, detectFaces: Boolean): List<ImportItem> = withContext(Dispatchers.Default) {
         val now = System.currentTimeMillis()
-        val mp = if (detectFaces) runCatching { MediaPipeFace(context) }.getOrNull() else null
+        val mp = if (detectFaces) MediaPipeFace.sharedOrNull(context) else null
         try {
             uris.map { u ->
                 val date = runCatching { context.contentResolver.openInputStream(u)?.use { exifDate(it) } }.getOrNull()
@@ -69,7 +69,7 @@ object PhotoImport {
                 }
                 ImportItem(u, date ?: now, date != null, sug ?: default, suggested = sug != null)
             }
-        } finally { mp?.close() }
+        } finally { }
     }
 
     /**

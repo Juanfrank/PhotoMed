@@ -108,7 +108,13 @@ fun ZoneGalleryScreen(
     val selecting = selection.isNotEmpty()
     var confirmDelete by remember { mutableStateOf(false) }
     var shareMenu by remember { mutableStateOf(false) }
-    val galleryDelete = rememberGalleryDelete { ok -> if (ok) { selection = emptyList(); reload++ } }
+    var pendingDelete by remember { mutableStateOf<List<com.photomed.app.data.Photo>>(emptyList()) }
+    val galleryDelete = rememberGalleryDelete { ok ->
+        val del = pendingDelete; pendingDelete = emptyList()
+        // tras aceptar: se completa el borrado (Android 10) y se limpian los datos privados
+        if (ok && del.isNotEmpty()) scope.launch { withContext(Dispatchers.IO) { runCatching { repo.deletePhotos(del) } }; reload++ }
+        if (ok) { selection = emptyList(); reload++ }
+    }
     BackHandler(enabled = selecting) { selection = emptyList() }
 
     LaunchedEffect(expId, zone, reload) {
@@ -251,7 +257,8 @@ fun ZoneGalleryScreen(
     if (confirmDelete) DeleteSelectionDialog(selection.size, onDismiss = { confirmDelete = false }) {
         confirmDelete = false
         val list = selectedPhotos()
-        scope.launch { galleryDelete(withContext(Dispatchers.IO) { list.forEach { com.photomed.app.align.ReliefStore.delete(context, it.uri.toString()) }; repo.deletePhotos(list) }) }
+        pendingDelete = list
+        scope.launch { galleryDelete(withContext(Dispatchers.IO) { repo.deletePhotos(list) }) }
     }
 }
 

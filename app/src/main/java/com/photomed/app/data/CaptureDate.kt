@@ -11,7 +11,7 @@ import java.util.TimeZone
 
 /** Fecha de captura en los metadatos de la foto: EXIF (DateTimeOriginal, DateTime) y XMP (pm:CapturedAt, xmp:CreateDate). */
 object CaptureDate {
-    fun write(context: Context, uri: Uri, takenAt: Long): Boolean = runCatching {
+    fun write(context: Context, uri: Uri, takenAt: Long): Boolean = PhotoLocks.on(uri.toString()) { runCatching {
         fun edit(e: ExifInterface) {
             val exif = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).format(Date(takenAt))
             e.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, exif)
@@ -27,5 +27,5 @@ object CaptureDate {
         if (uri.scheme == "file") edit(ExifInterface(File(uri.path!!)))
         else context.contentResolver.openFileDescriptor(uri, "rw")!!.use { edit(ExifInterface(it.fileDescriptor)) }
         true
-    }.getOrDefault(false)
+    }.getOrDefault(false) }
 }

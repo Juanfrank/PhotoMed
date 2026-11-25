@@ -21,7 +21,9 @@ object Protocols {
 
     fun get(context: Context, id: String): Protocol? = file(context, id).takeIf { it.exists() }?.let { runCatching { ProtocolJson.read(it.readText()) }.getOrNull() }
 
-    fun save(context: Context, p: Protocol) = AtomicFile.write(file(context, p.id), ProtocolJson.write(p))
+    /** false (registrado, sin cerrar la app) si no se pudo escribir. */
+    fun save(context: Context, p: Protocol): Boolean = runCatching { AtomicFile.write(file(context, p.id), ProtocolJson.write(p)) }
+        .onFailure { com.photomed.app.CrashLog.write("No se pudo guardar el protocolo", it) }.isSuccess
 
     fun delete(context: Context, id: String) { file(context, id).delete() }
 

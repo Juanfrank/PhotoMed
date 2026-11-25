@@ -47,14 +47,14 @@ class HairSkinSegmenter(context: Context) : Closeable {
             .setOutputCategoryMask(true).setOutputConfidenceMasks(false)
             .build())
 
-    fun labels(bmp: Bitmap): FaceLabels? = runCatching<FaceLabels?> {
+    fun labels(bmp: Bitmap): FaceLabels? = synchronized(this) { runCatching<FaceLabels?> {
         val src = if (bmp.config == Bitmap.Config.ARGB_8888) bmp else bmp.copy(Bitmap.Config.ARGB_8888, false)
         val r = seg.segment(BitmapImageBuilder(src).build())
         val m = r.categoryMask().orElse(null) ?: error(tr("sin máscara de categorías"))
         val buf = ByteBufferExtractor.extract(m)
         val out = ByteArray(m.width * m.height); buf.rewind(); buf.get(out)
         FaceLabels(m.width, m.height, out)
-    }.onFailure { lastError = it.message ?: it.javaClass.simpleName }.getOrNull()
+    }.onFailure { lastError = it.message ?: it.javaClass.simpleName }.getOrNull() }
 
     override fun close() = seg.close()
 
@@ -63,6 +63,16 @@ class HairSkinSegmenter(context: Context) : Closeable {
         /** null si el modelo no se puede cargar (p. ej. dispositivo sin soporte). */
         fun createOrNull(context: Context): HairSkinSegmenter? =
             runCatching { HairSkinSegmenter(context) }.onFailure { lastError = it.message ?: it.javaClass.simpleName }.getOrNull()
+
+        @Volatile private var shared: HairSkinSegmenter? = null
+
+        /**
+         * Instancia compartida de los análisis de fotos (con la puerta de los modelos nativos): antes cada
+         * análisis creaba y cerraba un segmentador nuevo, a veces varios por foto. No se cierra.
+         */
+        fun sharedOrNull(context: Context): HairSkinSegmenter? = shared ?: synchronized(this) {
+            shared ?: createOrNull(context.applicationContext)?.also { shared = it }
+        }
 
         /** Motivo del último fallo al cargar el modelo (para mostrarlo en pantalla y diagnosticar). */
         @Volatile var lastError: String? = null

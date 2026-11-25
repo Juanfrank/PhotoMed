@@ -22,6 +22,8 @@ class PhotoRepository(
     private val metaRoot: File,
     private val store: PhotoStore,
     private val openStream: (Uri) -> InputStream? = { null },
+    /** Limpieza de los datos privados de una foto ya borrada (relieve, trazos, anotaciones, ediciones). */
+    private val forgetPhoto: (Uri) -> Unit = {},
 ) {
     init {
         metaRoot.mkdirs()
@@ -56,8 +58,13 @@ class PhotoRepository(
 
     /** Borra el expediente y sus fotos de la galería. */
     fun deleteExpediente(exp: Expediente): DeleteResult {
-        val result = store.delete(photos(exp).map { it.uri })
-        if (result is DeleteResult.Done) exp.metaDir.deleteRecursively()
+        val uris = photos(exp).map { it.uri }
+        val result = store.delete(uris)
+        if (result is DeleteResult.Done) {
+            // datos privados de cada foto (antes quedaban huérfanos)
+            uris.forEach { runCatching { forgetPhoto(it) } }
+            exp.metaDir.deleteRecursively()
+        }
         return result
     }
 
@@ -90,7 +97,8 @@ class PhotoRepository(
             .put("notes", notes)
             .put("consent", consent)
             .put("createdAt", createdAt)
-        File(dir, META).writeText(json.toString(2))
+        // atómico (temporal + fsync + renombrado): un corte a medias ya no deja el expediente ilegible
+        com.photomed.app.align.AtomicFile.write(File(dir, META), json.toString(2))
     }
 
     private fun readExpediente(dir: File): Expediente? {
@@ -111,9 +119,27 @@ class PhotoRepository(
                 lastPhotoAt = photos.maxOfOrNull { it.takenAt },
             )
         } catch (e: Exception) {
-            null
+            // expediente.json ilegible (corte a medias en versiones anteriores): se reconstruye con los datos
+            // incrustados en sus fotos, como al recuperar desde la galería, en lugar de hacer desaparecer el expediente
+            com.photomed.app.CrashLog.crumb("expediente ilegible: ${dir.name} (${e.javaClass.simpleName})")
+            rebuildMeta(dir)
         }
     }
+
+    /** Reescribe expediente.json desde el XMP de la primera foto del álbum; null si no hay fotos. */
+    private fun rebuildMeta(dir: File): Expediente? = runCatching {
+        val photos = photos(dir.name)
+        val first = photos.minByOrNull { it.takenAt } ?: return null
+        val info = openStream(first.uri)?.use { PhotoMetadata.read(it) }
+        val broken = File(dir, META)
+        broken.renameTo(File(dir, "$META.danado-${System.currentTimeMillis()}"))
+        writeMeta(dir, info?.patientName?.ifBlank { null } ?: dir.name.replace('_', ' '), info?.recordNumber.orEmpty(),
+            "Recuperado (archivo del expediente dañado)", info?.consent ?: false, first.takenAt)
+        val json = JSONObject(File(dir, META).readText())
+        Expediente(id = dir.name, patientName = json.optString("patientName"), recordNumber = json.optString("recordNumber"),
+            notes = json.optString("notes"), consent = json.optBoolean("consent", false), createdAt = json.optLong("createdAt"),
+            metaDir = dir, photoCount = photos.size, lastPhotoAt = photos.maxOfOrNull { it.takenAt })
+    }.getOrNull()
 
     // ---------- Fotos ----------
 
@@ -153,7 +179,13 @@ class PhotoRepository(
     fun saveExport(exp: Expediente, file: File, displayName: String, takenAt: Long = System.currentTimeMillis()): Uri =
         store.save("${exp.id}/$EXPORT_DIR", displayName, file, takenAt)
 
-    fun deletePhotos(photos: List<Photo>): DeleteResult = store.delete(photos.map { it.uri })
+    /**
+     * Borra las fotos; sus datos privados solo cuando el borrado está hecho. Si pide confirmación al usuario,
+     * se vuelve a llamar tras aceptarla (en Android 10 eso completa el borrado; en 11+ ya está hecho y solo limpia).
+     */
+    fun deletePhotos(photos: List<Photo>): DeleteResult = store.delete(photos.map { it.uri }).also { r ->
+        if (r is DeleteResult.Done) photos.forEach { runCatching { forgetPhoto(it.uri) } }
+    }
 
     /**
      * Cambia la fecha de captura de una foto: nombre del archivo (lleva la fecha) y fecha de toma de la
@@ -212,6 +244,7 @@ class PhotoRepository(
                 File(context.filesDir, "expedientes"),
                 PhotoStore.create(context),
                 openStream = { uri -> context.contentResolver.openInputStream(uri) },
+                forgetPhoto = { uri -> com.photomed.app.align.PhotoKeys.forget(context.applicationContext, uri.toString()) },
             )
             return repo
         }

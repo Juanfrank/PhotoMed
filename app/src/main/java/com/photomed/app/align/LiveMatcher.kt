@@ -82,7 +82,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     /** Puntos del perfil del cuadro por silueta (segmentación como mucho cada 0,3 s). */
     private fun frameProfile(frame: Bitmap): Map<String, Pt>? {
         val now = System.currentTimeMillis()
-        if (now - frameSilAt > 300) {
+        if (still || now - frameSilAt > 300) {
             frameSilAt = now
             frameSil = runCatching { segmenter?.segment(frame)?.let { Silhouette.fromMask(it) }?.profilePoints(frontRight) }.getOrNull()
         }
@@ -211,7 +211,9 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         var eval = withDiagnostic(Standardization.evaluate(zone, cur, light, expression), cur)
         // sin puntos que comprobar (zonas sin detector, cuerpo de espaldas, manos, pies, primeros
         // planos sin cara): dispara con el encuadre quieto; si no, se reinicia
-        if (SteadyFraming.applies(zone, cur)) eval = steady.update(ImageOps.luma(frame, EDGE_W), System.currentTimeMillis())
+        // foto fija (ráfaga): sin la quietud del vídeo en vivo (su estado no se toca)
+        if (still) Unit
+        else if (SteadyFraming.applies(zone, cur)) eval = steady.update(ImageOps.luma(frame, EDGE_W), System.currentTimeMillis())
         else steady.reset()
         // Perfil sin rostro detectado: si la silueta muestra un perfil hacia el lado de la vista
         // (nariz y mentón en el borde anterior), se acepta como perfil
@@ -257,29 +259,33 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
     private fun refreshScene(frame: Bitmap) {
         val now = System.currentTimeMillis()
         var handsNow = false
-        if (ZoneCriteria.needsHands(zone) && now - lastHandsAt > 150) {
+        if (ZoneCriteria.needsHands(zone) && (still || now - lastHandsAt > 150)) {
             lastHandsAt = now; handsNow = true
             lastHands = handsLazy.value?.let { h -> runCatching { h.detect(frame) }.getOrNull() }
         }
         // en las manos, la piel del mismo cuadro que los puntos (el contorno sigue a la mano sin retraso)
         // pies: cada 0,2 s (el contorno dibujado sigue al pie al mover la cámara)
         val every = if (zone.guide == com.photomed.app.data.GuideType.FEET) 200 else 500
-        if (ZoneCriteria.needsClasses(zone) && (now - lastClassesAt > every || handsNow)) {
+        if (ZoneCriteria.needsClasses(zone) && (still || now - lastClassesAt > every || handsNow)) {
             lastClassesAt = now
             val raw = runCatching { hairSkin?.labels(frame) }.getOrNull()?.let { lb0 ->
                 // la rejilla con la proporción del cuadro (las coordenadas se miden en anchos del cuadro)
                 val lb = sameAspect(lb0, frame)
+                lastLabels = lb; lastLabelsAt = now
                 // pies y manos: con el color del cuadro en la misma rejilla (piel, surcos, uñas)
                 if (zone.guide == com.photomed.app.data.GuideType.FEET || zone.guide == com.photomed.app.data.GuideType.HANDS) ZoneCriteria.Classes(lb.width, lb.height, lb.data, rgbOf(frame, lb.width, lb.height))
                 else ZoneCriteria.Classes.of(lb)
             }
             lastRawClasses = raw
             // estable: mayoría de las últimas segmentaciones, solo con la escena quieta (si se mueve, la actual)
-            lastClasses = raw?.let { fusion.add(it) }
+            lastClasses = if (still) raw else raw?.let { fusion.add(it) }
         }
     }
 
     private val fusion = ClassesFusion()
+    /** Última segmentación de pelo y piel (con la proporción del cuadro) y cuándo: la reutiliza la línea del pelo. */
+    @Volatile private var lastLabels: FaceLabels? = null
+    @Volatile private var lastLabelsAt = 0L
     private var lastFace: Map<String, Pt> = emptyMap(); private var lastFaceAt = 0L
     private val SCALP_GUIDES = setOf(com.photomed.app.data.GuideType.SCALP, com.photomed.app.data.GuideType.SCALP_CROWN, com.photomed.app.data.GuideType.SCALP_PARIETAL)
     /** Última segmentación sin fusionar: para dibujar el contorno sin retraso. */
@@ -330,12 +336,15 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val f = analyzeRaw(frame, smooth)
         // capilar frontal (cabeza inclinada): la distancia punta nasal–mentón es criterio de peso
         if (zone.guide != com.photomed.app.data.GuideType.SCALP_FRONT || f.currentPointsAll.isEmpty()) return f
-        val refPts = if (useReference) ref.points.takeIf { it.isNotEmpty() } else null
+        val refPts = if (useReference && !referencePending) ref.points.takeIf { it.isNotEmpty() } else null
         return f.copy(eval = Standardization.withNoseChin(f.eval, f.currentPointsAll, refPts))
     }
 
+    /** La referencia nueva aún se está aplicando: hasta entonces no se compara con ninguna (tampoco con la anterior). */
+    @Volatile var referencePending: Boolean = false
+
     private fun analyzeRaw(frame: Bitmap, smooth: Boolean): LiveFrame {
-        if (!useReference) return standardize(frame, smooth)
+        if (!useReference || referencePending) return standardize(frame, smooth)
         val byFeatures = featureOnly && (usesPoints(spec, ref) || refProfile != null)
         val refG = refGray ?: if (byFeatures) GrayImage(1, 1) else return standardize(frame, smooth)
         var eval: MatchEval
@@ -366,7 +375,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
             // cuerpo en el cuadro actual (segmentación como mucho cada 0,5 s; el encuadre cambia poco)
             if (refBody != null) {
                 val now = System.currentTimeMillis()
-                if (now - frameBodyAt > 500) {
+                if (still || now - frameBodyAt > 500) {
                     frameBodyAt = now
                     frameBody = runCatching { BodyRegion.of(zone, frame) { b -> segmenter?.segment(b) } }.getOrNull()
                 }
@@ -402,6 +411,12 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
      */
     fun scoreOf(photo: Bitmap): Float {
         val m = matched; val l = last
+        // estado del vídeo en vivo: la foto se evalúa sola (segmentación, manos, rostro y silueta de la propia foto,
+        // sin votos ni fusión) y al terminar todo vuelve como estaba. Antes cada foto se juzgaba con la
+        // segmentación de otro cuadro y sus votos se mezclaban con los del vídeo.
+        val saved = arrayOf<Any?>(lastHands, lastHandsAt, lastClasses, lastClassesAt, lastRawClasses, lastSchema,
+            frameBody, frameBodyAt, frameSil, frameSilAt, lastFace, lastFaceAt, lastLabels, lastLabelsAt)
+        still = true
         return try {
             val e = analyze(photo, smooth = false).eval
             when (e.status) {
@@ -409,8 +424,22 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
                 MatchStatus.SEARCHING -> 0f
                 else -> e.pointFraction?.let { it / e.threshold.coerceAtLeast(0.05f) }?.coerceAtMost(0.99f) ?: e.quality
             }
-        } finally { matched = m; last = l }
+        } finally {
+            still = false; matched = m; last = l
+            @Suppress("UNCHECKED_CAST") run {
+                lastHands = saved[0] as List<ZoneCriteria.Hand>?; lastHandsAt = saved[1] as Long
+                lastClasses = saved[2] as ZoneCriteria.Classes?; lastClassesAt = saved[3] as Long
+                lastRawClasses = saved[4] as ZoneCriteria.Classes?; lastSchema = saved[5] as BodySchema.Schema?
+                frameBody = saved[6] as Mask?; frameBodyAt = saved[7] as Long
+                frameSil = saved[8] as Map<String, Pt>?; frameSilAt = saved[9] as Long
+                lastFace = saved[10] as Map<String, Pt>; lastFaceAt = saved[11] as Long
+                lastLabels = saved[12] as FaceLabels?; lastLabelsAt = saved[13] as Long
+            }
+        }
     }
+
+    /** Evaluando una foto fija de la ráfaga ([scoreOf]), no un cuadro del vídeo. */
+    @Volatile private var still = false
 
     /** Sin puntos y con un error del detector: mostrarlo para poder diagnosticar en el dispositivo. */
     private fun withDiagnostic(e: MatchEval, cur: Detection): MatchEval {
@@ -434,7 +463,9 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val now = System.currentTimeMillis()
         if (now - liveHairlineAt > 500) {
             liveHairlineAt = now
-            liveHairline = runCatching { hairSkin?.labels(frame)?.let { HairSkin.hairline(it, cur.points)?.points } }.getOrNull()
+            // la segmentación de los criterios de este mismo cuadro, si la hay (antes se segmentaba dos veces)
+            val labels = lastLabels?.takeIf { now - lastLabelsAt <= 500 } ?: runCatching { hairSkin?.labels(frame) }.getOrNull()
+            liveHairline = runCatching { labels?.let { HairSkin.hairline(it, cur.points)?.points } }.getOrNull()
         }
         return liveHairline
     }
@@ -454,7 +485,7 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         // con la guía girada, los criterios se miden en su orientación y el esquema vuelve al cuadro
         // zona del ojo (sin detector): si el detector de rostro ve la cara entera, no es un primer plano de un ojo
         // (y en el cuero cabelludo: con un rostro a la vista no es el cuero cabelludo; sin él, la piel es calvicie)
-        if ((zone.guide == com.photomed.app.data.GuideType.EYE || zone.guide in SCALP_GUIDES) && System.currentTimeMillis() - lastFaceAt > 500) {
+        if ((zone.guide == com.photomed.app.data.GuideType.EYE || zone.guide in SCALP_GUIDES) && (still || System.currentTimeMillis() - lastFaceAt > 500)) {
             lastFaceAt = System.currentTimeMillis()
             lastFace = runCatching { detector.detectFull(Detector.FACE, frame).points }.getOrDefault(emptyMap())
         }
@@ -476,7 +507,8 @@ class LiveMatcher(private val zone: Zone, context: android.content.Context? = nu
         val now = ZoneCriteria.hints(zone, scene) + lightNow
         // decisión estable: la zona cumple si cumple en al menos 2 de los 3 últimos análisis (una
         // segmentación o detección suelta no cambia el veredicto ni hace parpadear las indicaciones)
-        synchronized(votes) {
+        // foto fija: su propio veredicto, sin los votos del vídeo en vivo
+        if (still) { if (now.isEmpty()) return e } else synchronized(votes) {
             votes.addLast(now.isEmpty()); while (votes.size > 3) votes.removeFirst()
             val ok = votes.size >= 2 && votes.count { it } >= 2
             if (ok) return e

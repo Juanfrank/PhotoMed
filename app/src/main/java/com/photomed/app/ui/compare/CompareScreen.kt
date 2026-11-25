@@ -242,8 +242,11 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
             withContext(Dispatchers.IO) {
                 ps.forEach { p ->
                     val base = photoBaseLines(context, p.uri, previous(p)) ?: return@forEach
-                    val set = com.photomed.app.align.ConfirmedTraces.ensure(context, p.uri, base, com.photomed.app.align.TraceFrame.C34)
-                    if (!com.photomed.app.align.ConfirmedTraces.save(context, p.uri.toString(), change(set))) failed++
+                    val ok = com.photomed.app.data.PhotoLocks.on(p.uri.toString()) {
+                        val set = com.photomed.app.align.ConfirmedTraces.ensure(context, p.uri, base, com.photomed.app.align.TraceFrame.C34)
+                        com.photomed.app.align.ConfirmedTraces.save(context, p.uri.toString(), change(set))
+                    }
+                    if (!ok) failed++
                 }
             }
             userVersion++

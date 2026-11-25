@@ -194,7 +194,11 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     LaunchedEffect(list) { list.indexOfFirst { it.displayName == trackName }.takeIf { it >= 0 && it != pager.currentPage }?.let { pager.scrollToPage(it) } }
     val current = list[pager.currentPage.coerceIn(0, list.lastIndex)]
     var retrying by remember { mutableStateOf(false) }
+    // fotos cuyo borrado espera la confirmación del sistema: al aceptarla se completa y se limpian sus datos
+    var pendingDelete by remember { mutableStateOf<List<Photo>>(emptyList()) }
     val galleryDelete = rememberGalleryDelete { ok ->
+        val del = pendingDelete; pendingDelete = emptyList()
+        if (ok && del.isNotEmpty()) scope.launch { withContext(Dispatchers.IO) { runCatching { repo.deletePhotos(del) } } }
         if (retrying) { retrying = false; if (ok) review?.onRetry?.invoke() } else if (ok) reload++
     }
     if (review != null) androidx.activity.compose.BackHandler(onBack = review.onKeep)
@@ -205,10 +209,10 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     fun mutateTraces(ph: Photo, change: (com.photomed.app.align.TraceSet) -> com.photomed.app.align.TraceSet) {
         val u = ph.uri.toString()
         scope.launch {
-            val ok = withContext(Dispatchers.IO) {
+            val ok = withContext(Dispatchers.IO) { com.photomed.app.data.PhotoLocks.on(u) {
                 val set = com.photomed.app.align.ConfirmedTraces.ensure(context, ph.uri, annotsByUri[u].orEmpty(), com.photomed.app.align.TraceFrame.FULL)
                 com.photomed.app.align.ConfirmedTraces.save(context, u, change(set))
-            }
+            } }
             savedInPhoto[u] = ok
             userVersion++
         }
@@ -230,7 +234,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 }.getOrNull() }
                 if (out == null) { snackbar.showSnackbar(tr("No se pudo trazar ahí; dibuje una línea sobre el surco o rodéelo")); return@launch }
                 val (r, m, aE) = out
-                val ok = withContext(Dispatchers.IO) {
+                val ok = withContext(Dispatchers.IO) { com.photomed.app.data.PhotoLocks.on(u) {
                     val set = com.photomed.app.align.ConfirmedTraces.of(context, u)
                         ?: com.photomed.app.align.ConfirmedTraces.fromLines(annotsByUri[u].orEmpty(), e, aE, com.photomed.app.align.TraceFrame.FULL)
                     val orig = com.photomed.app.align.TraceMap.fromView(e, set.baseAspect, com.photomed.app.align.TraceFrame.FULL, r.points)
@@ -243,7 +247,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                                 metrics = (m ?: com.photomed.app.align.LineMetrics("x")).copy(name = name, note = note), origin = "añadido"))
                         }
                     com.photomed.app.align.ConfirmedTraces.save(context, u, next)
-                }
+                } }
                 savedInPhoto[u] = ok
                 if (com.photomed.app.align.AnnotLayer.FOLDS !in layersState.value) layersState.value = layersState.value + com.photomed.app.align.AnnotLayer.FOLDS
                 userVersion++
@@ -258,7 +262,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     fun inkPath(ph: Photo, path: List<com.photomed.app.align.Pt>, aE: Float) {
         val u = ph.uri.toString(); val st = inkStyle
         scope.launch {
-            val ok = withContext(Dispatchers.IO) { runCatching {
+            val ok = withContext(Dispatchers.IO) { runCatching { com.photomed.app.data.PhotoLocks.on(u) {
                 val e = com.photomed.app.align.PhotoEdits.of(context, u)
                 val old = com.photomed.app.align.Annotations.of(context, u) ?: com.photomed.app.align.InkSet(com.photomed.app.align.TraceMap.baseAspect(e, aE))
                 val fr = com.photomed.app.align.TraceFrame.FULL
@@ -282,7 +286,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 }
                 if (next != old) { inkUndo[u] = (inkUndo[u].orEmpty() + old).takeLast(30); com.photomed.app.align.Annotations.save(context, u, next) }
                 true
-            }.onFailure { com.photomed.app.CrashLog.write("Guardar una anotación", it) }.getOrDefault(false) }
+            } }.onFailure { com.photomed.app.CrashLog.write("Guardar una anotación", it) }.getOrDefault(false) }
             if (!ok) snackbar.showSnackbar(tr("No se pudo guardar la anotación"))
             inkVersion++
         }
@@ -293,7 +297,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
         if (pts.size < 2) return
         val u = ph.uri.toString(); val st = inkStyle
         scope.launch {
-            val ok = withContext(Dispatchers.IO) { runCatching {
+            val ok = withContext(Dispatchers.IO) { runCatching { com.photomed.app.data.PhotoLocks.on(u) {
                 val e = com.photomed.app.align.PhotoEdits.of(context, u)
                 val old = com.photomed.app.align.Annotations.of(context, u) ?: com.photomed.app.align.InkSet(com.photomed.app.align.TraceMap.baseAspect(e, aE))
                 val fr = com.photomed.app.align.TraceFrame.FULL
@@ -304,7 +308,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     kind = com.photomed.app.align.InkStroke.SYMBOL, shape = com.photomed.app.align.InkRenderer.POLYLINE, size = wOrig * 6f))
                 inkUndo[u] = (inkUndo[u].orEmpty() + old).takeLast(30); com.photomed.app.align.Annotations.save(context, u, next)
                 true
-            }.onFailure { com.photomed.app.CrashLog.write("Guardar una línea multipunto", it) }.getOrDefault(false) }
+            } }.onFailure { com.photomed.app.CrashLog.write("Guardar una línea multipunto", it) }.getOrDefault(false) }
             if (!ok) snackbar.showSnackbar(tr("No se pudo guardar la línea"))
             inkVersion++
         }
@@ -314,7 +318,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     fun inkVertex(ph: Photo, idx: Int, vi: Int, to: com.photomed.app.align.Pt) {
         val u = ph.uri.toString()
         scope.launch {
-            withContext(Dispatchers.IO) { runCatching {
+            withContext(Dispatchers.IO) { runCatching { com.photomed.app.data.PhotoLocks.on(u) {
                 val e = com.photomed.app.align.PhotoEdits.of(context, u)
                 val old = com.photomed.app.align.Annotations.of(context, u) ?: return@runCatching
                 val view = old.inView(e, com.photomed.app.align.TraceFrame.FULL)
@@ -324,7 +328,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 val next = old.copy(strokes = old.strokes.toMutableList().also { it[idx] = it[idx].copy(points = orig) })
                 inkUndo[u] = (inkUndo[u].orEmpty() + old).takeLast(30)
                 com.photomed.app.align.Annotations.save(context, u, next)
-            }.onFailure { com.photomed.app.CrashLog.write("Mover un punto de una línea", it) } }
+            } }.onFailure { com.photomed.app.CrashLog.write("Mover un punto de una línea", it) } }
             inkVersion++
         }
     }
@@ -333,7 +337,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     fun inkMove(ph: Photo, idx: Int, delta: com.photomed.app.align.Pt) {
         val u = ph.uri.toString()
         scope.launch {
-            withContext(Dispatchers.IO) { runCatching {
+            withContext(Dispatchers.IO) { runCatching { com.photomed.app.data.PhotoLocks.on(u) {
                 val e = com.photomed.app.align.PhotoEdits.of(context, u)
                 val old = com.photomed.app.align.Annotations.of(context, u) ?: return@runCatching
                 val view = old.inView(e, com.photomed.app.align.TraceFrame.FULL)
@@ -343,7 +347,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 val next = old.copy(strokes = old.strokes.toMutableList().also { it[idx] = it[idx].copy(points = orig) })
                 inkUndo[u] = (inkUndo[u].orEmpty() + old).takeLast(30)
                 com.photomed.app.align.Annotations.save(context, u, next)
-            }.onFailure { com.photomed.app.CrashLog.write("Mover una anotación", it) } }
+            } }.onFailure { com.photomed.app.CrashLog.write("Mover una anotación", it) } }
             inkVersion++
         }
     }
@@ -414,8 +418,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
                 androidx.compose.material3.OutlinedButton(enabled = !retrying, modifier = Modifier.weight(1f), onClick = {
                     retrying = true
-                    scope.launch { galleryDelete(withContext(Dispatchers.IO) {
-                        com.photomed.app.align.ReliefStore.delete(context, current.uri.toString()); repo.deletePhotos(listOf(current)) }) }
+                    pendingDelete = listOf(current)
+                    scope.launch { galleryDelete(withContext(Dispatchers.IO) { repo.deletePhotos(listOf(current)) }) }
                 }) {
                     Icon(Icons.Default.Replay, null); androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 8.dp)); Text(tr("Repetir"), color = Color.White)
                 }
@@ -537,13 +541,13 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                     onUndo = {
                         val u = current.uri.toString(); val st = inkUndo[u].orEmpty()
                         st.lastOrNull()?.let { prev -> inkUndo[u] = st.dropLast(1)
-                            scope.launch { withContext(Dispatchers.IO) { com.photomed.app.align.Annotations.save(context, u, prev) }; inkVersion++ } }
+                            scope.launch { withContext(Dispatchers.IO) { com.photomed.app.data.PhotoLocks.on(u) { com.photomed.app.align.Annotations.save(context, u, prev) } }; inkVersion++ } }
                     },
                     onClear = {
                         val u = current.uri.toString()
                         scope.launch {
-                            withContext(Dispatchers.IO) { com.photomed.app.align.Annotations.of(context, u)?.let { old ->
-                                inkUndo[u] = inkUndo[u].orEmpty() + old; com.photomed.app.align.Annotations.save(context, u, old.copy(strokes = emptyList())) } }
+                            withContext(Dispatchers.IO) { com.photomed.app.data.PhotoLocks.on(u) { com.photomed.app.align.Annotations.of(context, u)?.let { old ->
+                                inkUndo[u] = inkUndo[u].orEmpty() + old; com.photomed.app.align.Annotations.save(context, u, old.copy(strokes = emptyList())) } } }
                             inkVersion++
                         }
                     },
@@ -628,7 +632,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
             onDismiss = { confirmDelete = false },
             onConfirm = {
                 confirmDelete = false
-                scope.launch { galleryDelete(withContext(Dispatchers.IO) { current.uri.toString().let { com.photomed.app.align.ReliefStore.delete(context, it) }; repo.deletePhotos(listOf(current)) }) }
+                pendingDelete = listOf(current)
+                scope.launch { galleryDelete(withContext(Dispatchers.IO) { repo.deletePhotos(listOf(current)) }) }
             },
         )
     }

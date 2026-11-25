@@ -377,19 +377,32 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         val m = matcher
         val orient = refOrient
         refGuide = null
-        pipeline.post {
-            // modelos nativos: con la puerta (espera a que acabe el análisis de una foto en curso)
-            com.photomed.app.align.NativeGate.tryRunBlocking("referencia en la cámara", 30_000) {
-                runCatching { m.setReference(bmp) }
-                refGuide = if (orient.isIdentity) null else runCatching { m.guideOf(upright) }.getOrNull()
+        // Modelos nativos con la puerta, sin bloquear el hilo de análisis: intentos cortos hasta conseguir el turno
+        // (antes hasta 30 s parado y, si se agotaba, se seguía comparando con la referencia anterior). Mientras
+        // tanto el matcher no usa ninguna referencia (estandariza), nunca la de la foto anterior.
+        m.referencePending = true
+        var guide: com.photomed.app.align.LiveMatcher.GuideRef? = null
+        while (true) {
+            val done = kotlinx.coroutines.CompletableDeferred<Boolean>()
+            pipeline.post {
+                done.complete(com.photomed.app.align.NativeGate.tryRunBlocking("referencia en la cámara", 150) {
+                    runCatching { m.setReference(bmp) }
+                    guide = if (orient.isIdentity) null else runCatching { m.guideOf(upright) }.getOrNull()
+                    true
+                } ?: false)
             }
-            refPoints = m.referencePoints
-            refSilhouette = m.referenceSilhouette
-            refFree = m.referenceFree
-            refEdges = m.referenceEdges
-            refSchemaState = m.referenceSchema
-            refHairline = m.referenceHairline
+            if (kotlinx.coroutines.withTimeoutOrNull(5_000) { done.await() } == true) break
+            kotlinx.coroutines.delay(400)
         }
+        m.referencePending = false
+        // estado de Compose, en el hilo principal (antes se escribía desde el hilo de análisis)
+        refGuide = guide
+        refPoints = m.referencePoints
+        refSilhouette = m.referenceSilhouette
+        refFree = m.referenceFree
+        refEdges = m.referenceEdges
+        refSchemaState = m.referenceSchema
+        refHairline = m.referenceHairline
     }
     // Referencia del protocolo (sin imagen): puntos, pose, línea del pelo y perfil; distancia y zoom de la toma
     LaunchedEffect(protoRef, matcher, camera) {
@@ -500,6 +513,9 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
     LaunchedEffect(reload) {
         val (e, list) = withContext(Dispatchers.IO) {
             val e = repo.getExpediente(expId)
+            // tomas que no se pudieron guardar antes: se reintentan
+            e?.let { ex -> if (com.photomed.app.data.PendingPhotos.count(context, ex.id) > 0)
+                com.photomed.app.data.PendingPhotos.retry(context, repo, ex).takeIf { it > 0 }?.let { n -> scope.launch { snackbar.showSnackbar(tr("Se guardaron %1\$d foto(s) pendientes", n)) } } }
             e to e?.let { repo.photos(it, zone) }.orEmpty()
         }
         exp = e; photos = list
@@ -681,16 +697,31 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             })
     }
 
-    /** Puntuación de una foto frente a la referencia, en el hilo de análisis (sin tocar el estado en vivo). */
-    suspend fun scoreOf(file: File): Float {
-        val bmp = runCatching { ImageOps.load34(context, android.net.Uri.fromFile(file), 360) }.getOrNull() ?: return 0f
+    /**
+     * Puntuación de una foto frente a la referencia, en el hilo de análisis (sin tocar el estado en vivo).
+     * null si no se pudo puntuar (puerta ocupada, análisis detenido): antes valía 0 y se elegía la primera.
+     */
+    suspend fun scoreOf(file: File): Float? {
+        val bmp = runCatching { ImageOps.load34(context, android.net.Uri.fromFile(file), 360) }.getOrNull() ?: return null
         // con tiempo límite: si el análisis se detiene (cámara cerrada) no queda esperando
         return kotlinx.coroutines.withTimeoutOrNull(4000) {
-            kotlinx.coroutines.suspendCancellableCoroutine<Float> { c ->
-                pipeline.post { val sc = runCatching { com.photomed.app.align.NativeGate.tryRunBlocking("nitidez de la ráfaga", 3000, crumb = false) { pipeline.withEngine { it.scoreOf(bmp) } } }.getOrNull() ?: 0f; if (c.isActive) c.resume(sc) }
+            kotlinx.coroutines.suspendCancellableCoroutine<Float?> { c ->
+                pipeline.post { val sc = runCatching { com.photomed.app.align.NativeGate.tryRunBlocking("nitidez de la ráfaga", 3000, crumb = false) { pipeline.withEngine { it.scoreOf(bmp) } } }.getOrNull(); if (c.isActive) c.resume(sc) }
             }
-        } ?: 0f
+        }
     }
+
+    /** Nitidez (varianza del laplaciano a 360 px), sin modelos: respaldo para elegir la mejor de la ráfaga. */
+    suspend fun sharpnessOf(file: File): Float = runCatching {
+        val g = ImageOps.gray(ImageOps.load34(context, android.net.Uri.fromFile(file), 360), 360)
+        var s = 0.0; var s2 = 0.0; var n = 0
+        for (y in 1 until g.height - 1) for (x in 1 until g.width - 1) {
+            val l = (4 * g[x, y] - g[x - 1, y] - g[x + 1, y] - g[x, y - 1] - g[x, y + 1]).toDouble()
+            if (l.isNaN()) continue
+            s += l; s2 += l * l; n++
+        }
+        if (n == 0) 0f else (s2 / n - (s / n) * (s / n)).toFloat()
+    }.getOrDefault(0f)
 
     /**
      * Medición de relieve: secuencia de la pantalla (oscura, mitades, blanca), foto normal con la
@@ -775,7 +806,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
             var moved = false
             // quieto solo hasta que se hacen las exposiciones (no mientras se procesan y guardan)
             var exposedAll = false
-            val watch = stillOk?.let { ok -> launch {
+            // con flash (de pantalla o preflash) la luz de los cuadros cambia: solo se exige que el paciente siga
+            // en el cuadro (antes el propio destello cancelaba la foto como si se hubiera movido)
+            val flashOn = effectiveFlash != ImageCapture.FLASH_MODE_OFF
+            val watch = stillOk?.let { ok0 -> val ok = if (!flashOn) ok0 else ({ live?.eval?.let { it.status != MatchStatus.SEARCHING } ?: false }); launch {
                 var lostSince = 0L
                 while (!exposedAll) {
                     val now = System.currentTimeMillis()
@@ -808,7 +842,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                 snackbar.showSnackbar(tr("Error al capturar"))
                 return@launch
             }
-            val best = if (files.size == 1) files[0] else files.maxBy { scoreOf(it) }
+            val best = if (files.size == 1) files[0] else {
+                val scores = files.map { scoreOf(it) }
+                // si alguna no se pudo puntuar, la más nítida (antes se quedaba la primera)
+                if (scores.all { it != null }) files[scores.indices.maxBy { scores[it]!! }]
+                else { val sh = files.map { f -> withContext(Dispatchers.Default) { sharpnessOf(f) } }; files[sh.indices.maxBy { sh[it] }] }
+            }
             watch?.cancel()
             if (moved) {
                 files.forEach { it.delete() }
@@ -827,7 +866,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                     repo.savePhoto(e, zone, best, cameraPitch = pitch, roll = roll, focalNorm = focal, conditions = conds,
                         variant = listOfNotNull(limbSide.tag.takeIf { zone.hasLimbSides },
                             com.photomed.app.data.FacialExpression.variantTag(expression)).joinToString("_").ifEmpty { null })
-                }.also { best.delete() }
+                }
+                // la toma clínica no se pierde si falla el guardado en la galería: se conserva en la app y se reintenta
+                val kept = if (result.isSuccess) { best.delete(); null } else {
+                    com.photomed.app.CrashLog.write("No se pudo guardar la foto en la galería", result.exceptionOrNull()!!)
+                    com.photomed.app.data.PendingPhotos.keep(context, e.id, zone, System.currentTimeMillis(), best)
+                }
                 if (depthMm != null && focal != null) result.getOrNull()?.let { ReliefCapture.saveDepthScale(context, it.uri, depthMm, focal, zoomNow) }
                 if (com.photomed.app.align.HairSkin.appliesTo(zone)) result.getOrNull()?.let { ph ->
                     AppScope.launch { com.photomed.app.align.HairlineMeasure.measureAndStore(context, ph.uri) }
@@ -841,7 +885,8 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
                         // se muestra la foto para guardarla o repetirla
                         reviewName = it.displayName
                     }.onFailure {
-                        snackbar.showSnackbar(tr("No se pudo guardar: %1\$s", it.message))
+                        snackbar.showSnackbar(tr("No se pudo guardar: %1\$s", it.message) +
+                            (if (kept != null) tr(" · se conservó en la app y se volverá a guardar al abrir de nuevo la cámara") else ""))
                     }
                 }
             }

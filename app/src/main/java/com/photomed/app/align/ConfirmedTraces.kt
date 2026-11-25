@@ -3,6 +3,7 @@ package com.photomed.app.align
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import com.photomed.app.data.PhotoLocks
 import com.photomed.app.data.PhotoMetadata
 import com.photomed.app.data.XmpFile
 import org.json.JSONArray
@@ -180,43 +181,61 @@ object ConfirmedTraces {
     /** Tamaño máximo del JSON en el XMP (un bloque APP1 de JPEG admite ~64 kB). */
     const val XMP_MAX = 48_000
 
+    /**
+     * Marca de borrado: «Regenerar» no pudo quitar los trazos del XMP de la foto (sin permiso de escritura).
+     * Mientras exista, no se recuperan del XMP (antes el borrado se deshacía solo en la siguiente lectura).
+     */
+    private fun tombstone(context: Context, uri: String) = File(dir(context), key(uri) + ".removed")
+
     /** Conjunto confirmado de la foto, o null. Si solo está en el XMP (otra instalación), se recupera. */
-    fun of(context: Context, uri: String): TraceSet? {
+    fun of(context: Context, uri: String): TraceSet? = PhotoLocks.on(uri) {
         val f = file(context, uri)
-        synchronized(mem) { mem[uri]?.let { (stamp, s) -> if (stamp == f.lastModified()) return s } }
+        // marca tomada antes de leer: una escritura posterior invalida la caché aunque la lectura fuera anterior
+        val stamp = f.lastModified()
+        synchronized(mem) { mem[uri]?.let { (st, s) -> if (st == stamp) return@on s } }
         val s = if (f.exists()) TraceJson.read(f.readText())
-            else PhotoMetadata.tracesOf(XmpFile.read(context, Uri.parse(uri)))?.let { j -> TraceJson.read(j)?.also { AtomicFile.write(f, j) } }
+            else if (tombstone(context, uri).exists()) null
+            else PhotoMetadata.tracesOf(XmpFile.read(context, Uri.parse(uri)))?.let { j -> TraceJson.read(j)?.also { runCatching { AtomicFile.write(f, j) } } }
         synchronized(mem) { mem[uri] = f.lastModified() to s }
-        return s
+        s
     }
 
     /** Etiqueta para las claves de caché (cambia al confirmar, editar o regenerar). */
     fun tag(context: Context, uri: String): String = file(context, uri).let { if (it.exists()) "${it.lastModified()}-${it.length()}" else "-" }
 
-    /** Guarda el conjunto (copia privada y XMP de la foto). Devuelve si se pudo escribir en la foto. */
     /** Guarda los trazos; false (sin cerrar la app) si no se pudieron guardar, con la causa en el registro. */
-    fun save(context: Context, uri: String, s: TraceSet): Boolean = runCatching { saveOrThrow(context, uri, s) }
-        .onFailure { com.photomed.app.CrashLog.write("No se pudieron guardar los trazos", it) }.getOrDefault(false)
+    fun save(context: Context, uri: String, s: TraceSet): Boolean = PhotoLocks.on(uri) {
+        runCatching { saveOrThrow(context, uri, s) }
+            .onFailure { com.photomed.app.CrashLog.write("No se pudieron guardar los trazos", it) }.getOrDefault(false)
+    }
 
     private fun saveOrThrow(context: Context, uri: String, s: TraceSet): Boolean {
         val json = TraceJson.write(s)
         val f = file(context, uri)
         AtomicFile.write(f, json)
+        tombstone(context, uri).delete()
         // marca de tiempo distinta aunque se guarde dos veces en el mismo milisegundo (claves de caché)
-        f.setLastModified(maxOf(System.currentTimeMillis(), (mem[uri]?.first ?: 0L) + 1000))
-        synchronized(mem) { mem[uri] = f.lastModified() to s }
+        synchronized(mem) {
+            f.setLastModified(maxOf(System.currentTimeMillis(), (mem[uri]?.first ?: 0L) + 1000))
+            mem[uri] = f.lastModified() to s
+        }
         return json.length <= XMP_MAX && XmpFile.update(context, Uri.parse(uri)) { PhotoMetadata.withTraces(it, json) }
     }
 
     /** Al eliminar la foto: solo la copia privada (la foto y su XMP se borran aparte). */
-    fun forget(context: Context, uri: String) { file(context, uri).delete(); synchronized(mem) { mem.remove(uri) } }
+    fun forget(context: Context, uri: String) {
+        file(context, uri).delete(); tombstone(context, uri).delete(); synchronized(mem) { mem.remove(uri) }
+    }
 
-    /** Regenerar: se borran los trazos confirmados (y las correcciones antiguas) de la foto. */
-    fun clear(context: Context, uri: String) {
+    /** Regenerar: se borran los trazos confirmados (y las correcciones antiguas) de la foto. Devuelve si se quitaron también del XMP. */
+    fun clear(context: Context, uri: String): Boolean = PhotoLocks.on(uri) {
         // primero la foto: si se borrara antes la copia de la app, una lectura intermedia la recuperaría del XMP
-        XmpFile.update(context, Uri.parse(uri)) { PhotoMetadata.withTraces(it, null) }
+        val inPhoto = XmpFile.update(context, Uri.parse(uri)) { PhotoMetadata.withTraces(it, null) }
+        // si el XMP no se pudo reescribir, la marca de borrado impide recuperarlos de él
+        if (!inPhoto) runCatching { tombstone(context, uri).writeText("1") }
         synchronized(mem) { file(context, uri).delete(); mem.remove(uri) }
         AnnotUserEdits.delete(context, uri)
+        inPhoto
     }
 
     /** Confirma las líneas [lines] (en [frame] con la edición [e]; [aE]: alto / ancho de la foto editada). */

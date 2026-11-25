@@ -174,8 +174,9 @@ object ReliefStore {
     private fun metaFile(context: Context, uri: String) = File(dir(context), key(uri) + ".json")
 
     fun save(context: Context, uri: String, relief: Bitmap?, meta: MeasureMeta) {
-        relief?.let { b -> reliefFile(context, uri).outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) } }
-        metaFile(context, uri).writeText(JSONObject().apply {
+        // atómico: un corte a medias no deja un PNG o un JSON truncados
+        relief?.let { b -> AtomicFile.writeBytes(reliefFile(context, uri), java.io.ByteArrayOutputStream().also { b.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()) }
+        AtomicFile.write(metaFile(context, uri), JSONObject().apply {
             put("hasRelief", meta.hasRelief && relief != null)
             meta.irisFactor?.let { put("irisFactor", it.toDouble()) }
             meta.distanceMm?.let { put("distanceMm", it.toDouble()) }

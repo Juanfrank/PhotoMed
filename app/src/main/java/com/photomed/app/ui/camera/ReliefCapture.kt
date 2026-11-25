@@ -131,7 +131,7 @@ object ReliefCapture {
     suspend fun process(context: Context, frames: List<PsFrame>, photoUri: Uri, focalNorm: Float?, zoom: Float, depthMm: Float?): String =
         com.photomed.app.align.NativeGate.run("relieve") { withContext(Dispatchers.Default) {
             val full = frames.lastOrNull { it.pattern == Pattern.FULL } ?: return@withContext tr("Relieve: faltan tomas")
-            MediaPipeFace(context).use { mp ->
+            (MediaPipeFace.sharedOrNull(context) ?: return@withContext tr("Relieve: no se encontró la cara")).let { mp ->
                 val frameMesh = mp.mesh(full.bmp) ?: return@withContext tr("Relieve: no se encontró la cara")
                 val focalPx = focalNorm?.let { it * maxOf(full.bmp.width, full.bmp.height) * zoom }
                 val r = Relief.compute(frames, frameMesh, screen(context), focalPx, depthMm) ?: return@withContext tr("Relieve: no se pudo calcular")
@@ -160,7 +160,7 @@ object ReliefCapture {
     private suspend fun saveDepthScaleGated(context: Context, photoUri: Uri, depthMm: Float, focalNorm: Float, zoom: Float) = withContext(Dispatchers.Default) {
         runCatching {
             val photo = ImageOps.loadFull(context, photoUri, 1440, ImageEdit.NONE)
-            val mesh = MediaPipeFace(context).use { it.mesh(photo) } ?: return@runCatching
+            val mesh = MediaPipeFace.sharedOrNull(context)?.mesh(photo) ?: return@runCatching
             val iris = LineMeasure.scale(mesh)?.takeIf { it.second == "iris" }?.first ?: return@runCatching
             // ancho de la foto = lado corto del sensor (3/4 del largo) a la distancia medida
             val shortSide = minOf(photo.width, photo.height) / maxOf(photo.width, photo.height).toFloat()

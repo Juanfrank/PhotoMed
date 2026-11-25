@@ -248,6 +248,7 @@
     <string name="t_30789a1c2726" formatted="false">coincidencia ≥ %1$d %%</string>
     <string name="t_30d0b1778b73" formatted="false">Manos (dorso)</string>
     <string name="t_30dc0bfe7274" formatted="false">El archivo no es un protocolo de PhotoMed.</string>
+    <string name="t_30eaef7f92c9" formatted="false">" · se conservó en la app y se volverá a guardar al abrir de nuevo la cámara"</string>
     <string name="t_30fba1e31f72" formatted="false">Claro</string>
     <string name="t_31033391e217" formatted="false">Ojeras</string>
     <string name="t_310aad2bdd11" formatted="false">Brazo derecho</string>
@@ -1250,6 +1251,7 @@
     <string name="t_fdf1055e24e6" formatted="false">vértice</string>
     <string name="t_fe18f806b021" formatted="false">Usted es responsable de obtener el consentimiento informado y de cumplir la normativa de datos de salud.</string>
     <string name="t_fec02633dfb2" formatted="false">← Mueva la cámara a la izquierda</string>
+    <string name="t_feced300ca37" formatted="false">Se guardaron %1$d foto(s) pendientes</string>
     <string name="t_fed08c95a026" formatted="false">Analizando el cuero cabelludo…</string>
     <string name="t_ff2c03c8aeb8" formatted="false">Vista en espejo (cámara frontal)</string>
 </resources>

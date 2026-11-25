@@ -2,6 +2,7 @@ package com.photomed.app.align
 
 import android.content.Context
 import android.net.Uri
+import com.photomed.app.data.PhotoLocks
 import com.photomed.app.data.PhotoMetadata
 import com.photomed.app.data.XmpFile
 import org.json.JSONArray
@@ -104,25 +105,33 @@ object Annotations {
         })
     }.getOrNull()
 
-    fun of(context: Context, uri: String): InkSet? {
+    /** Marca de borrado (ver [ConfirmedTraces]): las anotaciones borradas no se recuperan del XMP si no se pudo reescribir. */
+    private fun tombstone(context: Context, uri: String) = File(file(context, uri).parentFile, file(context, uri).name + ".removed")
+
+    fun of(context: Context, uri: String): InkSet? = PhotoLocks.on(uri) {
         val f = file(context, uri)
-        if (f.exists()) return read(f.readText())
+        if (f.exists()) return@on read(f.readText())
+        if (tombstone(context, uri).exists()) return@on null
         // otra instalación: del XMP de la foto
-        return PhotoMetadata.attrOf(XmpFile.read(context, Uri.parse(uri)), "Ink")?.let { j -> read(j)?.also { AtomicFile.write(f, j) } }
+        PhotoMetadata.attrOf(XmpFile.read(context, Uri.parse(uri)), "Ink")?.let { j -> read(j)?.also { runCatching { AtomicFile.write(f, j) } } }
     }
 
     fun tag(context: Context, uri: String) = file(context, uri).let { if (it.exists()) "${it.lastModified()}-${it.length()}" else "-" }
 
     /** Guarda (vacío = se borran). Devuelve si se pudo escribir en la foto. */
-    fun save(context: Context, uri: String, s: InkSet): Boolean {
+    fun save(context: Context, uri: String, s: InkSet): Boolean = PhotoLocks.on(uri) {
         val f = file(context, uri)
         if (s.strokes.isEmpty()) {
             f.delete()
-            return XmpFile.update(context, Uri.parse(uri)) { PhotoMetadata.withAttr(it, "Ink", null) }
+            val ok = XmpFile.update(context, Uri.parse(uri)) { PhotoMetadata.withAttr(it, "Ink", null) }
+            if (!ok) runCatching { tombstone(context, uri).writeText("1") }
+            return@on ok
         }
         val json = write(s)
-        AtomicFile.write(f, json)
-        return json.length <= XMP_MAX && XmpFile.update(context, Uri.parse(uri)) { PhotoMetadata.withAttr(it, "Ink", json) }
+        val wrote = runCatching { AtomicFile.write(f, json) }
+            .onFailure { com.photomed.app.CrashLog.write("No se pudieron guardar las anotaciones", it) }.isSuccess
+        if (wrote) tombstone(context, uri).delete()
+        wrote && json.length <= XMP_MAX && XmpFile.update(context, Uri.parse(uri)) { PhotoMetadata.withAttr(it, "Ink", json) }
     }
 
     /**

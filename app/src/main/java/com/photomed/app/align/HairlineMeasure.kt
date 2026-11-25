@@ -19,8 +19,8 @@ object HairlineMeasure {
                 val bmp = ImageOps.load34(context, uri, 360)
                 val d = LandmarkDetector(stream = false, context, FaceEngine.MEDIAPIPE).use { it.detectFull(Detector.FACE, bmp) }
                 if (d.points.size < LiveDecision.MIN_POINTS) return@runCatching null
-                HairSkinSegmenter.createOrNull(context)?.use { seg ->
-                    val labels = seg.labels(bmp) ?: return@use null
+                HairSkinSegmenter.sharedOrNull(context)?.let { seg ->
+                    val labels = seg.labels(bmp) ?: return@let null
                     val pts = runCatching { BrowRefine.refineKeys(d.points, FaceCrop.lum(bmp), labels) }.getOrDefault(d.points)
                     HairSkin.hairline(labels, pts)?.heightIpd
                 }

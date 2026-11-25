@@ -124,7 +124,7 @@ class Aligner(private val context: Context) {
      * se quita ninguno: la oclusión es la misma y los puntos siguen siendo comparables.
      */
     private fun withoutOccluded(b: Detection, a: Detection, bb: Bitmap, ab: Bitmap): Pair<Detection, Detection> {
-        val occ = HairSkinSegmenter.createOrNull(context)?.use { s ->
+        val occ = HairSkinSegmenter.sharedOrNull(context)?.let { s ->
             val lb = s.labels(bb); val la = s.labels(ab)
             if (lb == null || la == null) null else HairSkin.occluded(lb, b.points) + HairSkin.occluded(la, a.points)
         } ?: return b to a
@@ -150,7 +150,7 @@ class Aligner(private val context: Context) {
             val pts = LandmarkDetector(stream = false, context, FaceEngine.get(context)).use { it.detect(Detector.FACE, bmp) }
             faceSkin(pts, bmp.width, bmp.height)?.let { poly ->
                 // solo piel del rostro según la segmentación (sin mechones, cejas pobladas ni gafas)
-                val skin = HairSkinSegmenter.createOrNull(context)?.use { s -> s.labels(bmp) }?.let { HairSkin.faceSkin(it, bmp.width, bmp.height) }
+                val skin = HairSkinSegmenter.sharedOrNull(context)?.let { s -> s.labels(bmp) }?.let { HairSkin.faceSkin(it, bmp.width, bmp.height) }
                 val both = if (skin == null) null else BooleanArray(poly.size) { poly[it] && skin[it] }
                 return@withContext both?.takeIf { b -> b.count { it } > 200 } ?: poly
             }

@@ -948,12 +948,12 @@ class PhotoAnnotator(private val context: Context) {
                     // análisis en el recorte de la cara a resolución fija (ver FaceCrop)
                     val c = FaceCrop.crop(mesh, bmp.width, bmp.height)
                     val b = FaceCrop.bitmap(bmp, c)
-                    val labels = HairSkinSegmenter.createOrNull(context)?.use { seg -> runCatching { seg.labels(b) }.getOrNull() }
+                    val labels = HairSkinSegmenter.sharedOrNull(context)?.let { seg -> runCatching { seg.labels(b) }.getOrNull() }
                     NativeFace(mesh, c, b, labels, profileMask = pm)
                 } else {
                     val pts = mlkitPoints(bmp)
                     val err = MediaPipeFace.lastError?.let { tr(" (detalle: %1\$s)", it) } ?: ""
-                    val labels = if (pts.size >= LiveDecision.MIN_POINTS) HairSkinSegmenter.createOrNull(context)?.use { it.labels(bmp) } else null
+                    val labels = if (pts.size >= LiveDecision.MIN_POINTS) HairSkinSegmenter.sharedOrNull(context)?.let { it.labels(bmp) } else null
                     NativeFace(labels = labels, points = pts, err = err, profileMask = pm)
                 }
             }
@@ -1063,7 +1063,7 @@ class PhotoAnnotator(private val context: Context) {
     private fun hairLines(bmp: Bitmap, view: HairDensity.View, keep: ((Pt) -> Boolean)?): List<AnnotLine> {
         val w = HAIR_W; val h = (w * bmp.height / bmp.width.toFloat()).roundToInt().coerceAtLeast(1)
         val small = Bitmap.createScaledBitmap(bmp, w, h, true).let { if (it.config == Bitmap.Config.ARGB_8888) it else it.copy(Bitmap.Config.ARGB_8888, false) }
-        val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(small) } ?: return emptyList()
+        val labels = HairSkinSegmenter.sharedOrNull(context)?.let { it.labels(small) } ?: return emptyList()
         val px = IntArray(w * h).also { small.getPixels(it, 0, w, 0, 0, w, h) }
         if (small !== bmp) small.recycle()
         val r = HairDensity.analyze(px, w, h, labels, view, keep) ?: return emptyList()
@@ -1077,7 +1077,7 @@ class PhotoAnnotator(private val context: Context) {
         // segmentación a baja resolución (como en la cámara: los criterios y el contorno están hechos para ella)
         val w = 192; val h = (w * bmp.height / bmp.width.toFloat()).roundToInt().coerceAtLeast(1)
         val small = Bitmap.createScaledBitmap(bmp, w, h, true)
-        val labels = HairSkinSegmenter.createOrNull(context)?.use { it.labels(small) }
+        val labels = HairSkinSegmenter.sharedOrNull(context)?.let { it.labels(small) }
         val classes = labels?.let { lb ->
             val src = if (lb.width == w && lb.height == h) small else Bitmap.createScaledBitmap(bmp, lb.width, lb.height, true)
             ZoneCriteria.Classes(lb.width, lb.height, lb.data, IntArray(lb.width * lb.height).also { src.getPixels(it, 0, lb.width, 0, 0, lb.width, lb.height) })

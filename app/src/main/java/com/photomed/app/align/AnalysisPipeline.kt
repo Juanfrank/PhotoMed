@@ -25,7 +25,7 @@ class AnalysisPipeline<M : Closeable>(private val executor: ExecutorService) {
         synchronized(lock) {
             if (stopped) { runCatching { engine.close() }; return } // nunca se usó
             val old = current.getAndSet(engine)
-            if (old != null && old !== engine) executor.execute { runCatching { old.close() } }
+            if (old != null && old !== engine) executor.execute { closeGated(old) }
         }
     }
 
@@ -41,13 +41,25 @@ class AnalysisPipeline<M : Closeable>(private val executor: ExecutorService) {
     /** Usar SOLO desde el hilo de análisis: ejecuta con el motor actual. */
     fun <R> withEngine(block: (M) -> R): R? = if (stopped) null else current.get()?.let(block)
 
+    /**
+     * Cierra un motor con la puerta de los modelos nativos: liberar MediaPipe o ML Kit mientras otro modelo
+     * corre era la misma concurrencia que daba cierres nativos. Si la puerta sigue ocupada tras la espera, se
+     * cierra igualmente (fuga peor que esperar sin fin) y queda en el registro.
+     */
+    private fun closeGated(m: M) {
+        NativeGate.tryRunBlocking("cerrar el motor en vivo", CLOSE_WAIT_MS, crumb = false) { runCatching { m.close() } }
+            ?: run { com.photomed.app.CrashLog.crumb("motor en vivo cerrado sin la puerta (ocupada)"); runCatching { m.close() } }
+    }
+
     fun shutdown() {
         synchronized(lock) {
             if (stopped) return
             stopped = true // los análisis aún encolados verán el pipeline detenido y no usarán el motor
             val last = current.getAndSet(null)
-            executor.execute { last?.let { runCatching { it.close() } } }
+            executor.execute { last?.let { closeGated(it) } }
             executor.shutdown()
         }
     }
+
+    companion object { const val CLOSE_WAIT_MS = 30_000L }
 }

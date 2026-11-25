@@ -248,6 +248,7 @@
     <string name="t_30789a1c2726" formatted="false">match ≥ %1$d %%</string>
     <string name="t_30d0b1778b73" formatted="false">Hands (dorsal)</string>
     <string name="t_30dc0bfe7274" formatted="false">The file is not a PhotoMed protocol.</string>
+    <string name="t_30eaef7f92c9" formatted="false">" · kept in the app; it will be saved when the camera is opened again"</string>
     <string name="t_30fba1e31f72" formatted="false">Light</string>
     <string name="t_31033391e217" formatted="false">Dark circles</string>
     <string name="t_310aad2bdd11" formatted="false">Right arm</string>
@@ -1250,6 +1251,7 @@
     <string name="t_fdf1055e24e6" formatted="false">vertex</string>
     <string name="t_fe18f806b021" formatted="false">You are responsible for obtaining informed consent and for complying with health data regulations.</string>
     <string name="t_fec02633dfb2" formatted="false">← Move the camera left</string>
+    <string name="t_feced300ca37" formatted="false">%1$d pending photo(s) were saved</string>
     <string name="t_fed08c95a026" formatted="false">Analyzing the scalp…</string>
     <string name="t_ff2c03c8aeb8" formatted="false">Mirrored preview (front camera)</string>
 </resources>

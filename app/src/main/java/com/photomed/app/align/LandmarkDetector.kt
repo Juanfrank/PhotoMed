@@ -38,10 +38,22 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
     /** Motivo por el que MediaPipe no se pudo iniciar (si se pidió). */
     var initError: String? = null
         private set
-    private val mediaPipe: MediaPipeFace? =
-        if (engine == FaceEngine.MEDIAPIPE && context != null) runCatching { MediaPipeFace(context.applicationContext) }
+    private val appContext = context?.applicationContext
+    private val isStream = stream
+    // MediaPipe se crea en el primer uso (que ya va con la puerta de los modelos nativos): antes se cargaba al
+    // construir el detector, en la composición de la cámara (hilo principal, sin la puerta)
+    private val mediaPipeLazy = lazy {
+        val ac = appContext
+        // fotos fijas: la malla compartida (no se cierra al cerrar el detector); en vivo, la suya
+        if (engine == FaceEngine.MEDIAPIPE && ac != null && !isStream) MediaPipeFace.sharedOrNull(ac)
+            .also { if (it == null) initError = tr("MediaPipe no se pudo iniciar (%1\$s); se usa ML Kit", MediaPipeFace.lastError ?: "?") }
+        else if (engine == FaceEngine.MEDIAPIPE && ac != null) runCatching { MediaPipeFace(ac) }
             .onFailure { initError = tr("MediaPipe no se pudo iniciar (%1\$s); se usa ML Kit", it.javaClass.simpleName) }.getOrNull()
         else null
+    }
+    private val mediaPipe: MediaPipeFace? get() = mediaPipeLazy.value
+    /** En vivo: ML Kit de respaldo cuando MediaPipe no ve cara, solo uno de cada [FALLBACK_EVERY] cuadros. */
+    private var noFaceFrames = 0
     // Los detectores de ML Kit se crean solo si se usan: antes cada LandmarkDetector creaba el de la cara y el
     // del cuerpo aunque el rostro fuera con MediaPipe, y cada análisis de una foto, alineación o línea del pelo
     // los creaba y cerraba seguidos (ML Kit libera su memoria nativa en sus propios hilos: un cierre en código
@@ -100,13 +112,16 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
      * fallos seguidos de MediaPipe se deja de intentar con él en este detector.
      */
     private fun detectFaceAny(bmp: Bitmap): Detection {
-        if (mediaPipe != null && mediaPipeFailures < 5) {
-            val mp = try { mediaPipe.detect(bmp).also { mediaPipeFailures = 0 } } catch (e: Exception) {
+        val mpEngine = mediaPipe
+        if (mpEngine != null && mediaPipeFailures < 5) {
+            val mp = try { mpEngine.detect(bmp).also { mediaPipeFailures = 0 } } catch (e: Exception) {
                 mediaPipeFailures++
                 lastError = "MediaPipe: " + e.javaClass.simpleName
                 null
             }
-            if (mp != null && mp.points.isNotEmpty()) return withPoseAndGaze(mp)
+            if (mp != null && mp.points.isNotEmpty()) { noFaceFrames = 0; return withPoseAndGaze(mp) }
+            // en vivo, sin cara (no por error): el segundo detector no en cada cuadro (dos detectores por cuadro sin cara)
+            if (mp != null && isStream && noFaceFrames++ % FALLBACK_EVERY != 0) return Detection.EMPTY
         }
         val d = detectFace(bmp)
         if (d.points.isEmpty()) return d
@@ -123,7 +138,8 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
     }
 
     /** true si se pidió MediaPipe pero no se pudo iniciar o se desactivó por fallos. */
-    val mediaPipeUnavailable: Boolean get() = engine == FaceEngine.MEDIAPIPE && (mediaPipe == null || mediaPipeFailures >= 5)
+    val mediaPipeUnavailable: Boolean get() = engine == FaceEngine.MEDIAPIPE &&
+        ((mediaPipeLazy.isInitialized() && mediaPipeLazy.value == null) || appContext == null || mediaPipeFailures >= 5)
 
     /** Texto de diagnóstico para mostrar cuando no hay puntos (null si no hay nada que reportar). */
     val diagnostic: String? get() = lastError ?: initError ?: if (mediaPipeUnavailable) tr("MediaPipe desactivado por errores; se usa ML Kit") else null
@@ -197,10 +213,15 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
         if (closed) return
         closed = true
         // una tarea que agotó el tiempo sigue usando el detector: se espera a que termine antes de liberarlo
-        pending?.let { t -> if (!t.isComplete) runCatching { Tasks.await(t, CLOSE_WAIT_S, java.util.concurrent.TimeUnit.SECONDS) } }
-        if (faceLazy.isInitialized()) runCatching { face.close() }
-        if (poseLazy.isInitialized()) runCatching { pose.close() }
-        mediaPipe?.close()
+        val t = pending
+        t?.let { if (!it.isComplete) runCatching { Tasks.await(it, CLOSE_WAIT_S, java.util.concurrent.TimeUnit.SECONDS) } }
+        fun closeMlKit() {
+            if (faceLazy.isInitialized()) runCatching { face.close() }
+            if (poseLazy.isInitialized()) runCatching { pose.close() }
+        }
+        // si sigue en curso tras la espera, ML Kit se libera cuando termine (antes se cerraba debajo de la tarea)
+        if (t != null && !t.isComplete) t.addOnCompleteListener { closeMlKit() } else closeMlKit()
+        if (isStream && mediaPipeLazy.isInitialized()) mediaPipeLazy.value?.close()
     }
 }
 
@@ -209,3 +230,6 @@ class LandmarkDetector(stream: Boolean, context: Context? = null, val engine: Fa
  * para siempre y, con varias, se agotan los hilos de fondo y la app deja de cargar imágenes.
  */
 const val ML_KIT_TIMEOUT_S = 10L
+
+/** En vivo, sin cara para MediaPipe: ML Kit como respaldo uno de cada tantos cuadros. */
+const val FALLBACK_EVERY = 5

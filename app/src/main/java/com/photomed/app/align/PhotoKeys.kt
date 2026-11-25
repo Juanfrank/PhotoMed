@@ -26,4 +26,23 @@ object PhotoKeys {
         }
         ConfirmedTraces.forget(context, from)
     }
+
+    /**
+     * Borra todos los datos privados de la foto (edición, correcciones, trazos, memoria de líneas, relieve,
+     * anotaciones). Solo tras confirmarse el borrado de la foto: antes se borraban antes de que el usuario lo
+     * aceptara, y al cancelar se perdían; y al borrar un expediente quedaban huérfanos.
+     */
+    fun forget(context: Context, uri: String) {
+        for (prefs in listOf("photo_edits", "annot_user")) {
+            val p = context.getSharedPreferences(prefs, Context.MODE_PRIVATE)
+            if (p.contains(uri)) p.edit().remove(uri).apply()
+        }
+        PhotoEdits.clearCache()
+        fun sha(u: String) = java.security.MessageDigest.getInstance("SHA-1").digest(u.toByteArray()).joinToString("") { "%02x".format(it) }
+        val h = sha(uri)
+        for (dir in listOf("trazos", "lineas", "relieve", "anotaciones")) {
+            File(context.filesDir, dir).listFiles { f -> f.name.startsWith(h) }?.forEach { it.delete() }
+        }
+        ConfirmedTraces.forget(context, uri)
+    }
 }

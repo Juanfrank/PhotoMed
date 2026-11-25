@@ -15,8 +15,12 @@ object XmpFile {
         else context.contentResolver.openInputStream(uri)?.use { ExifInterface(it).getAttribute(ExifInterface.TAG_XMP) }
     }.getOrNull()
 
-    /** Reescribe el XMP con [change] (recibe el actual). true si se pudo guardar. */
-    fun update(context: Context, uri: Uri, change: (String?) -> String): Boolean = runCatching {
+    /**
+     * Reescribe el XMP con [change] (recibe el actual). true si se pudo guardar. De una en una por foto
+     * ([PhotoLocks]): dos reescrituras a la vez del mismo JPEG perdían cambios o lo dañaban. Los fallos
+     * quedan en el registro de acciones (antes se perdían).
+     */
+    fun update(context: Context, uri: Uri, change: (String?) -> String): Boolean = PhotoLocks.on(uri.toString()) { runCatching {
         if (uri.scheme == "file") {
             val e = ExifInterface(File(uri.path!!))
             e.setAttribute(ExifInterface.TAG_XMP, change(e.getAttribute(ExifInterface.TAG_XMP)))
@@ -29,5 +33,6 @@ object XmpFile {
             }
         }
         true
-    }.getOrDefault(false)
+    }.onFailure { com.photomed.app.CrashLog.crumb("XMP no guardado: ${it.javaClass.simpleName} ${it.message.orEmpty().take(80)}") }
+        .getOrDefault(false) }
 }

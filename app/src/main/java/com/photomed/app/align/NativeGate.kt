@@ -2,6 +2,7 @@ package com.photomed.app.align
 
 import com.photomed.app.CrashLog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runInterruptible
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
@@ -47,6 +48,8 @@ object NativeGate {
         var got = false
         try {
             runInterruptible(Dispatchers.IO) { acquire(priority); got = true }
+            // quien lo pidió ya no está (pantalla cerrada): se suelta el turno sin ejecutar
+            kotlin.coroutines.coroutineContext.ensureActive()
             CrashLog.crumb(what)
             return block()
         } finally { if (got) { release(); CrashLog.crumb("fin: $what") } }

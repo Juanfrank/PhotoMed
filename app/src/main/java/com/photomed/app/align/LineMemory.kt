@@ -55,11 +55,12 @@ object LineMemory {
         for (l in lines) {
             if (l.layer !in LAYERS || l.estimated) continue
             val name = l.metrics?.name ?: continue
-            val f = FaceFrame.toFace(mesh, l.points) ?: continue
+            // puntos no finitos: JSONArray no los admite y la escritura fallaba en silencio
+            val f = FaceFrame.toFace(mesh, l.points)?.filter { it.x.isFinite() && it.y.isFinite() }?.takeIf { it.size >= 2 } ?: continue
             a.put(JSONObject().put("name", name).put("layer", l.layer.name)
                 .put("pts", JSONArray(f.map { JSONArray(listOf(it.x.toDouble(), it.y.toDouble())) })))
         }
-        runCatching { file(context, uri).writeText(a.toString()) }
+        runCatching { AtomicFile.write(file(context, uri), a.toString()) }
     }
 
     fun of(context: Context, uri: String): List<PriorLine> = runCatching {

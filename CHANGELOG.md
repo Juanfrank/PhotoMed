@@ -2,6 +2,44 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.58 — 25 de noviembre de 2026
+
+Revisión integral (10 revisores), tanda 1: **integridad de los datos clínicos**.
+
+- **Los modelos nativos ya no se quedan bloqueados**: si se salía de una pantalla justo cuando un análisis
+  conseguía su turno, la puerta de los modelos quedaba tomada y ningún análisis, alineación ni medida volvía a
+  ejecutarse hasta reiniciar la app.
+- **Ediciones simultáneas de la misma foto, de una en una**: trazos, anotaciones, metadatos XMP y fecha de
+  captura se leen, cambian y guardan bajo un bloqueo por foto. Antes dos toques rápidos (o el visor y Comparar
+  a la vez) perdían el primer cambio o reescribían el JPEG a la vez.
+- **Archivo del expediente atómico y recuperable**: se escribe en un temporal con fsync y se renombra; si uno
+  antiguo está dañado, se reconstruye con los datos de sus fotos (antes el expediente desaparecía de la lista).
+  Igual para protocolos, memoria de líneas y relieve.
+- **La toma no se pierde si falla el guardado en la galería**: se conserva en la app y se guarda sola al volver a
+  abrir la cámara del expediente (antes se borraba).
+- **Borrar fotos**: sus datos privados (relieve, trazos, anotaciones, ediciones) se borran solo cuando el borrado
+  se ha confirmado (antes se perdían si se cancelaba; en Android 10 la foto ni se borraba). Al borrar un
+  expediente se limpian también (antes quedaban huérfanos).
+- **«Regenerar» y «Borrar anotaciones» ya no se deshacen solos** cuando no se puede reescribir la foto.
+- Los fallos al escribir el XMP quedan en el registro de acciones.
+
+Tanda 2: **modelos nativos y cámara**.
+
+- **La cámara abre sin congelarse**: la malla facial se carga en el primer análisis (con la puerta de los
+  modelos), no al dibujar la pantalla; y los motores en vivo se cierran también con la puerta.
+- **Referencia en la cámara sin bloqueos**: el análisis en vivo ya no se para hasta 30 s esperando turno, y
+  mientras se aplica la referencia nueva no se compara con la anterior (antes podía dispararse alineado con la
+  foto equivocada).
+- **La mejor foto de la ráfaga se juzga sola**: segmentación, manos y rostro de la propia foto, sin los votos ni
+  la segmentación del vídeo en vivo (que además quedaba alterado). Si alguna no se puede puntuar, se elige la más
+  nítida (antes, la primera).
+- **El flash ya no cancela la foto**: durante la toma con flash solo se exige que el paciente siga en el cuadro.
+- **ML Kit no se cierra con una tarea en curso** (se libera al terminar) y deja de ejecutarse en cada cuadro sin
+  cara (uno de cada cinco).
+- **Menos memoria y trabajo**: una sola malla facial y un solo segmentador de pelo y piel compartidos para las
+  fotos (antes uno nuevo en cada análisis, alineación, relieve o importación), y la línea del pelo en vivo
+  reutiliza la segmentación del cuadro. Un análisis cuya pantalla ya se cerró suelta el turno sin ejecutarse.
+
 ## 2.57 — 25 de noviembre de 2026
 
 - **Capilar frontal (cabeza inclinada): la distancia punta nasal–mentón es criterio de alineación con

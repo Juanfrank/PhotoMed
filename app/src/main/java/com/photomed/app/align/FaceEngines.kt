@@ -115,7 +115,19 @@ class MediaPipeFace(context: Context) : Closeable {
     override fun close() = lm.close()
 
     companion object {
-        private var shared: MediaPipeFace? = null
+        @Volatile private var shared: MediaPipeFace? = null
+
+        /**
+         * La instancia compartida de las fotos fijas (análisis, alineación, línea del pelo, relieve,
+         * importación), siempre con la puerta de los modelos nativos: antes cada uno creaba y cerraba la suya
+         * (hasta tres mallas en memoria). No se cierra. null si no se puede crear.
+         */
+        fun sharedOrNull(context: Context): MediaPipeFace? = shared ?: synchronized(this) {
+            shared ?: runCatching { MediaPipeFace(context.applicationContext) }
+                // se conserva el primer error (los siguientes de una clase que no se inició solo repiten su nombre)
+                .onFailure { if (lastError == null) lastError = tr("no se pudo cargar el modelo: %1\$s: %2\$s", it.javaClass.simpleName, it.message) + (it.cause?.let { c -> " (${c.javaClass.simpleName}: ${c.message})" } ?: "") }
+                .getOrNull()?.also { shared = it }
+        }
         private val lock = kotlinx.coroutines.sync.Mutex()
         /** Motivo del último fallo de la malla (para mostrarlo al usuario y diagnosticar). */
         @Volatile var lastError: String? = null
@@ -125,10 +137,7 @@ class MediaPipeFace(context: Context) : Closeable {
          * fotos grandes, pueden agotar la memoria). null si no se puede crear.
          */
         suspend fun <T> withShared(context: Context, block: (MediaPipeFace) -> T): T? = lock.withLockCompat {
-            val m = shared ?: runCatching { MediaPipeFace(context.applicationContext) }
-                // se conserva el primer error (los siguientes de una clase que no se inició solo repiten su nombre)
-                .onFailure { if (lastError == null) lastError = tr("no se pudo cargar el modelo: %1\$s: %2\$s", it.javaClass.simpleName, it.message) + (it.cause?.let { c -> " (${c.javaClass.simpleName}: ${c.message})" } ?: "") }
-                .getOrNull()?.also { shared = it }
+            val m = sharedOrNull(context)
             m?.let { mp -> runCatching { block(mp) }.onFailure { if (lastError == null) lastError = "${it.javaClass.simpleName}: ${it.message}" }.getOrNull() }
         }
 

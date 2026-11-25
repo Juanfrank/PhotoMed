@@ -194,5 +194,7 @@
   "Diferencia centro − lados, puntos": "Center − sides difference, points",
   "Banda central de la cabeza (línea media) donde se mide la raya: si su cuero visible supera al de los lados, la raya se ensancha (Sinclair, Olsen).": "Central band of the head (midline) where the part is measured: if its visible scalp exceeds that of the sides, the part is widening (Sinclair, Olsen).",
   "Cabeza: inclinar más hacia delante (nariz–mentón)": "Head: tilt further forward (nose–chin)",
-  "Cabeza: inclinar menos, subir la barbilla (nariz–mentón)": "Head: tilt less, raise the chin (nose–chin)"
+  "Cabeza: inclinar menos, subir la barbilla (nariz–mentón)": "Head: tilt less, raise the chin (nose–chin)",
+  "Se guardaron %1$d foto(s) pendientes": "%1$d pending photo(s) were saved",
+  " · se conservó en la app y se volverá a guardar al abrir de nuevo la cámara": " · kept in the app; it will be saved when the camera is opened again"
 }
