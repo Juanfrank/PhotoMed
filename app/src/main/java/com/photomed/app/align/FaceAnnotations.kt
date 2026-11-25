@@ -944,6 +944,8 @@ class PhotoAnnotator(private val context: Context) {
     private suspend fun analyzeSplit(bmp: Bitmap, zone: Zone, extras: MeasureExtras?, user: AnnotUserEdit?, priors: List<PriorLine>,
                                      memoryUri: String?): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val spec = ZoneAlignment.of(zone)
+        // primer plano de un ojo: con la sección del ojo de la malla facial (foto + su espejo, ver EyeComposite)
+        if (zone.guide == com.photomed.app.data.GuideType.EYE) return@withContext analyzeEye(bmp, zone, user, extras?.onlyAdded == true)
         if (spec.detector != Detector.FACE)
             return@withContext NativeGate.run("análisis de una foto (${zone.id}, ${bmp.width}×${bmp.height})") { analyzeGated(bmp, zone) }
         val nat = NativeGate.run("análisis de una foto: malla y segmentación (${zone.id}, ${bmp.width}×${bmp.height})") {
@@ -1017,6 +1019,24 @@ class PhotoAnnotator(private val context: Context) {
         tr("Cabeza inclinada: contorno, ojos, cejas y línea del pelo; no se pudo medir el cabeceo y las alturas de la frente van sin corregir.")
     else tr("Cabeza inclinada %1\$s°: contorno, ojos, cejas y línea del pelo; las alturas de la frente están corregidas a las de una toma frontal a nivel.",
         "%.0f".format(tiltDeg))
+
+    /**
+     * Ojo: la foto y su espejo forman una «cara» superior en la que se busca la malla y se hace el análisis del
+     * rostro (periocular); se conservan las líneas del ojo real, en las coordenadas de la foto. Los trazos
+     * añadidos a mano van y vuelven igual. Sin malla: aviso, sin medidas.
+     */
+    private suspend fun analyzeEye(bmp: Bitmap, zone: Zone, user: AnnotUserEdit?, onlyAdded: Boolean = false): Pair<List<AnnotLine>, String?> {
+        val (comp, l) = EyeComposite.build(bmp, zone.mirrored)
+        try {
+            val u = user?.copy(added = user.added.map { t -> t.map(l::toComposite) })
+            val (lines, note) = analyzeSplit(comp, Zone.PERIOCULAR, if (onlyAdded) MeasureExtras(null, null, onlyAdded = true) else null, u, emptyList(), null)
+            val eye = lines.filter { it.layer in EyeComposite.LAYERS && l.isReal(it.points) }.map { it.mapped(l::toPhoto) }
+            if (!onlyAdded && eye.none { it.layer == AnnotLayer.EYES }) return emptyList<AnnotLine>() to
+                tr("No se encontró el ojo en la foto (encuadre el ojo con la ceja y el canto interno, como en la guía).")
+            return eye to (listOfNotNull(tr("Ojo: medidas con la sección del ojo de la malla facial (escala por el iris, 11,7 mm)."),
+                note?.takeIf { it.contains("barba", ignoreCase = true).not() }).joinToString(" "))
+        } finally { comp.recycle() }
+    }
 
     /** Capilar frontal inclinada: densidad del cuero por encima de la línea de implantación (nativo, con su puerta). */
     private suspend fun frontHair(bmp: Bitmap, lines: List<AnnotLine>): List<AnnotLine> {

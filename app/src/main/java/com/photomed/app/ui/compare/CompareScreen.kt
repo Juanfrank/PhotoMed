@@ -1,6 +1,7 @@
 package com.photomed.app.ui.compare
 
 import com.photomed.app.align.isFaceZone
+import com.photomed.app.align.usesFaceAnalysis
 import com.photomed.app.i18n.trn
 import com.photomed.app.i18n.tr
 import com.photomed.app.i18n.trData
@@ -504,9 +505,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
     ) { padding ->
         val (photos, zonesWithPhotos, visible, seq, seqKeys, n, timeline, reference, target, validAlign) = derive()
         // diagrama del cuerpo (contorno, ejes, dedos, uñas, puntos de referencia): fotos de manos, pies, tronco o miembros
-        val bodyDiagram = showLayers && seq.orEmpty().isNotEmpty() && seq.orEmpty().none { it.zone.isFaceZone() || it.zone == com.photomed.app.data.Zone.FREE }
+        val bodyDiagram = showLayers && seq.orEmpty().isNotEmpty() && seq.orEmpty().none { it.zone.usesFaceAnalysis() || it.zone == com.photomed.app.data.Zone.FREE }
         // capas faciales (contorno, rasgos, surcos, arrugas): solo con fotos del rostro
-        @Suppress("NAME_SHADOWING") val showLayers = showLayers && seq.orEmpty().any { it.zone.isFaceZone() }
+        @Suppress("NAME_SHADOWING") val showLayers = showLayers && seq.orEmpty().any { it.zone.usesFaceAnalysis() }
         // cuero cabelludo (vértice, coronilla, parietales): densidad aparente con su tabla de medidas
         val hairMetrics = bodyDiagram && seq.orEmpty().all { it.zone.category == com.photomed.app.data.ZoneCategory.CAPILAR }
         val metricsOk = showLayers || hairMetrics
@@ -522,13 +523,13 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         val layers = if (showLayers || bodyDiagram) layersState.value else emptySet()
         val annots: Map<String, List<com.photomed.app.align.AnnotLine>> = seq?.mapNotNull { p ->
             // fuera del rostro: el diagrama del cuerpo (si todas son del cuerpo); si no, nada que esperar
-            if (!p.zone.isFaceZone()) {
+            if (!p.zone.usesFaceAnalysis()) {
                 if (!bodyDiagram) return@mapNotNull p.key to emptyList<com.photomed.app.align.AnnotLine>()
                 return@mapNotNull key("b" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, true,
                     previous = emptyList(), userVersion = userVersion).value }?.let { p.key to it }
             }
             // con el panel de capas abierto se analizan las fotos aunque no haya capas encendidas (la tabla de medidas lo necesita)
-            key("a" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, showLayers && p.zone.isFaceZone(),
+            key("a" + p.key) { rememberPhotoAnnotations(p.uri, p.zone, resultOf(p)?.keystoneDeg ?: 0f, showLayers && p.zone.usesFaceAnalysis(),
                 previous = previousOf(p), userVersion = userVersion).value }?.let { p.key to it }
         }?.toMap().orEmpty()
         // anotaciones de cada foto (dibujo de planificación), en su foto corregida

@@ -322,3 +322,6 @@ fun landmarkTransform(allowed: Set<String>, before: Map<String, Pt>, after: Map<
 
 /** Zona que se encuadra con el detector de rostro (luz del rostro, mejillas…). */
 fun com.photomed.app.data.Zone.isFaceZone() = ZoneAlignment.of(this).detector == Detector.FACE
+
+/** Zonas con el análisis del rostro en el visor y en Comparar: las del rostro y el primer plano de un ojo (malla de su compuesta). */
+fun com.photomed.app.data.Zone.usesFaceAnalysis() = isFaceZone() || guide == com.photomed.app.data.GuideType.EYE
