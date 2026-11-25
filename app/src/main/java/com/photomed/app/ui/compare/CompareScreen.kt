@@ -509,7 +509,8 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
         // capas faciales (contorno, rasgos, surcos, arrugas): solo con fotos del rostro
         @Suppress("NAME_SHADOWING") val showLayers = showLayers && seq.orEmpty().any { it.zone.usesFaceAnalysis() }
         // cuero cabelludo (vértice, coronilla, parietales): densidad aparente con su tabla de medidas
-        val hairMetrics = bodyDiagram && seq.orEmpty().all { it.zone.category == com.photomed.app.data.ZoneCategory.CAPILAR }
+        // y del cuerpo (esqueleto: ángulos, inclinaciones y proporciones)
+        val hairMetrics = bodyDiagram
         val metricsOk = showLayers || hairMetrics
         // referencia de arrugas: fotos anteriores del paciente en la misma zona (la más reciente primero)
         fun previousOf(p: com.photomed.app.data.Photo) = photos.filter { it.zone == p.zone && it.expression == p.expression && it.takenAt < p.takenAt }

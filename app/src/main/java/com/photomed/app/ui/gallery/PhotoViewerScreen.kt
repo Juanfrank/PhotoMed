@@ -127,7 +127,8 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
     // manos, pies, tronco y miembros: su diagrama (contorno, ejes, dedos, uñas, puntos de referencia), sin medidas
     val bodyDiagram = !zone.usesFaceAnalysis() && zone != com.photomed.app.data.Zone.FREE
     // cuero cabelludo (vértice, coronilla, parietales): densidad aparente con su ficha de medidas
-    val hairMetrics = bodyDiagram && zone.category == com.photomed.app.data.ZoneCategory.CAPILAR
+    // y las del cuerpo (esqueleto: ángulos, inclinaciones y proporciones)
+    val hairMetrics = bodyDiagram
     var editing by remember { mutableStateOf(false) }
     var cropping by remember { mutableStateOf(false) }
     var editVersion by remember { mutableIntStateOf(0) }
@@ -477,7 +478,7 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
             if (analyzing) androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f).semantics { contentDescription = tr("Analizando arrugas y rasgos") })
-                Text(if (traceBusy) tr("Trazando y midiendo el surco…") else if (hairMetrics) tr("Analizando el cuero cabelludo…") else if (bodyDiagram) tr("Analizando el contorno y los puntos…") else tr("Analizando arrugas y rasgos…"), color = Color.White, style = MaterialTheme.typography.labelMedium,
+                Text(if (traceBusy) tr("Trazando y midiendo el surco…") else if (hairMetrics && zone.category == com.photomed.app.data.ZoneCategory.CAPILAR) tr("Analizando el cuero cabelludo…") else if (bodyDiagram) tr("Analizando el contorno y los puntos…") else tr("Analizando arrugas y rasgos…"), color = Color.White, style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(start = 10.dp))
             }
             }

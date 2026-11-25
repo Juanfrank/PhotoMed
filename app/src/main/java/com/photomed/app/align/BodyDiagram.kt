@@ -37,11 +37,17 @@ object BodyDiagram {
         val digits = zone.guide == GuideType.HANDS || zone.guide == GuideType.FEET
         // tamaño de los puntos: proporcional a lo que se ve (manos y pies, más pequeños)
         val r = if (digits) 0.006f else 0.008f
+        val pts = runCatching { BodyPoints.of(zone, s) }.getOrDefault(emptyMap())
+        // esqueleto al estilo de las manos (articulaciones, falanges transversales y medidas en grados y proporciones)
+        val skeleton = if (zone.guide == GuideType.HANDS) emptyList() else runCatching { BodySkeleton.lines(zone, s, pts, r) }.getOrDefault(emptyList())
         schema?.let { sc ->
             sc.polygons.filter { it.size >= 3 }.forEach { out += AnnotLine(AnnotLayer.CONTOUR, it, closed = true) }
-            sc.lines.filter { it.size >= 2 }.forEach { out += AnnotLine(if (digits) AnnotLayer.FINGERS else AnnotLayer.BODY_AXES, it, closed = false) }
-            if (!digits) sc.dots.forEach { out += dot(AnnotLayer.BODY_AXES, it, r * 1.3f) }
+            if (digits || skeleton.none { it.layer == AnnotLayer.BODY_AXES })
+                sc.lines.filter { it.size >= 2 }.forEach { out += AnnotLine(if (digits) AnnotLayer.FINGERS else AnnotLayer.BODY_AXES, it, closed = false) }
+            // los ejes del esquema, solo si no hay esqueleto (serían los mismos dos veces)
+            if (!digits && skeleton.none { it.layer == AnnotLayer.BODY_AXES }) sc.dots.forEach { out += dot(AnnotLayer.BODY_AXES, it, r * 1.3f) }
         }
+        out += skeleton
         // manos: el esqueleto de cada dedo y la palma; uñas visibles
         if (zone.guide == GuideType.HANDS) s.hands.orEmpty().filter { it.points.size >= 21 }.forEach { h ->
             FINGER_CHAINS.forEach { ch -> out += AnnotLine(AnnotLayer.FINGERS, ch.map { h.points[it] }, closed = false) }
@@ -55,7 +61,7 @@ object BodyDiagram {
             ZoneCriteria.feetOf(c).flatMap { it.nails }.forEach { out += dot(AnnotLayer.NAILS, it, r * 1.5f) }
         }
         // puntos de referencia de la alineación
-        runCatching { BodyPoints.of(zone, s) }.getOrDefault(emptyMap()).values.forEach { out += dot(AnnotLayer.BODY_POINTS, it, r) }
+        pts.values.forEach { out += dot(AnnotLayer.BODY_POINTS, it, r) }
         return out
     }
 }

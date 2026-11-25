@@ -50,6 +50,9 @@ object BodyPoints {
     val ARMS: Set<String> = edges(ARM_SEGS.map { it.first })
     val LEGS: Set<String> = edges(LEG_SEGS.map { it.first })
     val TORSO: Set<String> = edges(listOf("tronco"), TORSO_TS)
+    /** Alturas (%) de los bordes del cuello, de la boca a la base: por debajo de la mandíbula. */
+    val NECK_TS = listOf(40, 60, 80)
+    val NECK: Set<String> = edges(listOf("cuello"), NECK_TS)
 
     /** Claves adicionales de cada tipo de guía (para [ZoneAlignment]). */
     fun keysFor(guide: GuideType): Set<String> = when (guide) {
@@ -59,6 +62,7 @@ object BodyPoints {
         GuideType.LEGS -> LEGS
         GuideType.GLUTES -> LEGS + TORSO
         GuideType.TORSO_FRONT, GuideType.BREASTS, GuideType.BACK, GuideType.TORSO_SIDE -> TORSO + ARMS
+        GuideType.NECK -> NECK
         else -> emptySet()
     }
 
@@ -99,6 +103,15 @@ object BodyPoints {
             ARM_SEGS.forEach { (n, ab) -> segEdges(n, p[ab.first], p[ab.second]) }
         if (zone.guide == GuideType.LEGS || zone.guide == GuideType.GLUTES)
             LEG_SEGS.forEach { (n, ab) -> segEdges(n, p[ab.first], p[ab.second]) }
+        // cuello: sus bordes a tres alturas, de la boca (o la nariz) a la base del cuello
+        if (zone.guide == GuideType.NECK) {
+            val sh = listOfNotNull(p[L.SHOULDER_L], p[L.SHOULDER_R])
+            val mouth = listOfNotNull(p[L.MOUTH_L], p[L.MOUTH_R]).takeIf { it.size == 2 }?.let { Pt((it[0].x + it[1].x) / 2, (it[0].y + it[1].y) / 2) } ?: p[L.NOSE]
+            if (sh.size == 2 && mouth != null) {
+                val base = Pt((sh[0].x + sh[1].x) / 2, (sh[0].y + sh[1].y) / 2)
+                out.putAll(segmentEdges(c, "cuello", mouth, base, maxReach = d(sh[0], sh[1]) * 0.45f, ts = NECK_TS))
+            }
+        }
         if (zone.guide in setOf(GuideType.TORSO_FRONT, GuideType.BREASTS, GuideType.BACK, GuideType.TORSO_SIDE, GuideType.GLUTES)) {
             val sh = listOfNotNull(p[L.SHOULDER_L], p[L.SHOULDER_R]); val hp = listOfNotNull(p[L.HIP_L], p[L.HIP_R])
             if (sh.isNotEmpty() && hp.isNotEmpty()) {
