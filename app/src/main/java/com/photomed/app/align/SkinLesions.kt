@@ -70,6 +70,8 @@ object SkinLesions {
      */
     fun detect(px: IntArray, w: Int, h: Int, skin: BooleanArray?, kinds: Set<Kind>, mmPerUnit: Float? = null,
                exclude: List<List<Pt>> = emptyList(),
+               /** Discos (centro y radio, unidades del ancho) que no se analizan: ombligo, areolas, axilas. */
+               excludeDiscs: List<Pair<Pt, Float>> = emptyList(),
                /** Primer plano de una lesión (la piel llena el encuadre): admite manchas grandes. */
                closeUp: Boolean = false): List<AnnotLine> {
         if (kinds.isEmpty() || w < 32 || h < 32) return emptyList()
@@ -80,6 +82,11 @@ object SkinLesions {
         // con los huecos rellenos: una lesión muy oscura o azulada no deja de ser piel
         var region = fillHoles(if (skin != null) close(skin, w, h, 2) else close(col, w, h, 3), w, h)
         region = erode(region, w, h, max(1, w / 80))
+        for ((c0, r0) in excludeDiscs) {
+            val cx = c0.x * w; val cy = c0.y * w; val rr = r0 * w
+            for (y in max(0, (cy - rr).toInt())..min(h - 1, (cy + rr).toInt())) for (x in max(0, (cx - rr).toInt())..min(w - 1, (cx + rr).toInt()))
+                if (hypot(x - cx, y - cy) <= rr) region[y * w + x] = false
+        }
         if (exclude.isNotEmpty()) {
             val ex = BooleanArray(n)
             exclude.filter { it.size >= 3 }.forEach { poly -> fillPoly(ex, w, h, poly.map { Pt(it.x * w, it.y * w) }) }
@@ -130,7 +137,9 @@ object SkinLesions {
         // encuadre (primer plano, dermatoscopia) la piel visible es poca y el límite relativo la admite
         val maxA = if (closeUp) nRegion * 0.3f else nRegion * MAX_SPOT_FRAC
         val comps = components(pig, w, h).filter { it.size >= minA && it.size < maxA &&
-            edgeContrast(it, lab.l, region, w, h) >= MIN_EDGE_DL }
+            edgeContrast(it, lab.l, region, w, h) >= MIN_EDGE_DL &&
+            // una sombra pegada al borde de la piel (bajo la mandíbula, el pliegue de la axila) o una banda alargada no es una mancha
+            borderFraction(it, region, w, h) < MAX_BORDER && elongation(it, w) < MAX_SPOT_ELONG }
         val ranked = comps.map { c ->
             var dl = 0f; var de = 0f
             for (i in c) {
@@ -155,6 +164,41 @@ object SkinLesions {
             AnnotLine(AnnotLayer.SPOTS, hull.map { Pt(it.x / w, it.y / w) }, closed = true, filled = true,
                 metrics = LineMetrics("${trn("Mancha")} ${k + 1}", scale = if (mmPerPx != null) "iris" else "foto", features = f))
         }
+    }
+
+    /** Fracción máxima del borde de un hallazgo que puede tocar el límite de la piel analizada. */
+    const val MAX_BORDER = 0.2f
+    /** Alargamiento máximo de una mancha (eje mayor / menor). */
+    const val MAX_SPOT_ELONG = 3f
+
+    /** Fracción de los píxeles del borde del componente [c] que lindan con lo que no es [region] (o con el marco). */
+    fun borderFraction(c: IntArray, region: BooleanArray, w: Int, h: Int): Float {
+        val inC = HashSet<Int>(c.size * 2); c.forEach { inC += it }
+        var edge = 0; var touch = 0
+        for (i in c) {
+            val x = i % w; val y = i / w
+            var isEdge = false; var t = false
+            for ((dx, dy) in arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) {
+                val xx = x + dx; val yy = y + dy
+                if (xx !in 0 until w || yy !in 0 until h) { isEdge = true; t = true; continue }
+                val j = yy * w + xx
+                if (j !in inC) { isEdge = true; if (!region[j]) t = true }
+            }
+            if (isEdge) { edge++; if (t) touch++ }
+        }
+        return if (edge == 0) 0f else touch / edge.toFloat()
+    }
+
+    /** Alargamiento (raíz del cociente de los momentos principales) del componente [c]. */
+    fun elongation(c: IntArray, w: Int): Float {
+        if (c.size < 3) return 1f
+        var mx = 0f; var my = 0f
+        for (i in c) { mx += i % w; my += i / w }
+        mx /= c.size; my /= c.size
+        var sxx = 0f; var syy = 0f; var sxy = 0f
+        for (i in c) { val dx = i % w - mx; val dy = i / w - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy }
+        val tr = sxx + syy; val det = sxx * syy - sxy * sxy; val disc = sqrt(max(0f, tr * tr / 4 - det))
+        return sqrt((tr / 2 + disc) / max(1e-3f, tr / 2 - disc))
     }
 
     /** Mayor área de una mancha en una foto de la zona entera (fracción de la piel visible). */
@@ -190,7 +234,8 @@ object SkinLesions {
                         minFrac: Float, minElong: Float, maxWidthFrac: Float, edgeL: FloatArray? = null, region: BooleanArray? = null,
                         minEdge: Float = 2f, minLenFrac: Float = 0f, contrast: (Int) -> Float): List<AnnotLine> {
         val minA = max(5, (minFrac * nRegion).roundToInt())
-        val items = components(mask, w, h).filter { it.size >= minA && (edgeL == null || edgeContrast(it, edgeL, region!!, w, h) >= minEdge) }.mapNotNull { c ->
+        val items = components(mask, w, h).filter { it.size >= minA && (edgeL == null || edgeContrast(it, edgeL, region!!, w, h) >= minEdge) &&
+            (region == null || borderFraction(it, region, w, h) < MAX_BORDER) }.mapNotNull { c ->
             val xs = FloatArray(c.size) { (c[it] % w).toFloat() }; val ys = FloatArray(c.size) { (c[it] / w).toFloat() }
             val mx = xs.average().toFloat(); val my = ys.average().toFloat()
             var sxx = 0f; var syy = 0f; var sxy = 0f

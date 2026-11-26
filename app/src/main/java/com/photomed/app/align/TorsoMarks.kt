@@ -6,6 +6,7 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sin
 
 /**
@@ -40,8 +41,10 @@ object TorsoMarks {
     private val L = Landmarks
 
     fun of(guide: GuideType, c: ZoneCriteria.Classes, pose: Map<String, Pt>, hi: ZoneCriteria.Hi?): Map<String, Pt> {
-        val sl = pose[L.SHOULDER_L] ?: return emptyMap(); val sr = pose[L.SHOULDER_R] ?: return emptyMap()
-        val hl = pose[L.HIP_L] ?: return emptyMap(); val hr = pose[L.HIP_R] ?: return emptyMap()
+        val sl = pose[L.SHOULDER_L]; val sr = pose[L.SHOULDER_R]; val hl = pose[L.HIP_L]; val hr = pose[L.HIP_R]
+        // primer plano sin hombros ni caderas (abdomen, tórax): pezones y ombligo solo por la piel
+        if (sl == null || sr == null || hl == null || hr == null)
+            return if (guide == GuideType.TORSO_FRONT || guide == GuideType.BREASTS) frontMarks(c, hi, null, null, null) else emptyMap()
         val out = HashMap<String, Pt>()
         val ms = mid(sl, sr); val mh = mid(hl, hr)
         // axilas: lado de la imagen (a = izquierda)
@@ -80,79 +83,141 @@ object TorsoMarks {
         return null
     }
 
-    /** Pezones y ombligo (de frente), en la foto a más resolución si la hay (si no, en el color de [c]). */
-    private fun frontMarks(c: ZoneCriteria.Classes, hi: ZoneCriteria.Hi?, ms: Pt, mh: Pt, sw: Float): Map<String, Pt> {
-        // imagen de trabajo: la foto reducida a WORK_W (o la rejilla de la segmentación con su color)
-        val (px, w, h) = when {
-            hi != null -> {
-                val w = min(WORK_W, hi.w); val h = (hi.h * w / hi.w.toFloat()).toInt().coerceAtLeast(1)
-                Triple(IntArray(w * h) { i -> hi.px[((i / w) * hi.h / h) * hi.w + (i % w) * hi.w / w] }, w, h)
-            }
-            c.rgb != null -> Triple(c.rgb, c.width, c.height)
+    /** Candidato: mancha redonda más oscura que la piel alrededor (px de la imagen de trabajo). */
+    class Blob(val x: Float, val y: Float, val r: Float, val score: Float, val red: Float)
+
+    /**
+     * Pezones y ombligo (de frente). Con hombros y caderas de la pose, se buscan donde la anatomía los espera; sin
+     * ellos (primer plano del abdomen o del tórax, lo habitual en la consulta), solo con la piel: el ombligo, la
+     * mancha redonda más marcada junto a la línea media de la piel (si el tronco entra entero en el encuadre) y fuera
+     * del quinto superior; los pezones, la mejor pareja simétrica por encima del ombligo.
+     */
+    fun frontMarks(c: ZoneCriteria.Classes, hi: ZoneCriteria.Hi?, ms: Pt?, mh: Pt?, sw: Float?): Map<String, Pt> {
+        val px: IntArray; val pw: Int; val ph: Int
+        when {
+            hi != null -> { px = hi.px; pw = hi.w; ph = hi.h }
+            c.rgb != null -> { px = c.rgb; pw = c.width; ph = c.height }
             else -> return emptyMap()
         }
-        val k = w.toFloat()
-        val swPx = sw * k
-        val r = 0.03f * swPx
-        if (r < 1.5f) return emptyMap()                               // demasiado pequeño para verlos
-        val skin = BooleanArray(w * h) { i -> c.at((i % w) * c.width / w, (i / w) * c.height / h) == FaceLabels.BODY_SKIN }
-        val lab = LabImage.fromArgb(px, w, h)
-        val sx = ms.x * k; val sy = ms.y * k
-        val tx = (mh.x - ms.x) * k; val ty = (mh.y - ms.y) * k; val tl = hypot(tx, ty).takeIf { it > 1f } ?: return emptyMap()
-        val ux = tx / tl; val uy = ty / tl
-        val nx = -uy; val ny = ux                                      // normal: hacia la derecha de la imagen si el tronco va hacia abajo
+        fun skinAt(x: Int, y: Int) = c.at(x * c.width / pw, y * c.height / ph).let { it == FaceLabels.BODY_SKIN || it == FaceLabels.FACE_SKIN }
+        // recorte: el tronco de la pose (con margen) o la piel; a un ancho fijo
+        var x0: Int; var y0: Int; var x1: Int; var y1: Int
+        val k0 = pw.toFloat()
+        if (ms != null && mh != null && sw != null) {
+            val tl = hypot(mh.x - ms.x, mh.y - ms.y)
+            x0 = ((min(ms.x, mh.x) - 0.75f * sw) * k0).toInt(); x1 = ((max(ms.x, mh.x) + 0.75f * sw) * k0).toInt()
+            y0 = ((min(ms.y, mh.y) - 0.1f * tl) * k0).toInt(); y1 = ((max(ms.y, mh.y) + 0.15f * tl) * k0).toInt()
+        } else {
+            val xs = ArrayList<Int>(); val ys = ArrayList<Int>()
+            for (y in 0 until ph step 4) for (x in 0 until pw step 4) if (skinAt(x, y)) { xs += x; ys += y }
+            if (xs.size < 50) return emptyMap()
+            xs.sort(); ys.sort()
+            x0 = xs[(xs.size * 0.005f).toInt()] - 5; x1 = xs[(xs.size * 0.995f).toInt()] + 5
+            y0 = ys[(ys.size * 0.005f).toInt()] - 5; y1 = ys[(ys.size * 0.995f).toInt()] + 5
+        }
+        x0 = x0.coerceIn(0, pw - 1); y0 = y0.coerceIn(0, ph - 1); x1 = x1.coerceIn(x0 + 1, pw); y1 = y1.coerceIn(y0 + 1, ph)
+        val w = min(WORK_W, x1 - x0); val sc = w / (x1 - x0).toFloat(); val h = ((y1 - y0) * sc).toInt().coerceAtLeast(1)
+        if (w < 32 || h < 32) return emptyMap()
+        val sub = IntArray(w * h) { i -> px[(y0 + ((i / w) / sc).toInt()).coerceAtMost(ph - 1) * pw + (x0 + ((i % w) / sc).toInt()).coerceAtMost(pw - 1)] }
+        val skin = BooleanArray(w * h) { i -> skinAt((x0 + ((i % w) / sc).toInt()).coerceAtMost(pw - 1), (y0 + ((i / w) / sc).toInt()).coerceAtMost(ph - 1)) }
+        val lab = LabImage.fromArgb(sub, w, h)
+        fun toPt(x: Float, y: Float) = Pt((x0 + x / sc) / k0, (y0 + y / sc) / k0)
+        fun toW(p: Pt) = Pt((p.x * k0 - x0) * sc, (p.y * k0 - y0) * sc)
+        // filas de piel: ancho y centro
+        val rows = (0 until h).mapNotNull { y ->
+            var a = -1; var b = -1; var n = 0
+            for (x in 0 until w) if (skin[y * w + x]) { if (a < 0) a = x; b = x; n++ }
+            if (n > 0.1f * w) Triple(y, a, b) else null
+        }
+        if (rows.size < 10) return emptyMap()
+        val swW = if (sw != null) sw * k0 * sc else rows.map { (it.third - it.second).toFloat() }.sorted()[rows.size / 2]
+        val cands = candidates(lab, skin, w, h, swW)
         val out = HashMap<String, Pt>()
-        fun skinFrac(cx: Float, cy: Float, hw: Float, hh: Float): Float {
-            var n = 0; var s = 0
-            for (y in max(0, (cy - hh).toInt())..min(h - 1, (cy + hh).toInt())) for (x in max(0, (cx - hw).toInt())..min(w - 1, (cx + hw).toInt())) { n++; if (skin[y * w + x]) s++ }
-            return if (n == 0) 0f else s / n.toFloat()
+        var navel: Blob? = null
+        if (ms != null && mh != null && sw != null) {
+            // con la pose: ventanas anatómicas
+            val a = toW(ms); val b = toW(mh); val tx = b.x - a.x; val ty = b.y - a.y; val tl = hypot(tx, ty)
+            fun t(c: Blob) = ((c.x - a.x) * tx + (c.y - a.y) * ty) / (tl * tl)
+            fun lat(c: Blob) = ((c.x - a.x) * ty - (c.y - a.y) * tx) / tl
+            navel = cands.filter { t(it) in 0.55f..1.05f && abs(lat(it)) < 0.15f * swW && it.score >= NAVEL_MIN }
+                .maxByOrNull { it.score * it.r.pow(0.3f) - 0.5f * max(0f, it.red) }
+            pair(cands.filter { t(it) in 0.1f..0.55f && abs(lat(it)) in 0.1f * swW..0.45f * swW }, swW, null, navel)?.let { (l, r) ->
+                out[NIPPLE_A] = toPt(l.x, l.y); out[NIPPLE_B] = toPt(r.x, r.y) }
+        } else {
+            // sin pose: la línea media solo si el tronco entra entero (la piel no toca los bordes)
+            val touch = max(rows.count { (_, l, _) -> l < 3 }, rows.count { (_, _, r) -> r > w - 4 }) / rows.size.toFloat()
+            val mid = if (touch > 0.25f) null else rows.subList(rows.size / 4, 3 * rows.size / 4).map { (it.second + it.third) / 2f }.sorted().let { it[it.size / 2] }
+            val top = rows.first().first; val bot = rows.last().first
+            navel = cands.filter { (mid == null || abs(it.x - mid) < 0.12f * swW) && it.y > top + 0.2f * (bot - top) && it.score >= NAVEL_MIN }
+                .maxByOrNull { it.score * it.r.pow(0.3f) - 0.5f * max(0f, it.red) }
+            pair(cands, swW, mid, navel)?.let { (l, r) -> out[NIPPLE_A] = toPt(l.x, l.y); out[NIPPLE_B] = toPt(r.x, r.y) }
         }
-        // ombligo
-        run {
-            val cx = sx + 0.8f * tx; val cy = sy + 0.8f * ty
-            if (skinFrac(cx, cy, 0.2f * swPx, 0.2f * tl) < 0.6f) return@run
-            val b = blob(lab, skin, w, h, cx, cy, 0.2f * swPx, 0.22f * tl, max(1.5f, 0.022f * swPx), 0f) ?: return@run
-            val lat = abs((b.first - sx) * uy - (b.second - sy) * ux)
-            if (lat <= 0.12f * swPx && b.third >= MIN_BLOB) out[NAVEL] = Pt(b.first / k, b.second / k)
-        }
-        // pezones: los dos o ninguno
-        val nips = listOf(-1f, 1f).map { sg ->
-            val cx = sx + 0.3f * tx + sg * 0.27f * swPx * nx; val cy = sy + 0.3f * ty + sg * 0.27f * swPx * ny
-            if (skinFrac(cx, cy, 0.15f * swPx, 0.16f * tl) < 0.6f) null
-            else blob(lab, skin, w, h, cx, cy, 0.15f * swPx, 0.16f * tl, r, 0.7f)
-        }
-        val a = nips[0]; val b = nips[1]
-        if (a != null && b != null && abs(a.second - b.second) < 0.1f * tl && abs(a.first - b.first) in 0.3f * swPx..0.8f * swPx &&
-            min(a.third, b.third) >= MIN_BLOB) {
-            val (left, right) = if (a.first <= b.first) a to b else b to a
-            out[NIPPLE_A] = Pt(left.first / k, left.second / k); out[NIPPLE_B] = Pt(right.first / k, right.second / k)
-        }
+        navel?.let { out[NAVEL] = toPt(it.x, it.y) }
         return out
     }
 
+    /** Pezones: contraste (L*) y exceso de rojo (a*) mínimos de cada uno. */
+    const val NIPPLE_MIN = 6f
+    const val NIPPLE_RED = -99f
+
+    /** Contraste mínimo del ombligo (más marcado que una mancha cualquiera). */
+    const val NAVEL_MIN = 5f
+
+    /** La mejor pareja de pezones: a una altura parecida, separados lo plausible, centrados y por encima del ombligo. */
+    private fun pair(c: List<Blob>, sw: Float, mid: Float?, navel: Blob?): Pair<Blob, Blob>? {
+        var best: Triple<Float, Blob, Blob>? = null
+        for (i in c.indices) for (j in i + 1 until c.size) {
+            val a = c[i]; val b = c[j]
+            if (abs(a.y - b.y) > 0.08f * sw) continue
+            if (abs(a.x - b.x) !in 0.25f * sw..0.75f * sw) continue
+            val m = (a.x + b.x) / 2
+            if (mid != null && abs(m - mid) > 0.1f * sw) continue
+            // por encima del ombligo lo que la anatomía da (≈ 0,35–0,9 anchos del tronco) y centrados con él
+            if (navel != null && ((navel.y - (a.y + b.y) / 2) !in 0.35f * sw..0.9f * sw || abs(m - navel.x) > 0.12f * sw)) continue
+            // la areola es más roja (o parda) que la piel: un borde muscular o el vello, no
+            if (min(a.red, b.red) < NIPPLE_RED || min(a.score, b.score) < NIPPLE_MIN) continue
+            val s = min(a.score, b.score)
+            if (best == null || s > best.first) best = Triple(s, a, b)
+        }
+        return best?.let { (_, a, b) -> if (a.x <= b.x) a to b else b to a }
+    }
+
     /**
-     * La mancha redonda más marcada en la caja ([cx], [cy]) ± ([hw], [hh]) px: más oscura que la piel en las ocho
-     * direcciones a 1,9·[r] (el mínimo de las ocho), más [red] × su exceso de rojo; con una ligera preferencia por
-     * el centro esperado. (x, y, contraste) o null.
+     * Manchas redondas más oscuras que la piel en las ocho direcciones (a 1,9 radios; el mínimo de las ocho), con la
+     * piel alrededor en todas, a tres escalas (1,2 %, 2 % y 3 % del ancho del tronco); máximos locales, sin repetir.
      */
-    private fun blob(lab: LabImage, skin: BooleanArray, w: Int, h: Int, cx: Float, cy: Float, hw: Float, hh: Float, r: Float, red: Float): Triple<Float, Float, Float>? {
-        val sg = max(0.8f, 0.6f * r)
-        val lb = SkinLesions.blurNorm(lab.l, skin, w, h, sg)
-        val ab = if (red > 0f) SkinLesions.blurNorm(lab.a, skin, w, h, sg) else null
-        fun at(a: FloatArray, x: Float, y: Float): Float {
-            val xi = x.toInt().coerceIn(0, w - 1); val yi = y.toInt().coerceIn(0, h - 1); return a[yi * w + xi]
+    fun candidates(lab: LabImage, skin: BooleanArray, w: Int, h: Int, sw: Float): List<Blob> {
+        val all = ArrayList<Blob>()
+        for (f in floatArrayOf(0.012f, 0.02f, 0.03f)) {
+            val r = max(1.5f, f * sw); val sg = max(0.8f, 0.6f * r)
+            val lb = SkinLesions.blurNorm(lab.l, skin, w, h, sg); val ab = SkinLesions.blurNorm(lab.a, skin, w, h, sg)
+            val dirs = (0 until 8).map { val t = it * Math.PI / 4; Math.round(1.9f * r * cos(t).toFloat()) to Math.round(1.9f * r * sin(t).toFloat()) }
+            val sc = FloatArray(w * h) { -99f }; val rd = FloatArray(w * h)
+            for (y in 0 until h) for (x in 0 until w) {
+                val i = y * w + x; if (!skin[i]) continue
+                var mn = Float.MAX_VALUE; var asum = 0f; var ok = true
+                for ((dx, dy) in dirs) {
+                    val xx = x + dx; val yy = y + dy
+                    if (xx !in 0 until w || yy !in 0 until h || !skin[yy * w + xx]) { ok = false; break }
+                    mn = min(mn, lb[yy * w + xx]); asum += ab[yy * w + xx]
+                }
+                if (!ok) continue
+                sc[i] = mn - lb[i]; rd[i] = ab[i] - asum / 8f
+            }
+            // máximos locales (radio 2r)
+            val rr = max(1, (2 * r).toInt())
+            val idx = (0 until w * h).filter { sc[it] >= 3f }.sortedByDescending { sc[it] }
+            val taken = ArrayList<Blob>()
+            for (i in idx) {
+                val x = (i % w).toFloat(); val y = (i / w).toFloat()
+                if (taken.any { hypot(it.x - x, it.y - y) <= rr }) continue
+                taken += Blob(x, y, r, sc[i], rd[i])
+                if (taken.size > 200) break
+            }
+            all += taken
         }
-        val dirs = (0 until 8).map { val t = it * Math.PI / 4; (1.9f * r * cos(t)).toFloat() to (1.9f * r * sin(t)).toFloat() }
-        var best: Triple<Float, Float, Float>? = null; var bestS = -Float.MAX_VALUE
-        for (y in max(0, (cy - hh).toInt())..min(h - 1, (cy + hh).toInt())) for (x in max(0, (cx - hw).toInt())..min(w - 1, (cx + hw).toInt())) {
-            if (!skin[y * w + x]) continue
-            val c0 = lb[y * w + x]
-            var mn = Float.MAX_VALUE; var asum = 0f
-            for ((dx, dy) in dirs) { mn = min(mn, at(lb, x + dx, y + dy)); if (ab != null) asum += at(ab, x + dx, y + dy) }
-            val sc = mn - c0 + (if (ab != null) red * (ab[y * w + x] - asum / 8f) else 0f)
-            val pen = sc - 3f * hypot(x - cx, y - cy) / (2 * hw)
-            if (pen > bestS) { bestS = pen; best = Triple(x.toFloat(), y.toFloat(), sc) }
-        }
-        return best
+        val keep = ArrayList<Blob>()
+        for (b in all.sortedByDescending { it.score }) if (keep.none { hypot(it.x - b.x, it.y - b.y) <= 2 * max(it.r, b.r) }) keep += b
+        return keep
     }
 }

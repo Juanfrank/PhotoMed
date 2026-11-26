@@ -151,4 +151,28 @@ class SkinLesionsTest {
         File("build/reports").mkdirs(); File("build/reports/skin_lesions.md").writeText(rep.toString())
         assumeTrue("sin fotos locales", les.isNotEmpty())
     }
+
+    @Test fun shadowAlongTheSkinEdgeIsNotASpot() {
+        // piel desde y = 80 (encima, la mandíbula o el fondo); sombra oscura pegada a ese borde, como bajo el mentón
+        val w = 300; val h = 400; val px = skin(w, h)
+        val skinMask = BooleanArray(w * h) { it / w >= 80 }
+        for (y in 80 until 100) for (x in 60 until 240) px[y * w + x] = rgb(150, 105, 85)
+        val spots = SkinLesions.detect(px, w, h, skinMask, setOf(Kind.SPOTS)).filter { it.layer == AnnotLayer.SPOTS }
+        assertTrue("sombra del borde como mancha: ${spots.size}", spots.isEmpty())
+    }
+
+    @Test fun elongatedBandIsNotASpot() {
+        val w = 300; val h = 400; val px = skin(w, h)
+        for (y in 200 until 208) for (x in 50 until 250) px[y * w + x] = rgb(150, 105, 85)
+        val spots = SkinLesions.detect(px, w, h, null, setOf(Kind.SPOTS)).filter { it.layer == AnnotLayer.SPOTS }
+        assertTrue("banda alargada como mancha: ${spots.size}", spots.isEmpty())
+    }
+
+    @Test fun excludedDiscsSuchAsTheNavelAreIgnored() {
+        val w = 300; val h = 400; val px = skin(w, h)
+        for (y in 0 until h) for (x in 0 until w) if (hypot(x - 150f, y - 250f) < 8f) px[y * w + x] = rgb(120, 80, 60)
+        val navel = Pt(0.5f, 250f / w)
+        assertEquals(1, SkinLesions.detect(px, w, h, null, setOf(Kind.SPOTS)).count { it.layer == AnnotLayer.SPOTS })
+        assertTrue(SkinLesions.detect(px, w, h, null, setOf(Kind.SPOTS), excludeDiscs = listOf(navel to 0.05f)).none { it.layer == AnnotLayer.SPOTS })
+    }
 }

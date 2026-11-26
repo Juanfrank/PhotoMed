@@ -1140,19 +1140,29 @@ class PhotoAnnotator(private val context: Context) {
             b.recycleIfCopy(bmp)
             ZoneCriteria.Hi(px, nw, nh)
         }.getOrNull() else null
-        val diagram = BodyDiagram.lines(zone, ZoneCriteria.Scene(pose, hands?.ifEmpty { null }, classes, bmp.height / bmp.width.toFloat(), single = single, hi = hi))
-        return diagram + bodyLesions(bmp, zone, labels)
+        val scene = ZoneCriteria.Scene(pose, hands?.ifEmpty { null }, classes, bmp.height / bmp.width.toFloat(), single = single, hi = hi)
+        val diagram = BodyDiagram.lines(zone, scene)
+        return diagram + bodyLesions(bmp, zone, labels, scene)
     }
 
     /** Hallazgos de la piel ([SkinLesions]) de una zona del cuerpo, a resolución media, en la piel de la segmentación. */
-    private fun bodyLesions(bmp: Bitmap, zone: Zone, labels: FaceLabels?): List<AnnotLine> = runCatching {
+    private fun bodyLesions(bmp: Bitmap, zone: Zone, labels: FaceLabels?, scene: ZoneCriteria.Scene? = null): List<AnnotLine> = runCatching {
+        // ombligo, areolas y axilas no son hallados de la piel: se excluyen (con el ancho del tronco como escala)
+        val marks = if (scene != null && zone.guide in TorsoMarks.GUIDES) runCatching { BodyPoints.of(zone, scene) }.getOrDefault(emptyMap()) else emptyMap()
+        val sw = listOfNotNull(scene?.pose?.get(Landmarks.SHOULDER_L), scene?.pose?.get(Landmarks.SHOULDER_R)).takeIf { it.size == 2 }
+            ?.let { hypot(it[0].x - it[1].x, it[0].y - it[1].y) } ?: 0.8f
+        val discs = marks.mapNotNull { (k, p) -> when {
+            k == TorsoMarks.NAVEL -> p to 0.06f * sw
+            k.startsWith("pezon") -> p to 0.07f * sw
+            k.startsWith("axila") -> p to 0.12f * sw
+            else -> null } }
         val w = LESION_W; val h = (w * bmp.height / bmp.width.toFloat()).roundToInt().coerceAtLeast(1)
         val b = Bitmap.createScaledBitmap(bmp, w, h, true)
         val px = IntArray(w * h).also { b.getPixels(it, 0, w, 0, 0, w, h) }
         b.recycleIfCopy(bmp)
         // solo la piel del cuerpo: una cara pequeña en la foto daría ojos y cejas como «manchas»
         val skin = labels?.let { FaceCrop.skinOf(it, w, h, FaceLabels.BODY_SKIN) }
-        SkinLesions.detect(px, w, h, skin, SkinLesions.kindsFor(zone))
+        SkinLesions.detect(px, w, h, skin, SkinLesions.kindsFor(zone), excludeDiscs = discs)
     }.getOrDefault(emptyList())
 
     private fun Bitmap.recycleIfCopy(src: Bitmap) { if (this !== src && !isRecycled) recycle() }
