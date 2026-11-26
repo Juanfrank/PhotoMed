@@ -52,7 +52,7 @@ class BodySkeletonPhotosTest {
         val cache = HashMap<String, JSONObject>()
         val seen = HashMap<GuideType, Int>(); val withM = HashMap<GuideType, Int>()
         var vals = 0; var ok = 0
-        val bad = ArrayList<String>(); val tiles = ArrayList<Bitmap>()
+        val bad = ArrayList<String>(); val tiles = ArrayList<Bitmap>(); val feetTiles = ArrayList<Bitmap>()
         for (key in labels.keys().asSequence().sorted()) {
             val arr = labels.getJSONArray(key)
             val z = (0 until arr.length()).map { arr.getString(it) }.firstOrNull { !it.startsWith("!") }?.let { Zone.fromId(it) } ?: continue
@@ -80,16 +80,18 @@ class BodySkeletonPhotosTest {
             val m = lines.mapNotNull { it.metrics }.flatMap { it.features }
             if (m.isNotEmpty()) withM[z.guide] = (withM[z.guide] ?: 0) + 1
             m.forEach { (l, v) -> vals++; if (plausible(l, v)) ok++ else bad += "$key: $l = " + "%.1f".format(v) }
-            if (tiles.size < 24 && m.isNotEmpty()) {
-                val out = Bitmap.createScaledBitmap(img, 240, (240f * h / w).toInt(), true).copy(Bitmap.Config.ARGB_8888, true)
+            val feetTile = z.guide == GuideType.FEET && feetTiles.size < 18
+            val tw = if (feetTile) 480 else 240
+            if ((tiles.size < 24 || feetTile) && m.isNotEmpty()) {
+                val out = Bitmap.createScaledBitmap(img, tw, (tw.toFloat() * h / w).toInt(), true).copy(Bitmap.Config.ARGB_8888, true)
                 val cv = Canvas(out)
                 val pa = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 2.5f; style = Paint.Style.STROKE }
                 for (l in lines) {
                     pa.color = when (l.layer) { AnnotLayer.BODY_AXES -> Color.WHITE; AnnotLayer.BODY_POINTS -> Color.MAGENTA; AnnotLayer.FINGERS -> Color.CYAN; else -> continue }
                     pa.style = if (l.filled) Paint.Style.FILL else Paint.Style.STROKE
-                    for (i in 1 until l.points.size) cv.drawLine(l.points[i - 1].x * 240, l.points[i - 1].y * 240, l.points[i].x * 240, l.points[i].y * 240, pa)
+                    for (i in 1 until l.points.size) cv.drawLine(l.points[i - 1].x * tw, l.points[i - 1].y * tw, l.points[i].x * tw, l.points[i].y * tw, pa)
                 }
-                tiles += Bitmap.createScaledBitmap(out, 240, 320, true)
+                if (feetTile) feetTiles += Bitmap.createScaledBitmap(out, 480, 640, true) else tiles += Bitmap.createScaledBitmap(out, 240, 320, true)
             }
         }
         val rep = StringBuilder("# Esqueleto del cuerpo en fotos reales\n\n| toma | fotos | con medidas |\n|---|---|---|\n")
@@ -101,6 +103,11 @@ class BodySkeletonPhotosTest {
             val cols = 6; val sheet = Bitmap.createBitmap(240 * cols, 320 * ((tiles.size + cols - 1) / cols), Bitmap.Config.ARGB_8888)
             val c = Canvas(sheet); tiles.forEachIndexed { i, t -> c.drawBitmap(t, (i % cols) * 240f, (i / cols) * 320f, null) }
             File("build/reports/body_skeleton.png").outputStream().use { sheet.compress(Bitmap.CompressFormat.PNG, 90, it) }
+        }
+        if (feetTiles.isNotEmpty()) {
+            val cols = 4; val sheet = Bitmap.createBitmap(480 * cols, 640 * ((feetTiles.size + cols - 1) / cols), Bitmap.Config.ARGB_8888)
+            val c = Canvas(sheet); feetTiles.forEachIndexed { i, t -> c.drawBitmap(t, (i % cols) * 480f, (i / cols) * 640f, null) }
+            File("build/reports/feet_skeleton.png").outputStream().use { sheet.compress(Bitmap.CompressFormat.PNG, 90, it) }
         }
         println(rep)
         assert(vals > 0)

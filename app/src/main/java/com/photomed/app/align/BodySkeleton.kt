@@ -186,14 +186,80 @@ object BodySkeleton {
             fun fp(part: String) = pts[BodyPoints.foot(side, part)]
             val c = fp("centro") ?: continue; val tip = fp("punta") ?: continue
             out += AnnotLine(AnnotLayer.BODY_AXES, listOf(c, tip), false)
-            (1..5).mapNotNull { fp("dedo_$it") }.forEach { t -> out += AnnotLine(AnnotLayer.FINGERS, listOf(c, t), false); joint(t) }
+            (1..5).mapNotNull { fp("dedo_$it") }.forEach { t -> joint(t) }
             val widths = (1..5).mapNotNull { i -> val a = fp("izq_$i"); val b = fp("der_$i"); if (a != null && b != null) { out += AnnotLine(AnnotLayer.BODY_POINTS, listOf(a, b), false); d(a, b) } else null }
             joint(c); joint(tip)
             val f = listOfNotNull(widths.maxOrNull()?.let { trn("Antepié: largo / ancho, %") to d(c, tip) / it * 100 },
                 trn("Eje del pie respecto de la vertical, °") to lean(c, tip))
             out[out.indexOfLast { it.layer == AnnotLayer.BODY_AXES && !it.filled && it.points.size == 2 && it.points[0] == c }] =
                 AnnotLine(AnnotLayer.BODY_AXES, listOf(c, tip), false, metrics = metrics(if (side == 'a') trn("Pie (izquierda de la imagen)") else trn("Pie (derecha de la imagen)"), f))
+            // esqueleto del pie al estilo de la mano: articulaciones de cada dedo, metatarsianos y «planta»
+            widths.maxOrNull()?.let { fw -> footSkeleton(side, pts, c, tip, fw, r).let { out += it } }
         }
+        return out
+    }
+
+    /** Largo de cada dedo (de la articulación metatarsofalángica a la punta) en anchos del antepié: 1.º a 5.º. */
+    private val TOE_LEN = floatArrayOf(0.48f, 0.4f, 0.36f, 0.32f, 0.29f)
+
+    /**
+     * Esqueleto de un pie como el de la mano, con proporciones antropométricas (pie ≈ 2,6 anchos del antepié de largo;
+     * dedo gordo ≈ 0,5, dedos menores 0,4–0,3, vistos desde arriba): para cada dedo, de su punta hacia atrás a lo largo del eje del pie,
+     * la articulación metatarsofalángica (MTF) y las interfalángicas (una en el dedo gordo, dos en los demás);
+     * los metatarsianos, de cada MTF a su base en el mediopié (convergen hacia el eje); la «planta», el polígono de
+     * bases y MTF. Las puntas son las detectadas; si faltan, se reparten por el borde distal (marcadas como estimadas).
+     * El dedo gordo es el extremo del lado del otro pie (o, con un pie solo, el más distal de los dos extremos).
+     */
+    private fun footSkeleton(side: Char, pts: Map<String, Pt>, c: Pt, tip: Pt, fw: Float, r: Float): List<AnnotLine> {
+        val out = ArrayList<AnnotLine>()
+        val len = d(c, tip).takeIf { it > 1e-4f } ?: return out
+        val ux = (tip.x - c.x) / len; val uy = (tip.y - c.y) / len            // hacia la punta
+        val vx = -uy; val vy = ux
+        fun along(p: Pt) = (p.x - tip.x) * ux + (p.y - tip.y) * uy
+        fun across(p: Pt) = (p.x - tip.x) * vx + (p.y - tip.y) * vy
+        fun at(a: Float, b: Float) = Pt(tip.x + ux * a + vx * b, tip.y + uy * a + vy * b)
+        var toes = (1..5).mapNotNull { pts[BodyPoints.foot(side, "dedo_$it")] }
+        // cinco puntas repartidas por el antepié (si se amontonan, el detector de dedos no los separó)
+        val estimated = toes.size < 5 || toes.maxOf { across(it) } - toes.minOf { across(it) } < 0.5f * fw
+        if (estimated) {
+            // puntas repartidas por el borde distal, entre los bordes a ¼ de ancho de la punta
+            val a = pts[BodyPoints.foot(side, "izq_1")]; val b = pts[BodyPoints.foot(side, "der_1")]
+            if (a == null || b == null) return out
+            val la = across(a); val lb = across(b)
+            toes = (0 until 5).map { i -> val t = la + (lb - la) * (i + 0.5f) / 5; at(-0.08f * fw - 0.1f * fw * abs((i - 2) / 2f), t) }
+        }
+        toes = toes.sortedBy { across(it) }
+        // el dedo gordo: del lado del otro pie; con un pie solo, el extremo más distal
+        val other = pts[BodyPoints.foot(if (side == 'a') 'b' else 'a', "punta")]
+        val bigFirst = if (other != null) across(other) < 0f else along(toes.first()) >= along(toes.last())
+        if (!bigFirst) toes = toes.reversed()
+        // MTF: a lo largo, a su distancia de la punta de cada dedo; de través, repartidas por el ancho real del antepié
+        // a esa altura (bordes de la piel), del lado del dedo gordo al del quinto, como las de la mano
+        val edges = (1..5).mapNotNull { i -> val a = pts[BodyPoints.foot(side, "izq_$i")]; val b = pts[BodyPoints.foot(side, "der_$i")]
+            if (a != null && b != null) Triple(along(Pt((a.x + b.x) / 2, (a.y + b.y) / 2)), minOf(across(a), across(b)), maxOf(across(a), across(b))) else null }
+        fun edgesAt(al: Float) = edges.minByOrNull { abs(it.first - al) }
+        val mtp = toes.mapIndexed { i, t ->
+            val al = along(t) - TOE_LEN[i] * fw
+            val e = edgesAt(al)
+            val ac = if (e == null) across(t) else {
+                val f = 0.12f + 0.76f * i / 4f                                     // del borde del dedo gordo al del quinto
+                if (across(toes[0]) <= across(toes[4])) e.second + (e.third - e.second) * f else e.third - (e.third - e.second) * f
+            }
+            at(al, ac)
+        }
+        val baseAlong = mtp.map { along(it) }.average().toFloat() - 0.75f * fw   // bases de los metatarsianos (mediopié)
+        val midAc = mtp.map { across(it) }.average().toFloat()
+        val bases = mtp.map { m -> at(baseAlong, midAc + (across(m) - midAc) * 0.7f) }
+        for (i in 0 until 5) {
+            val t = toes[i]; val m = mtp[i]
+            val joints = if (i == 0) listOf(0.5f) else listOf(0.45f, 0.75f)      // IF del dedo gordo; IFP e IFD
+            val chain = listOf(m) + joints.map { f -> Pt(m.x + (t.x - m.x) * f, m.y + (t.y - m.y) * f) } + t
+            out += AnnotLine(AnnotLayer.FINGERS, chain, false, estimated = estimated)
+            out += AnnotLine(AnnotLayer.FINGERS, listOf(bases[i], m), false, estimated = true)
+            chain.dropLast(1).forEach { q -> out += dot(AnnotLayer.FINGERS, q, r * 0.8f) }
+        }
+        // «planta»: bases y MTF, como la palma de la mano
+        out += AnnotLine(AnnotLayer.FINGERS, bases + mtp.reversed() + bases.first(), false, estimated = true)
         return out
     }
 
