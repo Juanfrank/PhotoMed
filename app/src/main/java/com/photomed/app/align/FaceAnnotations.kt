@@ -197,7 +197,9 @@ object FaceAnnotations {
             }
         }
         // cejas ajustadas a su borde en la imagen (la malla a veces las deja arriba o abajo del pelo)
-        val mesh = if (lum != null) runCatching { BrowRefine.refineMesh(meshIn, lum, labels) }.getOrDefault(meshIn) else meshIn
+        // y con su forma corregida (la malla la deja fina y alta, con la cola larga) y ajustada al pelo por columnas
+        val mesh = (if (lum != null) runCatching { BrowRefine.refineMesh(meshIn, lum, labels) }.getOrDefault(meshIn) else meshIn)
+            .let { m -> runCatching { BrowRefine.reshapeMesh(m, lum) }.getOrDefault(m) }
         val keys = FaceKeys.canonical(keysFromMesh(mesh))
         val out = ArrayList<AnnotLine>()
         val snapped = if (labels != null) HairSkin.snapOval(labels, keys) else keys
