@@ -874,6 +874,20 @@ object FaceCrop {
         return Bitmap.createBitmap(src, x, y, w, h, m, true)
     }
 
+    /**
+     * [labels] (o, sin ellas, todo piel de la cara) con lo que [invalid] marca (punto del recorte de [w]×[h], en unidades
+     * de su ancho) como fondo: así ni las referencias de piel (mejilla de la ojera) ni las detecciones lo usan.
+     */
+    fun masked(labels: FaceLabels?, w: Int, h: Int, invalid: (Float, Float) -> Boolean): FaceLabels {
+        val lw = labels?.width ?: w; val lh = labels?.height ?: h
+        val data = labels?.data?.copyOf() ?: ByteArray(lw * lh) { FaceLabels.FACE_SKIN.toByte() }
+        for (y in 0 until lh) for (x in 0 until lw) {
+            val u = (x + 0.5f) / lw * w / w; val v = (y + 0.5f) / lh * h / w
+            if (invalid(u, v)) data[y * lw + x] = FaceLabels.BG.toByte()
+        }
+        return FaceLabels(lw, lh, data)
+    }
+
     /** Piel de [labels] (clases [classes]) en una rejilla [w]×[h] (vecino más cercano). */
     fun skinOf(labels: FaceLabels, w: Int, h: Int, vararg classes: Int): BooleanArray = BooleanArray(w * h) { i ->
         labels[(i % w) * labels.width / w, (i / w) * labels.height / h] in classes
@@ -901,18 +915,21 @@ object FaceCrop {
     fun annotate(mesh: List<Pt>, src: Bitmap, labelsOf: (Bitmap, Crop) -> FaceLabels?, extras: MeasureExtras? = null,
                  info: MutableMap<String, Float>? = null, priors: List<PriorLine> = emptyList(),
                  /** Trazos añadidos a mano, en coordenadas de [src] (unidades de su ancho). */
-                 added: List<List<Pt>> = emptyList()): List<AnnotLine> {
+                 added: List<List<Pt>> = emptyList(), invalid: ((Pt) -> Boolean)? = null): List<AnnotLine> {
         val c = crop(mesh, src.width, src.height)
         val b = bitmap(src, c)
         val labels = runCatching { labelsOf(b, c) }.getOrNull()
-        return finish(mesh, src, c, b, labels, extras, info, priors, added)
+        return finish(mesh, src, c, b, labels, extras, info, priors, added, invalid = invalid)
     }
 
     /** Parte de cálculo de [annotate] (sin modelos nativos): recorte [b] ya hecho y su segmentación. */
-    fun finish(mesh: List<Pt>, src: Bitmap, c: Crop, b: Bitmap, labels: FaceLabels?, extras: MeasureExtras? = null,
+    fun finish(mesh: List<Pt>, src: Bitmap, c: Crop, b: Bitmap, labelsIn: FaceLabels?, extras: MeasureExtras? = null,
                info: MutableMap<String, Float>? = null, priors: List<PriorLine> = emptyList(),
-               added: List<List<Pt>> = emptyList(), hairVScale: Float = 1f): List<AnnotLine> {
+               added: List<List<Pt>> = emptyList(), hairVScale: Float = 1f,
+               /** Lo que no es foto real (relleno de la compuesta del ojo, en unidades del ancho de [src]): no es piel. */
+               invalid: ((Pt) -> Boolean)? = null): List<AnnotLine> {
         val m = mesh.map { c.toCrop(it) }
+        val labels = if (invalid == null) labelsIn else masked(labelsIn, b.width, b.height) { u, v -> invalid(c.toPhoto(Pt(u, v))) }
         val px = IntArray(b.width * b.height).also { b.getPixels(it, 0, b.width, 0, 0, b.width, b.height) }
         val ex = extras?.let { e -> MeasureExtras(e.relief?.let { relief(it, c, b.width, b.height) }, e.meta, e.onlyAdded) }
         val lines = FaceAnnotations.fromMesh(m, labels, lum(b), LabImage.fromArgb(px, b.width, b.height), ex, info, priors,
@@ -960,7 +977,9 @@ class PhotoAnnotator(private val context: Context) {
     private suspend fun analyzeSplit(bmp: Bitmap, zone: Zone, extras: MeasureExtras?, user: AnnotUserEdit?, priors: List<PriorLine>,
                                      memoryUri: String?,
                                      /** Ajuste de la malla antes de medir (primer plano del ojo: párpados e iris con el modelo de ojo). */
-                                     meshFix: ((Bitmap, List<Pt>) -> List<Pt>)? = null): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                     meshFix: ((Bitmap, List<Pt>) -> List<Pt>)? = null,
+                                     /** Lo que no es foto real (relleno de la compuesta del ojo), unidades del ancho de [bmp]. */
+                                     invalid: ((Pt) -> Boolean)? = null): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val spec = ZoneAlignment.of(zone)
         // primer plano de un ojo: con la sección del ojo de la malla facial (foto + su espejo, ver EyeComposite)
         if (zone.guide == com.photomed.app.data.GuideType.EYE) return@withContext analyzeEye(bmp, zone, user, extras?.onlyAdded == true)
@@ -998,7 +1017,7 @@ class PhotoAnnotator(private val context: Context) {
                 val tilt = if (scalpFront) tiltOf(mesh) else null
                 val all = try {
                     FaceCrop.finish(mesh, bmp, nat.crop, nat.cropBmp, nat.labels, extras, info, priors, user?.added.orEmpty(),
-                        hairVScale = tilt?.let { FeatureMetrics.hairTiltScale(it) } ?: 1f)
+                        hairVScale = tilt?.let { FeatureMetrics.hairTiltScale(it) } ?: 1f, invalid = invalid)
                 } finally { if (nat.cropBmp !== bmp) nat.cropBmp.recycle() }
                 if (scalpFront) {
                     val kept = scalpFrontLines(all.filter { l -> l.metrics?.name?.let { it in user?.dismissed.orEmpty() } != true }, measured = true)
@@ -1049,8 +1068,9 @@ class PhotoAnnotator(private val context: Context) {
             val u = user?.copy(added = user.added.map { t -> t.map(l::toComposite) })
             // los párpados y el iris de la malla, afinados con el modelo de ojo en recortes que da la propia malla
             val fix: (Bitmap, List<Pt>) -> List<Pt> = { b, m -> eyeModel()?.let { EyeLandmarks.refineMesh(it, b, m) } ?: m }
-            val (lines, note) = analyzeSplit(comp, Zone.PERIOCULAR, if (onlyAdded) MeasureExtras(null, null, onlyAdded = true) else null, u, emptyList(), null, fix)
-            val eye = lines.filter { it.layer in EyeComposite.LAYERS && l.isReal(it.points) }.map { it.mapped(l::toPhoto) }
+            val (lines, note) = analyzeSplit(comp, Zone.PERIOCULAR, if (onlyAdded) MeasureExtras(null, null, onlyAdded = true) else null, u, emptyList(), null, fix,
+                invalid = l::isPad)
+            val eye = EyeComposite.keep(lines, l)
             if (!onlyAdded && eye.none { it.layer == AnnotLayer.EYES }) {
                 // sin malla (ojo que llena el encuadre, sin ceja): solo el modelo de ojo, buscando el ojo en la foto
                 val found = runCatching { NativeGate.run("ojo sin malla: modelo de ojo") { eyeModel()?.search(bmp, flip = zone.mirrored) } }.getOrNull()
