@@ -175,4 +175,18 @@ class SkinLesionsTest {
         assertEquals(1, SkinLesions.detect(px, w, h, null, setOf(Kind.SPOTS)).count { it.layer == AnnotLayer.SPOTS })
         assertTrue(SkinLesions.detect(px, w, h, null, setOf(Kind.SPOTS), excludeDiscs = listOf(navel to 0.05f)).none { it.layer == AnnotLayer.SPOTS })
     }
+
+    @Test fun findingsOnlyWhereTheyAreMedicallyPossible() {
+        val z = com.photomed.app.data.Zone.entries
+        // arañitas: nunca en plantas, palmas ni cuero cabelludo
+        for (zone in z) if (zone == com.photomed.app.data.Zone.FEET_PLANTAR || zone.guide == com.photomed.app.data.GuideType.HANDS ||
+            zone.category == com.photomed.app.data.ZoneCategory.CAPILAR) assertTrue("arañitas en $zone", Kind.SPIDER !in SkinLesions.kindsFor(zone))
+        // várices: solo miembro inferior (muslos, piernas, dorso del pie)
+        for (zone in z) if (Kind.VARICES in SkinLesions.kindsFor(zone))
+            assertTrue("várices en $zone", zone == com.photomed.app.data.Zone.LEGS || zone == com.photomed.app.data.Zone.FEET_DORSAL)
+        // celulitis: glúteos y muslos
+        for (zone in z) if (Kind.CELLULITE in SkinLesions.kindsFor(zone))
+            assertTrue("celulitis en $zone", zone == com.photomed.app.data.Zone.LEGS || zone == com.photomed.app.data.Zone.GLUTES)
+        assertEquals(setOf(Kind.SPOTS), SkinLesions.kindsFor(com.photomed.app.data.Zone.FEET_PLANTAR))
+    }
 }

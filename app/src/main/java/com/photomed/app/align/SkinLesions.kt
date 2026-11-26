@@ -47,11 +47,22 @@ object SkinLesions {
         "vecina; no son un diagnóstico. La fibrosis no se puede detectar en una foto (necesita palpación o ecografía).")
 
     /** Qué se busca en cada zona. */
-    fun kindsFor(zone: Zone): Set<Kind> = when (zone.guide) {
-        GuideType.LEGS -> setOf(Kind.SPOTS, Kind.SPIDER, Kind.VARICES, Kind.CELLULITE)
-        GuideType.GLUTES -> setOf(Kind.SPOTS, Kind.SPIDER, Kind.CELLULITE)
-        GuideType.FEET -> setOf(Kind.SPOTS, Kind.SPIDER, Kind.VARICES)
-        GuideType.SCALP, GuideType.SCALP_CROWN, GuideType.SCALP_PARIETAL, GuideType.SCALP_FRONT, GuideType.HANDS -> setOf(Kind.SPOTS)
+    /**
+     * Qué se busca en cada zona, según dónde es posible médicamente:
+     * - **Arañitas** (telangiectasias: vasos superficiales dilatados de una dermis fina): no en las **plantas** ni en
+     *   las **palmas** (piel gruesa sin pelo), ni en el **cuero cabelludo** con pelo, ni en las **uñas** (no son piel:
+     *   se excluyen aparte); dentro del ojo y en el bermellón de los labios (mucosa) tampoco se buscan.
+     * - **Várices**: solo en el miembro inferior (muslos, piernas, dorso del pie), nunca en la planta.
+     * - **Celulitis**: solo en glúteos y muslos.
+     * El dorso de la mano conserva solo las manchas (las telangiectasias de la mano son raras y, en un primer plano, el
+     * detector confundiría con ellas los nudillos y las uñas).
+     */
+    fun kindsFor(zone: Zone): Set<Kind> = when {
+        zone == Zone.FEET_PLANTAR -> setOf(Kind.SPOTS)
+        zone.guide == GuideType.LEGS -> setOf(Kind.SPOTS, Kind.SPIDER, Kind.VARICES, Kind.CELLULITE)
+        zone.guide == GuideType.GLUTES -> setOf(Kind.SPOTS, Kind.SPIDER, Kind.CELLULITE)
+        zone.guide == GuideType.FEET -> setOf(Kind.SPOTS, Kind.SPIDER, Kind.VARICES)
+        zone.guide in setOf(GuideType.SCALP, GuideType.SCALP_CROWN, GuideType.SCALP_PARIETAL, GuideType.SCALP_FRONT, GuideType.HANDS) -> setOf(Kind.SPOTS)
         else -> setOf(Kind.SPOTS, Kind.SPIDER)
     }
 

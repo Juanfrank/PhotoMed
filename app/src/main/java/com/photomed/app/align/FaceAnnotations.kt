@@ -1175,7 +1175,7 @@ class PhotoAnnotator(private val context: Context) {
             k == TorsoMarks.NAVEL -> p to 0.06f * sw
             k.startsWith("pezon") -> p to 0.07f * sw
             k.startsWith("axila") -> p to 0.12f * sw
-            else -> null } }
+            else -> null } } + nailDiscs(zone, scene)
         val w = LESION_W; val h = (w * bmp.height / bmp.width.toFloat()).roundToInt().coerceAtLeast(1)
         val b = Bitmap.createScaledBitmap(bmp, w, h, true)
         val px = IntArray(w * h).also { b.getPixels(it, 0, w, 0, 0, w, h) }
@@ -1184,6 +1184,30 @@ class PhotoAnnotator(private val context: Context) {
         val skin = labels?.let { FaceCrop.skinOf(it, w, h, FaceLabels.BODY_SKIN) }
         SkinLesions.detect(px, w, h, skin, SkinLesions.kindsFor(zone), excludeDiscs = discs)
     }.getOrDefault(emptyList())
+
+    /**
+     * Uñas (no son piel: el esmalte o el lecho ungueal rosado darían manchas o arañitas): discos en cada uña de los pies
+     * y en la falange distal de cada dedo de la mano (unidades del ancho).
+     */
+    private fun nailDiscs(zone: Zone, scene: ZoneCriteria.Scene?): List<Pair<Pt, Float>> {
+        scene ?: return emptyList()
+        return when (zone.guide) {
+            com.photomed.app.data.GuideType.FEET -> {
+                val feet = scene.classes?.let { runCatching { ZoneCriteria.feetOf(it) }.getOrNull() }.orEmpty()
+                feet.flatMap { f ->
+                    val fw = (f.box.x1 - f.box.x0 + 1) / (scene.classes?.width ?: 1).toFloat()
+                    (f.nails + f.toes).map { it to 0.12f * fw }
+                }
+            }
+            com.photomed.app.data.GuideType.HANDS -> scene.hands.orEmpty().filter { it.points.size >= 21 }.flatMap { h ->
+                (0 until 5).map { f ->
+                    val tip = h.points[4 + 4 * f]; val dip = h.points[3 + 4 * f]
+                    Pt((tip.x + dip.x) / 2, (tip.y + dip.y) / 2) to hypot(tip.x - dip.x, tip.y - dip.y) * 0.7f
+                }
+            }
+            else -> emptyList()
+        }
+    }
 
     private fun Bitmap.recycleIfCopy(src: Bitmap) { if (this !== src && !isRecycled) recycle() }
 

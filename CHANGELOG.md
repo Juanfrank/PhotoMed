@@ -2,6 +2,14 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.65 — 26 de noviembre de 2026
+
+- **Hallazgos de la piel solo donde son posibles médicamente**: las arañitas (telangiectasias, vasos superficiales
+  de una dermis fina) ya no se buscan en las plantas ni en las palmas (piel gruesa sin pelo), en el cuero cabelludo
+  con pelo ni en las uñas (no son piel: el esmalte o el lecho rosado parecían manchas o arañitas, en pies y manos);
+  las várices, solo en el miembro inferior y nunca en la planta; la celulitis, solo en glúteos y muslos. Dentro del
+  ojo y en el bermellón de los labios no se buscaban ya.
+
 ## 2.64 — 26 de noviembre de 2026
 
 - **Ombligo y pezones también en primeros planos** del abdomen o del tórax (sin hombros ni caderas a la vista, lo
