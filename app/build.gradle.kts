@@ -15,8 +15,8 @@ android {
         applicationId = "com.photomed.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 63
-        versionName = "2.63"
+        versionCode = 64
+        versionName = "2.64"
     }
 
     // ML Kit incluye bibliotecas nativas por arquitectura: un APK por ABI para instalación directa
@@ -107,6 +107,8 @@ dependencies {
     implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
     // Motor alternativo de puntos faciales (478 puntos + pose 3D), Apache 2.0
     implementation("com.google.mediapipe:tasks-vision:1.2.3")
+    // Puntos del ojo en primeros planos (modelo «iris landmark» de MediaPipe, Apache 2.0): intérprete LiteRT
+    implementation("com.google.ai.edge.litert:litert:1.4.2")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

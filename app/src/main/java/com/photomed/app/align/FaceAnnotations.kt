@@ -958,7 +958,9 @@ class PhotoAnnotator(private val context: Context) {
      * mientras una foto usa los modelos otra ya calcula sus arrugas.
      */
     private suspend fun analyzeSplit(bmp: Bitmap, zone: Zone, extras: MeasureExtras?, user: AnnotUserEdit?, priors: List<PriorLine>,
-                                     memoryUri: String?): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                     memoryUri: String?,
+                                     /** Ajuste de la malla antes de medir (primer plano del ojo: párpados e iris con el modelo de ojo). */
+                                     meshFix: ((Bitmap, List<Pt>) -> List<Pt>)? = null): Pair<List<AnnotLine>, String?> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val spec = ZoneAlignment.of(zone)
         // primer plano de un ojo: con la sección del ojo de la malla facial (foto + su espejo, ver EyeComposite)
         if (zone.guide == com.photomed.app.data.GuideType.EYE) return@withContext analyzeEye(bmp, zone, user, extras?.onlyAdded == true)
@@ -970,7 +972,7 @@ class PhotoAnnotator(private val context: Context) {
                 val pm = if (zone.guide == com.photomed.app.data.GuideType.FACE_PROFILE)
                     runCatching { SubjectSegmenter().use { it.segment(bmp) } }.getOrNull() else null
                 // malla completa de MediaPipe (nariz, labios, ojos y pasillos de los surcos con su topología real)
-                val mesh = meshRobust(bmp)
+                val mesh = meshRobust(bmp)?.let { m -> meshFix?.let { f -> runCatching { f(bmp, m) }.getOrNull() } ?: m }
                 if (mesh != null && mesh.size >= 468) {
                     // análisis en el recorte de la cara a resolución fija (ver FaceCrop)
                     val c = FaceCrop.crop(mesh, bmp.width, bmp.height)
@@ -1045,11 +1047,27 @@ class PhotoAnnotator(private val context: Context) {
         val (comp, l) = EyeComposite.build(bmp, zone.mirrored)
         try {
             val u = user?.copy(added = user.added.map { t -> t.map(l::toComposite) })
-            val (lines, note) = analyzeSplit(comp, Zone.PERIOCULAR, if (onlyAdded) MeasureExtras(null, null, onlyAdded = true) else null, u, emptyList(), null)
+            // los párpados y el iris de la malla, afinados con el modelo de ojo en recortes que da la propia malla
+            val fix: (Bitmap, List<Pt>) -> List<Pt> = { b, m -> eyeModel()?.let { EyeLandmarks.refineMesh(it, b, m) } ?: m }
+            val (lines, note) = analyzeSplit(comp, Zone.PERIOCULAR, if (onlyAdded) MeasureExtras(null, null, onlyAdded = true) else null, u, emptyList(), null, fix)
             val eye = lines.filter { it.layer in EyeComposite.LAYERS && l.isReal(it.points) }.map { it.mapped(l::toPhoto) }
-            if (!onlyAdded && eye.none { it.layer == AnnotLayer.EYES }) return emptyList<AnnotLine>() to
-                tr("No se encontró el ojo en la foto (encuadre el ojo con la ceja y el canto interno, como en la guía).")
-            return eye to (listOfNotNull(tr("Ojo: medidas con la sección del ojo de la malla facial (escala por el iris, 11,7 mm)."),
+            if (!onlyAdded && eye.none { it.layer == AnnotLayer.EYES }) {
+                // sin malla (ojo que llena el encuadre, sin ceja): solo el modelo de ojo, buscando el ojo en la foto
+                val found = runCatching { NativeGate.run("ojo sin malla: modelo de ojo") { eyeModel()?.search(bmp, flip = zone.mirrored) } }.getOrNull()
+                if (found != null) {
+                    val w = bmp.width.toFloat()
+                    val lid = (0 until 9).map { found.contour[it] } + (15 downTo 9).map { found.contour[it] }
+                    val irisR = found.iris.drop(1).map { kotlin.math.hypot(it.x - found.iris[0].x, it.y - found.iris[0].y) }.average().toFloat()
+                    val irisPoly = (0 until 16).map { k -> val t = k * Math.PI / 8
+                        Pt((found.iris[0].x + irisR * kotlin.math.cos(t).toFloat()) / w, (found.iris[0].y + irisR * kotlin.math.sin(t).toFloat()) / w) }
+                    return listOf(AnnotLine(AnnotLayer.EYES, lid.map { Pt(it.x / w, it.y / w) }, closed = true),
+                        AnnotLine(AnnotLayer.EYES, irisPoly, closed = true)) to
+                        tr("Ojo muy de cerca: sin la malla facial (no se ve la ceja), solo el contorno de los párpados y el iris con el modelo de ojo; sin medidas.")
+                }
+                return emptyList<AnnotLine>() to
+                    tr("No se encontró el ojo en la foto (encuadre el ojo con la ceja y el canto interno, como en la guía).")
+            }
+            return eye to (listOfNotNull(tr("Ojo: medidas con la sección del ojo de la malla facial, párpados e iris afinados con el modelo de ojo (escala por el iris, 11,7 mm)."),
                 note?.takeIf { it.contains("barba", ignoreCase = true).not() }).joinToString(" "))
         } finally { comp.recycle() }
     }
@@ -1210,6 +1228,12 @@ class PhotoAnnotator(private val context: Context) {
      * Malla de MediaPipe con reintentos: la foto reducida (≤ 1280 px), un recorte alrededor de la
      * cara que encuentra ML Kit y la foto dentro de un marco más amplio (primeros planos).
      */
+    /** Modelo de puntos del ojo (se carga una vez; null si no está disponible). Llamar dentro de [NativeGate]. */
+    private fun eyeModel(): EyeLandmarks? = eyeModelHolder ?: synchronized(this) {
+        eyeModelHolder ?: runCatching { EyeLandmarks(context) }.getOrNull()?.also { eyeModelHolder = it }
+    }
+    @Volatile private var eyeModelHolder: EyeLandmarks? = null
+
     private suspend fun meshRobust(bmp: Bitmap): List<Pt>? {
         MediaPipeFace.lastError = null
         fun scaled(b: Bitmap, maxSide: Int): Bitmap {

@@ -199,7 +199,6 @@
   " · se conservó en la app y se volverá a guardar al abrir de nuevo la cámara": " · kept in the app; it will be saved when the camera is opened again",
   "La importación se interrumpió por un error (queda en el registro de errores)": "The import was interrupted by an error (it is in the error log)",
   "No se encontró el ojo en la foto (encuadre el ojo con la ceja y el canto interno, como en la guía).": "The eye was not found in the photo (frame the eye with the eyebrow and the inner corner, as in the guide).",
-  "Ojo: medidas con la sección del ojo de la malla facial (escala por el iris, 11,7 mm).": "Eye: measurements with the eye section of the face mesh (scale from the iris, 11.7 mm).",
   "el punto elegido no parece piel natural: elija piel sin sombra ni brillo": "the chosen point does not look like natural skin: pick skin without shadow or shine",
   "Ángulo del codo, °": "Elbow angle, °",
   "Ángulo de la rodilla, °": "Knee angle, °",
@@ -258,5 +257,7 @@
   "Axilas": "Armpits",
   "Inclinación de las axilas, °": "Armpit-line tilt, °",
   "Altura de las axilas (hombros → caderas), %": "Armpit height (shoulders → hips), %",
-  "Distancia entre axilas / ancho de hombros, %": "Armpit distance / shoulder width, %"
+  "Distancia entre axilas / ancho de hombros, %": "Armpit distance / shoulder width, %",
+  "Ojo muy de cerca: sin la malla facial (no se ve la ceja), solo el contorno de los párpados y el iris con el modelo de ojo; sin medidas.": "Very close eye: without the face mesh (the eyebrow is not visible), only the eyelid outline and the iris from the eye model; no measurements.",
+  "Ojo: medidas con la sección del ojo de la malla facial, párpados e iris afinados con el modelo de ojo (escala por el iris, 11,7 mm).": "Eye: measurements with the eye section of the face mesh, eyelids and iris refined with the eye model (scale from the iris, 11.7 mm)."
 }

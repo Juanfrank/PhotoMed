@@ -185,6 +185,7 @@
     <string name="t_21b89cc3390d" formatted="false">the chest</string>
     <string name="t_21d72415f1cc" formatted="false">Square</string>
     <string name="t_2287a8a894ae" formatted="false">euryprosopic (broad)</string>
+    <string name="t_229c45f5f211" formatted="false">AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + Face Landmarker, Selfie Multiclass and Iris Landmark models (Apache 2.0), LiteRT (Apache 2.0), Google ML Kit (ML Kit Terms)</string>
     <string name="t_22d70e41ace7" formatted="false">Edit protocol</string>
     <string name="t_22f7fb923994" formatted="false">no category mask</string>
     <string name="t_232096b3c083" formatted="false">Clear all</string>
@@ -341,6 +342,8 @@
     <string name="t_412d4bd4d6e1" formatted="false">Create the first one</string>
     <string name="t_414daa71537f" formatted="false">Alignment details</string>
     <string name="t_41a1167e32f3" formatted="false">Face width, mm</string>
+    <string name="t_41bb15079091" formatted="false">Very close eye: without the face mesh (the eyebrow is not visible), only the eyelid outline and the iris from the eye model; no measurements.</string>
+    <string name="t_428b70d19f54" formatted="false">Eye: measurements with the eye section of the face mesh, eyelids and iris refined with the eye model (scale from the iris, 11.7 mm).</string>
     <string name="t_42a67e954344" formatted="false">Delete %1$d photos?</string>
     <string name="t_42c3b22a448e" formatted="false">The confirmed strokes of the compared photos will be deleted (also from their metadata) and they will be analyzed again.</string>
     <string name="t_42c7f6c305ac" formatted="false">Height (between eyes → subnasale), mm</string>
@@ -420,7 +423,6 @@
     <string name="t_52cb0c4bf02a" formatted="false">Relaxed face, lips together, gaze straight ahead</string>
     <string name="t_52f09c57b072" formatted="false">Wrinkle your nose, as if at a bad smell</string>
     <string name="t_5300f4fae710" formatted="false">Aligned: %1$s · contours %2$d%%</string>
-    <string name="t_53351ee254e5" formatted="false">AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + Face Landmarker and Selfie Multiclass models (Apache 2.0), Google ML Kit (ML Kit Terms)</string>
     <string name="t_5464ada4f9fd" formatted="false">More camera options</string>
     <string name="t_54fe8c6364b5" formatted="false">No photos of this area</string>
     <string name="t_5553abd9e73a" formatted="false">Photo %1$d to import</string>
@@ -1218,7 +1220,6 @@
     <string name="t_ebfa599808b3" formatted="false">Frontal (head tilted forward)</string>
     <string name="t_ec2a2156670c" formatted="false">No photos in 6 months</string>
     <string name="t_ec616f599f8c" formatted="false">Could not read the image</string>
-    <string name="t_ec841cc50d56" formatted="false">Eye: measurements with the eye section of the face mesh (scale from the iris, 11.7 mm).</string>
     <string name="t_ecffc6c021fa" formatted="false">Waiting for wrinkle analysis…</string>
     <string name="t_ed1c5e218500" formatted="false">With photos</string>
     <string name="t_ed206059d887" formatted="false">Move back: show the neckline, below the shoulders</string>

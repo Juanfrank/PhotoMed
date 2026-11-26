@@ -8,3 +8,6 @@
 # Flogger, MediaPipe no se inicia en la build de publicación (NoClassDefFoundError de Graph).
 -keep class com.google.common.flogger.** { *; }
 -dontwarn com.google.common.flogger.**
+# LiteRT (intérprete de TensorFlow Lite, para el modelo de puntos del ojo): JNI por reflexión.
+-keep class org.tensorflow.lite.** { *; }
+-dontwarn org.tensorflow.lite.**

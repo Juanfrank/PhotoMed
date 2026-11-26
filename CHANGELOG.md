@@ -2,6 +2,28 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.64 — 26 de noviembre de 2026
+
+- **Ombligo y pezones también en primeros planos** del abdomen o del tórax (sin hombros ni caderas a la vista, lo
+  habitual en la consulta): se buscan solo con la piel, como manchas redondas más oscuras que su alrededor en todas
+  las direcciones (los surcos abdominales, alargados, no cuentan), a varias escalas; el ombligo, junto a la línea
+  media si el tronco entra entero; los pezones, la pareja simétrica a la altura que da la anatomía por encima del
+  ombligo. Frente a marcas manuales en 11 fotos: ombligo bien en 7, mal en 1; los pezones solo cuando son claros
+  (sin falsos, a costa de no darlos en algunas fotos).
+- **Hallazgos de la piel sin falsos anatómicos**: el ombligo, las areolas y las axilas ya no salen como manchas ni
+  arañitas, y tampoco las sombras pegadas al borde de la piel (bajo la mandíbula, el pliegue de la axila) ni las
+  bandas alargadas. Las manchas falsas en fotos del cuerpo bajan a la mitad o menos; frente a máscaras de
+  dermatólogo el acierto mejora (IoU mediana 0,73).
+- **Pie con esqueleto como el de la mano**: articulación metatarsofalángica de cada dedo repartida por el ancho del
+  antepié, una interfalángica en el dedo gordo y dos en los demás, metatarsianos hacia el mediopié y la «planta».
+- **Cejas mejor ajustadas**: la malla las dejaba finas y altas (su borde inferior pasaba por el medio del pelo) y
+  con la cola larga; se corrige su forma y se ajustan al pelo por columnas. Solapamiento con la ceja real (29
+  cejas, máscaras por píxel): 0,41 → 0,44, mejor en 19 de 29. Afecta también a la altura de la ceja y de la frente.
+- **Ojo en primer plano**: los párpados y el iris se afinan con el modelo de puntos del ojo de MediaPipe (Apache
+  2.0) en el recorte que da la malla. Error del contorno (anchos de ojo): encuadre normal 0,046 → 0,042, primer
+  plano 0,071 → 0,048, muy cerrado 0,108 → 0,063. Si el ojo llena el encuadre y no hay malla, el ojo se busca
+  igualmente y se dibujan los párpados y el iris (sin medidas).
+
 ## 2.63 — 25 de noviembre de 2026
 
 - **Tronco: axilas, pezones y ombligo como puntos de referencia** (abdomen frontal y tórax / mamas; las axilas,

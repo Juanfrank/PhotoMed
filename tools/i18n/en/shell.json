@@ -155,7 +155,6 @@
   "Ilustraciones anatómicas": "Anatomical illustrations",
   "Universidad de Zúrich; JMIR Med Inform 2026;e75737. Adaptadas: recorte por zona, extracción y recoloreado de trazos; vistas oblicua 45° y lateral derivadas.": "University of Zurich; JMIR Med Inform 2026;e75737. Adapted: cropped by area, strokes extracted and recolored; 45° oblique and lateral views derived.",
   "Componentes de terceros": "Third-party components",
-  "AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + modelos Face Landmarker y Selfie Multiclass (Apache 2.0), Google ML Kit (Términos de ML Kit)": "AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + Face Landmarker and Selfie Multiclass models (Apache 2.0), Google ML Kit (ML Kit Terms)",
   "Bienvenido a PhotoMed": "Welcome to PhotoMed",
   "Antes de empezar, revise cómo se tratan las fotografías y los datos de sus pacientes:": "Before you start, review how your patients' photos and data are handled:",
   "Todo se guarda en este teléfono; no hay servidores ni cuentas.": "Everything is stored on this phone; there are no servers or accounts.",
@@ -176,5 +175,6 @@
   "Aplicar": "Apply",
   "Según el sistema": "System default",
   "Claro": "Light",
-  "Oscuro": "Dark"
+  "Oscuro": "Dark",
+  "AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + modelos Face Landmarker, Selfie Multiclass e Iris Landmark (Apache 2.0), LiteRT (Apache 2.0), Google ML Kit (Términos de ML Kit)": "AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + Face Landmarker, Selfie Multiclass and Iris Landmark models (Apache 2.0), LiteRT (Apache 2.0), Google ML Kit (ML Kit Terms)"
 }

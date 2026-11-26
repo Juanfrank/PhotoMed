@@ -185,6 +185,7 @@
     <string name="t_21b89cc3390d" formatted="false">el tórax</string>
     <string name="t_21d72415f1cc" formatted="false">Cuadrado</string>
     <string name="t_2287a8a894ae" formatted="false">euriprosopo (ancho)</string>
+    <string name="t_229c45f5f211" formatted="false">AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + modelos Face Landmarker, Selfie Multiclass e Iris Landmark (Apache 2.0), LiteRT (Apache 2.0), Google ML Kit (Términos de ML Kit)</string>
     <string name="t_22d70e41ace7" formatted="false">Editar protocolo</string>
     <string name="t_22f7fb923994" formatted="false">sin máscara de categorías</string>
     <string name="t_232096b3c083" formatted="false">Borrar todo</string>
@@ -341,6 +342,8 @@
     <string name="t_412d4bd4d6e1" formatted="false">Crear el primero</string>
     <string name="t_414daa71537f" formatted="false">Detalles de la alineación</string>
     <string name="t_41a1167e32f3" formatted="false">Ancho de la cara, mm</string>
+    <string name="t_41bb15079091" formatted="false">Ojo muy de cerca: sin la malla facial (no se ve la ceja), solo el contorno de los párpados y el iris con el modelo de ojo; sin medidas.</string>
+    <string name="t_428b70d19f54" formatted="false">Ojo: medidas con la sección del ojo de la malla facial, párpados e iris afinados con el modelo de ojo (escala por el iris, 11,7 mm).</string>
     <string name="t_42a67e954344" formatted="false">¿Eliminar %1$d fotografías?</string>
     <string name="t_42c3b22a448e" formatted="false">Se borrarán los trazos confirmados de las fotos comparadas (también de sus metadatos) y se volverán a analizar.</string>
     <string name="t_42c7f6c305ac" formatted="false">Alto (entre los ojos → subnasal), mm</string>
@@ -420,7 +423,6 @@
     <string name="t_52cb0c4bf02a" formatted="false">Cara relajada, labios juntos, mirada al frente</string>
     <string name="t_52f09c57b072" formatted="false">Arrugue la nariz, como ante un mal olor</string>
     <string name="t_5300f4fae710" formatted="false">Alineado: %1$s · contornos %2$d%%</string>
-    <string name="t_53351ee254e5" formatted="false">AndroidX, Jetpack Compose, CameraX, ExifInterface (Apache 2.0), Coil (Apache 2.0), MediaPipe Tasks + modelos Face Landmarker y Selfie Multiclass (Apache 2.0), Google ML Kit (Términos de ML Kit)</string>
     <string name="t_5464ada4f9fd" formatted="false">Más opciones de la cámara</string>
     <string name="t_54fe8c6364b5" formatted="false">Sin fotografías de esta zona</string>
     <string name="t_5553abd9e73a" formatted="false">Foto %1$d a importar</string>
@@ -1218,7 +1220,6 @@
     <string name="t_ebfa599808b3" formatted="false">Frontal (cabeza inclinada)</string>
     <string name="t_ec2a2156670c" formatted="false">Sin fotos en 6 meses</string>
     <string name="t_ec616f599f8c" formatted="false">No se pudo leer la imagen</string>
-    <string name="t_ec841cc50d56" formatted="false">Ojo: medidas con la sección del ojo de la malla facial (escala por el iris, 11,7 mm).</string>
     <string name="t_ecffc6c021fa" formatted="false">Esperando el análisis de arrugas…</string>
     <string name="t_ed1c5e218500" formatted="false">Con fotos</string>
     <string name="t_ed206059d887" formatted="false">Aléjese: que se vea el escote, por debajo de los hombros</string>
