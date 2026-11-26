@@ -2,6 +2,14 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.66 — 26 de noviembre de 2026
+
+- **Ojo solo = el segmento del ojo del diagrama de la cara**: se comprobó frente al análisis de la cara entera en
+  la foto original (23 ojos): contorno del ojo a 0,03 anchos de ojo, ceja 0,05, ojera 0,04, bolsa 0,04, valle
+  lagrimal 0,02, patas de gallo 0,13, con el mismo número de hallazgos. El relleno que completa la «cara» bajo el
+  ojo ya no cuenta como piel (ninguna referencia, como la mejilla de la ojera, ni línea lo usa) y el surco
+  nasogeniano ya no sale en el ojo solo (no es del ojo).
+
 ## 2.65 — 26 de noviembre de 2026
 
 - **Hallazgos de la piel solo donde son posibles médicamente**: las arañitas (telangiectasias, vasos superficiales
