@@ -660,7 +660,7 @@ class UsageFlowsTest {
         waitText("Comparar 4 fotos")
 
         // Cambios rápidos de modo (cruces de eventos de composición).
-        repeat(3) { listOf("Cuadrícula", "Lado a lado", "Fundido", "Deslizar").forEach { compose.onNodeWithText(it).performClick() } }
+        repeat(3) { listOf("Cuadrícula", "Lado a lado", "Fundido", "Deslizar").forEach { compose.modeNode(it).performClick() } }
         compose.onNodeWithText("Cuadrícula").performClick()
         compose.waitForIdle()
         (1..4).forEach { i -> assertTrue(compose.onAllNodesWithText("$i · ", substring = true).fetchSemanticsNodes().isNotEmpty()) }
@@ -779,7 +779,7 @@ class CompareNCaptureTest {
             .performSemanticsAction(SemanticsActions.SetProgress) { it(1.4f) }
         shot("progresivo")
         compose.onNodeWithText("Cuadrícula").performClick(); shot("cuadricula")
-        compose.onNodeWithText("Lado a lado").performClick(); shot("lado_a_lado")
+        compose.modeNode("Lado a lado").performClick(); shot("lado_a_lado")
         compose.onNodeWithContentDescription("Más opciones").performClick(); shot("menu")
     }
 }
@@ -869,3 +869,7 @@ class CompareExportTest {
         r2.files[0].copyTo(File("build/reports/export_side.jpg"), overwrite = true)
     }
 }
+
+/** Botón de modo de Comparar por su nombre accesible (en vertical la etiqueta visible puede ser corta: «Lado»). */
+private fun androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>.modeNode(name: String) =
+    onNode(androidx.compose.ui.test.hasContentDescription(name) and androidx.compose.ui.test.hasClickAction())
