@@ -10,13 +10,13 @@ import com.photomed.app.i18n.tr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
-/** Nombre de archivo para compartir sin datos del paciente (zona + fecha + índice si hay varias del mismo día). */
-fun anonymizedName(photo: Photo, index: Int? = null): String =
-    "PhotoMed_${photo.zone.id}_${SimpleDateFormat("yyyyMMdd", Locale.US).format(Date(photo.takenAt))}" +
+/**
+ * Nombre de archivo para compartir sin datos del paciente: zona, día relativo a [base] (la primera foto del envío; la
+ * fecha real identifica) e índice si hay varias.
+ */
+fun anonymizedName(photo: Photo, index: Int? = null, base: Long = photo.takenAt): String =
+    "PhotoMed_${photo.zone.id}_dia${((photo.takenAt - base) / 86_400_000L).coerceAtLeast(0)}" +
         (index?.let { "_%02d".format(it) } ?: "") + ".jpg"
 
 /**
@@ -27,12 +27,13 @@ suspend fun sharePhotos(context: Context, photos: List<Photo>, anonymize: Boolea
     if (photos.isEmpty()) return false
     val uris: List<Uri> = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "share").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
+        val base = photos.minOf { it.takenAt }
         photos.mapIndexedNotNull { i, photo ->
             runCatching {
-                val name = if (anonymize) anonymizedName(photo, if (photos.size > 1) i + 1 else null) else photo.displayName
+                val name = if (anonymize) anonymizedName(photo, if (photos.size > 1) i + 1 else null, base) else photo.displayName
                 val f = File(dir, name)
                 context.contentResolver.openInputStream(photo.uri)!!.use { input -> f.outputStream().use { input.copyTo(it) } }
-                if (anonymize) PhotoMetadata.strip(f)
+                if (anonymize) PhotoMetadata.anonymize(f)
                 FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", f)
             }.getOrNull()
         }
@@ -42,6 +43,6 @@ suspend fun sharePhotos(context: Context, photos: List<Photo>, anonymize: Boolea
     else Intent(Intent.ACTION_SEND_MULTIPLE).apply { putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris)) }
     intent.type = "image/jpeg"
     intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    context.startActivity(Intent.createChooser(intent, if (anonymize) tr("Compartir (anonimizada)") else tr("Compartir")))
+    context.startActivity(Intent.createChooser(intent, if (anonymize) tr("Compartir sin datos del paciente (la cara sigue visible)") else tr("Compartir")))
     return uris.size == photos.size
 }

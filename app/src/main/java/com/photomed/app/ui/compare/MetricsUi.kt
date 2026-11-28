@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -251,7 +252,9 @@ fun MetricsSheet(columns: List<Pair<String, List<AnnotLine>>>, layers: Set<Annot
  */
 class TraceActions(val confirmed: Boolean, val onConfirm: () -> Unit, val onRegenerate: () -> Unit,
                    val onEdit: ((String) -> Unit)? = null, val onRevert: ((String) -> Unit)? = null,
-                   val edited: Set<String> = emptySet(), val savedInPhoto: Boolean = true)
+                   val edited: Set<String> = emptySet(), val savedInPhoto: Boolean = true,
+                   /** Trazar a mano una línea nueva (sin análisis útil: el médico dibuja el surco). */
+                   val onTraceManual: (() -> Unit)? = null)
 
 /** Panel fijo de medidas (debajo de la foto, sin taparla), con su título y botón de cierre. */
 @Composable
@@ -318,16 +321,6 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
     // estilos de trazo de la línea seleccionada, por fila de la ficha
     val selStyles = selected?.let { l -> val st = com.photomed.app.ui.camera.guideStyleIndices(l)
         l.guides.indices.filter { st[it] >= 0 && l.guides[it].key.isNotEmpty() }.associate { l.guides[it].key to st[it] } }.orEmpty()
-    // estado de los trazos: confirmados (guardados en la foto, no se vuelven a analizar) o por confirmar
-    if (traces != null && !loading) Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(if (traces.confirmed) Icons.Default.Verified else Icons.Default.Info, null, Modifier.size(18.dp),
-            tint = if (traces.confirmed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(if (traces.confirmed) (if (traces.savedInPhoto) tr("Trazos confirmados: guardados en la foto") else tr("Trazos confirmados (guardados en la app)"))
-            else tr("Trazos sin confirmar (análisis automático)"),
-            style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f).padding(start = 6.dp))
-        if (traces.confirmed) TextButton(onClick = traces.onRegenerate) { Text(tr("Regenerar")) }
-        else androidx.compose.material3.FilledTonalButton(onClick = traces.onConfirm) { Text(tr("Confirmar")) }
-    }
     // todas las líneas medidas, estén o no visibles sus capas en la foto
     val byName = LinkedHashMap<String, Pair<AnnotLine, MutableList<LineMetrics?>>>()
     columns.forEachIndexed { ci, (_, lines) ->
@@ -336,13 +329,35 @@ private fun MetricsBody(columns: List<Pair<String, List<AnnotLine>>>, layers: Se
             e.second[ci] = l.metrics
         }
     }
+    // estado de los trazos: confirmados (guardados en la foto, no se vuelven a analizar) o por confirmar
+    // sin trazos no hay nada que confirmar (confirmar un análisis vacío lo dejaría «confirmado» en la foto)
+    if (traces != null && !loading && (byName.isNotEmpty() || traces.confirmed)) Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(if (traces.confirmed) Icons.Default.Verified else Icons.Default.Info, null, Modifier.size(18.dp),
+            tint = if (traces.confirmed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if (traces.confirmed) (if (traces.savedInPhoto) tr("Trazos confirmados: guardados en la foto") else tr("Trazos confirmados (guardados en la app)"))
+            else tr("Trazos sin confirmar (análisis automático)"),
+            style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f).padding(start = 6.dp))
+        if (traces.confirmed) TextButton(onClick = traces.onRegenerate) { Text(tr("Regenerar")) }
+        else androidx.compose.material3.FilledTonalButton(onClick = traces.onConfirm) { Text(tr("Confirmar")) }
+    }
     val numbers = com.photomed.app.align.MeasureNumbering.of(columns.map { it.second })
     if (loading) Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         androidx.compose.material3.LinearProgressIndicator(Modifier.weight(1f))
         Text(tr("Analizando…"), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 12.dp))
     }
-    if (byName.isEmpty() && !loading) Text(note ?: tr("No se encontraron arrugas ni surcos medibles."),
-        style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 16.dp))
+    // análisis vacío: el motivo (sin rostro, malla incompleta, piel lisa o luz plana…) y qué hacer
+    if (byName.isEmpty() && !loading) Column(Modifier.padding(vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(Icons.Default.Info, null, Modifier.size(18.dp).padding(top = 2.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(note ?: tr("No se encontraron arrugas ni surcos medibles."), style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(start = 8.dp))
+        }
+        traces?.onTraceManual?.let { f ->
+            androidx.compose.material3.OutlinedButton(onClick = f, modifier = Modifier.padding(top = 8.dp)) {
+                Icon(Icons.Default.Gesture, null, Modifier.size(18.dp)); Text(tr("Trazar a mano"), Modifier.padding(start = 6.dp))
+            }
+        }
+    }
     // medidas parciales (sin malla facial): el motivo, también con medidas
     if (byName.isNotEmpty() && note != null) Text(note, style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))

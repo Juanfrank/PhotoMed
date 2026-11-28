@@ -439,3 +439,8 @@ Pendiente de implementar: aún no se ha empezado ninguna.
 **Ajustes que implican las decisiones:**
 - 17 (registro de consentimiento) se mantiene como registro e información, sin bloquear la cámara ni la exportación, porque la 2 se descarta.
 - 29 (escala calibrada por paciente y aviso de «no comparable» por giro) se mantiene sin el margen de error ± de la 21.
+
+### Tamaño de la implementación
+- **Pequeñas:** 3, 4, 7, 8, 9, 10, 13, 14.
+- **Medianas:** 1, 5, 6, 12, 15, 16, 17, 19, 20, 22, 23, 24, 26, 27, 28, 29, 30, 33.
+- **Grandes:** 25, 31, 32, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45.

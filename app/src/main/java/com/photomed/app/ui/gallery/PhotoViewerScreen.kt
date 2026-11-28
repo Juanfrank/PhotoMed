@@ -457,7 +457,9 @@ fun PhotoViewerScreen(expId: String, zone: Zone, initialName: String, onBack: ()
                         onEdit = { name -> traceTarget = name; tracing = true; metricsSheet = false
                             scope.launch { snackbar.showSnackbar(tr("Vuelva a dibujar «%1\$s»: una línea por donde se ve, o rodee el área", name)) } },
                         onRevert = { name -> mutateTraces(current) { com.photomed.app.align.ConfirmedTraces.revert(it, name) } },
-                        edited = set?.editedNames.orEmpty(), savedInPhoto = savedInPhoto[u] != false),
+                        edited = set?.editedNames.orEmpty(), savedInPhoto = savedInPhoto[u] != false,
+                        onTraceManual = { traceTarget = null; tracing = true; metricsSheet = false
+                            scope.launch { snackbar.showSnackbar(tr("Dibuje sobre el surco: una línea por donde se ve, o rodee el área")) } }),
                     onSelectLine = { l, key -> selected = l; selectedKey = key; focusTick++; if (l.layer !in layersState.value) layersState.value = layersState.value + l.layer },
                     selected = selected, selectedKey = selectedKey,
                     modifier = mod)

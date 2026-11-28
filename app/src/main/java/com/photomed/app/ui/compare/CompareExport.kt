@@ -335,6 +335,24 @@ object CompareExport {
         return out
     }
 
+    /** Texto de la franja de trazabilidad: orientativo, escala de las medidas y versión de la app (que fija la del análisis). */
+    fun traceFooter(scale: String?): String =
+        tr("Trazos y medidas orientativos, no diagnósticos") + (scale?.let { " · " + tr("escala: %1\$s", scaleLabel(it)) } ?: "") +
+            " · PhotoMed " + com.photomed.app.BuildConfig.VERSION_NAME
+
+    /** [b] con una franja oscura debajo con [text] (no tapa la foto). */
+    fun withFooter(b: Bitmap, text: String): Bitmap {
+        val h = (b.width * 0.035f).coerceAtLeast(18f)
+        val out = Bitmap.createBitmap(b.width, b.height + h.toInt(), Bitmap.Config.ARGB_8888)
+        val c = Canvas(out)
+        c.drawColor(android.graphics.Color.rgb(24, 24, 24)); c.drawBitmap(b, 0f, 0f, null)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(220, 220, 220); textSize = h * 0.5f }
+        // si no cabe, se reduce
+        val tw = p.measureText(text); if (tw > b.width * 0.96f) p.textSize *= b.width * 0.96f / tw
+        c.drawText(text, b.width * 0.02f, b.height + h * 0.68f, p)
+        return out
+    }
+
     private fun jpeg(b: Bitmap, f: File): File = f.also { out -> out.outputStream().use { b.compress(Bitmap.CompressFormat.JPEG, 95, it) } }
 
     data class Result(val files: List<File>, val failed: Int)
@@ -378,6 +396,10 @@ object CompareExport {
         val rendered = mutableListOf<Pair<Bitmap, String>>()
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val numbers = com.photomed.app.align.MeasureNumbering.of(annots.values.toList())
+        // con trazos o medidas visibles: franja de trazabilidad (orientativo · escala · versión) en las imágenes fijas
+        val visible = if (view.diagram) annots.values.flatten().filter { it.layer in layers } else emptyList()
+        val footer = if (visible.isEmpty()) null else traceFooter(visible.firstNotNullOfOrNull { it.metrics?.scale })
+        fun stamped(b: Bitmap) = footer?.let { withFooter(b, it) } ?: b
         seq.forEachIndexed { i, p ->
             coroutineContext.ensureActive()
             onProgress(i, seq.size)
@@ -388,9 +410,9 @@ object CompareExport {
             val label = if (!view.overlay) "" else if (seq.size == 2) (if (i == 0) tr("Antes · %1\$s", d) else tr("Después · %1\$s", d)) else "${i + 1} · $d"
             rendered += (if (grid || side || gif != null) Bitmap.createScaledBitmap(b, 540, 540 * b.height / b.width, true) else b) to label
             if (individual) withContext(Dispatchers.IO) {
-                val name = if (anonymize) anonymizedName(p, i + 1).removeSuffix(".jpg") + "_ajustada.jpg"
+                val name = if (anonymize) anonymizedName(p, i + 1, seq.minOf { it.takenAt }).removeSuffix(".jpg") + "_ajustada.jpg"
                 else p.displayName.removeSuffix(".jpg") + "_ajustada.jpg"
-                val f = jpeg(com.photomed.app.export.Watermark.apply(b, watermark), File(dir, name))
+                val f = jpeg(com.photomed.app.export.Watermark.apply(stamped(b), watermark), File(dir, name))
                 if (!anonymize) runCatching { repo.readInfo(p)?.let { PhotoMetadata.write(f, it) } }
                 files += f
             }
@@ -399,11 +421,11 @@ object CompareExport {
         val shown = order?.filter { it in rendered.indices }?.takeIf { it.size == rendered.size }?.map { rendered[it] } ?: rendered
         if (grid && rendered.size >= 2) withContext(Dispatchers.IO) {
             val g = withContext(Dispatchers.Default) { composite(shown) }
-            files += jpeg(com.photomed.app.export.Watermark.apply(g, watermark), File(dir, "PhotoMed_${zone}_comparacion_${rendered.size}_$stamp.jpg"))
+            files += jpeg(com.photomed.app.export.Watermark.apply(stamped(g), watermark), File(dir, "PhotoMed_${zone}_comparacion_${rendered.size}_$stamp.jpg"))
         }
         if (side && rendered.size >= 2) withContext(Dispatchers.IO) {
             val g = withContext(Dispatchers.Default) { composite(shown, cols0 = shown.size) }
-            files += jpeg(com.photomed.app.export.Watermark.apply(g, watermark), File(dir, "PhotoMed_${zone}_lado_a_lado_${rendered.size}_$stamp.jpg"))
+            files += jpeg(com.photomed.app.export.Watermark.apply(stamped(g), watermark), File(dir, "PhotoMed_${zone}_lado_a_lado_${rendered.size}_$stamp.jpg"))
         }
         if (gif != null && rendered.size >= 2) {
             coroutineContext.ensureActive()

@@ -74,11 +74,11 @@ object ProtocolResults {
         ZipOutputStream(out.outputStream().buffered()).use { zip ->
             zip.putNextEntry(ZipEntry("protocolo.photomed.json")); zip.write(ProtocolJson.write(p).toByteArray()); zip.closeEntry()
             shots.forEachIndexed { i, (photo, info) ->
-                val name = "fotos/%02d_%s".format(i + 1, if (anonymize) com.photomed.app.ui.gallery.anonymizedName(photo) else photo.displayName)
+                val name = "fotos/%02d_%s".format(i + 1, if (anonymize) com.photomed.app.ui.gallery.anonymizedName(photo, base = shots.minOf { it.first.takenAt }) else photo.displayName)
                 val tmp = File(d, "res_${System.nanoTime()}.jpg")
                 try {
                     context.contentResolver.openInputStream(photo.uri)?.use { input -> tmp.outputStream().use { input.copyTo(it) } } ?: return@forEachIndexed
-                    if (anonymize) PhotoMetadata.strip(tmp)
+                    if (anonymize) PhotoMetadata.anonymize(tmp)
                     zip.putNextEntry(ZipEntry(name)); tmp.inputStream().use { it.copyTo(zip) }; zip.closeEntry()
                 } finally { tmp.delete() }
                 results.put(JSONObject().put("file", name).put("zone", photo.zone.id).put("expression", photo.expression.tag)

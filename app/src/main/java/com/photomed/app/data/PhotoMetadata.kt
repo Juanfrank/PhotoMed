@@ -59,13 +59,44 @@ object PhotoMetadata {
         null
     }
 
-    /** Elimina los datos del paciente (para compartir de forma anonimizada). */
+    /**
+     * Copia anonimizada de verdad: la foto se vuelve a codificar solo con sus píxeles (girados según su orientación),
+     * sin ningún metadato: ni XMP ni comentario, pero tampoco la miniatura EXIF (que conserva la imagen original), la
+     * marca y el modelo de la cámara, las fechas originales ni el GPS. Si no se puede decodificar, se quitan los
+     * metadatos conocidos ([strip]).
+     */
+    fun anonymize(file: File) {
+        val ok = runCatching {
+            val orientation = ExifInterface(file).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+            val bmp = android.graphics.BitmapFactory.decodeFile(file.path) ?: return@runCatching false
+            val m = android.graphics.Matrix()
+            when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> m.postRotate(90f)
+                ExifInterface.ORIENTATION_ROTATE_180 -> m.postRotate(180f)
+                ExifInterface.ORIENTATION_ROTATE_270 -> m.postRotate(270f)
+                ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> m.postScale(-1f, 1f)
+                ExifInterface.ORIENTATION_FLIP_VERTICAL -> m.postScale(1f, -1f)
+                ExifInterface.ORIENTATION_TRANSPOSE -> { m.postRotate(90f); m.postScale(-1f, 1f) }
+                ExifInterface.ORIENTATION_TRANSVERSE -> { m.postRotate(270f); m.postScale(-1f, 1f) }
+            }
+            val out = if (m.isIdentity) bmp else android.graphics.Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+            val tmp = File(file.parentFile, file.name + ".tmp")
+            tmp.outputStream().use { out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, it) }
+            if (out !== bmp) out.recycle(); bmp.recycle()
+            tmp.renameTo(file) || run { tmp.copyTo(file, overwrite = true); tmp.delete() }
+        }.getOrDefault(false)
+        if (!ok) strip(file)
+    }
+
+    /** Elimina los datos del paciente conocidos (respaldo de [anonymize]). */
     fun strip(file: File) {
         val exif = ExifInterface(file)
         listOf(
             ExifInterface.TAG_IMAGE_DESCRIPTION, ExifInterface.TAG_USER_COMMENT, ExifInterface.TAG_XMP,
             ExifInterface.TAG_ARTIST, ExifInterface.TAG_GPS_LATITUDE, ExifInterface.TAG_GPS_LONGITUDE,
             ExifInterface.TAG_GPS_LATITUDE_REF, ExifInterface.TAG_GPS_LONGITUDE_REF,
+            ExifInterface.TAG_MAKE, ExifInterface.TAG_MODEL, ExifInterface.TAG_DATETIME, ExifInterface.TAG_DATETIME_ORIGINAL,
+            ExifInterface.TAG_DATETIME_DIGITIZED, ExifInterface.TAG_SOFTWARE,
         ).forEach { exif.setAttribute(it, null) }
         exif.saveAttributes()
     }
