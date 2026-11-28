@@ -143,9 +143,11 @@ import kotlinx.coroutines.cancelAndJoin
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
-private enum class Mode(private val labelEs: String) {
-    SLIDER(trn("Deslizar")), SIDE(trn("Lado a lado")), GRID(trn("Cuadrícula")), FADE(trn("Fundido"));
+private enum class Mode(private val labelEs: String, private val shortEs: String) {
+    SLIDER(trn("Deslizar"), trn("Deslizar")), SIDE(trn("Lado a lado"), trn("Lado")), GRID(trn("Cuadrícula"), trn("Cuadrícula")), FADE(trn("Fundido"), trn("Fundido"));
     val label: String get() = tr(labelEs)
+    /** Etiqueta para anchos compactos (el nombre completo queda para TalkBack). */
+    val short: String get() = tr(shortEs)
 }
 
 /**
@@ -563,7 +565,9 @@ fun CompareScreen(expId: String, initialZone: Zone?, onBack: () -> Unit, initial
                         onClick = { mode = m },
                         shape = SegmentedButtonDefaults.itemShape(i, Mode.entries.size),
                         icon = {},
-                    ) { Text(m.label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
+                        modifier = Modifier.semantics { contentDescription = m.label },
+                    ) { Text(if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 600) m.short else m.label,
+                        maxLines = 1, style = MaterialTheme.typography.labelMedium) }
                 }
             }
 

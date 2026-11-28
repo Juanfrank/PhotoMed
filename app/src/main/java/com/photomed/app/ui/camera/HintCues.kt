@@ -67,7 +67,7 @@ object HintCues {
     }
 
     /** Icono para una indicación de texto; null si no tiene equivalente (se muestra el texto). */
-    fun of(h: String): HintCue? = cue(h)?.let { it.copy(description = HintText.display(h)) }
+    fun of(h: String): HintCue? = cue(h)?.let { it.copy(description = HintText.imperative(h)) }
 
     private fun cue(h: String): HintCue? {
         val t = h.lowercase()
@@ -205,6 +205,64 @@ object HintText {
     private val R_TOO_CLOSE = Regex("^≈ $N cm: aléjese ≥ 1 m y use zoom$")
     private val R_ABOUT = Regex("^≈ $N cm$")
     private val R_ZOOM = Regex("^zoom asistido $N×$")
+
+    /**
+     * La indicación como frase imperativa con sujeto explícito: «Paciente: …» lo que hace el paciente (cabeza, barbilla,
+     * mirada, expresión; los lados, de la imagen) y «Operador: …» lo que hace quien sostiene el teléfono (cámara,
+     * distancia). Para el texto principal y para TalkBack; si no se reconoce, [display].
+     */
+    fun imperative(h: String): String {
+        fun m(r: Regex) = r.find(h)?.groupValues
+        val p = tr("Paciente: %1\$s"); val o = tr("Operador: %1\$s")
+        fun pa(s: String) = p.format(s)
+        fun op(s: String) = o.format(s)
+        m(R_TURN_LEFT)?.let { return pa(tr("gire la cabeza hacia la izquierda de la imagen %1\$s°", it[1])) }
+        m(R_TURN_RIGHT)?.let { return pa(tr("gire la cabeza hacia la derecha de la imagen %1\$s°", it[1])) }
+        m(R_PROFILE)?.let { return pa(tr("siga girando la cabeza hasta el perfil (faltan %1\$s°)", it[1])) }
+        m(R_TURN_MORE)?.let { return pa(tr("gire un poco más la cabeza (%1\$s° de 45°)", it[1])) }
+        m(R_TURN_LESS)?.let { return pa(tr("gire un poco menos la cabeza (%1\$s° de 45°)", it[1])) }
+        m(R_YAW)?.let { return pa(tr("corrija el giro de la cabeza %1\$s°", it[1])) }
+        (m(R_CHIN_DOWN_F) ?: m(R_CHIN_DOWN))?.let { return pa(tr("baje la barbilla %1\$s°", it[1])) }
+        (m(R_CHIN_UP_F) ?: m(R_CHIN_UP))?.let { return pa(tr("suba la barbilla %1\$s°", it[1])) }
+        m(R_ROLL_RIGHT)?.let { return pa(tr("enderece la cabeza %1\$s° (está inclinada a la derecha de la imagen)", it[1])) }
+        m(R_ROLL_LEFT)?.let { return pa(tr("enderece la cabeza %1\$s° (está inclinada a la izquierda de la imagen)", it[1])) }
+        m(R_AIM_DOWN)?.let { return op(tr("apunte la cámara más abajo %1\$s°", it[1])) }
+        m(R_AIM_UP)?.let { return op(tr("apunte la cámara más arriba %1\$s°", it[1])) }
+        m(R_DISTANCE)?.let { return op(tr("ajuste la distancia de %1\$s cm a %2\$s cm", it[1], it[2])) }
+        m(R_TOO_CLOSE)?.let { return op(tr("está a ≈ %1\$s cm: aléjese al menos 1 m y use el zoom", it[1])) }
+        when (h) {
+            "Mirada: al frente" -> return pa(tr("mire al frente"))
+            "Cara: mirar a la derecha de la imagen" -> return pa(tr("mire hacia la derecha de la imagen"))
+            "Cara: mirar a la izquierda de la imagen" -> return pa(tr("mire hacia la izquierda de la imagen"))
+            "Cámara: inclinar hacia abajo" -> return op(tr("incline la cámara hacia abajo"))
+            "Cámara: inclinar hacia arriba" -> return op(tr("incline la cámara hacia arriba"))
+            "← Mueva la cámara a la izquierda" -> return op(tr("mueva la cámara a la izquierda"))
+            "Mueva la cámara a la derecha →" -> return op(tr("mueva la cámara a la derecha"))
+            "↑ Suba la cámara" -> return op(tr("suba la cámara"))
+            "↓ Baje la cámara" -> return op(tr("baje la cámara"))
+            "Acérquese" -> return op(tr("acérquese"))
+            "Aléjese" -> return op(tr("aléjese"))
+            "Gire la cámara ↺" -> return op(tr("gire la cámara en sentido antihorario"))
+            "Gire la cámara ↻" -> return op(tr("gire la cámara en sentido horario"))
+            "Mantenga el teléfono quieto" -> return op(tr("mantenga el teléfono quieto"))
+        }
+        if (h.startsWith("Mirada: ")) {
+            val parts = h.removePrefix("Mirada: ").split(" y ")
+            if (parts.all { it in GAZE_PARTS }) return pa(tr("mire %1\$s", parts.joinToString(tr(" y ")) { tr(it) }))
+        }
+        // expresión pedida: el verbo en infinitivo pasa a imperativo («abrir los ojos» → «abra los ojos»)
+        if (h.startsWith("Expresión: ")) {
+            val rest = tr(h.removePrefix("Expresión: "))
+            val imp = IMPERATIVE.entries.firstOrNull { rest.startsWith(it.key + " ") || rest == it.key }?.let { (inf, im) -> im + rest.removePrefix(inf) }
+            return pa(imp ?: rest)
+        }
+        return display(h)
+    }
+
+    /** Verbos de las indicaciones de expresión: infinitivo → imperativo (usted). */
+    private val IMPERATIVE = linkedMapOf("entrecerrar" to "entrecierre", "abrir" to "abra", "relajar" to "relaje", "sonreír" to "sonría",
+        "juntar" to "junte", "separar" to "separe", "subir" to "suba", "apretar" to "apriete", "fruncir" to "frunza", "bajar" to "baje",
+        "cerrar" to "cierre", "mirar" to "mire", "girar" to "gire", "levantar" to "levante", "elevar" to "eleve", "inflar" to "infle")
 
     fun display(h: String): String {
         if (h in FIXED) return tr(h)

@@ -1344,10 +1344,10 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         if (showGhost && photos.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 // girar (pasos de 90°) y espejar la referencia superpuesta
-                IconButton(onClick = { refOrient = refOrient.rotated() }, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { refOrient = refOrient.rotated() }, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Default.RotateRight, tr("Girar la referencia 90°"), tint = if (refOrient.rot != 0) GuideTone.MATCH.color else Color.White)
                 }
-                IconButton(onClick = { refOrient = refOrient.mirrored() }, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { refOrient = refOrient.mirrored() }, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Default.Flip, tr("Espejo de la referencia"), tint = if (refOrient.mirror) GuideTone.MATCH.color else Color.White)
                 }
                 androidx.compose.material3.FilterChip(
@@ -1433,6 +1433,12 @@ private fun CameraContent(expId: String, zone: Zone, onBack: () -> Unit, sequenc
         tr("Pellizque para el zoom. El anillo del disparador se llena al coincidir con la guía. " +
             "Más capas y datos: modo experto en los ajustes (⋯)."),
         Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 120.dp))
+    // leyenda de los iconos de las indicaciones (una vez, después de la de los gestos)
+    com.photomed.app.ui.components.CoachMark("camara_iconos", Icons.Default.Face,
+        tr("Indicaciones: la cara es lo que hace el paciente y la cámara, lo que hace usted; la flecha dice hacia dónde " +
+            "(los lados, de la imagen) y el número, cuánto. Toque «+N» para ver todas."),
+        Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 120.dp),
+        show = com.photomed.app.ui.components.CoachMarks.seen(androidx.compose.ui.platform.LocalContext.current, "camara_gestos"))
     ScreenFlashOverlay(screenFlash)
     ReliefPatternOverlay(psPattern)
     reviewName?.let { name ->

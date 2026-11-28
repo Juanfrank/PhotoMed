@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
@@ -278,6 +279,7 @@ fun ExpedienteContent(
     /** Bloque «Iniciar sesión de fotos»: abierto si aún no hay fotos (o lo abre el usuario). */
     var sessionOpenUser by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Boolean?>(null) }
     val sessionOpen = sessionOpenUser ?: photos.isEmpty()
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     androidx.activity.compose.BackHandler(enabled = selecting) { selection = emptyList() }
     fun toggleZone(z: Zone) { selection = if (z.id in selection) selection - z.id else selection + z.id }
     Scaffold(
@@ -294,6 +296,8 @@ fun ExpedienteContent(
                 title = { Text(exp?.patientName.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Atrás")) } },
                 actions = {
+                    // comparar: acción secundaria (con al menos dos fotos)
+                    if (photos.size >= 2) IconButton(onClick = onCompare) { Icon(Icons.Default.Compare, tr("Comparar")) }
                     IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, tr("Editar expediente")) }
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, tr("Más opciones")) }
@@ -321,11 +325,12 @@ fun ExpedienteContent(
                     icon = { Icon(Icons.Default.PlayArrow, null) },
                     text = { Text(tr("Iniciar secuencia de fotos (%1\$d)", selection.size)) },
                 )
-            } else if (photos.size >= 2) {
+            } else {
+                // la acción principal del expediente es fotografiar: abre los protocolos y los muestra
                 ExtendedFloatingActionButton(
-                    onClick = onCompare,
-                    icon = { Icon(Icons.Default.Compare, null) },
-                    text = { Text(tr("Comparar")) },
+                    onClick = { sessionOpenUser = true; scope.launch { gridState.animateScrollToItem(if (exp != null) 1 else 0) } },
+                    icon = { Icon(Icons.Default.PhotoCamera, null) },
+                    text = { Text(tr("Iniciar sesión")) },
                 )
             }
         },
@@ -340,13 +345,14 @@ fun ExpedienteContent(
         val byZone = photos.groupBy { it.zone }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 156.dp),
+            state = gridState,
             modifier = Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(Md3Spacing.marginCompact, Md3Spacing.s2, Md3Spacing.marginCompact, 96.dp),
             horizontalArrangement = Arrangement.spacedBy(Md3Spacing.s3),
             verticalArrangement = Arrangement.spacedBy(Md3Spacing.s3),
         ) {
             if (exp != null) {
-                item(span = { GridItemSpan(maxLineSpan) }) { SummaryCard(exp, photos.size) }
+                item(span = { GridItemSpan(maxLineSpan) }) { SummaryCard(exp, photos.size, photos.minOfOrNull { it.takenAt }?.takeIf { it > 0L }) }
             }
             // iniciar una sesión: protocolos (los predefinidos incluidos), plegados si el expediente ya tiene fotos
             item(span = { GridItemSpan(maxLineSpan) }, key = "sesion") {
@@ -366,7 +372,7 @@ fun ExpedienteContent(
             // (abiertas si el expediente aún no tiene fotos o si hay zonas suyas seleccionadas)
             val withPhotos = Zone.entries.filter { byZone.containsKey(it) }
             if (withPhotos.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader(tr("Con fotos · %1\$d zonas", withPhotos.size)) }
+                item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader(if (withPhotos.size == 1) tr("Con fotos · 1 zona") else tr("Con fotos · %1\$d zonas", withPhotos.size)) }
                 items(withPhotos, key = { "f_" + it.id }) { zone ->
                     val order = selection.indexOf(zone.id).takeIf { it >= 0 }?.plus(1)
                     ZoneCard(zone, byZone[zone].orEmpty(), order, selecting,
@@ -378,7 +384,9 @@ fun ExpedienteContent(
                 if (zones.isEmpty()) return@forEach
                 val open = cat.name in openCats || withPhotos.isEmpty() || zones.any { it.id in selection }
                 item(span = { GridItemSpan(maxLineSpan) }, key = "cat_" + cat.name) {
-                    CategoryHeader("${cat.label} · " + if (withPhotos.isEmpty()) tr("%1\$d zonas", zones.size) else tr("%1\$d zonas más", zones.size), open) {
+                    CategoryHeader("${cat.label} · " + when {
+                        zones.size == 1 && withPhotos.isEmpty() -> tr("1 zona"); zones.size == 1 -> tr("1 zona más")
+                        withPhotos.isEmpty() -> tr("%1\$d zonas", zones.size); else -> tr("%1\$d zonas más", zones.size) }, open) {
                         openCats = if (cat.name in openCats) openCats - cat.name else openCats + cat.name
                     }
                 }
@@ -430,7 +438,7 @@ private fun TemplateNameDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) 
 }
 
 @Composable
-private fun SummaryCard(exp: Expediente, count: Int) {
+private fun SummaryCard(exp: Expediente, count: Int, firstPhoto: Long?) {
     // una línea (número, fotos, consentimiento); al tocarla, las notas y el álbum
     var open by remember { mutableStateOf(false) }
     androidx.compose.material3.OutlinedCard(Modifier.fillMaxWidth().clickable(onClickLabel = if (open) tr("Ocultar detalles") else tr("Ver detalles")) { open = !open }) {
@@ -439,7 +447,16 @@ private fun SummaryCard(exp: Expediente, count: Int) {
                 Icon(if (exp.consent) Icons.Default.Verified else Icons.Default.Warning,
                     if (exp.consent) tr("Consentimiento registrado") else tr("Consentimiento no registrado"), Modifier.size(18.dp),
                     tint = if (exp.consent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                Text(listOfNotNull(exp.recordNumber.takeIf { it.isNotBlank() }?.let { tr("Exp. %1\$s", it) }, tr("%1\$d fotos", count), tr("creado el %1\$s", formatDate(exp.createdAt)))
+                // fechas coherentes: el alta en la app y, si hay fotos anteriores (importadas), la primera; nunca una fecha cero
+                val created = exp.createdAt.takeIf { it > 0L }
+                val dates = when {
+                    firstPhoto != null && (created == null || firstPhoto < created - 86_400_000L) ->
+                        listOfNotNull(tr("primera foto: %1\$s", formatDate(firstPhoto)), created?.let { tr("alta: %1\$s", formatDate(it)) })
+                    created != null -> listOf(tr("alta: %1\$s", formatDate(created)))
+                    else -> emptyList()
+                }
+                Text((listOfNotNull(exp.recordNumber.takeIf { it.isNotBlank() }?.let { tr("Exp. %1\$s", it) },
+                    if (count == 1) tr("1 foto") else tr("%1\$d fotos", count)) + dates)
                     .joinToString(" · "), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(start = 6.dp))
                 Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }

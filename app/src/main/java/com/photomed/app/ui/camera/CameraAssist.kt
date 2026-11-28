@@ -255,6 +255,11 @@ fun RecommendationStrip(frame: LiveFrame?, g: Guidance?, autoCapture: Boolean, z
             }
             Text(title, color = color, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
         }
+        // la corrección principal, en una frase con quién la hace («Paciente: …» / «Operador: …»)
+        if (eval?.status != MatchStatus.MATCH) items.minByOrNull(HintCues::priority)?.let { h ->
+            Text(HintText.imperative(h), color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 2,
+                modifier = Modifier.padding(top = 2.dp))
+        }
         eval?.pointFraction?.let {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LinearProgressIndicator(progress = { it }, color = color, trackColor = Color(0x33FFFFFF),

@@ -840,7 +840,18 @@ private fun PhotoPage(photo: Photo, zone: Zone, layers: Set<com.photomed.app.ali
         }
         .semantics { contentDescription = tr("Fotografía %1\$s, %2\$s", photo.zone.label, formatDateTime(photo.takenAt)) },
         contentAlignment = Alignment.Center) {
-        if (b == null) CircularProgressIndicator()
+        // mientras se decodifica la foto entera: su miniatura (caché de la galería), atenuada, y una barra con el texto
+        if (b == null) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            coil.compose.AsyncImage(com.photomed.app.ui.photoModel(context, photo.uri), null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit, alpha = 0.55f, modifier = Modifier.fillMaxSize())
+            androidx.compose.foundation.layout.Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth(0.6f))
+                Text(tr("Cargando foto…"), color = Color.White, style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 6.dp))
+            }
+        }
         else androidx.compose.foundation.Canvas(Modifier.fillMaxSize().graphicsLayer {
             scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
         }) {

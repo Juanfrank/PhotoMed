@@ -2,6 +2,12 @@ package com.photomed.app.ui.compare
 
 import com.photomed.app.i18n.tr
 import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Contrast
 import com.photomed.app.ui.components.detectTapPassThrough
 import com.photomed.app.ui.components.detectZoomPanPassThrough
@@ -141,7 +147,10 @@ fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, mod
                opacity: Float? = null, onOpacity: ((Float) -> Unit)? = null, light: Boolean = false,
                /** Fotos de manos, pies, tronco o miembros: un solo desplegable, «Diagrama del cuerpo». */
                body: Boolean = false) {
-    Row(modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+    // la fila se desplaza: un degradado con flecha en el borde lo indica mientras quedan chips fuera
+    val scroll = rememberScrollState()
+    androidx.compose.foundation.layout.Box(modifier) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(scroll).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically) {
         if (onMetrics != null) androidx.compose.material3.AssistChip(onClick = onMetrics, label = { Text(tr("Medidas")) },
             leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.TableChart, null, Modifier.size(18.dp)) })
@@ -163,6 +172,16 @@ fun LayerChips(layers: Set<AnnotLayer>, onChange: (Set<AnnotLayer>) -> Unit, mod
             }
         }
         if (viewLayers != null) ViewLayersButton(viewLayers)
+    }
+    if (scroll.canScrollForward) {
+        val bg = MaterialTheme.colorScheme.surface
+        androidx.compose.foundation.layout.Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+            androidx.compose.foundation.layout.Box(Modifier.width(40.dp).fillMaxHeight()
+                .background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(bg.copy(alpha = 0f), bg.copy(alpha = 0.9f)))))
+            Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.KeyboardArrowRight, tr("Más opciones a la derecha"),
+                Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
     }
 }
 

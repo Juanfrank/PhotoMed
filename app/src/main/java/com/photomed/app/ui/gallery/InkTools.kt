@@ -139,7 +139,7 @@ private fun IconPicker(icons: Map<String, ImageVector>, labels: Map<String, Stri
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         icons.forEach { (k, ic) ->
             val sel = value == k
-            IconButton(onClick = { onPick(k) }, modifier = Modifier.size(44.dp).semantics { selected = sel }
+            IconButton(onClick = { onPick(k) }, modifier = Modifier.size(48.dp).semantics { selected = sel }
                 .then(if (sel) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f), CircleShape) else Modifier)) {
                 Icon(ic, "$what: ${labels[k]?.let { tr(it) } ?: k}", tint = Color.White)
             }
@@ -165,7 +165,7 @@ fun InkOptions(style: InkStyle, onStyle: (InkStyle) -> Unit, modifier: Modifier 
             INK_COLORS.forEachIndexed { i, c ->
                 val sel = style.color == c
                 // área táctil de 44 dp (accesibilidad) con el círculo de color dentro
-                Box(Modifier.size(44.dp).clickable(onClickLabel = tr("Elegir el color %1\$s", tr(COLOR_NAMES[i]))) { onStyle(style.copy(color = c)) }
+                Box(Modifier.size(48.dp).clickable(onClickLabel = tr("Elegir el color %1\$s", tr(COLOR_NAMES[i]))) { onStyle(style.copy(color = c)) }
                     .semantics { contentDescription = tr("Color %1\$s", tr(COLOR_NAMES[i])); selected = sel }, contentAlignment = Alignment.Center) {
                     Box(Modifier.size(28.dp).background(Color(c), CircleShape)
                         .border(if (sel) 3.dp else 1.dp, if (sel) MaterialTheme.colorScheme.primary else Color.Gray, CircleShape))

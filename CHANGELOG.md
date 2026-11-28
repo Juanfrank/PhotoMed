@@ -2,6 +2,30 @@
 
 Registro de cambios de cada versión, de la más reciente a la más antigua.
 
+## 2.67 — 28 de noviembre de 2026
+
+Recomendaciones pequeñas del panel de expertos (ver docs/REVISION_EXPERTOS.md):
+
+- **Compartir sin datos del paciente, de verdad** (3): la foto se vuelve a codificar solo con sus píxeles (con la
+  orientación aplicada): sin XMP ni comentario, pero tampoco la miniatura EXIF, la marca y el modelo de la cámara,
+  las fechas originales ni el GPS. El nombre lleva el día relativo («dia0», «dia30») en lugar de la fecha, y el
+  selector avisa de que la cara sigue visible.
+- **Panel de medidas** (4): no se ofrece «Confirmar» si el análisis no encontró nada (se habría guardado como
+  confirmado un análisis vacío); se explica el motivo y se ofrece «Trazar a mano».
+- **Exportaciones con trazos o medidas** (7): franja debajo de la foto (sin taparla) con «Trazos y medidas
+  orientativos, no diagnósticos · escala · versión de PhotoMed».
+- **Expediente** (8): la acción principal es «Iniciar sesión» (abre los protocolos) y Comparar pasa a la barra
+  superior; plurales correctos («1 zona más», «1 foto»); fechas coherentes: «alta» y, si hay fotos anteriores
+  importadas, «primera foto»; nunca una fecha cero.
+- **Sin textos cortados** (9): los chips de capas indican con un degradado y una flecha que hay más a la derecha;
+  en el móvil en vertical, «Lado a lado» se muestra como «Lado» (TalkBack lee el nombre completo); buscador con
+  un texto más corto.
+- **Visor** (10): mientras carga la foto se ve su miniatura con «Cargando foto…», en lugar de la pantalla negra.
+- **Indicaciones de la cámara con sujeto** (13): la corrección principal, en una frase con quién la hace
+  («Paciente: baje la barbilla 5°», «Operador: incline la cámara hacia abajo»; los lados, de la imagen), también
+  para TalkBack; y una ayuda que explica los iconos.
+- **Accesibilidad** (14): botones de giro y espejo de la referencia y colores de la paleta de anotación de 48 dp.
+
 ## 2.66 — 26 de noviembre de 2026
 
 - **Ojo solo = el segmento del ojo del diagrama de la cara**: se comprobó frente al análisis de la cara entera en

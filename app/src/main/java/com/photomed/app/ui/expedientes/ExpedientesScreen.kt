@@ -272,7 +272,7 @@ fun ExpedientesTable(list: List<Expediente>, summaries: Map<String, com.photomed
             trailingIcon = {
                 if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Default.Close, tr("Borrar búsqueda")) }
             },
-            placeholder = { Text(tr("Buscar paciente o n.º de expediente"), maxLines = 1) },
+            placeholder = { Text(tr("Nombre o n.º de expediente"), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
             singleLine = true,
             shape = CircleShape,
             colors = TextFieldDefaults.colors(

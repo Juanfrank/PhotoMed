@@ -33,4 +33,14 @@ class HintCuesTest {
         assertEquals("1.3×", HintCues.of("zoom asistido 1.3×")!!.value)
         assertTrue(hints.mapNotNull { HintCues.of(it)?.value }.all { it.length <= 12 })
     }
+
+    @Test fun imperativeHintsSayWhoDoesIt() {
+        val t = com.photomed.app.ui.camera.HintText
+        assertEquals("Paciente: baje la barbilla 5°", t.imperative("Barbilla: bajar 5°"))
+        assertEquals("Paciente: gire la cabeza hacia la izquierda de la imagen 8°", t.imperative("Cabeza: girar a la izquierda 8°"))
+        assertEquals("Operador: incline la cámara hacia abajo", t.imperative("Cámara: inclinar hacia abajo"))
+        assertEquals("Operador: acérquese", t.imperative("Acérquese"))
+        assertEquals("Paciente: abra los ojos", t.imperative("Expresión: abrir los ojos"))
+        assertEquals("Paciente: mire más a la izquierda", t.imperative("Mirada: más a la izquierda"))
+    }
 }
