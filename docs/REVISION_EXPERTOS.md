@@ -421,3 +421,21 @@ Reformulé como mejora 5 recomendaciones porque la base ya existe:
 - Aviso de comparabilidad: ya existe, pero es solo geométrico.
 
 **Recomendaciones descartadas por ya existir: 0.**
+
+---
+
+## Decisiones del responsable del producto (28 nov 2026)
+
+Pendiente de implementar: aún no se ha empezado ninguna.
+
+**Descartadas:** 2 (comprobar el consentimiento al abrir la cámara o al exportar), 11 (protocolos predefinidos por procedimiento), 18 (aviso de «¿mismo paciente?» y mover a otro expediente) y 21 (margen de error ± por medida y cambios dentro del error).
+
+**Aprobadas:** 1, 3–10, 12–17, 19, 20, 22–45.
+
+**Aprobadas con nota:**
+- **19. Desidentificación visual al exportar:** no se impide nunca exportar ni compartir. Solo se avisa al exportar o al compartir cuando la foto es identificable, y se ofrece la opción de desidentificar.
+- **20. Álbum sin nombre del paciente:** el álbum se llama por el número de expediente. Si el expediente no tiene número, se usa un identificador del sistema o un número secuencial.
+
+**Ajustes que implican las decisiones:**
+- 17 (registro de consentimiento) se mantiene como registro e información, sin bloquear la cámara ni la exportación, porque la 2 se descarta.
+- 29 (escala calibrada por paciente y aviso de «no comparable» por giro) se mantiene sin el margen de error ± de la 21.
